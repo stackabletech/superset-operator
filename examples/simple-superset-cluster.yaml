@@ -1,0 +1,13 @@
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: simple
+spec:
+  version: 1.0.0
+  servers:
+    roleGroups:
+      default:
+        selector:
+          matchLabels:
+            kubernetes.io/os: stackable-linux
+        config: {}
