@@ -1,5 +1,6 @@
 mod error;
 use crate::error::Error;
+use serde::Serialize;
 use stackable_superset_crd::commands::{Restart, Start, Stop};
 
 use async_trait::async_trait;
@@ -31,9 +32,9 @@ use stackable_operator::product_config_utils::{
 use stackable_operator::reconcile::{
     ContinuationStrategy, ReconcileFunctionAction, ReconcileResult, ReconciliationContext,
 };
-use stackable_operator::role_utils;
 use stackable_operator::role_utils::{
-    get_role_and_group_labels, list_eligible_nodes_for_role_and_group, EligibleNodesForRoleAndGroup,
+    get_role_and_group_labels, list_eligible_nodes_for_role_and_group, EligibleNodesAndReplicas,
+    EligibleNodesForRoleAndGroup, Role,
 };
 use stackable_operator::scheduler::{
     K8SUnboundedHistory, RoleGroupEligibleNodes, ScheduleStrategy, Scheduler, StickyScheduler,
@@ -42,8 +43,8 @@ use stackable_operator::status::HasClusterExecutionStatus;
 use stackable_operator::status::{init_status, ClusterExecutionStatus};
 use stackable_operator::versioning::{finalize_versioning, init_versioning};
 use stackable_superset_crd::{
-    SupersetCluster, SupersetClusterSpec, SupersetRole, SupersetVersion,  APP_NAME,
-     CONFIG_MAP_TYPE_DATA, CONFIG_MAP_TYPE_ID,
+    SupersetCluster, SupersetClusterSpec, SupersetRole, SupersetVersion, APP_NAME,
+    CONFIG_MAP_TYPE_DATA, CONFIG_MAP_TYPE_ID, HTTP_PORT,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
@@ -121,7 +122,119 @@ impl SupersetState {
     }
 
     pub async fn create_missing_pods(&mut self) -> SupersetReconcileResult {
-        todo!()
+        trace!(target: "create_missing_pods","Starting `create_missing_pods`");
+
+        // The iteration happens in two stages here, to accommodate the way our operators think
+        // about roles and role groups.
+        // The hierarchy is:
+        // - Roles (Metastore)
+        //   - Role groups (user defined)
+        for role in SupersetRole::iter() {
+            let role_str = &role.to_string();
+            if let Some(nodes_for_role) = self.eligible_nodes.get(role_str) {
+                for (role_group, eligible_nodes) in nodes_for_role {
+                    debug!( target: "create_missing_pods",
+                        "Identify missing pods for [{}] role and group [{}]",
+                        role_str, role_group
+                    );
+                    trace!( target: "create_missing_pods",
+                        "candidate_nodes[{}]: [{:?}]",
+                        eligible_nodes.nodes.len(),
+                        eligible_nodes
+                            .nodes
+                            .iter()
+                            .map(|node| node.metadata.name.as_ref().unwrap())
+                            .collect::<Vec<_>>()
+                    );
+                    trace!(target: "create_missing_pods",
+                        "existing_pods[{}]: [{:?}]",
+                        &self.existing_pods.len(),
+                        &self
+                            .existing_pods
+                            .iter()
+                            .map(|pod| pod.metadata.name.as_ref().unwrap())
+                            .collect::<Vec<_>>()
+                    );
+                    trace!(target: "create_missing_pods",
+                        "labels: [{:?}]",
+                        get_role_and_group_labels(role_str, role_group)
+                    );
+                    let mut history = match self
+                        .context
+                        .resource
+                        .status
+                        .as_ref()
+                        .and_then(|status| status.history.as_ref())
+                    {
+                        Some(simple_history) => {
+                            // we clone here because we cannot access mut self because we need it later
+                            // to create config maps and pods. The `status` history will be out of sync
+                            // with the cloned `simple_history` until the next reconcile.
+                            // The `status` history should not be used after this method to avoid side
+                            // effects.
+                            K8SUnboundedHistory::new(&self.context.client, simple_history.clone())
+                        }
+                        None => K8SUnboundedHistory::new(
+                            &self.context.client,
+                            PodToNodeMapping::default(),
+                        ),
+                    };
+
+                    let mut sticky_scheduler =
+                        StickyScheduler::new(&mut history, ScheduleStrategy::GroupAntiAffinity);
+
+                    let pod_id_factory = LabeledPodIdentityFactory::new(
+                        APP_NAME,
+                        &self.context.name(),
+                        &self.eligible_nodes,
+                        ID_LABEL,
+                        1,
+                    );
+
+                    trace!("pod_id_factory: {:?}", pod_id_factory.as_ref());
+
+                    let state = sticky_scheduler.schedule(
+                        &pod_id_factory,
+                        &RoleGroupEligibleNodes::from(&self.eligible_nodes),
+                        &self.existing_pods,
+                    )?;
+
+                    let mapping = state.remaining_mapping().filter(
+                        APP_NAME,
+                        &self.context.name(),
+                        role_str,
+                        role_group,
+                    );
+
+                    if let Some((pod_id, node_id)) = mapping.iter().next() {
+                        // now we have a node that needs a pod -> get validated config
+                        let validated_config = config_for_role_and_group(
+                            pod_id.role(),
+                            pod_id.group(),
+                            &self.validated_role_config,
+                        )?;
+
+                        let config_maps = self
+                            .create_config_maps(pod_id, validated_config, &state.mapping())
+                            .await?;
+
+                        self.create_pod(pod_id, &node_id.name, &config_maps, validated_config)
+                            .await?;
+
+                        history.save(&self.context.resource).await?;
+
+                        return Ok(ReconcileFunctionAction::Requeue(Duration::from_secs(10)));
+                    }
+                }
+            }
+        }
+
+        // If we reach here it means all pods must be running on target_version.
+        // We can now set current_version to target_version (if target_version was set) and
+        // target_version to None
+        finalize_versioning(&self.context.client, &self.context.resource).await?;
+
+        Ok(ReconcileFunctionAction::Continue)
     }
 
     /// Creates the config maps required for a superset instance (or role, role_group combination):
@@ -149,7 +262,7 @@ impl SupersetState {
         validated_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
         id_mapping: &PodToNodeMapping,
     ) -> Result<HashMap<&'static str, ConfigMap>, Error> {
-        todo!()
+        Ok(HashMap::new())
     }
 
     /// Creates the pod required for the superset instance.
@@ -168,7 +281,56 @@ impl SupersetState {
         config_maps: &HashMap<&'static str, ConfigMap>,
         validated_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     ) -> Result<Pod, Error> {
-todo!()
+        let http_port = Some(String::from("8088"));
+
+        let version: &SupersetVersion = &self.context.resource.spec.version;
+
+        let mut cb = ContainerBuilder::new(APP_NAME);
+        cb.image("apache/superset:latest");
+
+        let pod_name = name_utils::build_resource_name(
+            pod_id.app(),
+            &self.context.name(),
+            pod_id.role(),
+            Some(pod_id.group()),
+            Some(node_name),
+            None,
+        )?;
+
+        let annotations = BTreeMap::new();
+
+        if let Some(http_port) = http_port {
+            cb.add_container_port(
+                ContainerPortBuilder::new(http_port.parse()?)
+                    .name(HTTP_PORT)
+                    .build(),
+            );
+        }
+
+        let mut recommended_labels = get_recommended_labels(
+            &self.context.resource,
+            pod_id.app(),
+            &version.to_string(),
+            pod_id.role(),
+            pod_id.group(),
+        );
+        recommended_labels.insert(ID_LABEL.to_string(), pod_id.id().to_string());
+
+        let pod = PodBuilder::new()
+            .metadata(
+                ObjectMetaBuilder::new()
+                    .generate_name(pod_name)
+                    .namespace(&self.context.client.default_namespace)
+                    .with_labels(recommended_labels)
+                    .with_annotations(annotations)
+                    .ownerreference_from_resource(&self.context.resource, Some(true), Some(true))?
+                    .build()?,
+            )
+            .add_container(cb.build())
+            .node_name(node_name)
+            .build()?;
+
+        Ok(self.context.client.create(&pod).await?)
     }
 
     async fn delete_all_pods(&self) -> OperatorResult<ReconcileFunctionAction> {
@@ -307,19 +469,14 @@ impl ControllerStrategy for SupersetStrategy {
         let mut eligible_nodes = HashMap::new();
 
         eligible_nodes.insert(
-            SupersetRole::Coordinator.to_string(),
-            role_utils::find_nodes_that_fit_selectors(&context.client, None, &superset_spec.servers)
-                .await?,
+            SupersetRole::Node.to_string(),
+            find_nodes_that_fit_selectors(&context.client, None, &superset_spec.servers).await?,
         );
 
         let mut roles = HashMap::new();
         roles.insert(
-            SupersetRole::Coordinator.to_string(),
-            (
-                vec![
-                ],
-                context.resource.spec.servers.clone().into(),
-            ),
+            SupersetRole::Node.to_string(),
+            (vec![], context.resource.spec.servers.clone().into()),
         );
 
         let role_config = transform_all_roles_to_config(&context.resource, roles);
@@ -338,6 +495,40 @@ impl ControllerStrategy for SupersetStrategy {
             validated_role_config,
         })
     }
+}
+
+/// Return a map where the key corresponds to the role_group (e.g. "default", "10core10Gb") and
+/// a tuple of a vector of nodes that fit the role_groups selector description, and the role_groups
+/// "replicas" field for scheduling missing pods or removing excess pods.
+pub async fn find_nodes_that_fit_selectors<T>(
+    client: &Client,
+    namespace: Option<String>,
+    role: &Role<T>,
+) -> OperatorResult<HashMap<String, EligibleNodesAndReplicas>>
+where
+    T: Serialize,
+{
+    let mut found_nodes = HashMap::new();
+    for (group_name, role_group) in &role.role_groups {
+        let selector = role_group.selector.to_owned().unwrap_or_default(); // krustlet::add_stackable_selector(role_group.selector.as_ref());
+        let nodes = client
+            .list_with_label_selector(namespace.as_deref(), &selector)
+            .await?;
+        debug!(
+            "Found [{}] nodes for role group [{}]: [{:?}]",
+            nodes.len(),
+            group_name,
+            nodes
+        );
+        found_nodes.insert(
+            group_name.clone(),
+            EligibleNodesAndReplicas {
+                nodes,
+                replicas: role_group.replicas,
+            },
+        );
+    }
+    Ok(found_nodes)
 }
 
 /// This creates an instance of a [`Controller`] which waits for incoming events and reconciles them.

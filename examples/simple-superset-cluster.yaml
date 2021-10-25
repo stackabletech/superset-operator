@@ -7,7 +7,4 @@ spec:
   servers:
     roleGroups:
       default:
-        selector:
-          matchLabels:
-            kubernetes.io/os: stackable-linux
         config: {}

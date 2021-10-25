@@ -26,8 +26,7 @@ spec:
                 roles:
                   items:
                     enum:
-                      - Coordinator
-                      - Worker
+                      - Node
                     type: string
                   nullable: true
                   type: array

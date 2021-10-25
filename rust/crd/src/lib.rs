@@ -34,6 +34,8 @@ pub const MANAGED_BY: &str = "superset-operator";
 pub const CONFIG_MAP_TYPE_DATA: &str = "data";
 pub const CONFIG_MAP_TYPE_ID: &str = "id";
 
+pub const HTTP_PORT: &str = "http";
+
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "superset.stackable.tech",
@@ -53,10 +55,8 @@ pub struct SupersetClusterSpec {
     Clone, Debug, Deserialize, Display, EnumIter, Eq, Hash, JsonSchema, PartialEq, Serialize,
 )]
 pub enum SupersetRole {
-    #[strum(serialize = "coordinator")]
-    Coordinator,
-    #[strum(serialize = "worker")]
-    Worker,
+    #[strum(serialize = "node")]
+    Node,
 }
 
 impl Status<SupersetClusterStatus> for SupersetCluster {
@@ -70,7 +70,7 @@ impl Status<SupersetClusterStatus> for SupersetCluster {
 
 impl HasRoleRestartOrder for SupersetCluster {
     fn get_role_restart_order() -> Vec<String> {
-        vec![SupersetRole::Coordinator.to_string()]
+        vec![SupersetRole::Node.to_string()]
     }
 }
 
