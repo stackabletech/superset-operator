@@ -1,8 +1,10 @@
 use clap::{crate_version, App, AppSettings, SubCommand};
+use stackable_operator::kube::CustomResourceExt;
 use stackable_operator::{cli, logging};
 use stackable_operator::{client, error};
-use stackable_superset_crd::commands::{Restart, Start, Stop};
+use stackable_superset_crd::commands::{Init, Restart, Start, Stop};
 use stackable_superset_crd::SupersetCluster;
+use tracing::error;
 
 mod built_info {
     // The file has been placed there by the build script.
@@ -48,6 +50,24 @@ async fn main() -> Result<(), error::Error> {
     );
 
     let client = client::create_client(Some("superset.stackable.tech".to_string())).await?;
+
+    // This will wait for (but not create) all CRDs we need.
+    if let Err(error) = stackable_operator::crd::wait_until_crds_present(
+        &client,
+        vec![
+            SupersetCluster::crd_name(),
+            Init::crd_name(),
+            Restart::crd_name(),
+            Start::crd_name(),
+            Stop::crd_name(),
+        ],
+        None,
+    )
+    .await
+    {
+        error!("Required CRDs missing, aborting: {:?}", error);
+        return Err(error);
+    };
 
     tokio::try_join!(
         stackable_superset_operator::create_controller(client.clone(), &product_config_path),

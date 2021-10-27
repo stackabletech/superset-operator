@@ -1,20 +1,11 @@
 mod error;
 use crate::error::Error;
-use stackable_operator::k8s_openapi::api::batch::v1::{Job, JobSpec};
 use serde::Serialize;
 use stackable_operator::command_controller::Command;
+use stackable_operator::k8s_openapi::api::batch::v1::{Job, JobSpec};
 use stackable_superset_crd::commands::{Init, Restart, Start, Stop};
 
 use async_trait::async_trait;
-use stackable_operator::k8s_openapi::api::core::v1::{
-    ConfigMap, Container, EnvVar, EnvVarSource, Pod, PodSpec, PodTemplateSpec, Secret,
-    SecretKeySelector, SecretVolumeSource, Volume, VolumeMount,
-};
-use stackable_operator::kube::api::{ListParams, ResourceExt};
-use stackable_operator::kube::Api;
-use stackable_operator::kube::CustomResourceExt;
-use stackable_operator::product_config::types::PropertyNameKind;
-use stackable_operator::product_config::ProductConfigManager;
 use stackable_operator::builder::{
     ContainerBuilder, ContainerPortBuilder, ObjectMetaBuilder, PodBuilder,
 };
@@ -25,11 +16,19 @@ use stackable_operator::controller::Controller;
 use stackable_operator::controller::{ControllerStrategy, ReconciliationState};
 use stackable_operator::error::OperatorResult;
 use stackable_operator::identity::{LabeledPodIdentityFactory, PodIdentity, PodToNodeMapping};
+use stackable_operator::k8s_openapi::api::core::v1::{
+    ConfigMap, Container, EnvVar, EnvVarSource, Pod, PodSpec, PodTemplateSpec, Secret,
+    SecretKeySelector, SecretVolumeSource, Volume, VolumeMount,
+};
+use stackable_operator::kube::api::{ListParams, ResourceExt};
+use stackable_operator::kube::Api;
 use stackable_operator::labels;
 use stackable_operator::labels::{
     build_common_labels_for_all_managed_resources, get_recommended_labels,
 };
 use stackable_operator::name_utils;
+use stackable_operator::product_config::types::PropertyNameKind;
+use stackable_operator::product_config::ProductConfigManager;
 use stackable_operator::product_config_utils::{
     config_for_role_and_group, transform_all_roles_to_config, validate_all_roles_and_groups_config,
     ValidatedRoleConfigByPropertyKind,
@@ -636,22 +635,6 @@ where
 ///
 /// This is an async method and the returned future needs to be consumed to make progress.
 pub async fn create_controller(client: Client, product_config_path: &str) -> OperatorResult<()> {
-    if let Err(error) = stackable_operator::crd::wait_until_crds_present(
-        &client,
-        vec![
-            SupersetCluster::crd_name(),
-            Restart::crd_name(),
-            Start::crd_name(),
-            Stop::crd_name(),
-        ],
-        None,
-    )
-    .await
-    {
-        error!("Required CRDs missing, aborting: {:?}", error);
-        return Err(error);
-    };
-
     let api: Api<SupersetCluster> = client.get_all_api();
     let pods_api: Api<Pod> = client.get_all_api();
     let config_maps_api: Api<ConfigMap> = client.get_all_api();
