@@ -61,7 +61,6 @@ pub struct SupersetClusterSpec {
     kind = "SupersetCredentials",
     plural = "supersetcredentials",
     shortname = "supersetcredentials",
-    status = "SupersetClusterStatus",
     namespaced,
     kube_core = "stackable_operator::kube::core",
     k8s_openapi = "stackable_operator::k8s_openapi",
