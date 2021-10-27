@@ -1,7 +1,7 @@
 pub mod commands;
 pub mod error;
 
-use crate::commands::{Restart, Start, Stop};
+use crate::commands::{Init, Restart, Start, Stop};
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Condition;
 use k8s_openapi::schemars::_serde_json::Value;
@@ -51,6 +51,31 @@ pub struct SupersetClusterSpec {
     pub servers: Role<SupersetConfig>,
 }
 
+#[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[kube(
+    group = "superset.stackable.tech",
+    version = "v1alpha1",
+    kind = "SupersetCredentials",
+    plural = "supersetcredentials",
+    shortname = "supersetcredentials",
+    namespaced
+)]
+#[kube(status = "SupersetClusterStatus")]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetCredentialsSpec {
+    pub admin_user: AdminUserCredentials,
+}
+
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminUserCredentials {
+    pub username: String,
+    pub firstname: String,
+    pub lastname: String,
+    pub email: String,
+    pub password: String,
+}
+
 #[derive(
     Clone, Debug, Deserialize, Display, EnumIter, Eq, Hash, JsonSchema, PartialEq, Serialize,
 )]
@@ -77,6 +102,7 @@ impl HasRoleRestartOrder for SupersetCluster {
 impl HasCommands for SupersetCluster {
     fn get_command_types() -> Vec<ApiResource> {
         vec![
+            Init::api_resource(),
             Start::api_resource(),
             Stop::api_resource(),
             Restart::api_resource(),
@@ -86,7 +112,12 @@ impl HasCommands for SupersetCluster {
 
 impl HasOwned for SupersetCluster {
     fn owned_objects() -> Vec<&'static str> {
-        vec![Restart::crd_name(), Start::crd_name(), Stop::crd_name()]
+        vec![
+            Init::crd_name(),
+            Restart::crd_name(),
+            Start::crd_name(),
+            Stop::crd_name(),
+        ]
     }
 }
 

@@ -1,10 +1,15 @@
 mod error;
 use crate::error::Error;
+use k8s_openapi::api::batch::v1::{Job, JobSpec};
 use serde::Serialize;
-use stackable_superset_crd::commands::{Restart, Start, Stop};
+use stackable_operator::command_controller::Command;
+use stackable_superset_crd::commands::{Init, Restart, Start, Stop};
 
 use async_trait::async_trait;
-use k8s_openapi::api::core::v1::{ConfigMap, EnvVar, Pod};
+use k8s_openapi::api::core::v1::{
+    ConfigMap, Container, EnvVar, EnvVarSource, Pod, PodSpec, PodTemplateSpec, Secret,
+    SecretKeySelector, SecretVolumeSource, Volume, VolumeMount,
+};
 use kube::api::{ListParams, ResourceExt};
 use kube::Api;
 use kube::CustomResourceExt;
@@ -14,7 +19,7 @@ use stackable_operator::builder::{
     ContainerBuilder, ContainerPortBuilder, ObjectMetaBuilder, PodBuilder,
 };
 use stackable_operator::client::Client;
-use stackable_operator::command::materialize_command;
+use stackable_operator::command::{clear_current_command, materialize_command};
 use stackable_operator::configmap;
 use stackable_operator::controller::Controller;
 use stackable_operator::controller::{ControllerStrategy, ReconciliationState};
@@ -62,6 +67,8 @@ const SHOULD_BE_SCRAPED: &str = "monitoring.stackable.tech/should_be_scraped";
 // TODO: adapt to Superset/.. config files
 // const PROPERTIES_FILE: &str = "zoo.cfg";
 // const CONFIG_DIR_NAME: &str = "conf";
+
+const IMAGE: &str = "apache/superset:latest";
 
 type SupersetReconcileResult = ReconcileResult<error::Error>;
 
@@ -286,7 +293,7 @@ impl SupersetState {
         let version: &SupersetVersion = &self.context.resource.spec.version;
 
         let mut cb = ContainerBuilder::new(APP_NAME);
-        cb.image("apache/superset:latest");
+        cb.image(IMAGE);
 
         let pod_name = name_utils::build_resource_name(
             pod_id.app(),
@@ -351,6 +358,12 @@ impl SupersetState {
                 _ => Ok(ReconcileFunctionAction::Continue),
             },
             Some(command_ref) => match command_ref.kind.as_str() {
+                "Init" => {
+                    info!("Initializing cluster [{:?}]", command_ref);
+                    let mut init_command: Init =
+                        materialize_command(&self.context.client, &command_ref).await?;
+                    Ok(self.initialize_superset_database(&mut init_command).await?)
+                }
                 "Restart" => {
                     info!("Restarting cluster [{:?}]", command_ref);
                     let mut restart_command: Restart =
@@ -376,6 +389,94 @@ impl SupersetState {
                 }
             },
         }
+    }
+
+    async fn initialize_superset_database(&mut self, command: &mut Init) -> ReconcileResult<Error> {
+        let client = &self.context.client;
+        let resource = &mut self.context.resource;
+
+        // set start time in command once
+        if command.start_time().is_none() {
+            let patch = command.start_patch();
+            client.merge_patch_status(command, &patch).await?;
+        }
+
+        // TODO Make names unique
+
+        let job_name = format!("{}-init-db", command.name());
+
+        // TODO Move commands into init script
+        let mut commands = vec![
+            String::from(
+                "superset fab create-admin \
+                    --username \"$ADMIN_USERNAME\" \
+                    --firstname \"$ADMIN_FIRSTNAME\" \
+                    --lastname \"$ADMIN_LASTNAME\" \
+                    --email \"$ADMIN_EMAIL\" \
+                    --password \"$ADMIN_PASSWORD\"",
+            ),
+            String::from("superset db upgrade"),
+            String::from("superset init"),
+        ];
+        if command.spec.load_examples {
+            commands.push(String::from("superset load_examples"));
+        }
+
+        let env_var_from_secret = |var_name, secret_key| EnvVar {
+            name: String::from(var_name),
+            value_from: Some(EnvVarSource {
+                secret_key_ref: Some(SecretKeySelector {
+                    name: Some(command.spec.credentials_secret.clone()),
+                    key: String::from(secret_key),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let pod = PodTemplateSpec {
+            metadata: Some(ObjectMetaBuilder::new().name(&job_name).build()?),
+            spec: Some(PodSpec {
+                containers: vec![Container {
+                    name: job_name.clone(),
+                    image: Some(String::from(IMAGE)),
+                    command: Some(vec![String::from("/bin/sh")]),
+                    args: Some(vec![String::from("-c"), commands.join("; ")]),
+                    env: Some(vec![
+                        env_var_from_secret("ADMIN_USERNAME", "adminUser.username"),
+                        env_var_from_secret("ADMIN_FIRSTNAME", "adminUser.firstname"),
+                        env_var_from_secret("ADMIN_LASTNAME", "adminUser.lastname"),
+                        env_var_from_secret("ADMIN_EMAIL", "adminUser.email"),
+                        env_var_from_secret("ADMIN_PASSWORD", "adminUser.password"),
+                    ]),
+                    ..Default::default()
+                }],
+                restart_policy: Some(String::from("Never")),
+                ..Default::default()
+            }),
+        };
+
+        let job = Job {
+            metadata: ObjectMetaBuilder::new()
+                .name(&job_name)
+                .namespace(&self.context.client.default_namespace)
+                .build()?,
+            spec: Some(JobSpec {
+                template: pod,
+                ..Default::default()
+            }),
+            status: None,
+        };
+
+        client.create(&job).await?;
+
+        clear_current_command(client, resource).await?;
+
+        let patch = command.finish_patch();
+        client.merge_patch_status(command, &patch).await?;
+
+        Ok(ReconcileFunctionAction::Done)
     }
 }
 

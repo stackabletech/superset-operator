@@ -14,6 +14,22 @@ use stackable_operator::command_controller::Command;
 #[kube(
     group = "command.superset.stackable.tech",
     version = "v1alpha1",
+    kind = "Init",
+    plural = "inits",
+    namespaced
+)]
+#[kube(status = "CommandStatus")]
+#[serde(rename_all = "camelCase")]
+pub struct InitCommandSpec {
+    pub name: String,
+    pub credentials_secret: String,
+    pub load_examples: bool,
+}
+
+#[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[kube(
+    group = "command.superset.stackable.tech",
+    version = "v1alpha1",
     kind = "Restart",
     plural = "restarts",
     namespaced
@@ -67,7 +83,7 @@ pub struct CommandStatus {
     pub finished_at: Option<Time>,
 }
 
-#[duplicate(Name; [Restart]; [Start]; [Stop])]
+#[duplicate(Name; [Init]; [Restart]; [Start]; [Stop])]
 impl Command for Name {
     fn owner_name(&self) -> String {
         self.spec.name.clone()

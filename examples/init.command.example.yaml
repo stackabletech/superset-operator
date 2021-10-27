@@ -1,0 +1,8 @@
+apiVersion: command.superset.stackable.tech/v1alpha1
+kind: Init
+metadata:
+  name: superset-cluster-command-init
+spec:
+  name: simple
+  credentialsSecret: simple-superset-credentials
+  loadExamples: true
