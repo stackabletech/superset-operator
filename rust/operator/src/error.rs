@@ -1,3 +1,5 @@
+use stackable_operator::kube;
+use stackable_operator::product_config;
 use std::num::ParseIntError;
 
 #[allow(clippy::enum_variant_names)]

@@ -1,20 +1,20 @@
 mod error;
 use crate::error::Error;
-use k8s_openapi::api::batch::v1::{Job, JobSpec};
+use stackable_operator::k8s_openapi::api::batch::v1::{Job, JobSpec};
 use serde::Serialize;
 use stackable_operator::command_controller::Command;
 use stackable_superset_crd::commands::{Init, Restart, Start, Stop};
 
 use async_trait::async_trait;
-use k8s_openapi::api::core::v1::{
+use stackable_operator::k8s_openapi::api::core::v1::{
     ConfigMap, Container, EnvVar, EnvVarSource, Pod, PodSpec, PodTemplateSpec, Secret,
     SecretKeySelector, SecretVolumeSource, Volume, VolumeMount,
 };
-use kube::api::{ListParams, ResourceExt};
-use kube::Api;
-use kube::CustomResourceExt;
-use product_config::types::PropertyNameKind;
-use product_config::ProductConfigManager;
+use stackable_operator::kube::api::{ListParams, ResourceExt};
+use stackable_operator::kube::Api;
+use stackable_operator::kube::CustomResourceExt;
+use stackable_operator::product_config::types::PropertyNameKind;
+use stackable_operator::product_config::ProductConfigManager;
 use stackable_operator::builder::{
     ContainerBuilder, ContainerPortBuilder, ObjectMetaBuilder, PodBuilder,
 };
