@@ -71,6 +71,9 @@ async fn main() -> Result<(), error::Error> {
 
     tokio::try_join!(
         stackable_superset_operator::create_controller(client.clone(), &product_config_path),
+        stackable_operator::command_controller::create_command_controller::<Init, SupersetCluster>(
+            client.clone()
+        ),
         stackable_operator::command_controller::create_command_controller::<Restart, SupersetCluster>(
             client.clone()
         ),

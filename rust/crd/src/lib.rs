@@ -31,6 +31,8 @@ use strum_macros::EnumIter;
 pub const APP_NAME: &str = "superset";
 pub const MANAGED_BY: &str = "superset-operator";
 
+pub const CREDENTIALS_SECRET_PROPERTY: &str = "credentialsSecret";
+
 pub const CONFIG_MAP_TYPE_DATA: &str = "data";
 pub const CONFIG_MAP_TYPE_ID: &str = "id";
 
@@ -51,7 +53,7 @@ pub const HTTP_PORT: &str = "http";
 )]
 pub struct SupersetClusterSpec {
     pub version: SupersetVersion,
-    pub servers: Role<SupersetConfig>,
+    pub nodes: Role<SupersetConfig>,
 }
 
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -69,6 +71,7 @@ pub struct SupersetClusterSpec {
 #[serde(rename_all = "camelCase")]
 pub struct SupersetCredentialsSpec {
     pub admin_user: AdminUserCredentials,
+    pub connections: Connections,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -79,6 +82,13 @@ pub struct AdminUserCredentials {
     pub lastname: String,
     pub email: String,
     pub password: String,
+}
+
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Connections {
+    pub secret_key: String,
+    pub sqlalchemy_database_uri: String,
 }
 
 #[derive(
@@ -147,7 +157,9 @@ impl HasClusterExecutionStatus for SupersetCluster {
 // TODO: These all should be "Property" Enums that can be either simple or complex where complex allows forcing/ignoring errors and/or warnings
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SupersetConfig {}
+pub struct SupersetConfig {
+    pub credentials_secret: String,
+}
 
 impl Configuration for SupersetConfig {
     type Configurable = SupersetCluster;
@@ -163,6 +175,12 @@ impl Configuration for SupersetConfig {
         //if let Some(metrics_port) = self.metrics_port {
         //    result.insert(METRICS_PORT.to_string(), Some(metrics_port.to_string()));
         // }
+
+        result.insert(
+            CREDENTIALS_SECRET_PROPERTY.to_string(),
+            Some(self.credentials_secret.clone()),
+        );
+
         Ok(result)
     }
 
@@ -201,13 +219,9 @@ impl Configuration for SupersetConfig {
     strum_macros::EnumString,
 )]
 pub enum SupersetVersion {
-    #[serde(rename = "1.0.0")]
-    #[strum(serialize = "1.0.0")]
-    v1_0_0,
-
-    #[serde(rename = "2.0.0")]
-    #[strum(serialize = "2.0.0")]
-    v2_0_0,
+    #[serde(rename = "1.3.2-1.0")]
+    #[strum(serialize = "1.3.2-1.0")]
+    v1_3_2_v1_0,
 }
 
 impl SupersetVersion {
@@ -305,29 +319,24 @@ mod tests {
     #[test]
     fn test_superset_version_versioning() {
         assert_eq!(
-            SupersetVersion::v1_0_0.versioning_state(&SupersetVersion::v2_0_0),
-            VersioningState::ValidUpgrade
-        );
-        assert_eq!(
-            SupersetVersion::v2_0_0.versioning_state(&SupersetVersion::v1_0_0),
-            VersioningState::ValidDowngrade
-        );
-        assert_eq!(
-            SupersetVersion::v1_0_0.versioning_state(&SupersetVersion::v1_0_0),
+            SupersetVersion::v1_3_2_v1_0.versioning_state(&SupersetVersion::v1_3_2_v1_0),
             VersioningState::NoOp
         );
     }
 
     #[test]
     fn test_version_conversion() {
-        SupersetVersion::from_str("1.0.0").unwrap();
+        SupersetVersion::from_str("1.3.2-1.0").unwrap();
     }
 
     #[test]
     fn test_package_name() {
         assert_eq!(
-            SupersetVersion::v1_0_0.package_name(),
-            format!("superset-server-{}", SupersetVersion::v1_0_0.to_string())
+            SupersetVersion::v1_3_2_v1_0.package_name(),
+            format!(
+                "superset-server-{}",
+                SupersetVersion::v1_3_2_v1_0.to_string()
+            )
         );
     }
 }

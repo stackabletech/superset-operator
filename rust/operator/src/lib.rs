@@ -17,8 +17,8 @@ use stackable_operator::controller::{ControllerStrategy, ReconciliationState};
 use stackable_operator::error::OperatorResult;
 use stackable_operator::identity::{LabeledPodIdentityFactory, PodIdentity, PodToNodeMapping};
 use stackable_operator::k8s_openapi::api::core::v1::{
-    ConfigMap, Container, EnvVar, EnvVarSource, Pod, PodSpec, PodTemplateSpec, Secret,
-    SecretKeySelector, SecretVolumeSource, Volume, VolumeMount,
+    ConfigMap, ConfigMapVolumeSource, Container, ContainerPort, EnvVar, EnvVarSource, Pod, PodSpec,
+    PodTemplateSpec, Secret, SecretKeySelector, SecretVolumeSource, Volume, VolumeMount,
 };
 use stackable_operator::kube::api::{ListParams, ResourceExt};
 use stackable_operator::kube::Api;
@@ -48,7 +48,7 @@ use stackable_operator::status::{init_status, ClusterExecutionStatus};
 use stackable_operator::versioning::{finalize_versioning, init_versioning};
 use stackable_superset_crd::{
     SupersetCluster, SupersetClusterSpec, SupersetRole, SupersetVersion, APP_NAME,
-    CONFIG_MAP_TYPE_DATA, CONFIG_MAP_TYPE_ID, HTTP_PORT,
+    CONFIG_MAP_TYPE_DATA, CONFIG_MAP_TYPE_ID, CREDENTIALS_SECRET_PROPERTY, HTTP_PORT,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
@@ -67,7 +67,8 @@ const SHOULD_BE_SCRAPED: &str = "monitoring.stackable.tech/should_be_scraped";
 // const PROPERTIES_FILE: &str = "zoo.cfg";
 // const CONFIG_DIR_NAME: &str = "conf";
 
-const IMAGE: &str = "apache/superset:latest";
+const IMAGE: &str = "stackable/superset";
+const PORT: i32 = 8088;
 
 type SupersetReconcileResult = ReconcileResult<error::Error>;
 
@@ -255,7 +256,7 @@ impl SupersetState {
     ///
     /// Returns a map with a 'type' identifier (e.g. data, id) as key and the corresponding
     /// ConfigMap as value. This is required to set the volume mounts in the pod later on.
-    ///
+
     /// # Arguments
     ///
     /// - `pod_id` - The `PodIdentity` containing app, instance, role, group names and the id.
@@ -287,12 +288,7 @@ impl SupersetState {
         config_maps: &HashMap<&'static str, ConfigMap>,
         validated_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     ) -> Result<Pod, Error> {
-        let http_port = Some(String::from("8088"));
-
-        let version: &SupersetVersion = &self.context.resource.spec.version;
-
-        let mut cb = ContainerBuilder::new(APP_NAME);
-        cb.image(IMAGE);
+        let version = &self.context.resource.spec.version;
 
         let pod_name = name_utils::build_resource_name(
             pod_id.app(),
@@ -305,14 +301,6 @@ impl SupersetState {
 
         let annotations = BTreeMap::new();
 
-        if let Some(http_port) = http_port {
-            cb.add_container_port(
-                ContainerPortBuilder::new(http_port.parse()?)
-                    .name(HTTP_PORT)
-                    .build(),
-            );
-        }
-
         let mut recommended_labels = get_recommended_labels(
             &self.context.resource,
             pod_id.app(),
@@ -321,6 +309,31 @@ impl SupersetState {
             pod_id.group(),
         );
         recommended_labels.insert(ID_LABEL.to_string(), pod_id.id().to_string());
+
+        let secret = validated_config
+            .get(&PropertyNameKind::Env)
+            .unwrap()
+            .get(CREDENTIALS_SECRET_PROPERTY)
+            .unwrap();
+
+        let container = Container {
+            name: String::from(APP_NAME),
+            image: Some(format!("{}:{}", IMAGE, version.to_string())),
+            env: Some(vec![
+                env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
+                env_var_from_secret(
+                    "SQLALCHEMY_DATABASE_URI",
+                    secret,
+                    "connections.sqlalchemyDatabaseUri",
+                ),
+            ]),
+            ports: Some(vec![ContainerPort {
+                container_port: PORT,
+                name: Some(String::from(HTTP_PORT)),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
 
         let pod = PodBuilder::new()
             .metadata(
@@ -332,7 +345,7 @@ impl SupersetState {
                     .ownerreference_from_resource(&self.context.resource, Some(true), Some(true))?
                     .build()?,
             )
-            .add_container(cb.build())
+            .add_container(container)
             .node_name(node_name)
             .build()?;
 
@@ -421,33 +434,29 @@ impl SupersetState {
             commands.push(String::from("superset load_examples"));
         }
 
-        let env_var_from_secret = |var_name, secret_key| EnvVar {
-            name: String::from(var_name),
-            value_from: Some(EnvVarSource {
-                secret_key_ref: Some(SecretKeySelector {
-                    name: Some(command.spec.credentials_secret.clone()),
-                    key: String::from(secret_key),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
+        let version = &resource.spec.version;
+        let secret = &command.spec.credentials_secret;
 
         let pod = PodTemplateSpec {
             metadata: Some(ObjectMetaBuilder::new().name(&job_name).build()?),
             spec: Some(PodSpec {
                 containers: vec![Container {
                     name: job_name.clone(),
-                    image: Some(String::from(IMAGE)),
+                    image: Some(format!("{}:{}", IMAGE, version.to_string())),
                     command: Some(vec![String::from("/bin/sh")]),
                     args: Some(vec![String::from("-c"), commands.join("; ")]),
                     env: Some(vec![
-                        env_var_from_secret("ADMIN_USERNAME", "adminUser.username"),
-                        env_var_from_secret("ADMIN_FIRSTNAME", "adminUser.firstname"),
-                        env_var_from_secret("ADMIN_LASTNAME", "adminUser.lastname"),
-                        env_var_from_secret("ADMIN_EMAIL", "adminUser.email"),
-                        env_var_from_secret("ADMIN_PASSWORD", "adminUser.password"),
+                        env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
+                        env_var_from_secret(
+                            "SQLALCHEMY_DATABASE_URI",
+                            secret,
+                            "connections.sqlalchemyDatabaseUri",
+                        ),
+                        env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username"),
+                        env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname"),
+                        env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname"),
+                        env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email"),
+                        env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password"),
                     ]),
                     ..Default::default()
                 }],
@@ -476,6 +485,21 @@ impl SupersetState {
         client.merge_patch_status(command, &patch).await?;
 
         Ok(ReconcileFunctionAction::Done)
+    }
+}
+
+fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> EnvVar {
+    EnvVar {
+        name: String::from(var_name),
+        value_from: Some(EnvVarSource {
+            secret_key_ref: Some(SecretKeySelector {
+                name: Some(String::from(secret)),
+                key: String::from(secret_key),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+        ..Default::default()
     }
 }
 
@@ -547,7 +571,7 @@ impl ControllerStrategy for SupersetStrategy {
 
     /// Init the Superset state. Store all available pods owned by this cluster for later processing.
     /// Retrieve nodes that fit selectors and store them for later processing:
-    /// SupersetRole (we only have 'server') -> role group -> list of nodes.
+    /// SupersetRole (we only have 'node') -> role group -> list of nodes.
     async fn init_reconcile_state(
         &self,
         context: ReconciliationContext<Self::Item>,
@@ -570,13 +594,16 @@ impl ControllerStrategy for SupersetStrategy {
 
         eligible_nodes.insert(
             SupersetRole::Node.to_string(),
-            find_nodes_that_fit_selectors(&context.client, None, &superset_spec.servers).await?,
+            find_nodes_that_fit_selectors(&context.client, None, &superset_spec.nodes).await?,
         );
 
         let mut roles = HashMap::new();
         roles.insert(
             SupersetRole::Node.to_string(),
-            (vec![], context.resource.spec.servers.clone().into()),
+            (
+                vec![PropertyNameKind::Env],
+                context.resource.spec.nodes.clone().into(),
+            ),
         );
 
         let role_config = transform_all_roles_to_config(&context.resource, roles);
@@ -638,6 +665,7 @@ pub async fn create_controller(client: Client, product_config_path: &str) -> Ope
     let api: Api<SupersetCluster> = client.get_all_api();
     let pods_api: Api<Pod> = client.get_all_api();
     let config_maps_api: Api<ConfigMap> = client.get_all_api();
+    let cmd_init_api: Api<Init> = client.get_all_api();
     let cmd_restart_api: Api<Restart> = client.get_all_api();
     let cmd_start_api: Api<Start> = client.get_all_api();
     let cmd_stop_api: Api<Stop> = client.get_all_api();
@@ -645,6 +673,7 @@ pub async fn create_controller(client: Client, product_config_path: &str) -> Ope
     let controller = Controller::new(api)
         .owns(pods_api, ListParams::default())
         .owns(config_maps_api, ListParams::default())
+        .owns(cmd_init_api, ListParams::default())
         .owns(cmd_restart_api, ListParams::default())
         .owns(cmd_start_api, ListParams::default())
         .owns(cmd_stop_api, ListParams::default());
