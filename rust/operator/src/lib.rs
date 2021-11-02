@@ -6,19 +6,17 @@ use stackable_operator::k8s_openapi::api::batch::v1::{Job, JobSpec};
 use stackable_superset_crd::commands::{Init, Restart, Start, Stop};
 
 use async_trait::async_trait;
-use stackable_operator::builder::{
-    ContainerBuilder, ContainerPortBuilder, ObjectMetaBuilder, PodBuilder,
-};
+use stackable_operator::builder::{ObjectMetaBuilder, PodBuilder};
 use stackable_operator::client::Client;
 use stackable_operator::command::{clear_current_command, materialize_command};
-use stackable_operator::configmap;
+
 use stackable_operator::controller::Controller;
 use stackable_operator::controller::{ControllerStrategy, ReconciliationState};
 use stackable_operator::error::OperatorResult;
 use stackable_operator::identity::{LabeledPodIdentityFactory, PodIdentity, PodToNodeMapping};
 use stackable_operator::k8s_openapi::api::core::v1::{
-    ConfigMap, ConfigMapVolumeSource, Container, ContainerPort, EnvVar, EnvVarSource, Pod, PodSpec,
-    PodTemplateSpec, Secret, SecretKeySelector, SecretVolumeSource, Volume, VolumeMount,
+    ConfigMap, Container, ContainerPort, EnvVar, EnvVarSource, Pod, PodSpec, PodTemplateSpec,
+    SecretKeySelector,
 };
 use stackable_operator::kube::api::{ListParams, ResourceExt};
 use stackable_operator::kube::Api;
@@ -47,8 +45,8 @@ use stackable_operator::status::HasClusterExecutionStatus;
 use stackable_operator::status::{init_status, ClusterExecutionStatus};
 use stackable_operator::versioning::{finalize_versioning, init_versioning};
 use stackable_superset_crd::{
-    SupersetCluster, SupersetClusterSpec, SupersetRole, SupersetVersion, APP_NAME,
-    CONFIG_MAP_TYPE_DATA, CONFIG_MAP_TYPE_ID, CREDENTIALS_SECRET_PROPERTY, HTTP_PORT,
+    SupersetCluster, SupersetClusterSpec, SupersetRole, APP_NAME, CREDENTIALS_SECRET_PROPERTY,
+    HTTP_PORT,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
@@ -57,15 +55,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use strum::IntoEnumIterator;
 use tracing::error;
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, info, trace};
 
 const FINALIZER_NAME: &str = "superset.stackable.tech/cleanup";
 const ID_LABEL: &str = "superset.stackable.tech/id";
-const SHOULD_BE_SCRAPED: &str = "monitoring.stackable.tech/should_be_scraped";
-
-// TODO: adapt to Superset/.. config files
-// const PROPERTIES_FILE: &str = "zoo.cfg";
-// const CONFIG_DIR_NAME: &str = "conf";
 
 const IMAGE: &str = "stackable/superset";
 const PORT: i32 = 8088;
@@ -244,15 +237,7 @@ impl SupersetState {
         Ok(ReconcileFunctionAction::Continue)
     }
 
-    /// Creates the config maps required for a superset instance (or role, role_group combination):
-    /// * The 'zoo.cfg' properties file
-    /// * The 'myid' file
-    ///
-    /// The 'zoo.cfg' properties are read from the product_config and/or merged with the cluster
-    /// custom resource.
-    ///
-    /// Labels are automatically adapted from the `recommended_labels` with a type (data for
-    /// 'zoo.cfg' and id for 'myid'). Names are generated via `name_utils::build_resource_name`.
+    /// Creates the config maps required for a superset instance (or role, role_group combination).
     ///
     /// Returns a map with a 'type' identifier (e.g. data, id) as key and the corresponding
     /// ConfigMap as value. This is required to set the volume mounts in the pod later on.
@@ -265,9 +250,9 @@ impl SupersetState {
     ///
     async fn create_config_maps(
         &self,
-        pod_id: &PodIdentity,
-        validated_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-        id_mapping: &PodToNodeMapping,
+        _pod_id: &PodIdentity,
+        _validated_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+        _id_mapping: &PodToNodeMapping,
     ) -> Result<HashMap<&'static str, ConfigMap>, Error> {
         Ok(HashMap::new())
     }
@@ -285,7 +270,7 @@ impl SupersetState {
         &self,
         pod_id: &PodIdentity,
         node_name: &str,
-        config_maps: &HashMap<&'static str, ConfigMap>,
+        _config_maps: &HashMap<&'static str, ConfigMap>,
         validated_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     ) -> Result<Pod, Error> {
         let version = &self.context.resource.spec.version;
@@ -413,11 +398,6 @@ impl SupersetState {
             client.merge_patch_status(command, &patch).await?;
         }
 
-        // TODO Make names unique
-
-        let job_name = format!("{}-init-db", command.name());
-
-        // TODO Move commands into init script
         let mut commands = vec![
             String::from(
                 "superset fab create-admin \
@@ -438,10 +418,14 @@ impl SupersetState {
         let secret = &command.spec.credentials_secret;
 
         let pod = PodTemplateSpec {
-            metadata: Some(ObjectMetaBuilder::new().name(&job_name).build()?),
+            metadata: Some(
+                ObjectMetaBuilder::new()
+                    .generate_name("superset-init-db-")
+                    .build()?,
+            ),
             spec: Some(PodSpec {
                 containers: vec![Container {
-                    name: job_name.clone(),
+                    name: String::from("superset-init-db"),
                     image: Some(format!("{}:{}", IMAGE, version.to_string())),
                     command: Some(vec![String::from("/bin/sh")]),
                     args: Some(vec![String::from("-c"), commands.join("; ")]),
@@ -467,7 +451,7 @@ impl SupersetState {
 
         let job = Job {
             metadata: ObjectMetaBuilder::new()
-                .name(&job_name)
+                .generate_name("superset-init-db-")
                 .namespace(&self.context.client.default_namespace)
                 .build()?,
             spec: Some(JobSpec {

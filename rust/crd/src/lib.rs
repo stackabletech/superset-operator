@@ -171,11 +171,6 @@ impl Configuration for SupersetConfig {
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         let mut result = BTreeMap::new();
 
-        // TODO: Readd if we want jmx metrics gathered
-        //if let Some(metrics_port) = self.metrics_port {
-        //    result.insert(METRICS_PORT.to_string(), Some(metrics_port.to_string()));
-        // }
-
         result.insert(
             CREDENTIALS_SECRET_PROPERTY.to_string(),
             Some(self.credentials_secret.clone()),
@@ -198,11 +193,7 @@ impl Configuration for SupersetConfig {
         _role_name: &str,
         _file: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
-        let mut result = BTreeMap::new();
-
-        // TODO: Insert configs here
-
-        Ok(result)
+        Ok(BTreeMap::new())
     }
 }
 
