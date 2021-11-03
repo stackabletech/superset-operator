@@ -1,0 +1,3 @@
+= Stackable Operator for Apache Superset
+
+This is an operator for Kubernetes that can manage https://superset.apache.org/[Apache Superset] clusters.

@@ -1,0 +1,4 @@
+= Installation
+
+The Superset operator can currently only be run from source with `cargo run`. A proper Helm
+deployment is planned.

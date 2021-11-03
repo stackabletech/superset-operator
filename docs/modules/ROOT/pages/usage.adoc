@@ -1,0 +1,130 @@
+= Usage
+
+== Custom resource definitions
+
+After installation, the CRDs for this operator must be created:
+
+[source,bash]
+----
+kubectl apply -f deploy/crd/supersetcluster.crd.yaml
+kubectl apply -f deploy/crd/supersetcredentials.crd.yaml
+kubectl apply -f deploy/crd/init.crd.yaml
+----
+
+== Database for the Superset metadata
+
+The metadata of Superset (slices, connections, tables, dashboards, ...) is stored in an SQL
+database.
+
+For testing purposes, you can spin up a PostgreSQL database with the following command:
+
+[source,bash]
+----
+helm install superset bitnami/postgresql \
+    --set postgresqlUsername=superset \
+    --set postgresqlPassword=superset \
+    --set postgresqlDatabase=superset
+----
+
+== Secret with Superset credentials
+
+Next, a secret with the necessary credentials must be created:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: simple-superset-credentials
+type: superset.stackable.tech/superset-credentials
+stringData:
+  adminUser.username: admin
+  adminUser.firstname: Superset
+  adminUser.lastname: Admin
+  adminUser.email: admin@superset.com
+  adminUser.password: admin
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql/superset
+----
+
+The `connections.secretKey` will be used for securely signing the session cookies and can be used
+for any other security related needs by extensions. It should be a long random string of bytes.
+
+`connections.sqlalchemyDatabaseUri` must contain the connection string to the SQL database storing
+the Superset metadata.
+
+The `adminUser` fields are used by the `init` command to create an admin user.
+
+== Creation of a Superset node
+
+A Superset node must be created as a custom resource:
+
+[source,yaml]
+----
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: simple
+spec:
+  version: 1.3.2-1.0
+  nodes:
+    roleGroups:
+      default:
+        config:
+          credentialsSecret: simple-superset-credentials
+----
+
+`metadata.name` contains the name of the Superset cluster.
+
+The label of the Docker image provided by Stackable must be set in `spec.version`.
+
+The previously created secret must be referenced in `credentialsSecret`.
+
+== Initializing the Superset database
+
+If the database is not initialized yet for Superset, the `init` command must be executed. The
+command initializes the dababase by creating the necessary database tables, creating the admin user
+account, and loading examples if desired.
+
+[source,yaml]
+----
+apiVersion: command.superset.stackable.tech/v1alpha1
+kind: Init
+metadata:
+  name: superset-cluster-command-init
+spec:
+  name: simple
+  credentialsSecret: simple-superset-credentials
+  loadExamples: true
+----
+
+`spec.name` refers to the name of the Superset cluster.
+
+The previously created secret must be referenced in `spec.credentialsSecret`.
+
+Set `spec.loadExamples` to `true` if you want the dababase populated with example data and
+dashboards.
+
+A Kubernetes job is created which starts a pod to initialize the database. This can take a while.
+
+== Using Superset
+
+When the Superset node is created and the database is initialized, Superset can be opened in the
+browser.
+
+The Superset port which defaults to `8088` can be forwarded to the local host:
+
+[source,bash]
+----
+kubectl port-forward <name-of-the-superset-pod> 8088
+----
+
+Then it can be opened in the browser with `http://localhost:8088`.
+
+Enter the admin credentials from the Kubernetes secret:
+
+image::superset-login.png[Login screen of Superset]
+
+If the examples were loaded then some dashboards are already available:
+
+image::superset-dashboard.png[Superset dashboard showing birth names]
