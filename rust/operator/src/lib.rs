@@ -60,7 +60,7 @@ use tracing::{debug, info, trace};
 const FINALIZER_NAME: &str = "superset.stackable.tech/cleanup";
 const ID_LABEL: &str = "superset.stackable.tech/id";
 
-const IMAGE: &str = "stackable/superset";
+const IMAGE: &str = "docker.stackable.tech/stackable/superset";
 const PORT: i32 = 8088;
 
 type SupersetReconcileResult = ReconcileResult<error::Error>;
