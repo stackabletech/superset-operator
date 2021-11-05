@@ -1,6 +1,5 @@
 mod error;
 use crate::error::Error;
-use serde::Serialize;
 use stackable_operator::command_controller::Command;
 use stackable_operator::k8s_openapi::api::batch::v1::{Job, JobSpec};
 use stackable_superset_crd::commands::{Init, Restart, Start, Stop};
@@ -35,8 +34,8 @@ use stackable_operator::reconcile::{
     ContinuationStrategy, ReconcileFunctionAction, ReconcileResult, ReconciliationContext,
 };
 use stackable_operator::role_utils::{
-    get_role_and_group_labels, list_eligible_nodes_for_role_and_group, EligibleNodesAndReplicas,
-    EligibleNodesForRoleAndGroup, Role,
+    find_nodes_that_fit_selectors, get_role_and_group_labels,
+    list_eligible_nodes_for_role_and_group, EligibleNodesForRoleAndGroup,
 };
 use stackable_operator::scheduler::{
     K8SUnboundedHistory, RoleGroupEligibleNodes, ScheduleStrategy, Scheduler, StickyScheduler,
@@ -606,40 +605,6 @@ impl ControllerStrategy for SupersetStrategy {
             validated_role_config,
         })
     }
-}
-
-/// Return a map where the key corresponds to the role_group (e.g. "default", "10core10Gb") and
-/// a tuple of a vector of nodes that fit the role_groups selector description, and the role_groups
-/// "replicas" field for scheduling missing pods or removing excess pods.
-pub async fn find_nodes_that_fit_selectors<T>(
-    client: &Client,
-    namespace: Option<String>,
-    role: &Role<T>,
-) -> OperatorResult<HashMap<String, EligibleNodesAndReplicas>>
-where
-    T: Serialize,
-{
-    let mut found_nodes = HashMap::new();
-    for (group_name, role_group) in &role.role_groups {
-        let selector = role_group.selector.to_owned().unwrap_or_default(); // krustlet::add_stackable_selector(role_group.selector.as_ref());
-        let nodes = client
-            .list_with_label_selector(namespace.as_deref(), &selector)
-            .await?;
-        debug!(
-            "Found [{}] nodes for role group [{}]: [{:?}]",
-            nodes.len(),
-            group_name,
-            nodes
-        );
-        found_nodes.insert(
-            group_name.clone(),
-            EligibleNodesAndReplicas {
-                nodes,
-                replicas: role_group.replicas,
-            },
-        );
-    }
-    Ok(found_nodes)
 }
 
 /// This creates an instance of a [`Controller`] which waits for incoming events and reconciles them.
