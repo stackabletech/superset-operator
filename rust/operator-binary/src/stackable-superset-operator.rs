@@ -3,7 +3,7 @@ use stackable_operator::kube::CustomResourceExt;
 use stackable_operator::{cli, logging};
 use stackable_operator::{client, error};
 use stackable_superset_crd::commands::{Init, Restart, Start, Stop};
-use stackable_superset_crd::SupersetCluster;
+use stackable_superset_crd::{SupersetCluster, SupersetCredentials};
 use tracing::error;
 
 mod built_info {
@@ -24,12 +24,32 @@ async fn main() -> Result<(), error::Error> {
         .subcommand(
             SubCommand::with_name("crd")
                 .setting(AppSettings::ArgRequiredElseHelp)
-                .subcommand(cli::generate_crd_subcommand::<SupersetCluster>()),
+                .subcommand(cli::generate_crd_subcommand::<SupersetCluster>())
+                .subcommand(cli::generate_crd_subcommand::<SupersetCredentials>())
+                .subcommand(cli::generate_crd_subcommand::<Init>())
+                .subcommand(cli::generate_crd_subcommand::<Restart>())
+                .subcommand(cli::generate_crd_subcommand::<Start>())
+                .subcommand(cli::generate_crd_subcommand::<Stop>()),
         )
         .get_matches();
 
     if let ("crd", Some(subcommand)) = matches.subcommand() {
         if cli::handle_crd_subcommand::<SupersetCluster>(subcommand)? {
+            return Ok(());
+        };
+        if cli::handle_crd_subcommand::<SupersetCredentials>(subcommand)? {
+            return Ok(());
+        };
+        if cli::handle_crd_subcommand::<Init>(subcommand)? {
+            return Ok(());
+        };
+        if cli::handle_crd_subcommand::<Restart>(subcommand)? {
+            return Ok(());
+        };
+        if cli::handle_crd_subcommand::<Start>(subcommand)? {
+            return Ok(());
+        };
+        if cli::handle_crd_subcommand::<Stop>(subcommand)? {
             return Ok(());
         };
     }
