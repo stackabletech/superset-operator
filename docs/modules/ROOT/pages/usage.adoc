@@ -20,6 +20,8 @@ For testing purposes, you can spin up a PostgreSQL database with the following c
 
 [source,bash]
 ----
+helm repo add bitnami https://charts.bitnami.com/bitnami
+
 helm install superset bitnami/postgresql \
     --set postgresqlUsername=superset \
     --set postgresqlPassword=superset \
