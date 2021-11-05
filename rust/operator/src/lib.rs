@@ -126,7 +126,7 @@ impl SupersetState {
         // The iteration happens in two stages here, to accommodate the way our operators think
         // about roles and role groups.
         // The hierarchy is:
-        // - Roles (Metastore)
+        // - Roles (Nodes)
         //   - Role groups (user defined)
         for role in SupersetRole::iter() {
             let role_str = &role.to_string();
