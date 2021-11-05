@@ -33,9 +33,6 @@ pub const MANAGED_BY: &str = "superset-operator";
 
 pub const CREDENTIALS_SECRET_PROPERTY: &str = "credentialsSecret";
 
-pub const CONFIG_MAP_TYPE_DATA: &str = "data";
-pub const CONFIG_MAP_TYPE_ID: &str = "id";
-
 pub const HTTP_PORT: &str = "http";
 
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]

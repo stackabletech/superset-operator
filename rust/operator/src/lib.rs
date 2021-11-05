@@ -14,7 +14,7 @@ use stackable_operator::controller::{ControllerStrategy, ReconciliationState};
 use stackable_operator::error::OperatorResult;
 use stackable_operator::identity::{LabeledPodIdentityFactory, PodIdentity, PodToNodeMapping};
 use stackable_operator::k8s_openapi::api::core::v1::{
-    ConfigMap, Container, ContainerPort, EnvVar, EnvVarSource, Pod, PodSpec, PodTemplateSpec,
+    Container, ContainerPort, EnvVar, EnvVarSource, Pod, PodSpec, PodTemplateSpec,
     SecretKeySelector,
 };
 use stackable_operator::kube::api::{ListParams, ResourceExt};
@@ -213,11 +213,7 @@ impl SupersetState {
                             &self.validated_role_config,
                         )?;
 
-                        let config_maps = self
-                            .create_config_maps(pod_id, validated_config, &state.mapping())
-                            .await?;
-
-                        self.create_pod(pod_id, &node_id.name, &config_maps, validated_config)
+                        self.create_pod(pod_id, &node_id.name, validated_config)
                             .await?;
 
                         history.save(&self.context.resource).await?;
@@ -236,40 +232,18 @@ impl SupersetState {
         Ok(ReconcileFunctionAction::Continue)
     }
 
-    /// Creates the config maps required for a superset instance (or role, role_group combination).
-    ///
-    /// Returns a map with a 'type' identifier (e.g. data, id) as key and the corresponding
-    /// ConfigMap as value. This is required to set the volume mounts in the pod later on.
-
-    /// # Arguments
-    ///
-    /// - `pod_id` - The `PodIdentity` containing app, instance, role, group names and the id.
-    /// - `validated_config` - The validated product config.
-    /// - `id_mapping` - All id to node mappings required to create config maps
-    ///
-    async fn create_config_maps(
-        &self,
-        _pod_id: &PodIdentity,
-        _validated_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-        _id_mapping: &PodToNodeMapping,
-    ) -> Result<HashMap<&'static str, ConfigMap>, Error> {
-        Ok(HashMap::new())
-    }
-
     /// Creates the pod required for the superset instance.
     ///
     /// # Arguments
     ///
     /// - `pod_id` - The `PodIdentity` containing app, instance, role, group names and the id.
     /// - `node_name` - The node_name for this pod.
-    /// - `config_maps` - The config maps and respective types required for this pod.
     /// - `validated_config` - The validated product config.
     ///
     async fn create_pod(
         &self,
         pod_id: &PodIdentity,
         node_name: &str,
-        _config_maps: &HashMap<&'static str, ConfigMap>,
         validated_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     ) -> Result<Pod, Error> {
         let version = &self.context.resource.spec.version;
@@ -613,7 +587,6 @@ impl ControllerStrategy for SupersetStrategy {
 pub async fn create_controller(client: Client, product_config_path: &str) -> OperatorResult<()> {
     let api: Api<SupersetCluster> = client.get_all_api();
     let pods_api: Api<Pod> = client.get_all_api();
-    let config_maps_api: Api<ConfigMap> = client.get_all_api();
     let cmd_init_api: Api<Init> = client.get_all_api();
     let cmd_restart_api: Api<Restart> = client.get_all_api();
     let cmd_start_api: Api<Start> = client.get_all_api();
@@ -621,7 +594,6 @@ pub async fn create_controller(client: Client, product_config_path: &str) -> Ope
 
     let controller = Controller::new(api)
         .owns(pods_api, ListParams::default())
-        .owns(config_maps_api, ListParams::default())
         .owns(cmd_init_api, ListParams::default())
         .owns(cmd_restart_api, ListParams::default())
         .owns(cmd_start_api, ListParams::default())
