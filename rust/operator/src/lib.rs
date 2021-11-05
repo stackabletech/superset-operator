@@ -60,6 +60,7 @@ const FINALIZER_NAME: &str = "superset.stackable.tech/cleanup";
 const ID_LABEL: &str = "superset.stackable.tech/id";
 
 const IMAGE: &str = "docker.stackable.tech/stackable/superset";
+const STACKABLE_PACKAGE_VERSION: &str = "1.0";
 const PORT: i32 = 8088;
 
 type SupersetReconcileResult = ReconcileResult<error::Error>;
@@ -276,7 +277,12 @@ impl SupersetState {
 
         let container = Container {
             name: String::from(APP_NAME),
-            image: Some(format!("{}:{}", IMAGE, version.to_string())),
+            image: Some(format!(
+                "{}:{}-{}",
+                IMAGE,
+                version.to_string(),
+                STACKABLE_PACKAGE_VERSION
+            )),
             env: Some(vec![
                 env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
                 env_var_from_secret(

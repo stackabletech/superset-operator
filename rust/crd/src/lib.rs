@@ -207,15 +207,9 @@ impl Configuration for SupersetConfig {
     strum_macros::EnumString,
 )]
 pub enum SupersetVersion {
-    #[serde(rename = "1.3.2-1.0")]
-    #[strum(serialize = "1.3.2-1.0")]
-    v1_3_2_v1_0,
-}
-
-impl SupersetVersion {
-    pub fn package_name(&self) -> String {
-        format!("superset-server-{}", self.to_string())
-    }
+    #[serde(rename = "1.3.2")]
+    #[strum(serialize = "1.3.2")]
+    v1_3_2,
 }
 
 impl Versioning for SupersetVersion {
@@ -307,24 +301,13 @@ mod tests {
     #[test]
     fn test_superset_version_versioning() {
         assert_eq!(
-            SupersetVersion::v1_3_2_v1_0.versioning_state(&SupersetVersion::v1_3_2_v1_0),
+            SupersetVersion::v1_3_2.versioning_state(&SupersetVersion::v1_3_2),
             VersioningState::NoOp
         );
     }
 
     #[test]
     fn test_version_conversion() {
-        SupersetVersion::from_str("1.3.2-1.0").unwrap();
-    }
-
-    #[test]
-    fn test_package_name() {
-        assert_eq!(
-            SupersetVersion::v1_3_2_v1_0.package_name(),
-            format!(
-                "superset-server-{}",
-                SupersetVersion::v1_3_2_v1_0.to_string()
-            )
-        );
+        SupersetVersion::from_str("1.3.2").unwrap();
     }
 }
