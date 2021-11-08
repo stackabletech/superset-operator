@@ -405,7 +405,12 @@ impl SupersetState {
             spec: Some(PodSpec {
                 containers: vec![Container {
                     name: String::from("superset-init-db"),
-                    image: Some(format!("{}:{}", IMAGE, version.to_string())),
+                    image: Some(format!(
+                        "{}:{}-{}",
+                        IMAGE,
+                        version.to_string(),
+                        STACKABLE_PACKAGE_VERSION
+                    )),
                     command: Some(vec![String::from("/bin/sh")]),
                     args: Some(vec![String::from("-c"), commands.join("; ")]),
                     env: Some(vec![
