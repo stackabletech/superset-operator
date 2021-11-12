@@ -45,8 +45,8 @@ use stackable_operator::status::HasClusterExecutionStatus;
 use stackable_operator::status::{init_status, ClusterExecutionStatus};
 use stackable_operator::versioning::{finalize_versioning, init_versioning};
 use stackable_superset_crd::{
-    SupersetCluster, SupersetClusterSpec, SupersetRole, APP_NAME, CREDENTIALS_SECRET_PROPERTY,
-    HTTP_PORT,
+    SupersetCluster, SupersetClusterSpec, SupersetRole, SupersetVersion, APP_NAME,
+    CREDENTIALS_SECRET_PROPERTY, HTTP_PORT,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::future::{self, Future};
@@ -57,11 +57,14 @@ use strum::IntoEnumIterator;
 use tracing::error;
 use tracing::{debug, info, trace};
 
+/// The docker image we default to. This needs to be adapted if the operator does not work
+/// with images 0.0.1, 0.1.0 etc. anymore and requires e.g. a new major version like 1(.0.0).
+const DEFAULT_IMAGE_VERSION: &str = "0";
+const IMAGE: &str = "docker.stackable.tech/stackable/superset";
+
 const FINALIZER_NAME: &str = "superset.stackable.tech/cleanup";
 const ID_LABEL: &str = "superset.stackable.tech/id";
 
-const IMAGE: &str = "docker.stackable.tech/stackable/superset";
-const STACKABLE_PACKAGE_VERSION: &str = "1.0";
 const PORT: i32 = 8088;
 
 type SupersetReconcileResult = ReconcileResult<error::Error>;
@@ -278,12 +281,7 @@ impl SupersetState {
 
         let container = Container {
             name: String::from(APP_NAME),
-            image: Some(format!(
-                "{}:{}-{}",
-                IMAGE,
-                version.to_string(),
-                STACKABLE_PACKAGE_VERSION
-            )),
+            image: Some(container_image(version)),
             env: Some(vec![
                 env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
                 env_var_from_secret(
@@ -406,12 +404,7 @@ impl SupersetState {
             spec: Some(PodSpec {
                 containers: vec![Container {
                     name: String::from("superset-init-db"),
-                    image: Some(format!(
-                        "{}:{}-{}",
-                        IMAGE,
-                        version.to_string(),
-                        STACKABLE_PACKAGE_VERSION
-                    )),
+                    image: Some(container_image(version)),
                     command: Some(vec![String::from("/bin/sh")]),
                     args: Some(vec![String::from("-c"), commands.join("; ")]),
                     env: Some(vec![
@@ -458,6 +451,21 @@ impl SupersetState {
 
         Ok(ReconcileFunctionAction::Done)
     }
+}
+
+fn container_image(version: &SupersetVersion) -> String {
+    format!(
+        // For now we hardcode the stackable image version via DEFAULT_IMAGE_VERSION
+        // which represents the major image version and will fallback to the newest
+        // available image e.g. if DEFAULT_IMAGE_VERSION = 0 and versions 0.0.1 and
+        // 0.0.2 are available, the latter one will be selected. This may change the
+        // image during restarts depending on the imagePullPolicy.
+        // TODO: should be made configurable
+        "{}:{}-stackable{}",
+        IMAGE,
+        version.to_string(),
+        DEFAULT_IMAGE_VERSION
+    )
 }
 
 // Waits until the given job is completed.
