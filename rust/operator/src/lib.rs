@@ -1,5 +1,6 @@
 mod error;
 use crate::error::Error;
+use futures::StreamExt;
 use stackable_operator::command_controller::Command;
 use stackable_operator::k8s_openapi::api::batch::v1::{Job, JobSpec};
 use stackable_superset_crd::commands::{Init, Restart, Start, Stop};
@@ -18,7 +19,7 @@ use stackable_operator::k8s_openapi::api::core::v1::{
     SecretKeySelector,
 };
 use stackable_operator::kube::api::{ListParams, ResourceExt};
-use stackable_operator::kube::Api;
+use stackable_operator::kube::{runtime, Api};
 use stackable_operator::labels;
 use stackable_operator::labels::{
     build_common_labels_for_all_managed_resources, get_recommended_labels,
@@ -48,7 +49,7 @@ use stackable_superset_crd::{
     HTTP_PORT,
 };
 use std::collections::{BTreeMap, HashMap};
-use std::future::Future;
+use std::future::{self, Future};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
@@ -445,7 +446,9 @@ impl SupersetState {
             status: None,
         };
 
-        client.create(&job).await?;
+        let job = client.create(&job).await?;
+
+        wait_completed(client, &job).await;
 
         clear_current_command(client, resource).await?;
 
@@ -454,6 +457,25 @@ impl SupersetState {
 
         Ok(ReconcileFunctionAction::Done)
     }
+}
+
+// Waits until the given job is completed.
+pub async fn wait_completed(client: &Client, job: &Job) {
+    let completed = |job: &Job| {
+        job.status
+            .as_ref()
+            .and_then(|status| status.conditions.clone())
+            .unwrap_or_default()
+            .into_iter()
+            .any(|condition| condition.type_ == "Complete" && condition.status == "True")
+    };
+
+    let lp = ListParams::default().fields(&format!("metadata.name={}", job.name()));
+    let jobs = client.get_api::<Job>(job.namespace().as_deref());
+    let watcher = runtime::watcher(jobs, lp).boxed();
+    runtime::utils::try_flatten_applied(watcher)
+        .any(|res| future::ready(res.as_ref().map(|job| completed(job)).unwrap_or(false)))
+        .await;
 }
 
 fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> EnvVar {

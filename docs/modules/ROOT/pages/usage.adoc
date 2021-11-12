@@ -46,7 +46,7 @@ stringData:
   adminUser.email: admin@superset.com
   adminUser.password: admin
   connections.secretKey: thisISaSECRET_1234
-  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql/superset
+  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql.default.svc.cluster.local/superset
 ----
 
 The `connections.secretKey` will be used for securely signing the session cookies and can be used
