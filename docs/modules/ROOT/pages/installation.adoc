@@ -1,4 +1,65 @@
 = Installation
 
-The Superset operator can currently only be run from source with `cargo run`. A proper Helm
-deployment is planned.
+== Database for the Superset metadata
+
+The metadata of Superset (slices, connections, tables, dashboards, ...) is stored in an SQL
+database.
+
+For testing purposes, you can spin up a PostgreSQL database with the following command:
+
+[source,bash]
+----
+helm repo add bitnami https://charts.bitnami.com/bitnami
+
+helm install superset bitnami/postgresql \
+    --set postgresqlUsername=superset \
+    --set postgresqlPassword=superset \
+    --set postgresqlDatabase=superset
+----
+
+== Starting the operator
+
+Before the operator can be started, the CRDs for this operator and the cluster role binding must be
+created:
+
+[source,bash]
+----
+kubectl apply -f deploy/crd
+kubectl apply -f deploy/role
+----
+
+The operator can be deployed as a pod:
+
+[source,bash]
+----
+kubectl apply -f deploy/operator
+----
+
+== Secret with Superset credentials
+
+A secret with the necessary credentials must be created:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: simple-superset-credentials
+type: superset.stackable.tech/superset-credentials
+stringData:
+  adminUser.username: admin
+  adminUser.firstname: Superset
+  adminUser.lastname: Admin
+  adminUser.email: admin@superset.com
+  adminUser.password: admin
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql.default.svc.cluster.local/superset
+----
+
+The `connections.secretKey` will be used for securely signing the session cookies and can be used
+for any other security related needs by extensions. It should be a long random string of bytes.
+
+`connections.sqlalchemyDatabaseUri` must contain the connection string to the SQL database storing
+the Superset metadata.
+
+The `adminUser` fields are used by the `init` command to create an admin user.

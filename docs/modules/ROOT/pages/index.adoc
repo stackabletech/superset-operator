@@ -1,3 +1,10 @@
 = Stackable Operator for Apache Superset
 
 This is an operator for Kubernetes that can manage https://superset.apache.org/[Apache Superset] clusters.
+
+WARNING: This operator only works with images from the https://repo.stackable.tech/#browse/browse:docker:v2%2Fstackable%2Fsuperset[Stackable] repository
+￼
+[source]
+----
+docker pull docker.stackable.tech/stackable/superset:<version>
+----
