@@ -438,6 +438,7 @@ impl SupersetState {
             metadata: ObjectMetaBuilder::new()
                 .generate_name("superset-init-db-")
                 .namespace(&self.context.client.default_namespace)
+                .ownerreference_from_resource(command, None, None)?
                 .build()?,
             spec: Some(JobSpec {
                 template: pod,
