@@ -1,0 +1,11 @@
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: simple
+spec:
+  version: 1.3.2
+  nodes:
+    roleGroups:
+      default:
+        config:
+          credentialsSecret: simple-superset-credentials

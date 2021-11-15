@@ -1,0 +1,7 @@
+apiVersion: command.superset.stackable.tech/v1alpha1
+kind: Restart
+metadata:
+  name: superset-cluster-command-restart
+spec:
+  name: "simple"
+  rolling: true

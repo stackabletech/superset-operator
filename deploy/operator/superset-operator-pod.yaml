@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: superset-operator
+  labels:
+    app.kubernetes.io/name: superset-operator
+    app.kubernetes.io/instance: simple
+spec:
+  containers:
+    - name: superset-operator
+      image: docker.stackable.tech/stackable/superset-operator:latest
+  serviceAccountName: superset-operator
