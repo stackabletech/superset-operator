@@ -43,6 +43,7 @@ rules:
       - get
       - list
       - patch
+      - watch
   - apiGroups:
       - command.superset.stackable.tech
     resources:
