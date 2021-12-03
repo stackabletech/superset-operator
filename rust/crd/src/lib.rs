@@ -53,25 +53,14 @@ pub struct SupersetClusterSpec {
     pub nodes: Role<SupersetConfig>,
 }
 
-#[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[kube(
-    group = "superset.stackable.tech",
-    version = "v1alpha1",
-    kind = "SupersetCredentials",
-    plural = "supersetcredentials",
-    shortname = "supersetcredentials",
-    namespaced,
-    kube_core = "stackable_operator::kube::core",
-    k8s_openapi = "stackable_operator::k8s_openapi",
-    schemars = "stackable_operator::schemars"
-)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SupersetCredentialsSpec {
+pub struct SupersetCredentials {
     pub admin_user: AdminUserCredentials,
     pub connections: Connections,
 }
 
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AdminUserCredentials {
     pub username: String,
@@ -81,7 +70,7 @@ pub struct AdminUserCredentials {
     pub password: String,
 }
 
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Connections {
     pub secret_key: String,
