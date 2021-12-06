@@ -1637,7 +1637,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-superset-crd"
-version = "0.1.0"
+version = "0.2.0-nightly"
 dependencies = [
  "duplicate",
  "indoc",
@@ -1655,7 +1655,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-superset-operator"
-version = "0.1.0"
+version = "0.2.0-nightly"
 dependencies = [
  "async-trait",
  "futures",
@@ -1672,7 +1672,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-superset-operator-binary"
-version = "0.1.0"
+version = "0.2.0-nightly"
 dependencies = [
  "built",
  "clap",
