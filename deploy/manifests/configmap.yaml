@@ -28,4 +28,4 @@ metadata:
   labels:
     app.kubernetes.io/name: superset-operator
     app.kubernetes.io/instance: superset-operator
-    app.kubernetes.io/version: "0.1.0-nightly"
+    app.kubernetes.io/version: "0.2.0-nightly"
