@@ -21,16 +21,24 @@ spec:
           properties:
             spec:
               properties:
+                clusterRef:
+                  description: "A reference to a [`SupersetCluster`]"
+                  properties:
+                    name:
+                      nullable: true
+                      type: string
+                    namespace:
+                      nullable: true
+                      type: string
+                  type: object
                 credentialsSecret:
                   type: string
                 loadExamples:
                   type: boolean
-                name:
-                  type: string
               required:
+                - clusterRef
                 - credentialsSecret
                 - loadExamples
-                - name
               type: object
             status:
               nullable: true

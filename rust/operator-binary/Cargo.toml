@@ -1,37 +1,27 @@
 [package]
-authors = ["Lars Francke <lars.francke@stackable.de>"]
+name = "stackable-superset-operator"
+authors = ["Stackable GmbH <info@stackable.de>"]
 description = "Stackable Operator for Apache Superset"
-edition = "2018"
 license = "OSL-3.0"
-name = "stackable-superset-operator-binary"
-repository = "https://github.com/stackabletech/superset-operator"
 version = "0.2.0-nightly"
-build = "build.rs"
+edition = "2021"
+repository = "https://github.com/stackabletech/superset-operator"
 
 [dependencies]
-stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.4.0" }
-stackable-superset-crd = { path = "../crd" }
-stackable-superset-operator = { path = "../operator" }
-
+anyhow = "1.0"
 clap = "2.34"
+fnv = "1.0"
+futures = { version = "0.3", features = ["compat"] }
+serde = "1.0"
+serde_yaml = "0.8"
+snafu = "0.6"
+stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.6.0" }
+stackable-superset-crd = { path = "../crd" }
+structopt = "0.3"
 tokio = { version = "1.14", features = ["macros", "rt-multi-thread"] }
 tracing = "0.1"
 
 [build-dependencies]
 built = { version =  "0.5", features = ["chrono", "git2"] }
-stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.4.0" }
+stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.6.0" }
 stackable-superset-crd = { path = "../crd" }
-
-[package.metadata.deb]
-name = "stackable-superset-operator"
-maintainer-scripts = "../../packaging/debian/"
-systemd-units = { enable = false, unit-name = "stackable-superset-operator" }
-assets = [
-    ["../../target/release/stackable-superset-operator", "opt/stackable/superset-operator/", "755"],
-    ["../../deploy/crd/supersetcluster.crd.yaml", "etc/stackable/superset-operator/crd/", "644"],
-    ["../../deploy/config-spec/properties.yaml", "etc/stackable/superset-operator/config-spec/", "644"],
-]
-
-[[bin]]
-name = "stackable-superset-operator"
-path = "src/stackable-superset-operator.rs"

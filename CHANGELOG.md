@@ -2,8 +2,11 @@
 
 ## [Unreleased]
 
-## [0.1.0] - 2021-12-06
+### Changed
 
+- Migrated to StatefulSet rather than direct Pod management.
+
+## [0.1.0] - 2021-12-06
 
 ### Added
 - Initial implementation of the operator added. An admin user can be created in the Superset

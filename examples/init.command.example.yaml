@@ -3,6 +3,7 @@ kind: Init
 metadata:
   name: superset-cluster-command-init
 spec:
-  name: simple
+  clusterRef:
+    name: superset
   credentialsSecret: simple-superset-credentials
-  loadExamples: true
+  loadExamples: false
