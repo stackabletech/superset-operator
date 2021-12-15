@@ -1,12 +1,12 @@
 pub mod commands;
 
-use std::{collections::BTreeMap, fmt::Display};
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use stackable_operator::kube::runtime::reflector::ObjectRef;
 use stackable_operator::kube::CustomResource;
 use stackable_operator::product_config_utils::{ConfigError, Configuration};
-use stackable_operator::role_utils::Role;
+use stackable_operator::role_utils::{Role, RoleGroupRef};
 use stackable_operator::schemars::{self, JsonSchema};
 use strum_macros::Display;
 use strum_macros::EnumIter;
@@ -129,34 +129,15 @@ impl SupersetCluster {
     }
 
     /// Metadata about a node rolegroup
-    pub fn node_rolegroup_ref(&self, group_name: impl Into<String>) -> RoleGroupRef {
+    pub fn node_rolegroup_ref(
+        &self,
+        group_name: impl Into<String>,
+    ) -> RoleGroupRef<SupersetCluster> {
         RoleGroupRef {
             cluster: ObjectRef::from_obj(self),
             role: SupersetRole::Node.to_string(),
             role_group: group_name.into(),
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct RoleGroupRef {
-    pub cluster: ObjectRef<SupersetCluster>,
-    pub role: String,
-    pub role_group: String,
-}
-
-impl RoleGroupRef {
-    pub fn object_name(&self) -> String {
-        format!("{}-{}-{}", self.cluster.name, self.role, self.role_group)
-    }
-}
-
-impl Display for RoleGroupRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!(
-            "rolegroup {}.{} of {}",
-            self.role, self.role_group, self.cluster
-        ))
     }
 }
 

@@ -23,8 +23,9 @@ use stackable_operator::{
     labels::{role_group_selector_labels, role_selector_labels},
     product_config::{types::PropertyNameKind, ProductConfigManager},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
+    role_utils::RoleGroupRef,
 };
-use stackable_superset_crd::{RoleGroupRef, SupersetCluster, SupersetConfig, SupersetRole};
+use stackable_superset_crd::{SupersetCluster, SupersetConfig, SupersetRole};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -49,12 +50,12 @@ pub enum Error {
     #[snafu(display("failed to apply Service for {}", rolegroup))]
     ApplyRoleGroupService {
         source: stackable_operator::error::Error,
-        rolegroup: RoleGroupRef,
+        rolegroup: RoleGroupRef<SupersetCluster>,
     },
     #[snafu(display("failed to apply StatefulSet for {}", rolegroup))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::error::Error,
-        rolegroup: RoleGroupRef,
+        rolegroup: RoleGroupRef<SupersetCluster>,
     },
     #[snafu(display("invalid product config"))]
     InvalidProductConfig {
@@ -168,7 +169,7 @@ pub fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
 ///
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
 fn build_node_rolegroup_service(
-    rolegroup: &RoleGroupRef,
+    rolegroup: &RoleGroupRef<SupersetCluster>,
     superset: &SupersetCluster,
 ) -> Result<Service> {
     Ok(Service {
@@ -210,7 +211,7 @@ fn build_node_rolegroup_service(
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
 fn build_server_rolegroup_statefulset(
-    rolegroup_ref: &RoleGroupRef,
+    rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     superset: &SupersetCluster,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
 ) -> Result<StatefulSet> {
