@@ -4,7 +4,9 @@
 
 ### Changed
 
-- Migrated to StatefulSet rather than direct Pod management.
+- Migrated to StatefulSet rather than direct Pod management ([#45]).
+
+[#45]: https://github.com/stackabletech/superset-operator/pull/45
 
 ## [0.1.0] - 2021-12-06
 
