@@ -6,4 +6,4 @@ spec:
   clusterRef:
     name: superset
   credentialsSecret: simple-superset-credentials
-  loadExamples: false
+  loadExamples: true

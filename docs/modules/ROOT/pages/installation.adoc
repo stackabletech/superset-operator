@@ -1,65 +1,63 @@
 = Installation
 
-== Database for the Superset metadata
+There are three ways to run the Superset Operator:
 
-The metadata of Superset (slices, connections, tables, dashboards, ...) is stored in an SQL
-database.
+1. Helm managed Docker container deployment on Kubernetes
 
-For testing purposes, you can spin up a PostgreSQL database with the following command:
+2. As a Docker container
 
+3. Build from source.
+
+== Helm
+
+Helm allows you to download and deploy Stackable operators on Kubernetes and is by far the easiest
+installation method. First ensure that you have installed the Stackable Operators Helm repository:
 [source,bash]
 ----
-helm repo add bitnami https://charts.bitnami.com/bitnami
-
-helm install superset bitnami/postgresql \
-    --set postgresqlUsername=superset \
-    --set postgresqlPassword=superset \
-    --set postgresqlDatabase=superset
+$ helm repo add stackable https://repo.stackable.tech/repository/helm-stable/
 ----
 
-== Starting the operator
-
-Before the operator can be started, the CRDs for this operator and the cluster role binding must be
-created:
-
+Then install the Stackable Operator for Apache Superset
 [source,bash]
 ----
-kubectl apply -f deploy/crd
-kubectl apply -f deploy/role
+$ helm install superset-operator stackable/superset-operator
 ----
 
-The operator can be deployed as a pod:
+Helm will deploy the operator in a Kubernetes container and apply the CRDs for the Apache Superset
+service. You are now ready to deploy Apache Superset in Kubernetes.
 
+== Docker
+
+This Operator is published as a Docker image:
+
+[source]
+----
+docker.stackable.tech/stackable/superset-operator
+----
+
+When installing manually with Docker you will need to install the Stackable CRDs for Apache Superset
+in your Kubernetes environment. These are available on the
+https://github.com/stackabletech/superset-operator/tree/main/deploy/crd[Stackable GitHub repository]
+for this operator.
+[source]
+----
+$ kubectl apply -f supersetcluster.crd.yaml
+$ kubectl apply -f init.crd.yaml
+----
+
+To run it straight from Docker you can use this command:
 [source,bash]
 ----
-kubectl apply -f deploy/operator
+docker run -e SUPERSET_OPERATOR_LOG=trace -e KUBECONFIG=/root/.kube/k3s.yaml --mount type=bind,source="$HOME/.kube/k3s.yaml",target="/root/.kube/k3s.yaml" -it docker.stackable.tech/stackable/superset-operator:latest
 ----
 
-== Secret with Superset credentials
+== Building the operator from source
 
-A secret with the necessary credentials must be created:
+This operator is written in Rust and is developed against the latest stable Rust release (1.57 at
+the time of writing).
 
-[source,yaml]
+[source]
 ----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: simple-superset-credentials
-type: superset.stackable.tech/superset-credentials
-stringData:
-  adminUser.username: admin
-  adminUser.firstname: Superset
-  adminUser.lastname: Admin
-  adminUser.email: admin@superset.com
-  adminUser.password: admin
-  connections.secretKey: thisISaSECRET_1234
-  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql.default.svc.cluster.local/superset
+cargo run -- crd | kubectl apply -f -
+cargo run -- run
 ----
-
-The `connections.secretKey` will be used for securely signing the session cookies and can be used
-for any other security related needs by extensions. It should be a long random string of bytes.
-
-`connections.sqlalchemyDatabaseUri` must contain the connection string to the SQL database storing
-the Superset metadata.
-
-The `adminUser` fields are used by the `init` command to create an admin user.
