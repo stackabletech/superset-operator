@@ -24,3 +24,4 @@ USER 1000:1000
 ENV LOG4J_FORMAT_MSG_NO_LOOKUPS=true
 
 ENTRYPOINT ["/stackable-superset-operator"]
+CMD ["run"]

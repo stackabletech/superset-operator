@@ -16,10 +16,24 @@ rules:
     resources:
       - pods
       - configmaps
+      - services
+      - endpoints
     verbs:
       - create
       - delete
       - list
+      - patch
+      - watch
+      - update
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+    verbs:
+      - create
+      - delete
+      - list
+      - patch
       - watch
       - update
   - apiGroups:
@@ -29,6 +43,7 @@ rules:
     verbs:
       - create
       - get
+      - patch
       - list
       - watch
   - apiGroups:
