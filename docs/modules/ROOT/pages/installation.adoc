@@ -48,7 +48,12 @@ $ kubectl apply -f init.crd.yaml
 To run it straight from Docker you can use this command:
 [source,bash]
 ----
-docker run -e SUPERSET_OPERATOR_LOG=trace -e KUBECONFIG=/root/.kube/k3s.yaml --mount type=bind,source="$HOME/.kube/k3s.yaml",target="/root/.kube/k3s.yaml" -it docker.stackable.tech/stackable/superset-operator:latest
+docker run \
+    --name superset-operator \
+    --network host \
+    --env KUBECONFIG=/home/stackable/.kube/config \
+    --mount type=bind,source="$HOME/.kube/config",target="/home/stackable/.kube/config" \
+    docker.stackable.tech/stackable/superset-operator:latest
 ----
 
 == Building the operator from source
