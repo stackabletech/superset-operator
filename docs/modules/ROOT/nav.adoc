@@ -1,3 +1,2 @@
-* xref:building.adoc[]
 * xref:installation.adoc[]
 * xref:usage.adoc[]
