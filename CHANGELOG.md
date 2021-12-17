@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2021-12-17
+
+
 ### Changed
 
 - Migrated to StatefulSet rather than direct Pod management ([#45]).
