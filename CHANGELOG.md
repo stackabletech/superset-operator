@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Shut down gracefully ([#XXX]).
+
+[#XXX]: TODO
+
 ## [0.2.0] - 2021-12-17
 
 

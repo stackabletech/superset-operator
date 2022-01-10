@@ -77,6 +77,7 @@ async fn main() -> anyhow::Result<()> {
             )
             .owns(client.get_all_api::<Service>(), ListParams::default())
             .owns(client.get_all_api::<StatefulSet>(), ListParams::default())
+            .shutdown_on_signal()
             .run(
                 superset_controller::reconcile_superset,
                 superset_controller::error_policy,
@@ -87,13 +88,15 @@ async fn main() -> anyhow::Result<()> {
             );
 
             let init_controller =
-                Controller::new(client.get_all_api::<Init>(), ListParams::default()).run(
-                    init_controller::reconcile_init,
-                    init_controller::error_policy,
-                    Context::new(init_controller::Ctx {
-                        client: client.clone(),
-                    }),
-                );
+                Controller::new(client.get_all_api::<Init>(), ListParams::default())
+                    .shutdown_on_signal()
+                    .run(
+                        init_controller::reconcile_init,
+                        init_controller::error_policy,
+                        Context::new(init_controller::Ctx {
+                            client: client.clone(),
+                        }),
+                    );
 
             futures::stream::select(
                 superset_controller.map(erase_controller_result_type),
