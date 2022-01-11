@@ -4,9 +4,9 @@
 
 ### Changed
 
-- Shut down gracefully ([#XXX]).
+- Shut down gracefully ([#70]).
 
-[#XXX]: TODO
+[#70]: https://github.com/stackabletech/superset-operator/pull/70
 
 ## [0.2.0] - 2021-12-17
 
