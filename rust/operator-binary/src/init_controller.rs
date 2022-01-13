@@ -25,7 +25,7 @@ use stackable_operator::{
     },
 };
 use stackable_superset_crd::{
-    commands::{CommandStatus, Init},
+    commands::{CommandStatus, Init, DruidConnection},
     SupersetCluster, SupersetClusterRef,
 };
 
@@ -113,6 +113,21 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
     })
 }
 
+fn get_sqlalchemy_uri_for_druid_cluster(cluster_name: &String) -> String {
+    // TODO here we have to retrieve the configmap and get the URL
+    "druid://psqls3-druid-router.default.svc.cluster.local:8888/druid/v2/sql".to_string()
+}
+
+/// Returns a yaml document read to be imported with "superset import-datasources"
+fn build_druid_db_yaml(druids: &Vec<DruidConnection>) -> String {
+    let druids_formatted: Vec<String> = druids.iter().map(|d| {
+        let name = if let Some(name) = d.name.clone() { name } else { d.cluster.clone() };
+        let uri = get_sqlalchemy_uri_for_druid_cluster(&d.cluster);
+        format!("- database_name: {}\n  sqlalchemy_uri: {}\n  tables: []\n", name, uri)
+    }).collect();
+    format!("databases:\n{}", druids_formatted.join(""))
+}
+
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
@@ -130,11 +145,10 @@ fn build_init_job(init: &Init, superset: &SupersetCluster) -> Result<Job> {
         String::from("superset init"),
     ];
     if init.spec.load_examples {
-        // commands.push(String::from("superset load_examples"));
+        commands.push(String::from("superset load_examples"));
     }
-    let import_druid = true;
-    if import_druid {
-        let druid_info = format!("databases:\n- database_name: Druid\n  sqlalchemy_uri: druid://psqls3-druid-router.default.svc.cluster.local:8888/druid/v2/sql\n  tables: []\n");
+    if let Some(druids) = &init.spec.druid_connections {
+        let druid_info = build_druid_db_yaml(druids);
         commands.push(String::from(format!("echo \"{}\" > /tmp/druids.yaml", druid_info)));
         commands.push(String::from("superset import_datasources -p /tmp/druids.yaml"));
     }

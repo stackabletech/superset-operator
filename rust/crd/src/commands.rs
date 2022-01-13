@@ -24,6 +24,18 @@ pub struct InitCommandSpec {
     pub cluster_ref: SupersetClusterRef,
     pub credentials_secret: String,
     pub load_examples: bool,
+    pub druid_connections: Option<Vec<DruidConnection>>
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DruidConnection {
+    /// The Druid Cluster to connect
+    pub cluster: String,
+    /// The namespace.  If not provided, the same namespace as the superset cluster will be assumed
+    pub namespace: Option<String>,
+    /// The name, used internally by Superset for display purposes.
+    pub name: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]
