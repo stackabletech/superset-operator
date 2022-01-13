@@ -9,7 +9,7 @@ use stackable_operator::{
     k8s_openapi::{
         api::{
             batch::v1::{Job, JobSpec},
-            core::v1::{EnvVar, EnvVarSource, PodSpec, PodTemplateSpec, SecretKeySelector},
+            core::v1::{ConfigMap, EnvVar, EnvVarSource, PodSpec, PodTemplateSpec, SecretKeySelector},
         },
         apimachinery::pkg::apis::meta::v1::Time,
         chrono::Utc,
@@ -24,6 +24,7 @@ use stackable_operator::{
         ResourceExt,
     },
 };
+use stackable_operator::client::Client;
 use stackable_superset_crd::{
     commands::{CommandStatus, Init, DruidConnection},
     SupersetCluster, SupersetClusterRef,
@@ -60,6 +61,22 @@ pub enum Error {
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
+    #[snafu(display(
+    "Failed to get Druid connection string from config map {} in namespace {:?}",
+    cm_name,
+    namespace
+    ))]
+    GetDruidConnStringConfigMap {
+        source: stackable_operator::error::Error,
+        cm_name: String,
+        namespace: Option<String>,
+    },
+    #[snafu(display(
+    "Failed to get Druid connection string from config map {} in namespace {:?}",
+    cm_name,
+    namespace
+    ))]
+    MissingDruidConnString { cm_name: String, namespace: Option<String> },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -70,7 +87,7 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
 
     let superset = find_superset_cluster_of_init_command(client, &init).await?;
 
-    let job = build_init_job(&init, &superset)?;
+    let job = build_init_job(&init, &superset, client).await?;
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
         .await
@@ -113,25 +130,37 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
     })
 }
 
-fn get_sqlalchemy_uri_for_druid_cluster(cluster_name: &String) -> String {
-    // TODO here we have to retrieve the configmap and get the URL
-    "druid://psqls3-druid-router.default.svc.cluster.local:8888/druid/v2/sql".to_string()
+async fn get_sqlalchemy_uri_for_druid_cluster(cluster_name: &String, namespace: &Option<String>, client: &Client) -> Result<String> {
+    client
+        .get::<ConfigMap>(cluster_name, namespace.as_deref())
+        .await
+        .with_context(|| GetDruidConnStringConfigMap {
+            cm_name: cluster_name.clone(),
+            namespace: namespace.clone(),
+        })?
+        .data
+        .and_then(|mut data| data.remove("DRUID_SQLALCHEMY"))
+        .with_context(|| MissingDruidConnString {
+            cm_name: cluster_name.clone(),
+            namespace: namespace.clone(),
+        })
 }
 
 /// Returns a yaml document read to be imported with "superset import-datasources"
-fn build_druid_db_yaml(druids: &Vec<DruidConnection>) -> String {
-    let druids_formatted: Vec<String> = druids.iter().map(|d| {
+async fn build_druid_db_yaml(druids: &Vec<DruidConnection>, client: &Client) -> Result<String> {
+    let mut druids_formatted = Vec::new();
+    for d in druids {
         let name = if let Some(name) = d.name.clone() { name } else { d.cluster.clone() };
-        let uri = get_sqlalchemy_uri_for_druid_cluster(&d.cluster);
-        format!("- database_name: {}\n  sqlalchemy_uri: {}\n  tables: []\n", name, uri)
-    }).collect();
-    format!("databases:\n{}", druids_formatted.join(""))
+        let uri = get_sqlalchemy_uri_for_druid_cluster(&d.cluster, &d.namespace, client).await?;
+        druids_formatted.push(format!("- database_name: {}\n  sqlalchemy_uri: {}\n  tables: []\n", name, uri));
+    }
+    Ok(format!("databases:\n{}", druids_formatted.join("")))
 }
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
-fn build_init_job(init: &Init, superset: &SupersetCluster) -> Result<Job> {
+async fn build_init_job(init: &Init, superset: &SupersetCluster, client: &Client) -> Result<Job> {
     let mut commands = vec![
         String::from(
             "superset fab create-admin \
@@ -148,7 +177,7 @@ fn build_init_job(init: &Init, superset: &SupersetCluster) -> Result<Job> {
         commands.push(String::from("superset load_examples"));
     }
     if let Some(druids) = &init.spec.druid_connections {
-        let druid_info = build_druid_db_yaml(druids);
+        let druid_info = build_druid_db_yaml(druids, client).await?;
         commands.push(String::from(format!("echo \"{}\" > /tmp/druids.yaml", druid_info)));
         commands.push(String::from("superset import_datasources -p /tmp/druids.yaml"));
     }
