@@ -130,7 +130,13 @@ fn build_init_job(init: &Init, superset: &SupersetCluster) -> Result<Job> {
         String::from("superset init"),
     ];
     if init.spec.load_examples {
-        commands.push(String::from("superset load_examples"));
+        // commands.push(String::from("superset load_examples"));
+    }
+    let import_druid = true;
+    if import_druid {
+        let druid_info = format!("databases:\n- database_name: Druid\n  sqlalchemy_uri: druid://psqls3-druid-router.default.svc.cluster.local:8888/druid/v2/sql\n  tables: []\n");
+        commands.push(String::from(format!("echo \"{}\" > /tmp/druids.yaml", druid_info)));
+        commands.push(String::from("superset import_datasources -p /tmp/druids.yaml"));
     }
 
     let version = superset_version(superset)?;
