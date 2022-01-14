@@ -91,10 +91,10 @@ pub async fn reconcile_add_druids(add_druids: AddDruids, ctx: Context<Ctx>) -> R
 
     let client = &ctx.get_ref().client;
 
-    let superset = find_superset_cluster_by_ref(client, &init.spec.cluster_ref)
-        .await.with_context(|| SupersetClusterNotFound {cluster_ref: init.spec.cluster_ref.clone()})?;
+    let superset = find_superset_cluster_by_ref(client, &add_druids.spec.cluster_ref)
+        .await.with_context(|| SupersetClusterNotFound {cluster_ref: add_druids.spec.cluster_ref.clone()})?;
 
-    let job = build_add_druids_job(&init, &superset, client).await?;
+    let job = build_add_druids_job(&add_druids, &superset, client).await?;
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
         .await
@@ -102,12 +102,12 @@ pub async fn reconcile_add_druids(add_druids: AddDruids, ctx: Context<Ctx>) -> R
             superset: ObjectRef::from_obj(&superset),
         })?;
 
-    if init.status == None {
+    if add_druids.status == None {
         let started_at = Some(Time(Utc::now()));
         client
             .apply_patch_status(
                 FIELD_MANAGER_SCOPE,
-                &init,
+                &add_druids,
                 &CommandStatus {
                     started_at: started_at.to_owned(),
                     finished_at: None,
@@ -122,7 +122,7 @@ pub async fn reconcile_add_druids(add_druids: AddDruids, ctx: Context<Ctx>) -> R
         client
             .apply_patch_status(
                 FIELD_MANAGER_SCOPE,
-                &init,
+                &add_druids,
                 &CommandStatus {
                     started_at,
                     finished_at,
@@ -218,7 +218,7 @@ async fn build_add_druids_job(add_druids: &AddDruids, superset: &SupersetCluster
         metadata: ObjectMetaBuilder::new()
             .name(format!("{}-init", superset.name()))
             .namespace_opt(superset.metadata.namespace.clone())
-            .ownerreference_from_resource(init, None, Some(true))
+            .ownerreference_from_resource(add_druids, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRef)?
             .build(),
         spec: Some(JobSpec {
