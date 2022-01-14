@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{APP_NAME, APP_PORT};
+use crate::{APP_NAME, APP_PORT, util::{error_policy, superset_version}};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
@@ -299,27 +299,3 @@ fn build_server_rolegroup_statefulset(
     })
 }
 
-pub fn superset_version(superset: &SupersetCluster) -> Result<&str> {
-    superset.spec.version.as_deref().context(ObjectHasNoVersion)
-}
-
-pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(5)),
-    }
-}
-
-fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> EnvVar {
-    EnvVar {
-        name: String::from(var_name),
-        value_from: Some(EnvVarSource {
-            secret_key_ref: Some(SecretKeySelector {
-                name: Some(String::from(secret)),
-                key: String::from(secret_key),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }),
-        ..Default::default()
-    }
-}

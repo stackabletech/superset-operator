@@ -1,5 +1,7 @@
+mod add_druid_controller;
 mod init_controller;
 mod superset_controller;
+mod util;
 
 use futures::StreamExt;
 use stackable_operator::{
@@ -79,7 +81,7 @@ async fn main() -> anyhow::Result<()> {
             .owns(client.get_all_api::<StatefulSet>(), ListParams::default())
             .run(
                 superset_controller::reconcile_superset,
-                superset_controller::error_policy,
+                util::error_policy,
                 Context::new(superset_controller::Ctx {
                     client: client.clone(),
                     product_config,
@@ -89,7 +91,7 @@ async fn main() -> anyhow::Result<()> {
             let init_controller =
                 Controller::new(client.get_all_api::<Init>(), ListParams::default()).run(
                     init_controller::reconcile_init,
-                    init_controller::error_policy,
+                    util::error_policy,
                     Context::new(init_controller::Ctx {
                         client: client.clone(),
                     }),

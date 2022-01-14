@@ -1,12 +1,11 @@
-//! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 use futures::{future, StreamExt};
-use snafu::{ResultExt, Snafu};
+use snafu::{OptionExt, ResultExt};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder},
     k8s_openapi::{
         api::{
             batch::v1::{Job, JobSpec},
-            core::v1::{PodSpec, PodTemplateSpec},
+            core::v1::{ConfigMap, PodSpec, PodTemplateSpec},
         },
         apimachinery::pkg::apis::meta::v1::Time,
         chrono::Utc,
@@ -21,11 +20,14 @@ use stackable_operator::{
         ResourceExt,
     },
 };
+use stackable_operator::client::Client;
 use stackable_superset_crd::{
-    commands::{CommandStatus, Init},
-    SupersetCluster, SupersetClusterRef,
+    commands::{CommandStatus, AddDruids, DruidConnection},
+    SupersetCluster,
 };
-use crate::util::{env_var_from_secret, superset_version, find_superset_cluster_by_ref};
+use crate::{
+    util::{find_superset_cluster_by_ref, env_var_from_secret},
+};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -33,16 +35,14 @@ pub struct Ctx {
     pub client: stackable_operator::client::Client,
 }
 
-type Result<T, E = Error> = std::result::Result<T, E>;
-
-pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerAction> {
-    tracing::info!("Starting reconcile");
+pub async fn reconcile_add_druids(add_druids: AddDruids, ctx: Context<Ctx>) -> Result<ReconcilerAction> {
+    tracing::info!("Starting reconciling AddDruids");
 
     let client = &ctx.get_ref().client;
 
-    let superset = find_superset_cluster_by_ref(client, &init.spec.cluster_ref).await?;
+    let superset = find_superset_cluster_by_ref(client, &add_druids.spec.cluster_ref).await?;
 
-    let job = build_init_job(&init, &superset).await?;
+    let job = build_add_druids_job(&init, &superset, client).await?;
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
         .await
@@ -85,30 +85,49 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
     })
 }
 
+async fn get_sqlalchemy_uri_for_druid_cluster(cluster_name: &String, namespace: &String, client: &Client) -> Result<String> {
+    client
+        .get::<ConfigMap>(cluster_name, Some(namespace))
+        .await
+        .with_context(|| GetDruidConnStringConfigMap {
+            cm_name: cluster_name.clone(),
+            namespace: namespace.clone(),
+        })?
+        .data
+        .and_then(|mut data| data.remove("DRUID_SQLALCHEMY"))
+        .with_context(|| MissingDruidConnString {
+            cm_name: cluster_name.clone(),
+            namespace: namespace.clone(),
+        })
+}
+
+/// Returns a yaml document read to be imported with "superset import-datasources"
+async fn build_druid_db_yaml(druids: &Vec<DruidConnection>, client: &Client) -> Result<String> {
+    let mut druids_formatted = Vec::new();
+    for d in druids {
+        let name = if let Some(name) = d.name.clone() { name } else { d.cluster.clone() };
+        let namespace = if let Some(ns) = d.namespace.clone() { ns.to_string() } else { "default".to_string() };
+        let uri = get_sqlalchemy_uri_for_druid_cluster(&d.cluster, &namespace, client).await?;
+        druids_formatted.push(format!("- database_name: {}\n  sqlalchemy_uri: {}\n  tables: []\n", name, uri));
+    }
+    Ok(format!("databases:\n{}", druids_formatted.join("")))
+}
+
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
-async fn build_init_job(init: &Init, superset: &SupersetCluster) -> Result<Job> {
+async fn build_add_druids_job(add_druids: &AddDruids, superset: &SupersetCluster, client: &Client) -> Result<Job> {
     let mut commands = vec![
-        String::from(
-            "superset fab create-admin \
-                    --username \"$ADMIN_USERNAME\" \
-                    --firstname \"$ADMIN_FIRSTNAME\" \
-                    --lastname \"$ADMIN_LASTNAME\" \
-                    --email \"$ADMIN_EMAIL\" \
-                    --password \"$ADMIN_PASSWORD\"",
-        ),
-        String::from("superset db upgrade"),
-        String::from("superset init"),
     ];
-    if init.spec.load_examples {
-        commands.push(String::from("superset load_examples"));
-    }
+        let druid_info = build_druid_db_yaml(&add_druids.spec.druid_connections, client).await?;
+        commands.push(String::from(format!("echo \"{}\" > /tmp/druids.yaml", druid_info)));
+        commands.push(String::from("superset import_datasources -p /tmp/druids.yaml"));
+
 
     let version = superset_version(superset)?;
-    let secret = &init.spec.credentials_secret;
+    let secret = &add_druids.spec.credentials_secret;
 
-    let container = ContainerBuilder::new("superset-init-db")
+    let container = ContainerBuilder::new("superset-add-druids")
         .image(format!(
             "docker.stackable.tech/stackable/superset:{}-stackable0",
             version
@@ -158,27 +177,6 @@ async fn build_init_job(init: &Init, superset: &SupersetCluster) -> Result<Job> 
     };
 
     Ok(job)
-}
-
-async fn find_superset_cluster_of_init_command(
-    client: &stackable_operator::client::Client,
-    init: &Init,
-) -> Result<SupersetCluster, Error> {
-    if let SupersetClusterRef {
-        name: Some(superset_name),
-        namespace: maybe_superset_ns,
-    } = &init.spec.cluster_ref
-    {
-        let superset_ns = maybe_superset_ns.as_deref().unwrap_or("default");
-        client
-            .get::<SupersetCluster>(superset_name, Some(superset_ns))
-            .await
-            .with_context(|| FindSuperset {
-                superset: ObjectRef::new(superset_name).within(superset_ns),
-            })
-    } else {
-        InvalidSupersetReference.fail()
-    }
 }
 
 // Waits until the given job is completed.
