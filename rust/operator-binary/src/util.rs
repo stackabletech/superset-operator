@@ -56,12 +56,6 @@ pub fn superset_version(superset: &SupersetCluster) -> Result<&str, Error> {
     superset.spec.version.as_deref().context(ObjectHasNoVersion)
 }
 
-pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(5)),
-    }
-}
-
 pub fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> EnvVar {
     EnvVar {
         name: String::from(var_name),

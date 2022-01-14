@@ -26,6 +26,7 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 use stackable_superset_crd::{SupersetCluster, SupersetConfig, SupersetRole};
+use crate::superset_controller::Error::NoSupersetVersion;
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -37,8 +38,10 @@ pub struct Ctx {
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
-    #[snafu(display("object defines no version"))]
-    ObjectHasNoVersion,
+    #[snafu(display("failed to retrieve superset version"))]
+    NoSupersetVersion {
+        source: crate::util::Error,
+    },
     #[snafu(display("object defines no node role"))]
     NoNodeRole,
     #[snafu(display("failed to calculate global service name"))]
@@ -77,7 +80,7 @@ pub async fn reconcile_superset(
     let client = &ctx.get_ref().client;
 
     let validated_config = validate_all_roles_and_groups_config(
-        superset_version(&superset)?,
+        superset_version(&superset).context(NoSupersetVersion)?,
         &transform_all_roles_to_config(
             &superset,
             [(
@@ -145,7 +148,7 @@ pub fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
             .with_recommended_labels(
                 superset,
                 APP_NAME,
-                superset_version(superset)?,
+                superset_version(superset).context(NoSupersetVersion)?,
                 &role_name,
                 "global",
             )
@@ -181,7 +184,7 @@ fn build_node_rolegroup_service(
             .with_recommended_labels(
                 superset,
                 APP_NAME,
-                superset_version(superset)?,
+                superset_version(superset).context(NoSupersetVersion)?,
                 &rolegroup.role,
                 &rolegroup.role_group,
             )
@@ -223,7 +226,7 @@ fn build_server_rolegroup_statefulset(
         .role_groups
         .get(&rolegroup_ref.role_group);
 
-    let superset_version = superset_version(superset)?;
+    let superset_version = superset_version(superset).context(NoSupersetVersion)?;
 
     let image = format!(
         "docker.stackable.tech/stackable/superset:{}-stackable0",

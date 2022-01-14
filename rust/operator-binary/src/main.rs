@@ -81,7 +81,9 @@ async fn main() -> anyhow::Result<()> {
             .owns(client.get_all_api::<StatefulSet>(), ListParams::default())
             .run(
                 superset_controller::reconcile_superset,
-                util::error_policy,
+                |_, _| ReconcilerAction {
+                    requeue_after: Some(Duration::from_secs(5)),
+                },
                 Context::new(superset_controller::Ctx {
                     client: client.clone(),
                     product_config,
@@ -91,7 +93,9 @@ async fn main() -> anyhow::Result<()> {
             let init_controller =
                 Controller::new(client.get_all_api::<Init>(), ListParams::default()).run(
                     init_controller::reconcile_init,
-                    util::error_policy,
+                    |_, _| ReconcilerAction {
+                        requeue_after: Some(Duration::from_secs(5)),
+                    },
                     Context::new(init_controller::Ctx {
                         client: client.clone(),
                     }),

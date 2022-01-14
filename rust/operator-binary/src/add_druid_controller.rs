@@ -1,5 +1,5 @@
 use futures::{future, StreamExt};
-use snafu::{OptionExt, ResultExt};
+use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder},
     k8s_openapi::{
@@ -25,15 +25,41 @@ use stackable_superset_crd::{
     commands::{CommandStatus, AddDruids, DruidConnection},
     SupersetCluster,
 };
-use crate::{
-    util::{find_superset_cluster_by_ref, env_var_from_secret},
-};
+use crate::util::{find_superset_cluster_by_ref, env_var_from_secret};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
 }
+
+#[derive(Snafu, Debug)]
+#[allow(clippy::enum_variant_names)]
+pub enum Error {
+    #[snafu(display("object does not refer to SupersetCluster"))]
+    InvalidSupersetReference,
+    #[snafu(display("could not find {}", superset))]
+    FindSuperset {
+        source: stackable_operator::error::Error,
+        superset: ObjectRef<SupersetCluster>,
+    },
+    #[snafu(display("object defines no version"))]
+    ObjectHasNoVersion,
+    #[snafu(display("failed to apply Job for {}", superset))]
+    ApplyJob {
+        source: stackable_operator::error::Error,
+        superset: ObjectRef<SupersetCluster>,
+    },
+    #[snafu(display("failed to update status"))]
+    ApplyStatus {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("object is missing metadata to build owner reference"))]
+    ObjectMissingMetadataForOwnerRef {
+        source: stackable_operator::error::Error,
+    },
+}
+type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub async fn reconcile_add_druids(add_druids: AddDruids, ctx: Context<Ctx>) -> Result<ReconcilerAction> {
     tracing::info!("Starting reconciling AddDruids");
