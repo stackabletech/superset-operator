@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{APP_NAME, APP_PORT, util::{error_policy, superset_version, env_var_from_secret}};
+use crate::{APP_NAME, APP_PORT, util::{superset_version, env_var_from_secret}};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},

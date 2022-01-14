@@ -27,7 +27,7 @@ use stackable_superset_crd::{
     commands::{CommandStatus, AddDruids, DruidConnection},
     SupersetCluster, SupersetClusterRef,
 };
-use crate::util::{find_superset_cluster_by_ref, env_var_from_secret};
+use crate::util::{find_superset_cluster_by_ref, env_var_from_secret, superset_version};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -38,6 +38,10 @@ pub struct Ctx {
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
+    #[snafu(display("failed to retrieve superset version"))]
+    NoSupersetVersion {
+        source: crate::util::Error,
+    },
     #[snafu(display("object does not refer to SupersetCluster"))]
     InvalidSupersetReference,
     #[snafu(display("could not find {}", superset))]
@@ -63,6 +67,22 @@ pub enum Error {
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
+    #[snafu(display(
+    "Failed to get Druid connection string from config map {} in namespace {:?}",
+    cm_name,
+    namespace
+    ))]
+    GetDruidConnStringConfigMap {
+        source: stackable_operator::error::Error,
+        cm_name: String,
+        namespace: Option<String>,
+    },
+    #[snafu(display(
+    "Failed to get Druid connection string from config map {} in namespace {:?}",
+    cm_name,
+    namespace
+    ))]
+    MissingDruidConnString { cm_name: String, namespace: Option<String> },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -156,7 +176,7 @@ async fn build_add_druids_job(add_druids: &AddDruids, superset: &SupersetCluster
         commands.push(String::from("superset import_datasources -p /tmp/druids.yaml"));
 
 
-    let version = superset_version(superset)?;
+    let version = superset_version(superset).context(NoSupersetVersion)?;
     let secret = &add_druids.spec.credentials_secret;
 
     let container = ContainerBuilder::new("superset-add-druids")
