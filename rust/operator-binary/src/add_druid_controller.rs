@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use futures::{future, StreamExt};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -23,7 +25,7 @@ use stackable_operator::{
 use stackable_operator::client::Client;
 use stackable_superset_crd::{
     commands::{CommandStatus, AddDruids, DruidConnection},
-    SupersetCluster,
+    SupersetCluster, SupersetClusterRef,
 };
 use crate::util::{find_superset_cluster_by_ref, env_var_from_secret};
 
@@ -43,8 +45,11 @@ pub enum Error {
         source: stackable_operator::error::Error,
         superset: ObjectRef<SupersetCluster>,
     },
-    #[snafu(display("object defines no version"))]
-    ObjectHasNoVersion,
+    #[snafu(display("failed to find superset with name {:?} in namespace {:?}", cluster_ref.name, cluster_ref.namespace))]
+    SupersetClusterNotFound {
+        source: crate::util::Error,
+        cluster_ref: SupersetClusterRef,
+    },
     #[snafu(display("failed to apply Job for {}", superset))]
     ApplyJob {
         source: stackable_operator::error::Error,
@@ -66,7 +71,8 @@ pub async fn reconcile_add_druids(add_druids: AddDruids, ctx: Context<Ctx>) -> R
 
     let client = &ctx.get_ref().client;
 
-    let superset = find_superset_cluster_by_ref(client, &add_druids.spec.cluster_ref).await?;
+    let superset = find_superset_cluster_by_ref(client, &init.spec.cluster_ref)
+        .await.with_context(|| SupersetClusterNotFound {cluster_ref: init.spec.cluster_ref.clone()})?;
 
     let job = build_add_druids_job(&init, &superset, client).await?;
     client
@@ -222,4 +228,10 @@ async fn wait_completed(client: &stackable_operator::client::Client, job: &Job) 
     runtime::utils::try_flatten_applied(watcher)
         .any(|res| future::ready(res.as_ref().map(|job| completed(job)).unwrap_or(false)))
         .await;
+}
+
+pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
+    ReconcilerAction {
+        requeue_after: Some(Duration::from_secs(5)),
+    }
 }

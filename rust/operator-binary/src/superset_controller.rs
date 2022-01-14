@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{APP_NAME, APP_PORT, util::{error_policy, superset_version}};
+use crate::{APP_NAME, APP_PORT, util::{error_policy, superset_version, env_var_from_secret}};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
@@ -14,7 +14,7 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                EnvVar, EnvVarSource, SecretKeySelector, Service, ServicePort, ServiceSpec,
+                Service, ServicePort, ServiceSpec,
             },
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
@@ -26,7 +26,6 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 use stackable_superset_crd::{SupersetCluster, SupersetConfig, SupersetRole};
-use crate::superset_controller::Error::NoSupersetVersion;
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -300,5 +299,11 @@ fn build_server_rolegroup_statefulset(
         }),
         status: None,
     })
+}
+
+pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
+    ReconcilerAction {
+        requeue_after: Some(Duration::from_secs(5)),
+    }
 }
 

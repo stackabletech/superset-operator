@@ -1,4 +1,3 @@
-use std::time::Duration;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     k8s_openapi::{
@@ -8,7 +7,6 @@ use stackable_operator::{
     },
     kube::{
         runtime::{
-            controller::{Context, ReconcilerAction},
             reflector::ObjectRef,
         },
     },

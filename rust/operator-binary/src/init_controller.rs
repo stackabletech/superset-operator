@@ -1,4 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
+
+use std::time::Duration;
+
 use futures::{future, StreamExt};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -33,6 +36,39 @@ pub struct Ctx {
     pub client: stackable_operator::client::Client,
 }
 
+#[derive(Snafu, Debug)]
+#[allow(clippy::enum_variant_names)]
+pub enum Error {
+    #[snafu(display("failed to retrieve superset version"))]
+    NoSupersetVersion {
+        source: crate::util::Error,
+    },
+    #[snafu(display("failed to find superset with name {:?} in namespace {:?}", cluster_ref.name, cluster_ref.namespace))]
+    SupersetClusterNotFound {
+        source: crate::util::Error,
+        cluster_ref: SupersetClusterRef,
+    },
+    #[snafu(display("object does not refer to SupersetCluster"))]
+    InvalidSupersetReference,
+    #[snafu(display("could not find {}", superset))]
+    FindSuperset {
+        source: stackable_operator::error::Error,
+        superset: ObjectRef<SupersetCluster>,
+    },
+    #[snafu(display("failed to apply Job for {}", superset))]
+    ApplyJob {
+        source: stackable_operator::error::Error,
+        superset: ObjectRef<SupersetCluster>,
+    },
+    #[snafu(display("failed to update status"))]
+    ApplyStatus {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("object is missing metadata to build owner reference"))]
+    ObjectMissingMetadataForOwnerRef {
+        source: stackable_operator::error::Error,
+    },
+}
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerAction> {
@@ -40,7 +76,8 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
 
     let client = &ctx.get_ref().client;
 
-    let superset = find_superset_cluster_by_ref(client, &init.spec.cluster_ref).await?;
+    let superset = find_superset_cluster_by_ref(client, &init.spec.cluster_ref)
+        .await.with_context(|| SupersetClusterNotFound {cluster_ref: init.spec.cluster_ref.clone()})?;
 
     let job = build_init_job(&init, &superset).await?;
     client
@@ -105,7 +142,7 @@ async fn build_init_job(init: &Init, superset: &SupersetCluster) -> Result<Job> 
         commands.push(String::from("superset load_examples"));
     }
 
-    let version = superset_version(superset)?;
+    let version = superset_version(superset).context(NoSupersetVersion)?;
     let secret = &init.spec.credentials_secret;
 
     let container = ContainerBuilder::new("superset-init-db")
@@ -198,4 +235,10 @@ async fn wait_completed(client: &stackable_operator::client::Client, job: &Job) 
     runtime::utils::try_flatten_applied(watcher)
         .any(|res| future::ready(res.as_ref().map(|job| completed(job)).unwrap_or(false)))
         .await;
+}
+
+pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
+    ReconcilerAction {
+        requeue_after: Some(Duration::from_secs(5)),
+    }
 }
