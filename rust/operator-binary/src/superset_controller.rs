@@ -6,16 +6,17 @@ use std::{
     time::Duration,
 };
 
-use crate::{APP_NAME, APP_PORT, util::{superset_version, env_var_from_secret}};
+use crate::{
+    util::{env_var_from_secret, superset_version},
+    APP_NAME, APP_PORT,
+};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{
-                Service, ServicePort, ServiceSpec,
-            },
+            core::v1::{Service, ServicePort, ServiceSpec},
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
@@ -38,9 +39,7 @@ pub struct Ctx {
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("failed to retrieve superset version"))]
-    NoSupersetVersion {
-        source: crate::util::Error,
-    },
+    NoSupersetVersion { source: crate::util::Error },
     #[snafu(display("object defines no node role"))]
     NoNodeRole,
     #[snafu(display("failed to calculate global service name"))]
@@ -306,4 +305,3 @@ pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
         requeue_after: Some(Duration::from_secs(5)),
     }
 }
-

@@ -1,7 +1,9 @@
 use std::time::Duration;
 
+use crate::util::{env_var_from_secret, find_superset_cluster_by_ref, superset_version};
 use futures::{future, StreamExt};
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::client::Client;
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder},
     k8s_openapi::{
@@ -22,12 +24,10 @@ use stackable_operator::{
         ResourceExt,
     },
 };
-use stackable_operator::client::Client;
 use stackable_superset_crd::{
-    commands::{CommandStatus, AddDruids, DruidConnection},
+    commands::{AddDruids, CommandStatus, DruidConnection},
     SupersetCluster, SupersetClusterRef,
 };
-use crate::util::{find_superset_cluster_by_ref, env_var_from_secret, superset_version};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -39,9 +39,7 @@ pub struct Ctx {
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("failed to retrieve superset version"))]
-    NoSupersetVersion {
-        source: crate::util::Error,
-    },
+    NoSupersetVersion { source: crate::util::Error },
     #[snafu(display("object does not refer to SupersetCluster"))]
     InvalidSupersetReference,
     #[snafu(display("could not find {}", superset))]
@@ -68,9 +66,9 @@ pub enum Error {
         source: stackable_operator::error::Error,
     },
     #[snafu(display(
-    "Failed to get Druid connection string from config map {} in namespace {:?}",
-    cm_name,
-    namespace
+        "Failed to get Druid connection string from config map {} in namespace {:?}",
+        cm_name,
+        namespace
     ))]
     GetDruidConnStringConfigMap {
         source: stackable_operator::error::Error,
@@ -78,21 +76,30 @@ pub enum Error {
         namespace: Option<String>,
     },
     #[snafu(display(
-    "Failed to get Druid connection string from config map {} in namespace {:?}",
-    cm_name,
-    namespace
+        "Failed to get Druid connection string from config map {} in namespace {:?}",
+        cm_name,
+        namespace
     ))]
-    MissingDruidConnString { cm_name: String, namespace: Option<String> },
+    MissingDruidConnString {
+        cm_name: String,
+        namespace: Option<String>,
+    },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub async fn reconcile_add_druids(add_druids: AddDruids, ctx: Context<Ctx>) -> Result<ReconcilerAction> {
+pub async fn reconcile_add_druids(
+    add_druids: AddDruids,
+    ctx: Context<Ctx>,
+) -> Result<ReconcilerAction> {
     tracing::info!("Starting reconciling AddDruids");
 
     let client = &ctx.get_ref().client;
 
     let superset = find_superset_cluster_by_ref(client, &add_druids.spec.cluster_ref)
-        .await.with_context(|| SupersetClusterNotFound {cluster_ref: add_druids.spec.cluster_ref.clone()})?;
+        .await
+        .with_context(|| SupersetClusterNotFound {
+            cluster_ref: add_druids.spec.cluster_ref.clone(),
+        })?;
 
     let job = build_add_druids_job(&add_druids, &superset, client).await?;
     client
@@ -137,7 +144,11 @@ pub async fn reconcile_add_druids(add_druids: AddDruids, ctx: Context<Ctx>) -> R
     })
 }
 
-async fn get_sqlalchemy_uri_for_druid_cluster(cluster_name: &String, namespace: &String, client: &Client) -> Result<String> {
+async fn get_sqlalchemy_uri_for_druid_cluster(
+    cluster_name: &String,
+    namespace: &String,
+    client: &Client,
+) -> Result<String> {
     client
         .get::<ConfigMap>(cluster_name, Some(namespace))
         .await
@@ -157,10 +168,21 @@ async fn get_sqlalchemy_uri_for_druid_cluster(cluster_name: &String, namespace: 
 async fn build_druid_db_yaml(druids: &Vec<DruidConnection>, client: &Client) -> Result<String> {
     let mut druids_formatted = Vec::new();
     for d in druids {
-        let name = if let Some(name) = d.name.clone() { name } else { d.cluster.clone() };
-        let namespace = if let Some(ns) = d.namespace.clone() { ns.to_string() } else { "default".to_string() };
+        let name = if let Some(name) = d.name.clone() {
+            name
+        } else {
+            d.cluster.clone()
+        };
+        let namespace = if let Some(ns) = d.namespace.clone() {
+            ns.to_string()
+        } else {
+            "default".to_string()
+        };
         let uri = get_sqlalchemy_uri_for_druid_cluster(&d.cluster, &namespace, client).await?;
-        druids_formatted.push(format!("- database_name: {}\n  sqlalchemy_uri: {}\n  tables: []\n", name, uri));
+        druids_formatted.push(format!(
+            "- database_name: {}\n  sqlalchemy_uri: {}\n  tables: []\n",
+            name, uri
+        ));
     }
     Ok(format!("databases:\n{}", druids_formatted.join("")))
 }
@@ -168,13 +190,20 @@ async fn build_druid_db_yaml(druids: &Vec<DruidConnection>, client: &Client) -> 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
-async fn build_add_druids_job(add_druids: &AddDruids, superset: &SupersetCluster, client: &Client) -> Result<Job> {
-    let mut commands = vec![
-    ];
-        let druid_info = build_druid_db_yaml(&add_druids.spec.druid_connections, client).await?;
-        commands.push(String::from(format!("echo \"{}\" > /tmp/druids.yaml", druid_info)));
-        commands.push(String::from("superset import_datasources -p /tmp/druids.yaml"));
-
+async fn build_add_druids_job(
+    add_druids: &AddDruids,
+    superset: &SupersetCluster,
+    client: &Client,
+) -> Result<Job> {
+    let mut commands = vec![];
+    let druid_info = build_druid_db_yaml(&add_druids.spec.druid_connections, client).await?;
+    commands.push(String::from(format!(
+        "echo \"{}\" > /tmp/druids.yaml",
+        druid_info
+    )));
+    commands.push(String::from(
+        "superset import_datasources -p /tmp/druids.yaml",
+    ));
 
     let version = superset_version(superset).context(NoSupersetVersion)?;
     let secret = &add_druids.spec.credentials_secret;

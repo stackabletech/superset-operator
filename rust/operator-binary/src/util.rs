@@ -1,19 +1,9 @@
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    k8s_openapi::{
-        api::{
-            core::v1::{EnvVar, EnvVarSource, SecretKeySelector},
-        },
-    },
-    kube::{
-        runtime::{
-            reflector::ObjectRef,
-        },
-    },
+    k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, SecretKeySelector},
+    kube::runtime::reflector::ObjectRef,
 };
-use stackable_superset_crd::{
-    SupersetCluster, SupersetClusterRef,
-};
+use stackable_superset_crd::{SupersetCluster, SupersetClusterRef};
 
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]

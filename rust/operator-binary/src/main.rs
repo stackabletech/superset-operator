@@ -17,7 +17,10 @@ use stackable_operator::{
         CustomResourceExt, Resource,
     },
 };
-use stackable_superset_crd::{commands::{Init, AddDruids}, SupersetCluster};
+use stackable_superset_crd::{
+    commands::{AddDruids, Init},
+    SupersetCluster,
+};
 use structopt::StructOpt;
 
 mod built_info {
@@ -109,18 +112,16 @@ async fn main() -> anyhow::Result<()> {
             futures::stream::select(
                 futures::stream::select(
                     superset_controller.map(erase_controller_result_type),
-                    init_controller.map(erase_controller_result_type)
+                    init_controller.map(erase_controller_result_type),
                 ),
-                add_druid_controller.map(erase_controller_result_type)
+                add_druid_controller.map(erase_controller_result_type),
             )
-
-                /*
+            /*
             futures::stream::select_all(vec![
                 superset_controller.map(erase_controller_result_type),
                 init_controller.map(erase_controller_result_type),
                 add_druid_controller.map(erase_controller_result_type)]
             )
-
                  */
             .for_each(|res| async {
                 match res {

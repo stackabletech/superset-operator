@@ -28,23 +28,23 @@ pub struct InitCommandSpec {
 
 #[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[kube(
-group = "command.superset.stackable.tech",
-version = "v1alpha1",
-kind = "AddDruids",
-plural = "adddruids",
-status = "CommandStatus",
-namespaced,
-crates(
-kube_core = "stackable_operator::kube::core",
-k8s_openapi = "stackable_operator::k8s_openapi",
-schemars = "stackable_operator::schemars"
-)
+    group = "command.superset.stackable.tech",
+    version = "v1alpha1",
+    kind = "AddDruids",
+    plural = "adddruids",
+    status = "CommandStatus",
+    namespaced,
+    crates(
+        kube_core = "stackable_operator::kube::core",
+        k8s_openapi = "stackable_operator::k8s_openapi",
+        schemars = "stackable_operator::schemars"
+    )
 )]
 #[serde(rename_all = "camelCase")]
 pub struct AddDruidsCommandSpec {
     pub cluster_ref: SupersetClusterRef,
     pub credentials_secret: String,
-    pub druid_connections: Vec<DruidConnection>
+    pub druid_connections: Vec<DruidConnection>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]

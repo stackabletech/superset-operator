@@ -1,5 +1,5 @@
 use stackable_operator::crd::CustomResourceExt;
-use stackable_superset_crd::commands::{Init, AddDruids};
+use stackable_superset_crd::commands::{AddDruids, Init};
 use stackable_superset_crd::SupersetCluster;
 
 fn main() {

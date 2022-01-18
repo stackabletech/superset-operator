@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use crate::util::{env_var_from_secret, find_superset_cluster_by_ref, superset_version};
 use futures::{future, StreamExt};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -28,7 +29,6 @@ use stackable_superset_crd::{
     commands::{CommandStatus, Init},
     SupersetCluster, SupersetClusterRef,
 };
-use crate::util::{env_var_from_secret, superset_version, find_superset_cluster_by_ref};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -40,9 +40,7 @@ pub struct Ctx {
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("failed to retrieve superset version"))]
-    NoSupersetVersion {
-        source: crate::util::Error,
-    },
+    NoSupersetVersion { source: crate::util::Error },
     #[snafu(display("failed to find superset with name {:?} in namespace {:?}", cluster_ref.name, cluster_ref.namespace))]
     SupersetClusterNotFound {
         source: crate::util::Error,
@@ -77,7 +75,10 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
     let client = &ctx.get_ref().client;
 
     let superset = find_superset_cluster_by_ref(client, &init.spec.cluster_ref)
-        .await.with_context(|| SupersetClusterNotFound {cluster_ref: init.spec.cluster_ref.clone()})?;
+        .await
+        .with_context(|| SupersetClusterNotFound {
+            cluster_ref: init.spec.cluster_ref.clone(),
+        })?;
 
     let job = build_init_job(&init, &superset).await?;
     client
