@@ -40,11 +40,11 @@ spec:
                         description: The Druid Cluster to connect
                         type: string
                       name:
-                        description: "The name, used internally by Superset for display purposes."
+                        description: "The name of the Druid instance, used internally by Superset for display purposes. If no name is given the value of [`cluster`] will be used."
                         nullable: true
                         type: string
                       namespace:
-                        description: "The namespace.  If not provided, the same namespace as the superset cluster will be assumed"
+                        description: "The namespace.  If not provided, \"default\" will be used"
                         nullable: true
                         type: string
                     required:
