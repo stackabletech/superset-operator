@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Druid DB connections can now be configured in a custom resource ([#71]).
+
+[#71]: https://github.com/stackabletech/superset-operator/pull/71
+
 ## [0.2.0] - 2021-12-17
 
 
