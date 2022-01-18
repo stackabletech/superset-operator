@@ -80,7 +80,7 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
             cluster_ref: init.spec.cluster_ref.clone(),
         })?;
 
-    let job = build_init_job(&init, &superset).await?;
+    let job = build_init_job(&init, &superset)?;
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
         .await
@@ -126,7 +126,7 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
-async fn build_init_job(init: &Init, superset: &SupersetCluster) -> Result<Job> {
+fn build_init_job(init: &Init, superset: &SupersetCluster) -> Result<Job> {
     let mut commands = vec![
         String::from(
             "superset fab create-admin \
