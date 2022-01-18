@@ -7,5 +7,3 @@ target/
 *.iml
 
 *.tgz
-deploy/helm/superset-operator/configs
-deploy/helm/superset-operator/templates/crds.yaml
