@@ -197,27 +197,6 @@ async fn build_init_job(init: &Init, superset: &SupersetCluster) -> Result<Job> 
     Ok(job)
 }
 
-async fn find_superset_cluster_of_init_command(
-    client: &stackable_operator::client::Client,
-    init: &Init,
-) -> Result<SupersetCluster, Error> {
-    if let SupersetClusterRef {
-        name: Some(superset_name),
-        namespace: maybe_superset_ns,
-    } = &init.spec.cluster_ref
-    {
-        let superset_ns = maybe_superset_ns.as_deref().unwrap_or("default");
-        client
-            .get::<SupersetCluster>(superset_name, Some(superset_ns))
-            .await
-            .with_context(|| FindSuperset {
-                superset: ObjectRef::new(superset_name).within(superset_ns),
-            })
-    } else {
-        InvalidSupersetReference.fail()
-    }
-}
-
 // Waits until the given job is completed.
 async fn wait_completed(client: &stackable_operator::client::Client, job: &Job) {
     let completed = |job: &Job| {

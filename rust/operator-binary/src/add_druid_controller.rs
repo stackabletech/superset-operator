@@ -173,6 +173,9 @@ async fn build_add_druids_job(add_druids: &AddDruids, superset: &SupersetCluster
     ];
         let druid_info = build_druid_db_yaml(&add_druids.spec.druid_connections, client).await?;
         commands.push(String::from(format!("echo \"{}\" > /tmp/druids.yaml", druid_info)));
+        // Retry 3 times
+        // TODO Add more error logic (Maybe something like an error status
+        // Also maybe disable k8s retrying
         commands.push(String::from("for i in 1 2 3; do superset import_datasources -p /tmp/druids.yaml && break || sleep 30; done"));
 
 
@@ -193,11 +196,6 @@ async fn build_add_druids_job(add_druids: &AddDruids, superset: &SupersetCluster
                 secret,
                 "connections.sqlalchemyDatabaseUri",
             ),
-            env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username"),
-            env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname"),
-            env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname"),
-            env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email"),
-            env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password"),
         ])
         .build();
 
