@@ -1,0 +1,80 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: adddruids.command.superset.stackable.tech
+spec:
+  group: command.superset.stackable.tech
+  names:
+    categories: []
+    kind: AddDruids
+    plural: adddruids
+    shortNames: []
+    singular: adddruids
+  scope: Namespaced
+  versions:
+    - additionalPrinterColumns: []
+      name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: "Auto-generated derived type for AddDruidsCommandSpec via `CustomResource`"
+          properties:
+            spec:
+              properties:
+                clusterRef:
+                  description: "A reference to a [`SupersetCluster`]"
+                  properties:
+                    name:
+                      nullable: true
+                      type: string
+                    namespace:
+                      nullable: true
+                      type: string
+                  type: object
+                credentialsSecret:
+                  type: string
+                druidConnections:
+                  items:
+                    properties:
+                      cluster:
+                        description: The Druid Cluster to connect
+                        type: string
+                      name:
+                        description: "The name, used internally by Superset for display purposes."
+                        nullable: true
+                        type: string
+                      namespace:
+                        description: "The namespace.  If not provided, the same namespace as the superset cluster will be assumed"
+                        nullable: true
+                        type: string
+                    required:
+                      - cluster
+                    type: object
+                  type: array
+              required:
+                - clusterRef
+                - credentialsSecret
+                - druidConnections
+              type: object
+            status:
+              nullable: true
+              properties:
+                finishedAt:
+                  description: Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.
+                  format: date-time
+                  nullable: true
+                  type: string
+                startedAt:
+                  description: Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.
+                  format: date-time
+                  nullable: true
+                  type: string
+              type: object
+          required:
+            - spec
+          title: AddDruids
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}

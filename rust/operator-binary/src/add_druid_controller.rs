@@ -204,7 +204,7 @@ async fn build_add_druids_job(add_druids: &AddDruids, superset: &SupersetCluster
     let pod = PodTemplateSpec {
         metadata: Some(
             ObjectMetaBuilder::new()
-                .name(format!("{}-init", superset.name()))
+                .name(format!("{}-adddruids", superset.name()))
                 .build(),
         ),
         spec: Some(PodSpec {
@@ -216,7 +216,7 @@ async fn build_add_druids_job(add_druids: &AddDruids, superset: &SupersetCluster
 
     let job = Job {
         metadata: ObjectMetaBuilder::new()
-            .name(format!("{}-init", superset.name()))
+            .name(format!("{}-adddruids", superset.name()))
             .namespace_opt(superset.metadata.namespace.clone())
             .ownerreference_from_resource(add_druids, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRef)?

@@ -17,7 +17,7 @@ use stackable_operator::{
         CustomResourceExt, Resource,
     },
 };
-use stackable_superset_crd::{commands::Init, SupersetCluster};
+use stackable_superset_crd::{commands::{Init, AddDruids}, SupersetCluster};
 use structopt::StructOpt;
 
 mod built_info {
@@ -97,10 +97,31 @@ async fn main() -> anyhow::Result<()> {
                     }),
                 );
 
+            let add_druid_controller =
+                Controller::new(client.get_all_api::<AddDruids>(), ListParams::default()).run(
+                    add_druid_controller::reconcile_add_druids,
+                    add_druid_controller::error_policy,
+                    Context::new(add_druid_controller::Ctx {
+                        client: client.clone(),
+                    }),
+                );
+
             futures::stream::select(
+                futures::stream::select(
+                    superset_controller.map(erase_controller_result_type),
+                    init_controller.map(erase_controller_result_type)
+                ),
+                add_druid_controller.map(erase_controller_result_type)
+            )
+
+                /*
+            futures::stream::select_all(vec![
                 superset_controller.map(erase_controller_result_type),
                 init_controller.map(erase_controller_result_type),
+                add_druid_controller.map(erase_controller_result_type)]
             )
+
+                 */
             .for_each(|res| async {
                 match res {
                     Ok((obj, _)) => tracing::info!(object = %obj, "Reconciled object"),
