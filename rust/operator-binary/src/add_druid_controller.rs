@@ -145,27 +145,27 @@ pub async fn reconcile_add_druids(
 }
 
 async fn get_sqlalchemy_uri_for_druid_cluster(
-    cluster_name: &String,
-    namespace: &String,
+    cluster_name: &str,
+    namespace: &str,
     client: &Client,
 ) -> Result<String> {
     client
         .get::<ConfigMap>(cluster_name, Some(namespace))
         .await
         .with_context(|| GetDruidConnStringConfigMap {
-            cm_name: cluster_name.clone(),
-            namespace: namespace.clone(),
+            cm_name: cluster_name.to_string(),
+            namespace: namespace.to_string(),
         })?
         .data
         .and_then(|mut data| data.remove("DRUID_SQLALCHEMY"))
         .with_context(|| MissingDruidConnString {
-            cm_name: cluster_name.clone(),
-            namespace: namespace.clone(),
+            cm_name: cluster_name.to_string(),
+            namespace: namespace.to_string(),
         })
 }
 
 /// Returns a yaml document read to be imported with "superset import-datasources"
-async fn build_druid_db_yaml(druids: &Vec<DruidConnection>, client: &Client) -> Result<String> {
+async fn build_druid_db_yaml(druids: &[DruidConnection], client: &Client) -> Result<String> {
     let mut druids_formatted = Vec::new();
     for d in druids {
         let name = if let Some(name) = d.name.clone() {
@@ -197,10 +197,7 @@ async fn build_add_druids_job(
 ) -> Result<Job> {
     let mut commands = vec![];
     let druid_info = build_druid_db_yaml(&add_druids.spec.druid_connections, client).await?;
-    commands.push(String::from(format!(
-        "echo \"{}\" > /tmp/druids.yaml",
-        druid_info
-    )));
+    commands.push(format!("echo \"{}\" > /tmp/druids.yaml", druid_info));
     commands.push(String::from(
         "superset import_datasources -p /tmp/druids.yaml",
     ));
