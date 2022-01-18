@@ -210,7 +210,7 @@ fn build_node_rolegroup_service(
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
-/// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
+/// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_node_rolegroup_service`]).
 fn build_server_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     superset: &SupersetCluster,
