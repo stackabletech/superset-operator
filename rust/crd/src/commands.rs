@@ -52,9 +52,10 @@ pub struct AddDruidsCommandSpec {
 pub struct DruidConnection {
     /// The Druid Cluster to connect
     pub cluster: String,
-    /// The namespace.  If not provided, the same namespace as the superset cluster will be assumed
+    /// The namespace.  If not provided, "default" will be used
     pub namespace: Option<String>,
-    /// The name, used internally by Superset for display purposes.
+    /// The name of the Druid instance, used internally by Superset for display purposes.
+    /// If no name is given the value of [`cluster`] will be used.
     pub name: Option<String>,
 }
 

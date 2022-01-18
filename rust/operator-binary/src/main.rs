@@ -116,13 +116,6 @@ async fn main() -> anyhow::Result<()> {
                 ),
                 add_druid_controller.map(erase_controller_result_type),
             )
-            /*
-            futures::stream::select_all(vec![
-                superset_controller.map(erase_controller_result_type),
-                init_controller.map(erase_controller_result_type),
-                add_druid_controller.map(erase_controller_result_type)]
-            )
-                 */
             .for_each(|res| async {
                 match res {
                     Ok((obj, _)) => tracing::info!(object = %obj, "Reconciled object"),
