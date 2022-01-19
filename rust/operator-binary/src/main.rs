@@ -91,8 +91,23 @@ async fn main() -> anyhow::Result<()> {
                 }),
             );
 
-            let init_controller =
-                Controller::new(client.get_all_api::<Init>(), ListParams::default()).run(
+            let init_controller_builder = Controller::new(client.get_all_api::<Init>(), ListParams::default());
+            let init_store = init_controller_builder.store();
+            let init_controller = init_controller_builder
+                // We gotta watch jobs so we can react to finished init jobs
+                // and update our status accordingly
+                    .watches(
+                        client.get_all_api::<Job>(),
+                        ListParams::default(),
+                        move |job| {
+                            init_store.state().into_iter().filter(move |init| {
+                                init.metadata.namespace == job.metadata.namespace &&
+                                    format!("{}-init", init.metadata.name) == job.metadata.name
+                            })
+                                .map(|init| ObjectRef::from_obj(&init))
+                        }
+                    )
+                    .run(
                     init_controller::reconcile_init,
                     init_controller::error_policy,
                     Context::new(init_controller::Ctx {

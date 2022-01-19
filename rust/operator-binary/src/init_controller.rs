@@ -29,6 +29,7 @@ use stackable_superset_crd::{
     commands::{CommandStatus, Init},
     SupersetCluster, SupersetClusterRef,
 };
+use stackable_superset_crd::commands::{InitCommandStatus, InitCommandStatusCondition};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -66,6 +67,11 @@ pub enum Error {
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
+    #[snafu(display("database state is 'initializing' but failed to find job {}/{}", namespace, name))]
+    GetInitializationJob {
+        namespace: String,
+        name: String,
+    },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -74,48 +80,81 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
 
     let client = &ctx.get_ref().client;
 
-    let superset = find_superset_cluster_by_ref(client, &init.spec.cluster_ref)
-        .await
-        .with_context(|| SupersetClusterNotFound {
-            cluster_ref: init.spec.cluster_ref.clone(),
-        })?;
+    if let Some(s) = init.status {
+        match s.condition {
+            InitCommandStatusCondition::Provisioned => {
+                // Check if the referenced cluster exists,
+                // Check if the referenced secret exists
+                // Check all the other stuff, and if something is missing, report it in status
+                // If everything is ready, schedule the job and set status to "initializing"
+                let superset = find_superset_cluster_by_ref(client, &init.spec.cluster_ref)
+                    .await
+                    .with_context(|| SupersetClusterNotFound {
+                        cluster_ref: init.spec.cluster_ref.clone(),
+                    })?;
+                let job = build_init_job(&init, &superset)?;
+                client
+                    .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
+                    .await
+                    .with_context(|| ApplyJob {
+                        superset: ObjectRef::from_obj(&superset),
+                    })?;
+                // TODO we need to watch the job somehow. it would be great if we could add a watch for just this one.
+                // The job is started, update status to reflect new state
+                client.apply_patch_status(FIELD_MANAGER_SCOPE, &init, &init.status.initializing());
+            },
+            InitCommandStatusCondition::Initializing => {
+                // In here, check the associated job that is running.
+                // If it is still running, do nothing. If it completed, set status to ready, if it failed, set status to failed.
+                // TODO we need to fetch the job here
+                // we need namespace/name.
+                let ns = init.metadata.namespace;
+                let job_name = format!("{}-init", init.metadata.name);
+                let job = client.get::<Job>(&job_name, Some(ns))
+                    .await
+                    .with_context(|| GetInitializationJob {
+                        namespace: ns,
+                        name: job_name,
+                    })?;
 
-    let job = build_init_job(&init, &superset)?;
-    client
-        .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
-        .await
-        .with_context(|| ApplyJob {
-            superset: ObjectRef::from_obj(&superset),
-        })?;
+                let completed =
+                    job.status
+                        .as_ref()
+                        .and_then(|status| status.conditions.clone())
+                        .unwrap_or_default()
+                        .into_iter()
+                        .any(|condition| condition.type_ == "Complete" && condition.status == "True");
 
-    if init.status == None {
-        let started_at = Some(Time(Utc::now()));
-        client
-            .apply_patch_status(
-                FIELD_MANAGER_SCOPE,
-                &init,
-                &CommandStatus {
-                    started_at: started_at.to_owned(),
-                    finished_at: None,
-                },
-            )
-            .await
-            .context(ApplyStatus)?;
-
-        wait_completed(client, &job).await;
-
-        let finished_at = Some(Time(Utc::now()));
-        client
-            .apply_patch_status(
-                FIELD_MANAGER_SCOPE,
-                &init,
-                &CommandStatus {
-                    started_at,
-                    finished_at,
-                },
-            )
-            .await
-            .context(ApplyStatus)?;
+                if completed {
+                    client.apply_patch_status(FIELD_MANAGER_SCOPE, &init, &init.status.ready());
+                }
+                // TODO also check for failed condition and update state accordingly
+                // Also, should we clean up the job/pods?
+            },
+            InitCommandStatusCondition::Ready => {
+                /*
+                let finished_at = Some(Time(Utc::now()));
+                client
+                    .apply_patch_status(
+                        FIELD_MANAGER_SCOPE,
+                        &init,
+                        &CommandStatus {
+                            started_at,
+                            finished_at,
+                        },
+                    )
+                    .await
+                    .context(ApplyStatus)?;
+                    
+                 */
+            },
+            InitCommandStatusCondition::Failed => (),
+        }
+    } else {
+        // Status is none => initialize the status object as "Provisioned"
+        let new_status = InitCommandStatus::new();
+        client.apply_patch_status(FIELD_MANAGER_SCOPE, &init, &new_status).await.context(ApplyStatus)?;
+        // TODO I think this should then automatically trigger a reconcile, because an object changed.
     }
 
     Ok(ReconcilerAction {
@@ -196,25 +235,6 @@ fn build_init_job(init: &Init, superset: &SupersetCluster) -> Result<Job> {
     };
 
     Ok(job)
-}
-
-// Waits until the given job is completed.
-async fn wait_completed(client: &stackable_operator::client::Client, job: &Job) {
-    let completed = |job: &Job| {
-        job.status
-            .as_ref()
-            .and_then(|status| status.conditions.clone())
-            .unwrap_or_default()
-            .into_iter()
-            .any(|condition| condition.type_ == "Complete" && condition.status == "True")
-    };
-
-    let lp = ListParams::default().fields(&format!("metadata.name={}", job.name()));
-    let api = client.get_api(Some(job.namespace().as_deref().unwrap_or("default")));
-    let watcher = runtime::watcher(api, lp).boxed();
-    runtime::utils::try_flatten_applied(watcher)
-        .any(|res| future::ready(res.as_ref().map(|job| completed(job)).unwrap_or(false)))
-        .await;
 }
 
 pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {

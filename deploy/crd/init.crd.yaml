@@ -43,16 +43,20 @@ spec:
             status:
               nullable: true
               properties:
-                finishedAt:
-                  description: Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.
-                  format: date-time
-                  nullable: true
+                condition:
+                  enum:
+                    - Provisioned
+                    - Initializing
+                    - Ready
+                    - Failed
                   type: string
                 startedAt:
                   description: Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.
                   format: date-time
                   nullable: true
                   type: string
+              required:
+                - condition
               type: object
           required:
             - spec
