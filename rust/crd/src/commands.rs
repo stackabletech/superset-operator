@@ -32,14 +32,14 @@ pub struct InitCommandSpec {
 pub struct InitCommandStatus {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub started_at: Option<Time>,
-    pub condition: InitCommandStatusCondition
+    pub condition: InitCommandStatusCondition,
 }
 
 impl InitCommandStatus {
     pub fn new() -> InitCommandStatus {
         InitCommandStatus {
             started_at: Some(Time(Utc::now())).to_owned(),
-            condition: InitCommandStatusCondition::Provisioned
+            condition: InitCommandStatusCondition::Provisioned,
         }
     }
 
@@ -62,16 +62,13 @@ impl InitCommandStatus {
     }
 }
 
-#[derive(
-Clone, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize,
-)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize)]
 pub enum InitCommandStatusCondition {
     Provisioned,
     Initializing,
     Ready,
-    Failed
+    Failed,
 }
-
 
 #[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[kube(

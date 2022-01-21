@@ -6,7 +6,7 @@ mod util;
 use futures::StreamExt;
 use stackable_operator::{
     cli::Command,
-    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
+    k8s_openapi::api::{apps::v1::StatefulSet, batch::v1::Job, core::v1::Service},
     kube::{
         api::{DynamicObject, ListParams},
         runtime::{
@@ -91,23 +91,27 @@ async fn main() -> anyhow::Result<()> {
                 }),
             );
 
-            let init_controller_builder = Controller::new(client.get_all_api::<Init>(), ListParams::default());
+            let init_controller_builder =
+                Controller::new(client.get_all_api::<Init>(), ListParams::default());
             let init_store = init_controller_builder.store();
             let init_controller = init_controller_builder
                 // We gotta watch jobs so we can react to finished init jobs
                 // and update our status accordingly
-                    .watches(
-                        client.get_all_api::<Job>(),
-                        ListParams::default(),
-                        move |job| {
-                            init_store.state().into_iter().filter(move |init| {
-                                init.metadata.namespace == job.metadata.namespace &&
-                                    format!("{}-init", init.metadata.name) == job.metadata.name
+                .watches(
+                    client.get_all_api::<Job>(),
+                    ListParams::default(),
+                    move |job| {
+                        init_store
+                            .state()
+                            .into_iter()
+                            .filter(move |init| {
+                                init.metadata.namespace.as_ref().unwrap() == job.metadata.namespace.as_ref().unwrap()
+                                    && &format!("{}-init", init.metadata.name.as_ref().unwrap()) == job.metadata.name.as_ref().unwrap()
                             })
-                                .map(|init| ObjectRef::from_obj(&init))
-                        }
-                    )
-                    .run(
+                            .map(|init| ObjectRef::from_obj(&init))
+                    },
+                )
+                .run(
                     init_controller::reconcile_init,
                     init_controller::error_policy,
                     Context::new(init_controller::Ctx {

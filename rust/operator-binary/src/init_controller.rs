@@ -3,33 +3,23 @@
 use std::time::Duration;
 
 use crate::util::{env_var_from_secret, find_superset_cluster_by_ref, superset_version};
-use futures::{future, StreamExt};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder},
-    k8s_openapi::{
-        api::{
-            batch::v1::{Job, JobSpec},
-            core::v1::{PodSpec, PodTemplateSpec},
-        },
-        apimachinery::pkg::apis::meta::v1::Time,
-        chrono::Utc,
+    k8s_openapi::api::{
+        batch::v1::{Job, JobSpec},
+        core::v1::{PodSpec, PodTemplateSpec},
     },
     kube::{
-        api::ListParams,
         runtime::{
-            self,
             controller::{Context, ReconcilerAction},
             reflector::ObjectRef,
         },
         ResourceExt,
     },
 };
-use stackable_superset_crd::{
-    commands::{CommandStatus, Init},
-    SupersetCluster, SupersetClusterRef,
-};
 use stackable_superset_crd::commands::{InitCommandStatus, InitCommandStatusCondition};
+use stackable_superset_crd::{commands::Init, SupersetCluster, SupersetClusterRef};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -63,12 +53,19 @@ pub enum Error {
     ApplyStatus {
         source: stackable_operator::error::Error,
     },
+    #[snafu(display("The init object {}/{} is missing its status", namespace, name))]
+    InitStatusMissing { namespace: String, name: String },
     #[snafu(display("object is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("database state is 'initializing' but failed to find job {}/{}", namespace, name))]
+    #[snafu(display(
+        "database state is 'initializing' but failed to find job {}/{}",
+        namespace,
+        name
+    ))]
     GetInitializationJob {
+        source: stackable_operator::error::Error,
         namespace: String,
         name: String,
     },
@@ -80,7 +77,7 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
 
     let client = &ctx.get_ref().client;
 
-    if let Some(s) = init.status {
+    if let Some(ref s) = init.status {
         match s.condition {
             InitCommandStatusCondition::Provisioned => {
                 // Check if the referenced cluster exists,
@@ -89,48 +86,56 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
                 // If everything is ready, schedule the job and set status to "initializing"
                 let superset = find_superset_cluster_by_ref(client, &init.spec.cluster_ref)
                     .await
-                    .with_context(|| SupersetClusterNotFound {
+                    .context(SupersetClusterNotFound {
                         cluster_ref: init.spec.cluster_ref.clone(),
                     })?;
                 let job = build_init_job(&init, &superset)?;
                 client
                     .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
                     .await
-                    .with_context(|| ApplyJob {
+                    .context(ApplyJob {
                         superset: ObjectRef::from_obj(&superset),
                     })?;
-                // TODO we need to watch the job somehow. it would be great if we could add a watch for just this one.
                 // The job is started, update status to reflect new state
-                client.apply_patch_status(FIELD_MANAGER_SCOPE, &init, &init.status.initializing());
-            },
+                client.apply_patch_status(
+                    FIELD_MANAGER_SCOPE,
+                    &init,
+                    &s.initializing(),
+                ).await.context(ApplyStatus)?;
+            }
             InitCommandStatusCondition::Initializing => {
                 // In here, check the associated job that is running.
                 // If it is still running, do nothing. If it completed, set status to ready, if it failed, set status to failed.
                 // TODO we need to fetch the job here
                 // we need namespace/name.
-                let ns = init.metadata.namespace;
-                let job_name = format!("{}-init", init.metadata.name);
-                let job = client.get::<Job>(&job_name, Some(ns))
-                    .await
-                    .with_context(|| GetInitializationJob {
+                let ns = init.metadata.namespace.clone().unwrap();
+                let job_name = format!("{}-init", init.metadata.name.clone().unwrap());
+                let job = client.get::<Job>(&job_name, Some(&ns)).await.context(
+                    GetInitializationJob {
                         namespace: ns,
                         name: job_name,
-                    })?;
+                    },
+                )?;
 
-                let completed =
-                    job.status
-                        .as_ref()
-                        .and_then(|status| status.conditions.clone())
-                        .unwrap_or_default()
-                        .into_iter()
-                        .any(|condition| condition.type_ == "Complete" && condition.status == "True");
+                let completed = job
+                    .status
+                    .as_ref()
+                    .and_then(|status| status.conditions.clone())
+                    .unwrap_or_default()
+                    .into_iter()
+                    .any(|condition| condition.type_ == "Complete" && condition.status == "True");
 
                 if completed {
-                    client.apply_patch_status(FIELD_MANAGER_SCOPE, &init, &init.status.ready());
+
+                    client.apply_patch_status(
+                        FIELD_MANAGER_SCOPE,
+                        &init,
+                        &s.ready(),
+                    ).await.context(ApplyStatus)?;
                 }
                 // TODO also check for failed condition and update state accordingly
                 // Also, should we clean up the job/pods?
-            },
+            }
             InitCommandStatusCondition::Ready => {
                 /*
                 let finished_at = Some(Time(Utc::now()));
@@ -145,15 +150,17 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
                     )
                     .await
                     .context(ApplyStatus)?;
-                    
                  */
-            },
+            }
             InitCommandStatusCondition::Failed => (),
         }
     } else {
         // Status is none => initialize the status object as "Provisioned"
         let new_status = InitCommandStatus::new();
-        client.apply_patch_status(FIELD_MANAGER_SCOPE, &init, &new_status).await.context(ApplyStatus)?;
+        client
+            .apply_patch_status(FIELD_MANAGER_SCOPE, &init, &new_status)
+            .await
+            .context(ApplyStatus)?;
         // TODO I think this should then automatically trigger a reconcile, because an object changed.
     }
 
