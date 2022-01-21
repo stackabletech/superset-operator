@@ -156,7 +156,6 @@ pub async fn reconcile_superset_db(superset_db: SupersetDB, ctx: Context<Ctx>) -
             .apply_patch_status(FIELD_MANAGER_SCOPE, &superset_db, &new_status)
             .await
             .context(ApplyStatus)?;
-        // TODO I think this should then automatically trigger a reconcile, because an object changed.
     }
 
     Ok(ReconcilerAction {

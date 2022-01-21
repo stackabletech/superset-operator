@@ -1,5 +1,5 @@
 use stackable_operator::crd::CustomResourceExt;
-use stackable_superset_crd::commands::{AddDruids, SupersetDB};
+use stackable_superset_crd::commands::{DruidConnection, SupersetDB};
 use stackable_superset_crd::SupersetCluster;
 
 fn main() {
@@ -7,5 +7,5 @@ fn main() {
 
     SupersetCluster::write_yaml_schema("../../deploy/crd/supersetcluster.crd.yaml").unwrap();
     SupersetDB::write_yaml_schema("../../deploy/crd/supersetdb.crd.yaml").unwrap();
-    AddDruids::write_yaml_schema("../../deploy/crd/adddruids.crd.yaml").unwrap();
+    DruidConnection::write_yaml_schema("../../deploy/crd/druidconnection.crd.yaml").unwrap();
 }

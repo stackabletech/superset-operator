@@ -18,7 +18,7 @@ use stackable_operator::{
     },
 };
 use stackable_superset_crd::{
-    commands::{AddDruids, SupersetDB},
+    commands::{DruidConnection, SupersetDB},
     SupersetCluster,
 };
 use structopt::StructOpt;
@@ -119,9 +119,9 @@ async fn main() -> anyhow::Result<()> {
                     }),
                 );
 
-            let add_druid_controller =
-                Controller::new(client.get_all_api::<AddDruids>(), ListParams::default()).run(
-                    add_druid_controller::reconcile_add_druids,
+            let druid_connection_controller =
+                Controller::new(client.get_all_api::<DruidConnection>(), ListParams::default()).run(
+                    add_druid_controller::reconcile_druid_connection,
                     add_druid_controller::error_policy,
                     Context::new(add_druid_controller::Ctx {
                         client: client.clone(),
@@ -133,7 +133,7 @@ async fn main() -> anyhow::Result<()> {
                     superset_controller.map(erase_controller_result_type),
                     superset_db_controller.map(erase_controller_result_type),
                 ),
-                add_druid_controller.map(erase_controller_result_type),
+                druid_connection_controller.map(erase_controller_result_type),
             )
             .for_each(|res| async {
                 match res {

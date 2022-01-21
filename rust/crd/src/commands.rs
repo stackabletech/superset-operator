@@ -3,8 +3,7 @@ use stackable_operator::k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use stackable_operator::k8s_openapi::chrono::Utc;
 use stackable_operator::kube::CustomResource;
 use stackable_operator::schemars::{self, JsonSchema};
-
-use crate::SupersetClusterRef;
+use stackable_operator::kube::ResourceExt;
 
 #[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[kube(
@@ -25,6 +24,12 @@ pub struct SupersetDBSpec {
     pub superset_version: String,
     pub credentials_secret: String,
     pub load_examples: bool,
+}
+
+impl SupersetDB {
+    pub fn job_name(&self) -> String {
+        self.name()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]
@@ -74,9 +79,9 @@ pub enum InitCommandStatusCondition {
 #[kube(
     group = "command.superset.stackable.tech",
     version = "v1alpha1",
-    kind = "AddDruids",
-    plural = "adddruids",
-    status = "CommandStatus",
+    kind = "DruidConnection",
+    plural = "druidconnections",
+    status = "DruidConnectionStatus",
     namespaced,
     crates(
         kube_core = "stackable_operator::kube::core",
@@ -85,29 +90,60 @@ pub enum InitCommandStatusCondition {
     )
 )]
 #[serde(rename_all = "camelCase")]
-pub struct AddDruidsCommandSpec {
-    pub cluster_ref: SupersetClusterRef,
-    pub credentials_secret: String,
-    pub druid_connections: Vec<DruidConnection>,
+pub struct DruidConnectionSpec {
+    pub superset_db_name: String,
+    pub superset_db_namespace: String,
+    pub druid_cluster_name: String,
+    pub druid_cluster_namespace: String,
+}
+
+impl DruidConnection {
+    pub fn job_name(&self) -> String {
+        format!("{}-import", self.name())
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct DruidConnection {
-    /// The Druid Cluster to connect
-    pub cluster: String,
-    /// The namespace.  If not provided, "default" will be used
-    pub namespace: Option<String>,
-    /// The name of the Druid instance, used internally by Superset for display purposes.
-    /// If no name is given the value of [`cluster`] will be used.
-    pub name: Option<String>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct CommandStatus {
+pub struct DruidConnectionStatus {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub started_at: Option<Time>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub finished_at: Option<Time>,
+    pub condition: DruidConnectionStatusCondition,
+}
+
+impl DruidConnectionStatus {
+    pub fn new() -> Self {
+        Self {
+            started_at: Some(Time(Utc::now())).to_owned(),
+            condition: DruidConnectionStatusCondition::Provisioned,
+        }
+    }
+
+    pub fn importing(&self) -> Self {
+        let mut new = self.clone();
+        new.condition = DruidConnectionStatusCondition::Importing;
+        new
+    }
+
+    pub fn ready(&self) -> Self {
+        let mut new = self.clone();
+        new.condition = DruidConnectionStatusCondition::Ready;
+        new
+    }
+
+    pub fn failed(&self) -> Self {
+        let mut new = self.clone();
+        new.condition = DruidConnectionStatusCondition::Failed;
+        new
+    }
+}
+
+
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize)]
+pub enum DruidConnectionStatusCondition {
+    Provisioned,
+    Importing,
+    Ready,
+    Failed,
 }
