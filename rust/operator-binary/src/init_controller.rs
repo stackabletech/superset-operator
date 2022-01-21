@@ -109,7 +109,7 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
                 // TODO we need to fetch the job here
                 // we need namespace/name.
                 let ns = init.metadata.namespace.clone().unwrap();
-                let job_name = format!("{}-init", init.metadata.name.clone().unwrap());
+                let job_name = init.metadata.name.clone().unwrap();
                 let job = client.get::<Job>(&job_name, Some(&ns)).await.context(
                     GetInitializationJob {
                         namespace: ns,
@@ -229,8 +229,8 @@ fn build_init_job(init: &Init, superset: &SupersetCluster) -> Result<Job> {
 
     let job = Job {
         metadata: ObjectMetaBuilder::new()
-            .name(format!("{}-init", superset.name()))
-            .namespace_opt(superset.metadata.namespace.clone())
+            .name(init.metadata.name.as_ref().unwrap())
+            .namespace_opt(init.metadata.namespace.clone())
             .ownerreference_from_resource(init, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRef)?
             .build(),

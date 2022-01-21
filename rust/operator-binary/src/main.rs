@@ -106,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
                             .into_iter()
                             .filter(move |init| {
                                 init.metadata.namespace.as_ref().unwrap() == job.metadata.namespace.as_ref().unwrap()
-                                    && &format!("{}-init", init.metadata.name.as_ref().unwrap()) == job.metadata.name.as_ref().unwrap()
+                                    && init.metadata.name.as_ref().unwrap() == job.metadata.name.as_ref().unwrap()
                             })
                             .map(|init| ObjectRef::from_obj(&init))
                     },
