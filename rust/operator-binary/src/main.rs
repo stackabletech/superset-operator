@@ -1,5 +1,5 @@
-mod add_druid_controller;
-mod init_controller;
+mod druid_connection_controller;
+mod superset_db_controller;
 mod superset_controller;
 mod util;
 
@@ -112,18 +112,18 @@ async fn main() -> anyhow::Result<()> {
                     },
                 )
                 .run(
-                    init_controller::reconcile_superset_db,
-                    init_controller::error_policy,
-                    Context::new(init_controller::Ctx {
+                    superset_db_controller::reconcile_superset_db,
+                    superset_db_controller::error_policy,
+                    Context::new(superset_db_controller::Ctx {
                         client: client.clone(),
                     }),
                 );
 
             let druid_connection_controller =
                 Controller::new(client.get_all_api::<DruidConnection>(), ListParams::default()).run(
-                    add_druid_controller::reconcile_druid_connection,
-                    add_druid_controller::error_policy,
-                    Context::new(add_druid_controller::Ctx {
+                    druid_connection_controller::reconcile_druid_connection,
+                    druid_connection_controller::error_policy,
+                    Context::new(druid_connection_controller::Ctx {
                         client: client.clone(),
                     }),
                 );

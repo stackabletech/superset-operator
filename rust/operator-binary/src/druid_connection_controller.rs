@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use crate::util::{env_var_from_secret};
-use futures::{future, StreamExt};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::client::Client;
 use stackable_operator::{
@@ -13,13 +12,10 @@ use stackable_operator::{
         },
     },
     kube::{
-        api::ListParams,
         runtime::{
-            self,
             controller::{Context, ReconcilerAction},
             reflector::ObjectRef,
         },
-        ResourceExt,
     },
 };
 use stackable_superset_crd::{
@@ -308,25 +304,6 @@ async fn build_import_job(
     };
 
     Ok(job)
-}
-
-// Waits until the given job is completed.
-async fn wait_completed(client: &stackable_operator::client::Client, job: &Job) {
-    let completed = |job: &Job| {
-        job.status
-            .as_ref()
-            .and_then(|status| status.conditions.clone())
-            .unwrap_or_default()
-            .into_iter()
-            .any(|condition| condition.type_ == "Complete" && condition.status == "True")
-    };
-
-    let lp = ListParams::default().fields(&format!("metadata.name={}", job.name()));
-    let api = client.get_api(Some(job.namespace().as_deref().unwrap_or("default")));
-    let watcher = runtime::watcher(api, lp).boxed();
-    runtime::utils::try_flatten_applied(watcher)
-        .any(|res| future::ready(res.as_ref().map(|job| completed(job)).unwrap_or(false)))
-        .await;
 }
 
 pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
