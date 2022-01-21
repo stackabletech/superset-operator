@@ -10,9 +10,9 @@ use crate::SupersetClusterRef;
 #[kube(
     group = "command.superset.stackable.tech",
     version = "v1alpha1",
-    kind = "Init",
-    plural = "inits",
-    status = "InitCommandStatus",
+    kind = "SupersetDB",
+    plural = "supersetdbs",
+    status = "SupersetDBStatus",
     namespaced,
     crates(
         kube_core = "stackable_operator::kube::core",
@@ -21,41 +21,41 @@ use crate::SupersetClusterRef;
     )
 )]
 #[serde(rename_all = "camelCase")]
-pub struct InitCommandSpec {
-    pub cluster_ref: SupersetClusterRef,
+pub struct SupersetDBSpec {
+    pub superset_version: String,
     pub credentials_secret: String,
     pub load_examples: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct InitCommandStatus {
+pub struct SupersetDBStatus {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub started_at: Option<Time>,
     pub condition: InitCommandStatusCondition,
 }
 
-impl InitCommandStatus {
-    pub fn new() -> InitCommandStatus {
-        InitCommandStatus {
+impl SupersetDBStatus {
+    pub fn new() -> Self {
+        Self {
             started_at: Some(Time(Utc::now())).to_owned(),
             condition: InitCommandStatusCondition::Provisioned,
         }
     }
 
-    pub fn initializing(&self) -> InitCommandStatus {
+    pub fn initializing(&self) -> Self {
         let mut new = self.clone();
         new.condition = InitCommandStatusCondition::Initializing;
         new
     }
 
-    pub fn ready(&self) -> InitCommandStatus {
+    pub fn ready(&self) -> Self {
         let mut new = self.clone();
         new.condition = InitCommandStatusCondition::Ready;
         new
     }
 
-    pub fn failed(&self) -> InitCommandStatus {
+    pub fn failed(&self) -> Self {
         let mut new = self.clone();
         new.condition = InitCommandStatusCondition::Failed;
         new

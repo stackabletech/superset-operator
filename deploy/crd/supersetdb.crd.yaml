@@ -2,43 +2,35 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: inits.command.superset.stackable.tech
+  name: supersetdbs.command.superset.stackable.tech
 spec:
   group: command.superset.stackable.tech
   names:
     categories: []
-    kind: Init
-    plural: inits
+    kind: SupersetDB
+    plural: supersetdbs
     shortNames: []
-    singular: init
+    singular: supersetdb
   scope: Namespaced
   versions:
     - additionalPrinterColumns: []
       name: v1alpha1
       schema:
         openAPIV3Schema:
-          description: "Auto-generated derived type for InitCommandSpec via `CustomResource`"
+          description: "Auto-generated derived type for SupersetDBSpec via `CustomResource`"
           properties:
             spec:
               properties:
-                clusterRef:
-                  description: "A reference to a [`SupersetCluster`]"
-                  properties:
-                    name:
-                      nullable: true
-                      type: string
-                    namespace:
-                      nullable: true
-                      type: string
-                  type: object
                 credentialsSecret:
                   type: string
                 loadExamples:
                   type: boolean
+                supersetVersion:
+                  type: string
               required:
-                - clusterRef
                 - credentialsSecret
                 - loadExamples
+                - supersetVersion
               type: object
             status:
               nullable: true
@@ -60,7 +52,7 @@ spec:
               type: object
           required:
             - spec
-          title: Init
+          title: SupersetDB
           type: object
       served: true
       storage: true

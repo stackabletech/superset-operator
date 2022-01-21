@@ -18,7 +18,7 @@ use stackable_operator::{
     },
 };
 use stackable_superset_crd::{
-    commands::{AddDruids, Init},
+    commands::{AddDruids, SupersetDB},
     SupersetCluster,
 };
 use structopt::StructOpt;
@@ -57,7 +57,7 @@ async fn main() -> anyhow::Result<()> {
         Command::Crd => println!(
             "{}{}",
             serde_yaml::to_string(&SupersetCluster::crd())?,
-            serde_yaml::to_string(&Init::crd())?
+            serde_yaml::to_string(&SupersetDB::crd())?
         ),
         Command::Run { product_config } => {
             stackable_operator::utils::print_startup_string(
@@ -91,28 +91,28 @@ async fn main() -> anyhow::Result<()> {
                 }),
             );
 
-            let init_controller_builder =
-                Controller::new(client.get_all_api::<Init>(), ListParams::default());
-            let init_store = init_controller_builder.store();
-            let init_controller = init_controller_builder
+            let superset_db_controller_builder =
+                Controller::new(client.get_all_api::<SupersetDB>(), ListParams::default());
+            let superset_db_store = superset_db_controller_builder.store();
+            let superset_db_controller = superset_db_controller_builder
                 // We gotta watch jobs so we can react to finished init jobs
                 // and update our status accordingly
                 .watches(
                     client.get_all_api::<Job>(),
                     ListParams::default(),
                     move |job| {
-                        init_store
+                        superset_db_store
                             .state()
                             .into_iter()
-                            .filter(move |init| {
-                                init.metadata.namespace.as_ref().unwrap() == job.metadata.namespace.as_ref().unwrap()
-                                    && init.metadata.name.as_ref().unwrap() == job.metadata.name.as_ref().unwrap()
+                            .filter(move |superset_db| {
+                                superset_db.metadata.namespace.as_ref().unwrap() == job.metadata.namespace.as_ref().unwrap()
+                                    && superset_db.metadata.name.as_ref().unwrap() == job.metadata.name.as_ref().unwrap()
                             })
-                            .map(|init| ObjectRef::from_obj(&init))
+                            .map(|superset_db| ObjectRef::from_obj(&superset_db))
                     },
                 )
                 .run(
-                    init_controller::reconcile_init,
+                    init_controller::reconcile_superset_db,
                     init_controller::error_policy,
                     Context::new(init_controller::Ctx {
                         client: client.clone(),
@@ -131,7 +131,7 @@ async fn main() -> anyhow::Result<()> {
             futures::stream::select(
                 futures::stream::select(
                     superset_controller.map(erase_controller_result_type),
-                    init_controller.map(erase_controller_result_type),
+                    superset_db_controller.map(erase_controller_result_type),
                 ),
                 add_druid_controller.map(erase_controller_result_type),
             )
