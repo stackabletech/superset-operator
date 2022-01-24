@@ -74,7 +74,7 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
         .await
-        .with_context(|| ApplyJob {
+        .with_context(|_| ApplyJobSnafu {
             superset: ObjectRef::from_obj(&superset),
         })?;
 
@@ -90,7 +90,7 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
                 },
             )
             .await
-            .context(ApplyStatus)?;
+            .context(ApplyStatusSnafu)?;
 
         wait_completed(client, &job).await;
 
@@ -105,7 +105,7 @@ pub async fn reconcile_init(init: Init, ctx: Context<Ctx>) -> Result<ReconcilerA
                 },
             )
             .await
-            .context(ApplyStatus)?;
+            .context(ApplyStatusSnafu)?;
     }
 
     Ok(ReconcilerAction {
@@ -173,7 +173,7 @@ fn build_init_job(init: &Init, superset: &SupersetCluster) -> Result<Job> {
             .name(format!("{}-init", superset.name()))
             .namespace_opt(superset.metadata.namespace.clone())
             .ownerreference_from_resource(init, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRef)?
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .build(),
         spec: Some(JobSpec {
             template: pod,
@@ -198,11 +198,11 @@ async fn find_superset_cluster_of_init_command(
         client
             .get::<SupersetCluster>(superset_name, Some(superset_ns))
             .await
-            .with_context(|| FindSuperset {
+            .with_context(|_| FindSupersetSnafu {
                 superset: ObjectRef::new(superset_name).within(superset_ns),
             })
     } else {
-        InvalidSupersetReference.fail()
+        InvalidSupersetReferenceSnafu.fail()
     }
 }
 
@@ -226,7 +226,11 @@ async fn wait_completed(client: &stackable_operator::client::Client, job: &Job) 
 }
 
 pub fn superset_version(superset: &SupersetCluster) -> Result<&str> {
-    superset.spec.version.as_deref().context(ObjectHasNoVersion)
+    superset
+        .spec
+        .version
+        .as_deref()
+        .context(ObjectHasNoVersionSnafu)
 }
 
 pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
