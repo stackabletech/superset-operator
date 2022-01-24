@@ -75,9 +75,10 @@ pub enum SupersetRole {
     Node,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetConfig {
+    #[serde(default)]
     pub credentials_secret: String,
 }
 
