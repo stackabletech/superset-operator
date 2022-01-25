@@ -46,7 +46,7 @@ pub enum Error {
         source: crate::util::Error,
         cluster_ref: SupersetClusterRef,
     },
-    #[snafu(display("failed to apply Job for AddDruid"))] // TODO add more info here
+    #[snafu(display("failed to apply Job for Druid Connection"))]
     ApplyJob {
         source: stackable_operator::error::Error,
     },
@@ -174,10 +174,6 @@ pub async fn reconcile_druid_connection(
                 }
             }
             DruidConnectionStatusCondition::Importing => {
-                // In here, check the associated job that is running.
-                // If it is still running, do nothing. If it completed, set status to ready, if it failed, set status to failed.
-                // TODO we need to fetch the job here
-                // we need namespace/name.
                 let ns = druid_connection.metadata.namespace.clone().unwrap();
                 let job_name = druid_connection.job_name();
                 let job = client
