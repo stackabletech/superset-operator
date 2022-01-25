@@ -106,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
                             .into_iter()
                             .filter(move |superset_db| {
                                 superset_db.metadata.namespace.as_ref().unwrap() == job.metadata.namespace.as_ref().unwrap()
-                                    && superset_db.metadata.name.as_ref().unwrap() == job.metadata.name.as_ref().unwrap()
+                                    && superset_db.metadata.name.as_ref().unwrap() == job.metadata.name.as_ref().unwrap() // TODO use job_name here
                             })
                             .map(|superset_db| ObjectRef::from_obj(&superset_db))
                     },
@@ -118,9 +118,40 @@ async fn main() -> anyhow::Result<()> {
                         client: client.clone(),
                     }),
                 );
-
+            let druid_connection_controller_builder = Controller::new(client.get_all_api::<DruidConnection>(), ListParams::default());
+            let druid_connection_store = druid_connection_controller_builder.store();
+            let druid_connection_store2 = druid_connection_controller_builder.store();  // TODO this is ugly
             let druid_connection_controller =
-                Controller::new(client.get_all_api::<DruidConnection>(), ListParams::default()).run(
+                druid_connection_controller_builder
+                    .watches(
+                        client.get_all_api::<SupersetDB>(),
+                        ListParams::default(),
+                        move |sdb| {
+                            druid_connection_store
+                                .state()
+                                .into_iter()
+                                .filter(move |druid_connection| {
+                                    &druid_connection.spec.superset_db_namespace == sdb.metadata.namespace.as_ref().unwrap()
+                                        && &druid_connection.spec.superset_db_name == sdb.metadata.name.as_ref().unwrap()
+                                })
+                                .map(|druid_connection| ObjectRef::from_obj(&druid_connection))
+                        },
+                    )
+                    .watches(
+                        client.get_all_api::<Job>(),
+                        ListParams::default(),
+                        move |job| {
+                            druid_connection_store2
+                                .state()
+                                .into_iter()
+                                .filter(move |druid_connection| {
+                                    druid_connection.metadata.namespace.as_ref().unwrap() == job.metadata.namespace.as_ref().unwrap()
+                                        && &druid_connection.job_name() == job.metadata.name.as_ref().unwrap()
+                                })
+                                .map(|druid_connection| ObjectRef::from_obj(&druid_connection))
+                        },
+                    )
+                    .run(
                     druid_connection_controller::reconcile_druid_connection,
                     druid_connection_controller::error_policy,
                     Context::new(druid_connection_controller::Ctx {
