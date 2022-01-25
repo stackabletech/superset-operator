@@ -6,8 +6,8 @@ mod util;
 use clap::Parser;
 use futures::StreamExt;
 use stackable_operator::{
-    k8s_openapi::api::{apps::v1::StatefulSet, batch::v1::Job, core::v1::Service},
     cli::{Command, ProductOperatorRun},
+    k8s_openapi::api::{apps::v1::StatefulSet, batch::v1::Job, core::v1::Service},
     kube::{
         api::{DynamicObject, ListParams},
         runtime::{
