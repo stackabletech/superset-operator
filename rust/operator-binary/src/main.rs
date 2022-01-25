@@ -82,6 +82,7 @@ async fn main() -> anyhow::Result<()> {
             )
             .owns(client.get_all_api::<Service>(), ListParams::default())
             .owns(client.get_all_api::<StatefulSet>(), ListParams::default())
+            .shutdown_on_signal()
             .run(
                 superset_controller::reconcile_superset,
                 superset_controller::error_policy,
@@ -95,6 +96,7 @@ async fn main() -> anyhow::Result<()> {
                 Controller::new(client.get_all_api::<SupersetDB>(), ListParams::default());
             let superset_db_store = superset_db_controller_builder.store();
             let superset_db_controller = superset_db_controller_builder
+                .shutdown_on_signal()
                 // We gotta watch jobs so we can react to finished init jobs
                 // and update our status accordingly
                 .watches(
@@ -127,6 +129,7 @@ async fn main() -> anyhow::Result<()> {
             let druid_connection_store = druid_connection_controller_builder.store();
             let druid_connection_store2 = druid_connection_controller_builder.store(); // TODO this is ugly
             let druid_connection_controller = druid_connection_controller_builder
+                .shutdown_on_signal()
                 .watches(
                     client.get_all_api::<SupersetDB>(),
                     ListParams::default(),
