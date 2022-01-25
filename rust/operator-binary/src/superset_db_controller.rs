@@ -159,7 +159,6 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
         ),
         String::from("superset db upgrade"),
         String::from("superset init"),
-        String::from("false"),
     ];
     if superset_db.spec.load_examples {
         commands.push(String::from("superset load_examples"));
@@ -211,7 +210,6 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
             .build(),
         spec: Some(JobSpec {
             template: pod,
-            backoff_limit: Some(1),
             ..Default::default()
         }),
         status: None,
