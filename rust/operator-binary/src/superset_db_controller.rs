@@ -29,6 +29,7 @@ pub struct Ctx {
 
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
+#[snafu(context(suffix(false)))]
 pub enum Error {
     #[snafu(display("failed to retrieve superset version"))]
     NoSupersetVersion { source: crate::util::Error },
@@ -87,6 +88,7 @@ pub async fn reconcile_superset_db(
                 // Check if the referenced secret exists
                 // Check all the other stuff, and if something is missing, report it in status
                 // If everything is ready, schedule the job and set status to "initializing"
+                // TODO ensure that secret exists
                 let job = build_init_job(&superset_db)?;
                 client
                     .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)

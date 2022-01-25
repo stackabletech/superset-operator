@@ -5,6 +5,7 @@ use stackable_superset_crd::SupersetCluster;
 
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
+#[snafu(context(suffix(false)))]
 pub enum Error {
     #[snafu(display("object defines no version"))]
     ObjectHasNoVersion,

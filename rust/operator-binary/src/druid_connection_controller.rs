@@ -30,6 +30,7 @@ pub struct Ctx {
 
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
+#[snafu(context(suffix(false)))]
 pub enum Error {
     #[snafu(display("failed to retrieve superset version"))]
     NoSupersetVersion { source: crate::util::Error },
@@ -103,7 +104,7 @@ pub async fn reconcile_druid_connection(
     druid_connection: DruidConnection,
     ctx: Context<Ctx>,
 ) -> Result<ReconcilerAction> {
-    tracing::info!("Starting reconciling AddDruids");
+    tracing::info!("Starting reconciling DruidConnections");
 
     let client = &ctx.get_ref().client;
 
@@ -229,13 +230,13 @@ async fn get_sqlalchemy_uri_for_druid_cluster(
     client
         .get::<ConfigMap>(cluster_name, Some(namespace))
         .await
-        .with_context(|| GetDruidConnStringConfigMap {
+        .context(GetDruidConnStringConfigMap {
             cm_name: cluster_name.to_string(),
             namespace: namespace.to_string(),
         })?
         .data
         .and_then(|mut data| data.remove("DRUID_SQLALCHEMY"))
-        .with_context(|| MissingDruidConnString {
+        .context(MissingDruidConnString {
             cm_name: cluster_name.to_string(),
             namespace: namespace.to_string(),
         })
@@ -267,7 +268,7 @@ async fn build_import_job(
 
     let secret = &superset_db.spec.credentials_secret;
 
-    let container = ContainerBuilder::new("superset-add-druids")
+    let container = ContainerBuilder::new("superset-import-druid-connection")
         .image(format!(
             "docker.stackable.tech/stackable/superset:{}-stackable0",
             superset_db.spec.superset_version

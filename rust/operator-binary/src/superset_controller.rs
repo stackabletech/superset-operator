@@ -37,6 +37,7 @@ pub struct Ctx {
 
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
+#[snafu(context(suffix(false)))]
 pub enum Error {
     #[snafu(display("failed to retrieve superset version"))]
     NoSupersetVersion { source: crate::util::Error },
@@ -57,6 +58,10 @@ pub enum Error {
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
+    },
+    #[snafu(display("failed to generate product config"))]
+    GenerateProductConfig {
+        source: stackable_operator::product_config_utils::ConfigError,
     },
     #[snafu(display("invalid product config"))]
     InvalidProductConfig {
@@ -89,7 +94,8 @@ pub async fn reconcile_superset(
                 ),
             )]
             .into(),
-        ),
+        )
+        .context(GenerateProductConfig)?,
         &ctx.get_ref().product_config,
         false,
         false,
@@ -114,13 +120,13 @@ pub async fn reconcile_superset(
         client
             .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
             .await
-            .with_context(|| ApplyRoleGroupService {
+            .with_context(|_| ApplyRoleGroupService {
                 rolegroup: rolegroup.clone(),
             })?;
         client
             .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
             .await
-            .with_context(|| ApplyRoleGroupStatefulSet {
+            .with_context(|_| ApplyRoleGroupStatefulSet {
                 rolegroup: rolegroup.clone(),
             })?;
     }

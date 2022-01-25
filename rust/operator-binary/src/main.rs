@@ -3,10 +3,11 @@ mod superset_controller;
 mod superset_db_controller;
 mod util;
 
+use clap::Parser;
 use futures::StreamExt;
 use stackable_operator::{
-    cli::Command,
     k8s_openapi::api::{apps::v1::StatefulSet, batch::v1::Job, core::v1::Service},
+    cli::{Command, ProductOperatorRun},
     kube::{
         api::{DynamicObject, ListParams},
         runtime::{
@@ -21,7 +22,6 @@ use stackable_superset_crd::{
     commands::{DruidConnection, SupersetDB},
     SupersetCluster,
 };
-use structopt::StructOpt;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -30,10 +30,10 @@ mod built_info {
 pub const APP_NAME: &str = "superset";
 pub const APP_PORT: u16 = 8088;
 
-#[derive(StructOpt)]
-#[structopt(about = built_info::PKG_DESCRIPTION, author = stackable_operator::cli::AUTHOR)]
+#[derive(Parser)]
+#[clap(about = built_info::PKG_DESCRIPTION, author = stackable_operator::cli::AUTHOR)]
 struct Opts {
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     cmd: Command,
 }
 
@@ -52,14 +52,14 @@ fn erase_controller_result_type<K: Resource, E: std::error::Error + Send + Sync 
 async fn main() -> anyhow::Result<()> {
     stackable_operator::logging::initialize_logging("SUPERSET_OPERATOR_LOG");
 
-    let opts = Opts::from_args();
+    let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => println!(
             "{}{}",
             serde_yaml::to_string(&SupersetCluster::crd())?,
             serde_yaml::to_string(&SupersetDB::crd())?
         ),
-        Command::Run { product_config } => {
+        Command::Run(ProductOperatorRun { product_config }) => {
             stackable_operator::utils::print_startup_string(
                 built_info::PKG_DESCRIPTION,
                 built_info::PKG_VERSION,
@@ -73,7 +73,7 @@ async fn main() -> anyhow::Result<()> {
                 "/etc/stackable/superset-operator/config-spec/properties.yaml",
             ])?;
             let client = stackable_operator::client::create_client(Some(
-                "zookeeper.stackable.tech".to_string(),
+                "superset.stackable.tech".to_string(),
             ))
             .await?;
             let superset_controller = Controller::new(
