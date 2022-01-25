@@ -15,7 +15,7 @@ use stackable_operator::{
     },
 };
 use stackable_superset_crd::commands::{
-    DruidConnectionStatus, DruidConnectionStatusCondition, InitCommandStatusCondition,
+    DruidConnectionStatus, DruidConnectionStatusCondition, SupersetDBStatusCondition,
 };
 use stackable_superset_crd::{
     commands::{DruidConnection, SupersetDB},
@@ -128,7 +128,7 @@ pub async fn reconcile_druid_connection(
                         .context(SupersetDBRetrieval)?
                         .status;
                     if let Some(s) = superset_db_status {
-                        s.condition == InitCommandStatusCondition::Ready
+                        s.condition == SupersetDBStatusCondition::Ready
                     } else {
                         false
                     }

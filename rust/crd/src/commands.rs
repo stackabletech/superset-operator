@@ -37,38 +37,44 @@ impl SupersetDB {
 pub struct SupersetDBStatus {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub started_at: Option<Time>,
-    pub condition: InitCommandStatusCondition,
+    pub condition: SupersetDBStatusCondition,
 }
 
 impl SupersetDBStatus {
     pub fn new() -> Self {
         Self {
             started_at: Some(Time(Utc::now())),
-            condition: InitCommandStatusCondition::Provisioned,
+            condition: SupersetDBStatusCondition::Provisioned,
         }
     }
 
     pub fn initializing(&self) -> Self {
         let mut new = self.clone();
-        new.condition = InitCommandStatusCondition::Initializing;
+        new.condition = SupersetDBStatusCondition::Initializing;
         new
     }
 
     pub fn ready(&self) -> Self {
         let mut new = self.clone();
-        new.condition = InitCommandStatusCondition::Ready;
+        new.condition = SupersetDBStatusCondition::Ready;
         new
     }
 
     pub fn failed(&self) -> Self {
         let mut new = self.clone();
-        new.condition = InitCommandStatusCondition::Failed;
+        new.condition = SupersetDBStatusCondition::Failed;
         new
     }
 }
 
+impl Default for SupersetDBStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize)]
-pub enum InitCommandStatusCondition {
+pub enum SupersetDBStatusCondition {
     Provisioned,
     Initializing,
     Ready,
@@ -135,6 +141,12 @@ impl DruidConnectionStatus {
         let mut new = self.clone();
         new.condition = DruidConnectionStatusCondition::Failed;
         new
+    }
+}
+
+impl Default for DruidConnectionStatus {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

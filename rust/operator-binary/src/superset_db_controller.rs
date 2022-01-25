@@ -18,7 +18,7 @@ use stackable_operator::{
         ResourceExt,
     },
 };
-use stackable_superset_crd::commands::{InitCommandStatusCondition, SupersetDB, SupersetDBStatus};
+use stackable_superset_crd::commands::{SupersetDBStatusCondition, SupersetDB, SupersetDBStatus};
 use stackable_superset_crd::{SupersetCluster, SupersetClusterRef};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
@@ -82,7 +82,7 @@ pub async fn reconcile_superset_db(
 
     if let Some(ref s) = superset_db.status {
         match s.condition {
-            InitCommandStatusCondition::Provisioned => {
+            SupersetDBStatusCondition::Provisioned => {
                 // Check if the referenced cluster exists,
                 // Check if the referenced secret exists
                 // Check all the other stuff, and if something is missing, report it in status
@@ -100,7 +100,7 @@ pub async fn reconcile_superset_db(
                     .await
                     .context(ApplyStatus)?;
             }
-            InitCommandStatusCondition::Initializing => {
+            SupersetDBStatusCondition::Initializing => {
                 // In here, check the associated job that is running.
                 // If it is still running, do nothing. If it completed, set status to ready, if it failed, set status to failed.
                 // TODO we need to fetch the job here
@@ -127,8 +127,8 @@ pub async fn reconcile_superset_db(
                         .context(ApplyStatus)?;
                 }
             }
-            InitCommandStatusCondition::Ready => (),
-            InitCommandStatusCondition::Failed => (),
+            SupersetDBStatusCondition::Ready => (),
+            SupersetDBStatusCondition::Failed => (),
         }
     } else {
         // Status is none => initialize the status object as "Provisioned"
