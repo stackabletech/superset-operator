@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use stackable_operator::k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use stackable_operator::k8s_openapi::chrono::Utc;
 use stackable_operator::kube::CustomResource;
-use stackable_operator::schemars::{self, JsonSchema};
 use stackable_operator::kube::ResourceExt;
+use stackable_operator::schemars::{self, JsonSchema};
 
 #[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[kube(
@@ -43,7 +43,7 @@ pub struct SupersetDBStatus {
 impl SupersetDBStatus {
     pub fn new() -> Self {
         Self {
-            started_at: Some(Time(Utc::now())).to_owned(),
+            started_at: Some(Time(Utc::now())),
             condition: InitCommandStatusCondition::Provisioned,
         }
     }
@@ -114,7 +114,7 @@ pub struct DruidConnectionStatus {
 impl DruidConnectionStatus {
     pub fn new() -> Self {
         Self {
-            started_at: Some(Time(Utc::now())).to_owned(),
+            started_at: Some(Time(Utc::now())),
             condition: DruidConnectionStatusCondition::Provisioned,
         }
     }
@@ -137,8 +137,6 @@ impl DruidConnectionStatus {
         new
     }
 }
-
-
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize)]
 pub enum DruidConnectionStatusCondition {

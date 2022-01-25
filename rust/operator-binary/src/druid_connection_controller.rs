@@ -1,28 +1,26 @@
 use std::time::Duration;
 
-use crate::util::{env_var_from_secret};
+use crate::util::{env_var_from_secret, get_job_state, JobState};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::client::Client;
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder},
-    k8s_openapi::{
-        api::{
-            batch::v1::{Job, JobSpec},
-            core::v1::{ConfigMap, PodSpec, PodTemplateSpec},
-        },
+    k8s_openapi::api::{
+        batch::v1::{Job, JobSpec},
+        core::v1::{ConfigMap, PodSpec, PodTemplateSpec},
     },
-    kube::{
-        runtime::{
-            controller::{Context, ReconcilerAction},
-            reflector::ObjectRef,
-        },
+    kube::runtime::{
+        controller::{Context, ReconcilerAction},
+        reflector::ObjectRef,
     },
+};
+use stackable_superset_crd::commands::{
+    DruidConnectionStatus, DruidConnectionStatusCondition, InitCommandStatusCondition,
 };
 use stackable_superset_crd::{
-    commands::{SupersetDB, DruidConnection},
+    commands::{DruidConnection, SupersetDB},
     SupersetCluster, SupersetClusterRef,
 };
-use stackable_superset_crd::commands::{DruidConnectionStatus, DruidConnectionStatusCondition, InitCommandStatusCondition};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -47,7 +45,7 @@ pub enum Error {
         source: crate::util::Error,
         cluster_ref: SupersetClusterRef,
     },
-    #[snafu(display("failed to apply Job for AddDruid"))]  // TODO add more info here
+    #[snafu(display("failed to apply Job for AddDruid"))] // TODO add more info here
     ApplyJob {
         source: stackable_operator::error::Error,
     },
@@ -79,9 +77,9 @@ pub enum Error {
         namespace: Option<String>,
     },
     #[snafu(display(
-    "druid connection state is 'importing' but failed to find job {}/{}",
-    namespace,
-    name
+        "druid connection state is 'importing' but failed to find job {}/{}",
+        namespace,
+        name
     ))]
     GetImportJob {
         source: stackable_operator::error::Error,
@@ -97,7 +95,7 @@ pub enum Error {
     },
     SupersetDBRetrieval {
         source: stackable_operator::error::Error,
-    }
+    },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -111,20 +109,24 @@ pub async fn reconcile_druid_connection(
 
     if let Some(ref s) = druid_connection.status {
         match s.condition {
-
             DruidConnectionStatusCondition::Provisioned => {
-                // Check if the referenced cluster exists,
-                // Check if the referenced secret exists
-                // Check all the other stuff, and if something is missing, report it in status
-                // If everything is ready, schedule the job and set status to "initializing"
-                let superset_db_ready = if client.exists::<SupersetDB>(
-                    &druid_connection.spec.superset_db_name,
-                    Some(&druid_connection.spec.superset_db_namespace)
-                ).await.context(SupersetDBExistsCheck)? {
-                    let superset_db_status = client.get::<SupersetDB>(
+                // Is the superset DB object there, and is its status "Ready"?
+                let superset_db_ready = if client
+                    .exists::<SupersetDB>(
                         &druid_connection.spec.superset_db_name,
-                        Some(&druid_connection.spec.superset_db_namespace)
-                    ).await.context(SupersetDBRetrieval)?.status;
+                        Some(&druid_connection.spec.superset_db_namespace),
+                    )
+                    .await
+                    .context(SupersetDBExistsCheck)?
+                {
+                    let superset_db_status = client
+                        .get::<SupersetDB>(
+                            &druid_connection.spec.superset_db_name,
+                            Some(&druid_connection.spec.superset_db_namespace),
+                        )
+                        .await
+                        .context(SupersetDBRetrieval)?
+                        .status;
                     if let Some(s) = superset_db_status {
                         s.condition == InitCommandStatusCondition::Ready
                     } else {
@@ -133,32 +135,41 @@ pub async fn reconcile_druid_connection(
                 } else {
                     false
                 };
-                let druid_discovery_cm_exists = client.exists::<ConfigMap>(
-                    &druid_connection.spec.druid_cluster_name,
-                    Some(&druid_connection.spec.druid_cluster_namespace)
-                ).await.context(DruidDiscoveryCheck)?;
+                // Is the referenced druid discovery configmap there?
+                let druid_discovery_cm_exists = client
+                    .exists::<ConfigMap>(
+                        &druid_connection.spec.druid_cluster_name,
+                        Some(&druid_connection.spec.druid_cluster_namespace),
+                    )
+                    .await
+                    .context(DruidDiscoveryCheck)?;
 
                 if superset_db_ready && druid_discovery_cm_exists {
-                    let superset_db = client.get::<SupersetDB>(
-                        &druid_connection.spec.superset_db_name,
-                        Some(&druid_connection.spec.superset_db_namespace)
-                    ).await.context(SupersetDBRetrieval)?;
+                    let superset_db = client
+                        .get::<SupersetDB>(
+                            &druid_connection.spec.superset_db_name,
+                            Some(&druid_connection.spec.superset_db_namespace),
+                        )
+                        .await
+                        .context(SupersetDBRetrieval)?;
+                    // Everything is there, retrieve all necessary info and start the job
                     let sqlalchemy_str = get_sqlalchemy_uri_for_druid_cluster(
                         &druid_connection.spec.druid_cluster_name,
                         &druid_connection.spec.druid_cluster_namespace,
-                        client
-                    ).await?;
-                    let job = build_import_job(&druid_connection, &superset_db, &sqlalchemy_str).await?;
+                        client,
+                    )
+                    .await?;
+                    let job =
+                        build_import_job(&druid_connection, &superset_db, &sqlalchemy_str).await?;
                     client
                         .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
                         .await
                         .context(ApplyJob)?;
                     // The job is started, update status to reflect new state
-                    client.apply_patch_status(
-                        FIELD_MANAGER_SCOPE,
-                        &druid_connection,
-                        &s.importing(),
-                    ).await.context(ApplyStatus)?;
+                    client
+                        .apply_patch_status(FIELD_MANAGER_SCOPE, &druid_connection, &s.importing())
+                        .await
+                        .context(ApplyStatus)?;
                 }
             }
             DruidConnectionStatusCondition::Importing => {
@@ -168,38 +179,32 @@ pub async fn reconcile_druid_connection(
                 // we need namespace/name.
                 let ns = druid_connection.metadata.namespace.clone().unwrap();
                 let job_name = druid_connection.job_name();
-                let job = client.get::<Job>(&job_name, Some(&ns)).await.context(
-                    GetImportJob {
+                let job = client
+                    .get::<Job>(&job_name, Some(&ns))
+                    .await
+                    .context(GetImportJob {
                         namespace: ns,
                         name: job_name,
-                    },
-                )?;
+                    })?;
 
-                let completed = job
-                    .status
-                    .as_ref()
-                    .and_then(|status| status.conditions.clone())
-                    .unwrap_or_default()
-                    .into_iter()
-                    .any(|condition| condition.type_ == "Complete" && condition.status == "True");
+                let new_status = match get_job_state(&job) {
+                    JobState::Failed => Some(s.failed()),
+                    JobState::Complete => Some(s.ready()),
+                    JobState::InProgress => None,
+                };
 
-                if completed {
-                    client.apply_patch_status(
-                        FIELD_MANAGER_SCOPE,
-                        &druid_connection,
-                        &s.ready(),
-                    ).await.context(ApplyStatus)?;
+                if let Some(ns) = new_status {
+                    client
+                        .apply_patch_status(FIELD_MANAGER_SCOPE, &druid_connection, &ns)
+                        .await
+                        .context(ApplyStatus)?;
                 }
-                // TODO also check for failed condition and update state accordingly
-                // Also, should we clean up the job/pods?
             }
-            DruidConnectionStatusCondition::Ready => {
-
-            }
+            DruidConnectionStatusCondition::Ready => (),
             DruidConnectionStatusCondition::Failed => (),
-
         }
     } else {
+        // Status not set yet, initialize
         client
             .apply_patch_status(
                 FIELD_MANAGER_SCOPE,
@@ -209,7 +214,6 @@ pub async fn reconcile_druid_connection(
             .await
             .context(ApplyStatus)?;
     }
-
 
     Ok(ReconcilerAction {
         requeue_after: None,
@@ -239,7 +243,10 @@ async fn get_sqlalchemy_uri_for_druid_cluster(
 
 /// Returns a yaml document read to be imported with "superset import-datasources"
 fn build_druid_db_yaml(druid_cluster_name: &str, sqlalchemy_str: &str) -> Result<String> {
-    Ok(format!("databases:\n- database_name: {}\n  sqlalchemy_uri: {}\n  tables: []\n", druid_cluster_name, sqlalchemy_str))
+    Ok(format!(
+        "databases:\n- database_name: {}\n  sqlalchemy_uri: {}\n  tables: []\n",
+        druid_cluster_name, sqlalchemy_str
+    ))
 }
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
@@ -251,7 +258,8 @@ async fn build_import_job(
     sqlalchemy_str: &str,
 ) -> Result<Job> {
     let mut commands = vec![];
-    let druid_info = build_druid_db_yaml(&druid_connection.spec.druid_cluster_name, sqlalchemy_str)?;
+    let druid_info =
+        build_druid_db_yaml(&druid_connection.spec.druid_cluster_name, sqlalchemy_str)?;
     commands.push(format!("echo \"{}\" > /tmp/druids.yaml", druid_info));
     commands.push(String::from(
         "superset import_datasources -p /tmp/druids.yaml",

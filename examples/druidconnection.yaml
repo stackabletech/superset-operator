@@ -1,0 +1,9 @@
+apiVersion: command.superset.stackable.tech/v1alpha1
+kind: DruidConnection
+metadata:
+  name: superset-druid-connection
+spec:
+  supersetDbName: superset-cluster-backend-db
+  supersetDbNamespace: default
+  druidClusterName: derby-druid
+  druidClusterNamespace: default

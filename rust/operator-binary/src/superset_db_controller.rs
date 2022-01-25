@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use crate::util::{env_var_from_secret};
+use crate::util::{env_var_from_secret, get_job_state, JobState};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder},
@@ -18,7 +18,7 @@ use stackable_operator::{
         ResourceExt,
     },
 };
-use stackable_superset_crd::commands::{SupersetDBStatus, InitCommandStatusCondition, SupersetDB};
+use stackable_superset_crd::commands::{InitCommandStatusCondition, SupersetDB, SupersetDBStatus};
 use stackable_superset_crd::{SupersetCluster, SupersetClusterRef};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
@@ -72,7 +72,10 @@ pub enum Error {
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub async fn reconcile_superset_db(superset_db: SupersetDB, ctx: Context<Ctx>) -> Result<ReconcilerAction> {
+pub async fn reconcile_superset_db(
+    superset_db: SupersetDB,
+    ctx: Context<Ctx>,
+) -> Result<ReconcilerAction> {
     tracing::info!("Starting reconcile");
 
     let client = &ctx.get_ref().client;
@@ -92,11 +95,10 @@ pub async fn reconcile_superset_db(superset_db: SupersetDB, ctx: Context<Ctx>) -
                         superset_db: ObjectRef::from_obj(&superset_db),
                     })?;
                 // The job is started, update status to reflect new state
-                client.apply_patch_status(
-                    FIELD_MANAGER_SCOPE,
-                    &superset_db,
-                    &s.initializing(),
-                ).await.context(ApplyStatus)?;
+                client
+                    .apply_patch_status(FIELD_MANAGER_SCOPE, &superset_db, &s.initializing())
+                    .await
+                    .context(ApplyStatus)?;
             }
             InitCommandStatusCondition::Initializing => {
                 // In here, check the associated job that is running.
@@ -112,41 +114,20 @@ pub async fn reconcile_superset_db(superset_db: SupersetDB, ctx: Context<Ctx>) -
                     },
                 )?;
 
-                let completed = job
-                    .status
-                    .as_ref()
-                    .and_then(|status| status.conditions.clone())
-                    .unwrap_or_default()
-                    .into_iter()
-                    .any(|condition| condition.type_ == "Complete" && condition.status == "True");
+                let new_status = match get_job_state(&job) {
+                    JobState::Complete => Some(s.ready()),
+                    JobState::Failed => Some(s.failed()),
+                    JobState::InProgress => None,
+                };
 
-                if completed {
-
-                    client.apply_patch_status(
-                        FIELD_MANAGER_SCOPE,
-                        &superset_db,
-                        &s.ready(),
-                    ).await.context(ApplyStatus)?;
+                if let Some(ns) = new_status {
+                    client
+                        .apply_patch_status(FIELD_MANAGER_SCOPE, &superset_db, &ns)
+                        .await
+                        .context(ApplyStatus)?;
                 }
-                // TODO also check for failed condition and update state accordingly
-                // Also, should we clean up the job/pods?
             }
-            InitCommandStatusCondition::Ready => {
-                /*
-                let finished_at = Some(Time(Utc::now()));
-                client
-                    .apply_patch_status(
-                        FIELD_MANAGER_SCOPE,
-                        &init,
-                        &CommandStatus {
-                            started_at,
-                            finished_at,
-                        },
-                    )
-                    .await
-                    .context(ApplyStatus)?;
-                 */
-            }
+            InitCommandStatusCondition::Ready => (),
             InitCommandStatusCondition::Failed => (),
         }
     } else {
@@ -178,6 +159,7 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
         ),
         String::from("superset db upgrade"),
         String::from("superset init"),
+        String::from("false"),
     ];
     if superset_db.spec.load_examples {
         commands.push(String::from("superset load_examples"));
@@ -229,6 +211,7 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
             .build(),
         spec: Some(JobSpec {
             template: pod,
+            backoff_limit: Some(1),
             ..Default::default()
         }),
         status: None,
