@@ -97,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
             let superset_db_store = superset_db_controller_builder.store();
             let superset_db_controller = superset_db_controller_builder
                 .shutdown_on_signal()
-                // We gotta watch jobs so we can react to finished init jobs
+                // We have to watch jobs so we can react to finished init jobs
                 // and update our status accordingly
                 .watches(
                     client.get_all_api::<Job>(),
@@ -109,8 +109,8 @@ async fn main() -> anyhow::Result<()> {
                             .filter(move |superset_db| {
                                 superset_db.metadata.namespace.as_ref().unwrap()
                                     == job.metadata.namespace.as_ref().unwrap()
-                                    && superset_db.metadata.name.as_ref().unwrap()
-                                        == job.metadata.name.as_ref().unwrap() // TODO use job_name here
+                                    && &superset_db.job_name()
+                                        == job.metadata.name.as_ref().unwrap()
                             })
                             .map(|superset_db| ObjectRef::from_obj(&superset_db))
                     },
@@ -126,15 +126,15 @@ async fn main() -> anyhow::Result<()> {
                 client.get_all_api::<DruidConnection>(),
                 ListParams::default(),
             );
-            let druid_connection_store = druid_connection_controller_builder.store();
-            let druid_connection_store2 = druid_connection_controller_builder.store(); // TODO this is ugly
+            let druid_connection_store1 = druid_connection_controller_builder.store();
+            let druid_connection_store2 = druid_connection_controller_builder.store();
             let druid_connection_controller = druid_connection_controller_builder
                 .shutdown_on_signal()
                 .watches(
                     client.get_all_api::<SupersetDB>(),
                     ListParams::default(),
                     move |sdb| {
-                        druid_connection_store
+                        druid_connection_store1
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {

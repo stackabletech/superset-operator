@@ -18,7 +18,7 @@ use stackable_operator::{
         ResourceExt,
     },
 };
-use stackable_superset_crd::commands::{SupersetDBStatusCondition, SupersetDB, SupersetDBStatus};
+use stackable_superset_crd::commands::{SupersetDB, SupersetDBStatus, SupersetDBStatusCondition};
 use stackable_superset_crd::{SupersetCluster, SupersetClusterRef};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
@@ -106,7 +106,7 @@ pub async fn reconcile_superset_db(
                 // TODO we need to fetch the job here
                 // we need namespace/name.
                 let ns = superset_db.metadata.namespace.clone().unwrap();
-                let job_name = superset_db.metadata.name.clone().unwrap();
+                let job_name = superset_db.job_name();
                 let job = client.get::<Job>(&job_name, Some(&ns)).await.context(
                     GetInitializationJob {
                         namespace: ns,
