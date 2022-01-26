@@ -8,7 +8,7 @@ use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder},
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
-        core::v1::{PodSpec, PodTemplateSpec},
+        core::v1::{PodSpec, PodTemplateSpec, Secret},
     },
     kube::{
         runtime::{
@@ -70,6 +70,11 @@ pub enum Error {
         namespace: String,
         name: String,
     },
+    #[snafu(display("Failed to check whether the secret ({}) exists", secret_name))]
+    SecretCheck {
+        source: stackable_operator::error::Error,
+        secret_name: String,
+    },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -84,23 +89,29 @@ pub async fn reconcile_superset_db(
     if let Some(ref s) = superset_db.status {
         match s.condition {
             SupersetDBStatusCondition::Provisioned => {
-                // Check if the referenced cluster exists,
-                // Check if the referenced secret exists
-                // Check all the other stuff, and if something is missing, report it in status
-                // If everything is ready, schedule the job and set status to "initializing"
-                // TODO ensure that secret exists
-                let job = build_init_job(&superset_db)?;
-                client
-                    .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
+                let secret_exists = client
+                    .exists::<Secret>(
+                        &superset_db.spec.credentials_secret,
+                        superset_db.metadata.namespace.as_deref(),
+                    )
                     .await
-                    .context(ApplyJob {
-                        superset_db: ObjectRef::from_obj(&superset_db),
+                    .context(SecretCheck {
+                        secret_name: superset_db.spec.credentials_secret.clone(),
                     })?;
-                // The job is started, update status to reflect new state
-                client
-                    .apply_patch_status(FIELD_MANAGER_SCOPE, &superset_db, &s.initializing())
-                    .await
-                    .context(ApplyStatus)?;
+                if secret_exists {
+                    let job = build_init_job(&superset_db)?;
+                    client
+                        .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
+                        .await
+                        .context(ApplyJob {
+                            superset_db: ObjectRef::from_obj(&superset_db),
+                        })?;
+                    // The job is started, update status to reflect new state
+                    client
+                        .apply_patch_status(FIELD_MANAGER_SCOPE, &superset_db, &s.initializing())
+                        .await
+                        .context(ApplyStatus)?;
+                }
             }
             SupersetDBStatusCondition::Initializing => {
                 // In here, check the associated job that is running.

@@ -7,7 +7,11 @@ use clap::Parser;
 use futures::StreamExt;
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
-    k8s_openapi::api::{apps::v1::StatefulSet, batch::v1::Job, core::v1::Service},
+    k8s_openapi::api::{
+        apps::v1::StatefulSet,
+        batch::v1::Job,
+        core::v1::{Secret, Service},
+    },
     kube::{
         api::{DynamicObject, ListParams},
         runtime::{
@@ -94,16 +98,34 @@ async fn main() -> anyhow::Result<()> {
 
             let superset_db_controller_builder =
                 Controller::new(client.get_all_api::<SupersetDB>(), ListParams::default());
-            let superset_db_store = superset_db_controller_builder.store();
+            let superset_db_store1 = superset_db_controller_builder.store();
+            let superset_db_store2 = superset_db_controller_builder.store();
             let superset_db_controller = superset_db_controller_builder
                 .shutdown_on_signal()
+                .watches(
+                    client.get_all_api::<Secret>(),
+                    ListParams::default(),
+                    move |secret| {
+                        superset_db_store1
+                            .state()
+                            .into_iter()
+                            .filter(move |superset_db| {
+                                if let Some(n) = &secret.metadata.name {
+                                    &superset_db.spec.credentials_secret == n
+                                } else {
+                                    false
+                                }
+                            })
+                            .map(|superset_db| ObjectRef::from_obj(&superset_db))
+                    },
+                )
                 // We have to watch jobs so we can react to finished init jobs
                 // and update our status accordingly
                 .watches(
                     client.get_all_api::<Job>(),
                     ListParams::default(),
                     move |job| {
-                        superset_db_store
+                        superset_db_store2
                             .state()
                             .into_iter()
                             .filter(move |superset_db| {
