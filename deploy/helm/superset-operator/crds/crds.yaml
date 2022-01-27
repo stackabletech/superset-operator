@@ -2,63 +2,72 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: inits.command.superset.stackable.tech
+  name: druidconnections.command.superset.stackable.tech
   annotations:
     helm.sh/resource-policy: keep
 spec:
   group: command.superset.stackable.tech
   names:
     categories: []
-    kind: Init
-    plural: inits
+    kind: DruidConnection
+    plural: druidconnections
     shortNames: []
-    singular: init
+    singular: druidconnection
   scope: Namespaced
   versions:
     - additionalPrinterColumns: []
       name: v1alpha1
       schema:
         openAPIV3Schema:
-          description: "Auto-generated derived type for InitCommandSpec via `CustomResource`"
+          description: "Auto-generated derived type for DruidConnectionSpec via `CustomResource`"
           properties:
             spec:
               properties:
-                clusterRef:
-                  description: "A reference to a [`SupersetCluster`]"
+                druid:
                   properties:
                     name:
-                      nullable: true
                       type: string
                     namespace:
-                      nullable: true
                       type: string
+                  required:
+                    - name
+                    - namespace
                   type: object
-                credentialsSecret:
-                  type: string
-                loadExamples:
-                  type: boolean
+                superset:
+                  properties:
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                  required:
+                    - name
+                    - namespace
+                  type: object
               required:
-                - clusterRef
-                - credentialsSecret
-                - loadExamples
+                - druid
+                - superset
               type: object
             status:
               nullable: true
               properties:
-                finishedAt:
-                  description: Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.
-                  format: date-time
-                  nullable: true
+                condition:
+                  enum:
+                    - Provisioned
+                    - Importing
+                    - Ready
+                    - Failed
                   type: string
                 startedAt:
                   description: Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.
                   format: date-time
                   nullable: true
                   type: string
+              required:
+                - condition
               type: object
           required:
             - spec
-          title: Init
+          title: DruidConnection
           type: object
       served: true
       storage: true
@@ -90,6 +99,11 @@ spec:
           properties:
             spec:
               properties:
+                credentialsSecret:
+                  type: string
+                loadExamplesOnInit:
+                  nullable: true
+                  type: boolean
                 nodes:
                   nullable: true
                   properties:
@@ -100,10 +114,6 @@ spec:
                       type: object
                     config:
                       default: {}
-                      properties:
-                        credentialsSecret:
-                          default: ""
-                          type: string
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -127,10 +137,6 @@ spec:
                             type: object
                           config:
                             default: {}
-                            properties:
-                              credentialsSecret:
-                                default: ""
-                                type: string
                             type: object
                           configOverrides:
                             additionalProperties:
@@ -193,6 +199,8 @@ spec:
                   description: Desired Superset version
                   nullable: true
                   type: string
+              required:
+                - credentialsSecret
               type: object
             status:
               nullable: true
@@ -200,6 +208,68 @@ spec:
           required:
             - spec
           title: SupersetCluster
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: supersetdbs.command.superset.stackable.tech
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  group: command.superset.stackable.tech
+  names:
+    categories: []
+    kind: SupersetDB
+    plural: supersetdbs
+    shortNames: []
+    singular: supersetdb
+  scope: Namespaced
+  versions:
+    - additionalPrinterColumns: []
+      name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: "Auto-generated derived type for SupersetDBSpec via `CustomResource`"
+          properties:
+            spec:
+              properties:
+                credentialsSecret:
+                  type: string
+                loadExamples:
+                  type: boolean
+                supersetVersion:
+                  type: string
+              required:
+                - credentialsSecret
+                - loadExamples
+                - supersetVersion
+              type: object
+            status:
+              nullable: true
+              properties:
+                condition:
+                  enum:
+                    - Provisioned
+                    - Initializing
+                    - Ready
+                    - Failed
+                  type: string
+                startedAt:
+                  description: Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.
+                  format: date-time
+                  nullable: true
+                  type: string
+              required:
+                - condition
+              type: object
+          required:
+            - spec
+          title: SupersetDB
           type: object
       served: true
       storage: true
