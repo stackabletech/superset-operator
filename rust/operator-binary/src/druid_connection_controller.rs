@@ -112,16 +112,16 @@ pub async fn reconcile_druid_connection(
                 // Is the superset DB object there, and is its status "Ready"?
                 let superset_db_ready = if client
                     .exists::<SupersetDB>(
-                        &druid_connection.spec.superset_cluster_name,
-                        Some(&druid_connection.spec.superset_cluster_namespace),
+                        &druid_connection.spec.superset.name,
+                        Some(&druid_connection.spec.superset.namespace),
                     )
                     .await
                     .context(SupersetDBExistsCheck)?
                 {
                     let superset_db_status = client
                         .get::<SupersetDB>(
-                            &druid_connection.spec.superset_cluster_name,
-                            Some(&druid_connection.spec.superset_cluster_namespace),
+                            &druid_connection.spec.superset.name,
+                            Some(&druid_connection.spec.superset.namespace),
                         )
                         .await
                         .context(SupersetDBRetrieval)?
@@ -137,8 +137,8 @@ pub async fn reconcile_druid_connection(
                 // Is the referenced druid discovery configmap there?
                 let druid_discovery_cm_exists = client
                     .exists::<ConfigMap>(
-                        &druid_connection.spec.druid_cluster_name,
-                        Some(&druid_connection.spec.druid_cluster_namespace),
+                        &druid_connection.spec.druid.name,
+                        Some(&druid_connection.spec.druid.namespace),
                     )
                     .await
                     .context(DruidDiscoveryCheck)?;
@@ -146,15 +146,15 @@ pub async fn reconcile_druid_connection(
                 if superset_db_ready && druid_discovery_cm_exists {
                     let superset_db = client
                         .get::<SupersetDB>(
-                            &druid_connection.spec.superset_cluster_name,
-                            Some(&druid_connection.spec.superset_cluster_namespace),
+                            &druid_connection.spec.superset.name,
+                            Some(&druid_connection.spec.superset.namespace),
                         )
                         .await
                         .context(SupersetDBRetrieval)?;
                     // Everything is there, retrieve all necessary info and start the job
                     let sqlalchemy_str = get_sqlalchemy_uri_for_druid_cluster(
-                        &druid_connection.spec.druid_cluster_name,
-                        &druid_connection.spec.druid_cluster_namespace,
+                        &druid_connection.spec.druid.name,
+                        &druid_connection.spec.druid.namespace,
                         client,
                     )
                     .await?;
@@ -252,7 +252,7 @@ async fn build_import_job(
 ) -> Result<Job> {
     let mut commands = vec![];
     let druid_info =
-        build_druid_db_yaml(&druid_connection.spec.druid_cluster_name, sqlalchemy_str)?;
+        build_druid_db_yaml(&druid_connection.spec.druid.name, sqlalchemy_str)?;
     commands.push(format!("echo \"{}\" > /tmp/druids.yaml", druid_info));
     commands.push(String::from(
         "superset import_datasources -p /tmp/druids.yaml",

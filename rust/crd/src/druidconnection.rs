@@ -5,6 +5,13 @@ use stackable_operator::kube::CustomResource;
 use stackable_operator::kube::ResourceExt;
 use stackable_operator::schemars::{self, JsonSchema};
 
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClusterRef {
+    pub name: String,
+    pub namespace: String,
+}
+
 #[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "command.superset.stackable.tech",
@@ -21,10 +28,8 @@ use stackable_operator::schemars::{self, JsonSchema};
 )]
 #[serde(rename_all = "camelCase")]
 pub struct DruidConnectionSpec {
-    pub superset_cluster_name: String,
-    pub superset_cluster_namespace: String,
-    pub druid_cluster_name: String,
-    pub druid_cluster_namespace: String,
+    pub superset: ClusterRef,
+    pub druid: ClusterRef,
 }
 
 impl DruidConnection {
