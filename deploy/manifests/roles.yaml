@@ -82,7 +82,8 @@ rules:
   - apiGroups:
       - command.superset.stackable.tech
     resources:
-      - inits/status
+      - supersetdbs/status
+      - druidconnections/status
     verbs:
       - patch
   - apiGroups:
