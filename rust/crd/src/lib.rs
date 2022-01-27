@@ -39,6 +39,9 @@ pub struct SupersetClusterSpec {
     /// Desired Superset version
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    pub credentials_secret: String,
+    #[serde(default)]
+    pub load_examples_on_init: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nodes: Option<Role<SupersetConfig>>,
 }
@@ -78,8 +81,6 @@ pub enum SupersetRole {
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetConfig {
-    #[serde(default)]
-    pub credentials_secret: String,
 }
 
 impl SupersetConfig {
@@ -91,12 +92,12 @@ impl Configuration for SupersetConfig {
 
     fn compute_env(
         &self,
-        _resource: &Self::Configurable,
+        cluster: &Self::Configurable,
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         Ok([(
             Self::CREDENTIALS_SECRET_PROPERTY.to_string(),
-            Some(self.credentials_secret.clone()),
+            Some(cluster.spec.credentials_secret.clone()),
         )]
         .into())
     }

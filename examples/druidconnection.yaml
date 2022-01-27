@@ -3,7 +3,7 @@ kind: DruidConnection
 metadata:
   name: superset-druid-connection
 spec:
-  supersetDbName: superset-cluster-backend-db
+  supersetDbName: superset
   supersetDbNamespace: default
   druidClusterName: derby-druid
   druidClusterNamespace: default

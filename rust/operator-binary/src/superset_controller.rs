@@ -9,6 +9,7 @@ use std::{
 use crate::{
     util::{env_var_from_secret, superset_version},
     APP_NAME, APP_PORT,
+    SupersetDB,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -49,6 +50,15 @@ pub enum Error {
     ApplyRoleService {
         source: stackable_operator::error::Error,
     },
+
+    #[snafu(display("failed to apply Superset DB"))]
+    CreateSupersetObject {
+        source: stackable_superset_crd::commands::Error,
+    },
+    #[snafu(display("failed to apply Superset DB"))]
+    ApplySupersetDB {
+        source: stackable_operator::error::Error,
+    },
     #[snafu(display("failed to apply Service for {}", rolegroup))]
     ApplyRoleGroupService {
         source: stackable_operator::error::Error,
@@ -81,6 +91,15 @@ pub async fn reconcile_superset(
     tracing::info!("Starting reconcile");
 
     let client = &ctx.get_ref().client;
+
+    // Ensure DB Schema is set up
+    let superset_db = SupersetDB::for_superset(&superset).context(CreateSupersetObject)?;
+
+    client
+        .apply_patch(FIELD_MANAGER_SCOPE, &superset_db, dbg!(&superset_db))
+        .await
+        .context(ApplySupersetDB)?;
+
 
     let validated_config = validate_all_roles_and_groups_config(
         superset_version(&superset).context(NoSupersetVersion)?,

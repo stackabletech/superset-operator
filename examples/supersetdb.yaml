@@ -1,8 +1,0 @@
-apiVersion: command.superset.stackable.tech/v1alpha1
-kind: SupersetDB
-metadata:
-  name: superset-cluster-backend-db
-spec:
-  supersetVersion: 1.3.2
-  credentialsSecret: simple-superset-credentials
-  loadExamples: false
