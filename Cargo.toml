@@ -1,6 +1,3 @@
 [workspace]
 members = ["rust/crd", "rust/operator-binary"]
 
-# TODO remove this again before merging into main
-[patch."git+https://github.com/stackabletech/operator-rs.git"]
-stackable-operator = { git = "https://github.com/stackabletech//operator-rs.git", branch = "main" }
