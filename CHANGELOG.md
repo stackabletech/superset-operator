@@ -12,6 +12,7 @@
 - All dependencies upgraded. The upgrade to operator-rs 0.8.0 does not
   force the credentials secret to be set anymore in the custom resource
   but it is still required ([#82]).
+- - `operator-rs` `0.8.0` → `0.9.0` ([#71])
 
 [#70]: https://github.com/stackabletech/superset-operator/pull/70
 [#71]: https://github.com/stackabletech/superset-operator/pull/71
