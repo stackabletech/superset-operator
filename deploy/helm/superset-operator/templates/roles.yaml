@@ -82,7 +82,8 @@ rules:
   - apiGroups:
       - command.{{ include "operator.name" . }}.stackable.tech
     resources:
-      - inits/status
+      - supersetdbs/status
+      - druidconnections/status
     verbs:
       - patch
   - apiGroups:
