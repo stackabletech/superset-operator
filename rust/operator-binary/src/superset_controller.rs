@@ -94,9 +94,8 @@ pub async fn reconcile_superset(
 
     // Ensure DB Schema is set up
     let superset_db = SupersetDB::for_superset(&superset).context(CreateSupersetObject)?;
-
     client
-        .apply_patch(FIELD_MANAGER_SCOPE, &superset_db, dbg!(&superset_db))
+        .apply_patch(FIELD_MANAGER_SCOPE, &superset_db, &superset_db)
         .await
         .context(ApplySupersetDB)?;
 
