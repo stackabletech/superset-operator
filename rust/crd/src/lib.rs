@@ -1,4 +1,5 @@
-pub mod commands;
+pub mod druidconnection;
+pub mod supersetdb;
 
 use std::collections::BTreeMap;
 

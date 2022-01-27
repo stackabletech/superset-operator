@@ -18,7 +18,7 @@ use stackable_operator::{
         ResourceExt,
     },
 };
-use stackable_superset_crd::commands::{SupersetDB, SupersetDBStatus, SupersetDBStatusCondition};
+use stackable_superset_crd::supersetdb::{SupersetDB, SupersetDBStatus, SupersetDBStatusCondition};
 use stackable_superset_crd::{SupersetCluster, SupersetClusterRef};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";

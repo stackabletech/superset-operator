@@ -14,11 +14,9 @@ use stackable_operator::{
         reflector::ObjectRef,
     },
 };
-use stackable_superset_crd::commands::{
-    DruidConnectionStatus, DruidConnectionStatusCondition, SupersetDBStatusCondition,
-};
+use stackable_superset_crd::druidconnection::{DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition};
+use stackable_superset_crd::supersetdb::{SupersetDB, SupersetDBStatusCondition};
 use stackable_superset_crd::{
-    commands::{DruidConnection, SupersetDB},
     SupersetCluster, SupersetClusterRef,
 };
 
@@ -114,16 +112,16 @@ pub async fn reconcile_druid_connection(
                 // Is the superset DB object there, and is its status "Ready"?
                 let superset_db_ready = if client
                     .exists::<SupersetDB>(
-                        &druid_connection.spec.superset_db_name,
-                        Some(&druid_connection.spec.superset_db_namespace),
+                        &druid_connection.spec.superset_cluster_name,
+                        Some(&druid_connection.spec.superset_cluster_namespace),
                     )
                     .await
                     .context(SupersetDBExistsCheck)?
                 {
                     let superset_db_status = client
                         .get::<SupersetDB>(
-                            &druid_connection.spec.superset_db_name,
-                            Some(&druid_connection.spec.superset_db_namespace),
+                            &druid_connection.spec.superset_cluster_name,
+                            Some(&druid_connection.spec.superset_cluster_namespace),
                         )
                         .await
                         .context(SupersetDBRetrieval)?
@@ -148,8 +146,8 @@ pub async fn reconcile_druid_connection(
                 if superset_db_ready && druid_discovery_cm_exists {
                     let superset_db = client
                         .get::<SupersetDB>(
-                            &druid_connection.spec.superset_db_name,
-                            Some(&druid_connection.spec.superset_db_namespace),
+                            &druid_connection.spec.superset_cluster_name,
+                            Some(&druid_connection.spec.superset_cluster_namespace),
                         )
                         .await
                         .context(SupersetDBRetrieval)?;

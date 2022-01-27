@@ -1,5 +1,6 @@
 use stackable_operator::crd::CustomResourceExt;
-use stackable_superset_crd::commands::{DruidConnection, SupersetDB};
+use stackable_superset_crd::druidconnection::DruidConnection;
+use stackable_superset_crd::supersetdb::SupersetDB;
 use stackable_superset_crd::SupersetCluster;
 
 fn main() {

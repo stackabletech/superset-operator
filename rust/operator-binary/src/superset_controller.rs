@@ -9,7 +9,6 @@ use std::{
 use crate::{
     util::{env_var_from_secret, superset_version},
     APP_NAME, APP_PORT,
-    SupersetDB,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -28,6 +27,7 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 use stackable_superset_crd::{SupersetCluster, SupersetConfig, SupersetRole};
+use stackable_superset_crd::supersetdb::SupersetDB;
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -53,7 +53,7 @@ pub enum Error {
 
     #[snafu(display("failed to apply Superset DB"))]
     CreateSupersetObject {
-        source: stackable_superset_crd::commands::Error,
+        source: stackable_superset_crd::supersetdb::Error,
     },
     #[snafu(display("failed to apply Superset DB"))]
     ApplySupersetDB {

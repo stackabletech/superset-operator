@@ -25,15 +25,15 @@ spec:
                   type: string
                 druidClusterNamespace:
                   type: string
-                supersetDbName:
+                supersetClusterName:
                   type: string
-                supersetDbNamespace:
+                supersetClusterNamespace:
                   type: string
               required:
                 - druidClusterName
                 - druidClusterNamespace
-                - supersetDbName
-                - supersetDbNamespace
+                - supersetClusterName
+                - supersetClusterNamespace
               type: object
             status:
               nullable: true
