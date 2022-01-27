@@ -82,10 +82,10 @@ rules:
       - watch
   - apiGroups:
       - command.{{ include "operator.name" . }}.stackable.tech
-      resources:
-        - supersetdb
-      verbs:
-        - create
+    resources:
+      - supersetdb
+    verbs:
+      - create
   - apiGroups:
       - {{ include "operator.name" . }}.stackable.tech
     resources:
