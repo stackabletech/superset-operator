@@ -1,5 +1,3 @@
-//! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
-
 use std::time::Duration;
 
 use crate::util::{env_var_from_secret, get_job_state, JobState};
