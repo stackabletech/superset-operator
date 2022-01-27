@@ -19,6 +19,7 @@ rules:
       - services
       - endpoints
       - serviceaccounts
+      - secrets
     verbs:
       - create
       - delete
@@ -70,15 +71,21 @@ rules:
   - apiGroups:
       - command.superset.stackable.tech
     resources:
-      - supersetdb
       - druidconnections
-      - supersetdbs/status
       - druidconnections/status
+      - supersetdb
+      - supersetdbs/status
     verbs:
       - get
       - list
       - patch
       - watch
+  - apiGroups:
+      - command.superset.stackable.tech
+    resources:
+      - supersetdb
+    verbs:
+      - create
   - apiGroups:
       - superset.stackable.tech
     resources:
