@@ -73,7 +73,7 @@ rules:
     resources:
       - druidconnections
       - druidconnections/status
-      - supersetdb
+      - supersetdbs
       - supersetdbs/status
     verbs:
       - get
@@ -83,7 +83,7 @@ rules:
   - apiGroups:
       - command.{{ include "operator.name" . }}.stackable.tech
     resources:
-      - supersetdb
+      - supersetdbs
     verbs:
       - create
   - apiGroups:
