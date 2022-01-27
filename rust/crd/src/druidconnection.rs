@@ -7,17 +7,17 @@ use stackable_operator::schemars::{self, JsonSchema};
 
 #[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[kube(
-group = "command.superset.stackable.tech",
-version = "v1alpha1",
-kind = "DruidConnection",
-plural = "druidconnections",
-status = "DruidConnectionStatus",
-namespaced,
-crates(
-kube_core = "stackable_operator::kube::core",
-k8s_openapi = "stackable_operator::k8s_openapi",
-schemars = "stackable_operator::schemars"
-)
+    group = "command.superset.stackable.tech",
+    version = "v1alpha1",
+    kind = "DruidConnection",
+    plural = "druidconnections",
+    status = "DruidConnectionStatus",
+    namespaced,
+    crates(
+        kube_core = "stackable_operator::kube::core",
+        k8s_openapi = "stackable_operator::k8s_openapi",
+        schemars = "stackable_operator::schemars"
+    )
 )]
 #[serde(rename_all = "camelCase")]
 pub struct DruidConnectionSpec {

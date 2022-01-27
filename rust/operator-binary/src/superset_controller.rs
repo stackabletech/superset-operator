@@ -26,8 +26,8 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::RoleGroupRef,
 };
-use stackable_superset_crd::{SupersetCluster, SupersetConfig, SupersetRole};
 use stackable_superset_crd::supersetdb::SupersetDB;
+use stackable_superset_crd::{SupersetCluster, SupersetConfig, SupersetRole};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -99,7 +99,6 @@ pub async fn reconcile_superset(
         .apply_patch(FIELD_MANAGER_SCOPE, &superset_db, dbg!(&superset_db))
         .await
         .context(ApplySupersetDB)?;
-
 
     let validated_config = validate_all_roles_and_groups_config(
         superset_version(&superset).context(NoSupersetVersion)?,

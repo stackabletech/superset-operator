@@ -23,9 +23,7 @@ use stackable_operator::{
     },
 };
 use stackable_superset_crd::{
-    druidconnection::DruidConnection,
-    supersetdb::SupersetDB,
-    SupersetCluster,
+    druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
 };
 
 mod built_info {

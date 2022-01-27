@@ -14,11 +14,11 @@ use stackable_operator::{
         reflector::ObjectRef,
     },
 };
-use stackable_superset_crd::druidconnection::{DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition};
-use stackable_superset_crd::supersetdb::{SupersetDB, SupersetDBStatusCondition};
-use stackable_superset_crd::{
-    SupersetCluster, SupersetClusterRef,
+use stackable_superset_crd::druidconnection::{
+    DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition,
 };
+use stackable_superset_crd::supersetdb::{SupersetDB, SupersetDBStatusCondition};
+use stackable_superset_crd::{SupersetCluster, SupersetClusterRef};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 

@@ -81,8 +81,7 @@ pub enum SupersetRole {
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SupersetConfig {
-}
+pub struct SupersetConfig {}
 
 impl SupersetConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";

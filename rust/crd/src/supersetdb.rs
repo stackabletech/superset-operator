@@ -1,6 +1,6 @@
-use crate::{APP_NAME, SupersetCluster};
-use snafu::{OptionExt, ResultExt, Snafu};
+use crate::{SupersetCluster, APP_NAME};
 use serde::{Deserialize, Serialize};
+use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::builder::ObjectMetaBuilder;
 use stackable_operator::k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use stackable_operator::k8s_openapi::chrono::Utc;
@@ -22,17 +22,17 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[kube(
-group = "command.superset.stackable.tech",
-version = "v1alpha1",
-kind = "SupersetDB",
-plural = "supersetdbs",
-status = "SupersetDBStatus",
-namespaced,
-crates(
-kube_core = "stackable_operator::kube::core",
-k8s_openapi = "stackable_operator::k8s_openapi",
-schemars = "stackable_operator::schemars"
-)
+    group = "command.superset.stackable.tech",
+    version = "v1alpha1",
+    kind = "SupersetDB",
+    plural = "supersetdbs",
+    status = "SupersetDBStatus",
+    namespaced,
+    crates(
+        kube_core = "stackable_operator::kube::core",
+        k8s_openapi = "stackable_operator::k8s_openapi",
+        schemars = "stackable_operator::schemars"
+    )
 )]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetDBSpec {
@@ -44,7 +44,11 @@ pub struct SupersetDBSpec {
 impl SupersetDB {
     /// Returns a SupersetDB resource with the same name, namespace and Superset version as the cluster.
     pub fn for_superset(superset: &SupersetCluster) -> Result<Self> {
-        let version = superset.spec.version.as_deref().context(NoSupersetVersionSnafu)?;
+        let version = superset
+            .spec
+            .version
+            .as_deref()
+            .context(NoSupersetVersionSnafu)?;
         Ok(Self {
             metadata: ObjectMetaBuilder::new()
                 .name_and_namespace(superset)
