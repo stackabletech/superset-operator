@@ -244,9 +244,7 @@ fn build_druid_db_yaml(druid_cluster_name: &str, sqlalchemy_str: &str) -> Result
     ))
 }
 
-/// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
-///
-/// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_rolegroup_service`]).
+/// Builds the import job.  When run it will import the druid connection into the database.
 async fn build_import_job(
     druid_connection: &DruidConnection,
     superset_db: &SupersetDB,
