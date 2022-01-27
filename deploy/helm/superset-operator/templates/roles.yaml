@@ -80,6 +80,12 @@ rules:
       - patch
       - watch
   - apiGroups:
+      - command.{{ include "operator.name" . }}.stackable.tech
+      resources:
+        - supersetdb
+      verbs:
+        - create
+  - apiGroups:
       - {{ include "operator.name" . }}.stackable.tech
     resources:
       - {{ include "operator.name" . }}clusters
