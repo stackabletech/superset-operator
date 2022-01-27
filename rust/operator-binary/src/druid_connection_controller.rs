@@ -251,8 +251,7 @@ async fn build_import_job(
     sqlalchemy_str: &str,
 ) -> Result<Job> {
     let mut commands = vec![];
-    let druid_info =
-        build_druid_db_yaml(&druid_connection.spec.druid.name, sqlalchemy_str)?;
+    let druid_info = build_druid_db_yaml(&druid_connection.spec.druid.name, sqlalchemy_str)?;
     commands.push(format!("echo \"{}\" > /tmp/druids.yaml", druid_info));
     commands.push(String::from(
         "superset import_datasources -p /tmp/druids.yaml",

@@ -19,7 +19,6 @@ use stackable_operator::{
     },
 };
 use stackable_superset_crd::supersetdb::{SupersetDB, SupersetDBStatus, SupersetDBStatusCondition};
-use stackable_superset_crd::{SupersetCluster, SupersetClusterRef};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -31,20 +30,6 @@ pub struct Ctx {
 #[allow(clippy::enum_variant_names)]
 #[snafu(context(suffix(false)))]
 pub enum Error {
-    #[snafu(display("failed to retrieve superset version"))]
-    NoSupersetVersion { source: crate::util::Error },
-    #[snafu(display("failed to find superset with name {:?} in namespace {:?}", cluster_ref.name, cluster_ref.namespace))]
-    SupersetClusterNotFound {
-        source: crate::util::Error,
-        cluster_ref: SupersetClusterRef,
-    },
-    #[snafu(display("object does not refer to SupersetCluster"))]
-    InvalidSupersetReference,
-    #[snafu(display("could not find {}", superset))]
-    FindSuperset {
-        source: stackable_operator::error::Error,
-        superset: ObjectRef<SupersetCluster>,
-    },
     #[snafu(display("failed to apply Job for {}", superset_db))]
     ApplyJob {
         source: stackable_operator::error::Error,
@@ -54,8 +39,6 @@ pub enum Error {
     ApplyStatus {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("The init object {}/{} is missing its status", namespace, name))]
-    InitStatusMissing { namespace: String, name: String },
     #[snafu(display("object is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
