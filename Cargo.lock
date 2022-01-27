@@ -1482,7 +1482,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator"
 version = "0.9.0-nightly"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=bugfix/apply-status#af4c0630dfe256bd786e6372cd4a1dc292ff1053"
+source = "git+https://github.com/stackabletech//operator-rs.git?branch=main#d8246880d84e2d57123a5e0a5f35893b841d6ca8"
 dependencies = [
  "async-trait",
  "backoff",
