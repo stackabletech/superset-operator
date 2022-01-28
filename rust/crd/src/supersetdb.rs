@@ -50,6 +50,9 @@ impl SupersetDB {
             .as_deref()
             .context(NoSupersetVersionSnafu)?;
         Ok(Self {
+            // The db is deliberately not owned by the cluster so it doesn't get deleted when the
+            // cluster gets deleted.  The schema etc. still exists in the postgres db and can be reused
+            // when the cluster is created again.
             metadata: ObjectMetaBuilder::new()
                 .name_and_namespace(superset)
                 .with_recommended_labels(superset, APP_NAME, version, "", "") // TODO fill in missing fields
