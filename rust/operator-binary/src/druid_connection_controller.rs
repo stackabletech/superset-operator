@@ -80,30 +80,18 @@ pub async fn reconcile_druid_connection(
         match s.condition {
             DruidConnectionStatusCondition::Provisioned => {
                 // Is the superset DB object there, and is its status "Ready"?
-                let superset_db_ready = if client
-                    .exists::<SupersetDB>(
+                let mut superset_db_ready = false;
+                if let Some(status) = client
+                    .get::<SupersetDB>(
                         &druid_connection.spec.superset.name,
                         Some(&druid_connection.spec.superset.namespace),
                     )
                     .await
-                    .context(SupersetDBExistsCheck)?
+                    .context(SupersetDBRetrieval)?
+                    .status
                 {
-                    let superset_db_status = client
-                        .get::<SupersetDB>(
-                            &druid_connection.spec.superset.name,
-                            Some(&druid_connection.spec.superset.namespace),
-                        )
-                        .await
-                        .context(SupersetDBRetrieval)?
-                        .status;
-                    if let Some(s) = superset_db_status {
-                        s.condition == SupersetDBStatusCondition::Ready
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                };
+                    superset_db_ready = status.condition == SupersetDBStatusCondition::Ready;
+                }
                 // Is the referenced druid discovery configmap there?
                 let druid_discovery_cm_exists = client
                     .exists::<ConfigMap>(
