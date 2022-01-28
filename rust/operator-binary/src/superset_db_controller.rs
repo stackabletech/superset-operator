@@ -68,13 +68,13 @@ pub async fn reconcile_superset_db(
                 let secret_exists = client
                     .exists::<Secret>(
                         &superset_db.spec.credentials_secret,
-                        superset_db.metadata.namespace.as_deref(),
+                        superset_db.namespace().as_deref(),
                     )
                     .await
                     .with_context(|_| {
                         let mut secret_ref =
                             ObjectRef::<Secret>::new(&superset_db.spec.credentials_secret);
-                        if let Some(ns) = superset_db.metadata.namespace.clone() {
+                        if let Some(ns) = superset_db.namespace() {
                             secret_ref = secret_ref.within(&ns);
                         }
                         SecretCheck { secret: secret_ref }
@@ -97,9 +97,9 @@ pub async fn reconcile_superset_db(
             SupersetDBStatusCondition::Initializing => {
                 // In here, check the associated job that is running.
                 // If it is still running, do nothing. If it completed, set status to ready, if it failed, set status to failed.
-                // TODO we need to fetch the job here
-                // we need namespace/name.
-                let ns = superset_db.metadata.namespace.clone().unwrap();
+                let ns = superset_db
+                    .namespace()
+                    .unwrap_or_else(|| "default".to_string());
                 let job_name = superset_db.job_name();
                 let job = client.get::<Job>(&job_name, Some(&ns)).await.context(
                     GetInitializationJob {
@@ -198,8 +198,8 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
 
     let job = Job {
         metadata: ObjectMetaBuilder::new()
-            .name(superset_db.metadata.name.as_ref().unwrap())
-            .namespace_opt(superset_db.metadata.namespace.clone())
+            .name(superset_db.name())
+            .namespace_opt(superset_db.namespace())
             .ownerreference_from_resource(superset_db, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRef)?
             .build(),

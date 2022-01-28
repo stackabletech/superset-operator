@@ -11,6 +11,7 @@ use stackable_operator::{
         core::v1::{ConfigMap, PodSpec, PodTemplateSpec},
     },
     kube::runtime::controller::{Context, ReconcilerAction},
+    kube::ResourceExt,
 };
 use stackable_superset_crd::druidconnection::{
     DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition,
@@ -141,7 +142,9 @@ pub async fn reconcile_druid_connection(
                 }
             }
             DruidConnectionStatusCondition::Importing => {
-                let ns = druid_connection.metadata.namespace.clone().unwrap();
+                let ns = druid_connection
+                    .namespace()
+                    .unwrap_or_else(|| "default".to_string());
                 let job_name = druid_connection.job_name();
                 let job = client
                     .get::<Job>(&job_name, Some(&ns))
@@ -258,7 +261,7 @@ async fn build_import_job(
     let job = Job {
         metadata: ObjectMetaBuilder::new()
             .name(druid_connection.job_name())
-            .namespace_opt(druid_connection.metadata.namespace.clone())
+            .namespace_opt(druid_connection.namespace())
             .ownerreference_from_resource(druid_connection, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRef)?
             .build(),
