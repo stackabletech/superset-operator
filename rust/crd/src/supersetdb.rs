@@ -52,8 +52,6 @@ impl SupersetDB {
         Ok(Self {
             metadata: ObjectMetaBuilder::new()
                 .name_and_namespace(superset)
-                .ownerreference_from_resource(superset, None, Some(true))
-                .context(ObjectMissingMetadataForOwnerRefSnafu)?
                 .with_recommended_labels(superset, APP_NAME, version, "", "") // TODO fill in missing fields
                 .build(),
             spec: SupersetDBSpec {
@@ -61,7 +59,7 @@ impl SupersetDB {
                 credentials_secret: superset.spec.credentials_secret.clone(),
                 load_examples: superset.spec.load_examples_on_init.unwrap_or_default(),
             },
-            status: Some(SupersetDBStatus::new()),
+            status: None,
         })
     }
 
