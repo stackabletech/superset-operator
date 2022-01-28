@@ -2,9 +2,9 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: druidconnections.command.superset.stackable.tech
+  name: druidconnections.superset.stackable.tech
 spec:
-  group: command.superset.stackable.tech
+  group: superset.stackable.tech
   names:
     categories: []
     kind: DruidConnection
