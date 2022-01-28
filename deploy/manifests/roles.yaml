@@ -69,27 +69,13 @@ rules:
     verbs:
       - get
   - apiGroups:
-      - command.superset.stackable.tech
+      - superset.stackable.tech
     resources:
+      - supersetclusters
       - druidconnections
       - druidconnections/status
       - supersetdbs
       - supersetdbs/status
-    verbs:
-      - get
-      - list
-      - patch
-      - watch
-  - apiGroups:
-      - command.superset.stackable.tech
-    resources:
-      - supersetdbs
-    verbs:
-      - create
-  - apiGroups:
-      - superset.stackable.tech
-    resources:
-      - supersetclusters
     verbs:
       - get
       - list
@@ -101,3 +87,10 @@ rules:
       - supersetclusters/status
     verbs:
       - patch
+  # The operator creates the supersetdb for the cluster automatically
+  - apiGroups:
+      - superset.stackable.tech
+    resources:
+      - supersetdbs
+    verbs:
+      - create
