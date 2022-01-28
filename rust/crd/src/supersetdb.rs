@@ -1,6 +1,6 @@
 use crate::{SupersetCluster, APP_NAME};
 use serde::{Deserialize, Serialize};
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{OptionExt, Snafu};
 use stackable_operator::builder::ObjectMetaBuilder;
 use stackable_operator::k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use stackable_operator::k8s_openapi::chrono::Utc;

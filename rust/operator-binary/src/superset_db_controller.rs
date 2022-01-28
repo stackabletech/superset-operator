@@ -41,20 +41,15 @@ pub enum Error {
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display(
-        "database state is 'initializing' but failed to find job {}/{}",
-        namespace,
-        name
-    ))]
+    #[snafu(display("database state is 'initializing' but failed to find job {}", init_job))]
     GetInitializationJob {
         source: stackable_operator::error::Error,
-        namespace: String,
-        name: String,
+        init_job: ObjectRef<Job>,
     },
-    #[snafu(display("Failed to check whether the secret ({}) exists", secret_name))]
+    #[snafu(display("Failed to check whether the secret ({}) exists", secret))]
     SecretCheck {
         source: stackable_operator::error::Error,
-        secret_name: String,
+        secret: ObjectRef<Secret>,
     },
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -76,8 +71,13 @@ pub async fn reconcile_superset_db(
                         superset_db.metadata.namespace.as_deref(),
                     )
                     .await
-                    .context(SecretCheck {
-                        secret_name: superset_db.spec.credentials_secret.clone(),
+                    .with_context(|_| {
+                        let mut secret_ref =
+                            ObjectRef::<Secret>::new(&superset_db.spec.credentials_secret);
+                        if let Some(ns) = superset_db.metadata.namespace.clone() {
+                            secret_ref = secret_ref.within(&ns);
+                        }
+                        SecretCheck { secret: secret_ref }
                     })?;
                 if secret_exists {
                     let job = build_init_job(&superset_db)?;
@@ -103,8 +103,7 @@ pub async fn reconcile_superset_db(
                 let job_name = superset_db.job_name();
                 let job = client.get::<Job>(&job_name, Some(&ns)).await.context(
                     GetInitializationJob {
-                        namespace: ns,
-                        name: job_name,
+                        init_job: ObjectRef::<Job>::new(&job_name).within(&ns),
                     },
                 )?;
 
