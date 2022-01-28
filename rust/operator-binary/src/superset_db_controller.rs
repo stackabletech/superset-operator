@@ -163,7 +163,12 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
             superset_db.spec.superset_version
         ))
         .command(vec!["/bin/sh".to_string()])
-        .args(vec![String::from("-c"), commands.join("; ")])
+        .args(vec![
+            String::from("-euo"),
+            String::from("pipefail"),
+            String::from("-c"),
+            commands.join("; "),
+        ])
         .add_env_vars(vec![
             env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
             env_var_from_secret(
