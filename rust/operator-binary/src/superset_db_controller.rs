@@ -162,7 +162,7 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
             "docker.stackable.tech/stackable/superset:{}-stackable0",
             superset_db.spec.superset_version
         ))
-        .command(vec!["/bin/sh".to_string()])
+        .command(vec!["/bin/bash".to_string()])
         .args(vec![
             String::from("-euo"),
             String::from("pipefail"),
