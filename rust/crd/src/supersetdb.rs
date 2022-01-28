@@ -22,7 +22,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[kube(
-    group = "command.superset.stackable.tech",
+    group = "superset.stackable.tech",
     version = "v1alpha1",
     kind = "SupersetDB",
     plural = "supersetdbs",
