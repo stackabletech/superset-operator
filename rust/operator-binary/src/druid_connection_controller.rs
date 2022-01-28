@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use crate::util::{env_var_from_secret, get_job_state, JobState};
+use crate::ObjectRef;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::client::Client;
 use stackable_operator::{
@@ -38,34 +39,20 @@ pub enum Error {
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display(
-        "Failed to get Druid connection string from config map {} in namespace {:?}",
-        cm_name,
-        namespace
-    ))]
+    #[snafu(display("Failed to get Druid connection string from config map {}", config_map))]
     GetDruidConnStringConfigMap {
         source: stackable_operator::error::Error,
-        cm_name: String,
-        namespace: Option<String>,
+        config_map: ObjectRef<ConfigMap>,
     },
+    #[snafu(display("Failed to get Druid connection string from config map {}", config_map))]
+    MissingDruidConnString { config_map: ObjectRef<ConfigMap> },
     #[snafu(display(
-        "Failed to get Druid connection string from config map {} in namespace {:?}",
-        cm_name,
-        namespace
-    ))]
-    MissingDruidConnString {
-        cm_name: String,
-        namespace: Option<String>,
-    },
-    #[snafu(display(
-        "druid connection state is 'importing' but failed to find job {}/{}",
-        namespace,
-        name
+        "druid connection state is 'importing' but failed to find job {}",
+        import_job
     ))]
     GetImportJob {
         source: stackable_operator::error::Error,
-        namespace: String,
-        name: String,
+        import_job: ObjectRef<Job>,
     },
     #[snafu(display("Failed to check if druid discovery map exists"))]
     DruidDiscoveryCheck {
@@ -160,8 +147,7 @@ pub async fn reconcile_druid_connection(
                     .get::<Job>(&job_name, Some(&ns))
                     .await
                     .context(GetImportJob {
-                        namespace: ns,
-                        name: job_name,
+                        import_job: ObjectRef::<Job>::new(&job_name).within(&ns),
                     })?;
 
                 let new_status = match get_job_state(&job) {
@@ -207,14 +193,12 @@ async fn get_sqlalchemy_uri_for_druid_cluster(
         .get::<ConfigMap>(cluster_name, Some(namespace))
         .await
         .context(GetDruidConnStringConfigMap {
-            cm_name: cluster_name.to_string(),
-            namespace: namespace.to_string(),
+            config_map: ObjectRef::<ConfigMap>::new(cluster_name).within(namespace),
         })?
         .data
         .and_then(|mut data| data.remove("DRUID_SQLALCHEMY"))
         .context(MissingDruidConnString {
-            cm_name: cluster_name.to_string(),
-            namespace: namespace.to_string(),
+            config_map: ObjectRef::<ConfigMap>::new(cluster_name).within(namespace),
         })
 }
 
