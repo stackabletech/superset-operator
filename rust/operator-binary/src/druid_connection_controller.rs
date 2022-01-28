@@ -9,16 +9,12 @@ use stackable_operator::{
         batch::v1::{Job, JobSpec},
         core::v1::{ConfigMap, PodSpec, PodTemplateSpec},
     },
-    kube::runtime::{
-        controller::{Context, ReconcilerAction},
-        reflector::ObjectRef,
-    },
+    kube::runtime::controller::{Context, ReconcilerAction},
 };
 use stackable_superset_crd::druidconnection::{
     DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition,
 };
 use stackable_superset_crd::supersetdb::{SupersetDB, SupersetDBStatusCondition};
-use stackable_superset_crd::{SupersetCluster, SupersetClusterRef};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -30,20 +26,6 @@ pub struct Ctx {
 #[allow(clippy::enum_variant_names)]
 #[snafu(context(suffix(false)))]
 pub enum Error {
-    #[snafu(display("failed to retrieve superset version"))]
-    NoSupersetVersion { source: crate::util::Error },
-    #[snafu(display("object does not refer to SupersetCluster"))]
-    InvalidSupersetReference,
-    #[snafu(display("could not find {}", superset))]
-    FindSuperset {
-        source: stackable_operator::error::Error,
-        superset: ObjectRef<SupersetCluster>,
-    },
-    #[snafu(display("failed to find superset with name {:?} in namespace {:?}", cluster_ref.name, cluster_ref.namespace))]
-    SupersetClusterNotFound {
-        source: crate::util::Error,
-        cluster_ref: SupersetClusterRef,
-    },
     #[snafu(display("failed to apply Job for Druid Connection"))]
     ApplyJob {
         source: stackable_operator::error::Error,
