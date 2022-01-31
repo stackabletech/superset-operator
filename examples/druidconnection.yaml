@@ -1,4 +1,4 @@
-apiVersion: command.superset.stackable.tech/v1alpha1
+apiVersion: superset.stackable.tech/v1alpha1
 kind: DruidConnection
 metadata:
   name: superset-druid-connection
