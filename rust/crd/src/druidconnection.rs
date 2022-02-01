@@ -50,7 +50,7 @@ impl DruidConnectionStatus {
     pub fn new() -> Self {
         Self {
             started_at: Some(Time(Utc::now())),
-            condition: DruidConnectionStatusCondition::Provisioned,
+            condition: DruidConnectionStatusCondition::Pending,
         }
     }
 
@@ -81,7 +81,7 @@ impl Default for DruidConnectionStatus {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize)]
 pub enum DruidConnectionStatusCondition {
-    Provisioned,
+    Pending,
     Importing,
     Ready,
     Failed,

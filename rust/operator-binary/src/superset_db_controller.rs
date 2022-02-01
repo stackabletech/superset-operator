@@ -63,7 +63,7 @@ pub async fn reconcile_superset_db(
 
     if let Some(ref s) = superset_db.status {
         match s.condition {
-            SupersetDBStatusCondition::Provisioned => {
+            SupersetDBStatusCondition::Pending => {
                 let secret_exists = client
                     .exists::<Secret>(
                         &superset_db.spec.credentials_secret,

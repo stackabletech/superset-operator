@@ -37,7 +37,7 @@ spec:
               properties:
                 condition:
                   enum:
-                    - Provisioned
+                    - Pending
                     - Initializing
                     - Ready
                     - Failed

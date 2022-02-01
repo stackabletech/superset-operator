@@ -83,7 +83,7 @@ impl SupersetDBStatus {
     pub fn new() -> Self {
         Self {
             started_at: Some(Time(Utc::now())),
-            condition: SupersetDBStatusCondition::Provisioned,
+            condition: SupersetDBStatusCondition::Pending,
         }
     }
 
@@ -114,7 +114,7 @@ impl Default for SupersetDBStatus {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize)]
 pub enum SupersetDBStatusCondition {
-    Provisioned,
+    Pending,
     Initializing,
     Ready,
     Failed,

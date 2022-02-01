@@ -77,7 +77,7 @@ pub async fn reconcile_druid_connection(
 
     if let Some(ref s) = druid_connection.status {
         match s.condition {
-            DruidConnectionStatusCondition::Provisioned => {
+            DruidConnectionStatusCondition::Pending => {
                 // Is the superset DB object there, and is its status "Ready"?
                 let mut superset_db_ready = false;
                 if let Some(status) = client

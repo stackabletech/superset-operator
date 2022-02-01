@@ -50,7 +50,7 @@ spec:
               properties:
                 condition:
                   enum:
-                    - Provisioned
+                    - Pending
                     - Importing
                     - Ready
                     - Failed
