@@ -26,7 +26,6 @@ pub struct Ctx {
 
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
-#[snafu(context(suffix(false)))]
 pub enum Error {
     #[snafu(display("failed to apply Job for {}", superset_db))]
     ApplyJob {
@@ -77,21 +76,21 @@ pub async fn reconcile_superset_db(
                         if let Some(ns) = superset_db.namespace() {
                             secret_ref = secret_ref.within(&ns);
                         }
-                        SecretCheck { secret: secret_ref }
+                        SecretCheckSnafu { secret: secret_ref }
                     })?;
                 if secret_exists {
                     let job = build_init_job(&superset_db)?;
                     client
                         .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
                         .await
-                        .context(ApplyJob {
+                        .context(ApplyJobSnafu {
                             superset_db: ObjectRef::from_obj(&superset_db),
                         })?;
                     // The job is started, update status to reflect new state
                     client
                         .apply_patch_status(FIELD_MANAGER_SCOPE, &superset_db, &s.initializing())
                         .await
-                        .context(ApplyStatus)?;
+                        .context(ApplyStatusSnafu)?;
                 }
             }
             SupersetDBStatusCondition::Initializing => {
@@ -102,7 +101,7 @@ pub async fn reconcile_superset_db(
                     .unwrap_or_else(|| "default".to_string());
                 let job_name = superset_db.job_name();
                 let job = client.get::<Job>(&job_name, Some(&ns)).await.context(
-                    GetInitializationJob {
+                    GetInitializationJobSnafu {
                         init_job: ObjectRef::<Job>::new(&job_name).within(&ns),
                     },
                 )?;
@@ -117,7 +116,7 @@ pub async fn reconcile_superset_db(
                     client
                         .apply_patch_status(FIELD_MANAGER_SCOPE, &superset_db, &ns)
                         .await
-                        .context(ApplyStatus)?;
+                        .context(ApplyStatusSnafu)?;
                 }
             }
             SupersetDBStatusCondition::Ready => (),
@@ -129,7 +128,7 @@ pub async fn reconcile_superset_db(
         client
             .apply_patch_status(FIELD_MANAGER_SCOPE, &superset_db, &new_status)
             .await
-            .context(ApplyStatus)?;
+            .context(ApplyStatusSnafu)?;
     }
 
     Ok(ReconcilerAction {
@@ -201,7 +200,7 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
             .name(superset_db.name())
             .namespace_opt(superset_db.namespace())
             .ownerreference_from_resource(superset_db, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRef)?
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .build(),
         spec: Some(JobSpec {
             template: pod,

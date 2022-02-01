@@ -38,7 +38,6 @@ pub struct Ctx {
 
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
-#[snafu(context(suffix(false)))]
 pub enum Error {
     #[snafu(display("failed to retrieve superset version"))]
     NoSupersetVersion { source: crate::util::Error },
@@ -93,31 +92,31 @@ pub async fn reconcile_superset(
     let client = &ctx.get_ref().client;
 
     // Ensure DB Schema is set up
-    let superset_db = SupersetDB::for_superset(&superset).context(CreateSupersetObject)?;
+    let superset_db = SupersetDB::for_superset(&superset).context(CreateSupersetObjectSnafu)?;
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &superset_db, &superset_db)
         .await
-        .context(ApplySupersetDB)?;
+        .context(ApplySupersetDBSnafu)?;
 
     let validated_config = validate_all_roles_and_groups_config(
-        superset_version(&superset).context(NoSupersetVersion)?,
+        superset_version(&superset).context(NoSupersetVersionSnafu)?,
         &transform_all_roles_to_config(
             &superset,
             [(
                 SupersetRole::Node.to_string(),
                 (
                     vec![PropertyNameKind::Env],
-                    superset.spec.nodes.clone().context(NoNodeRole)?,
+                    superset.spec.nodes.clone().context(NoNodeRoleSnafu)?,
                 ),
             )]
             .into(),
         )
-        .context(GenerateProductConfig)?,
+        .context(GenerateProductConfigSnafu)?,
         &ctx.get_ref().product_config,
         false,
         false,
     )
-    .context(InvalidProductConfig)?;
+    .context(InvalidProductConfigSnafu)?;
     let role_node_config = validated_config
         .get(&SupersetRole::Node.to_string())
         .map(Cow::Borrowed)
@@ -127,7 +126,7 @@ pub async fn reconcile_superset(
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &node_role_service, &node_role_service)
         .await
-        .context(ApplyRoleService)?;
+        .context(ApplyRoleServiceSnafu)?;
     for (rolegroup_name, rolegroup_config) in role_node_config.iter() {
         let rolegroup = superset.node_rolegroup_ref(rolegroup_name);
 
@@ -137,13 +136,13 @@ pub async fn reconcile_superset(
         client
             .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
             .await
-            .with_context(|_| ApplyRoleGroupService {
+            .with_context(|_| ApplyRoleGroupServiceSnafu {
                 rolegroup: rolegroup.clone(),
             })?;
         client
             .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
             .await
-            .with_context(|_| ApplyRoleGroupStatefulSet {
+            .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
                 rolegroup: rolegroup.clone(),
             })?;
     }
@@ -159,17 +158,17 @@ pub fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
     let role_name = SupersetRole::Node.to_string();
     let role_svc_name = superset
         .node_role_service_name()
-        .context(GlobalServiceNameNotFound)?;
+        .context(GlobalServiceNameNotFoundSnafu)?;
     Ok(Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(superset)
             .name(format!("{}-external", &role_svc_name))
             .ownerreference_from_resource(superset, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRef)?
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(
                 superset,
                 APP_NAME,
-                superset_version(superset).context(NoSupersetVersion)?,
+                superset_version(superset).context(NoSupersetVersionSnafu)?,
                 &role_name,
                 "global",
             )
@@ -201,11 +200,11 @@ fn build_node_rolegroup_service(
             .name_and_namespace(superset)
             .name(&rolegroup.object_name())
             .ownerreference_from_resource(superset, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRef)?
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(
                 superset,
                 APP_NAME,
-                superset_version(superset).context(NoSupersetVersion)?,
+                superset_version(superset).context(NoSupersetVersionSnafu)?,
                 &rolegroup.role,
                 &rolegroup.role_group,
             )
@@ -243,11 +242,11 @@ fn build_server_rolegroup_statefulset(
         .spec
         .nodes
         .as_ref()
-        .context(NoNodeRole)?
+        .context(NoNodeRoleSnafu)?
         .role_groups
         .get(&rolegroup_ref.role_group);
 
-    let superset_version = superset_version(superset).context(NoSupersetVersion)?;
+    let superset_version = superset_version(superset).context(NoSupersetVersionSnafu)?;
 
     let image = format!(
         "docker.stackable.tech/stackable/superset:{}-stackable0",
@@ -279,7 +278,7 @@ fn build_server_rolegroup_statefulset(
             .name_and_namespace(superset)
             .name(&rolegroup_ref.object_name())
             .ownerreference_from_resource(superset, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRef)?
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(
                 superset,
                 APP_NAME,

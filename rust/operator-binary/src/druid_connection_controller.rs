@@ -26,7 +26,6 @@ pub struct Ctx {
 
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
-#[snafu(context(suffix(false)))]
 pub enum Error {
     #[snafu(display("failed to apply Job for Druid Connection"))]
     ApplyJob {
@@ -87,7 +86,7 @@ pub async fn reconcile_druid_connection(
                         Some(&druid_connection.spec.superset.namespace),
                     )
                     .await
-                    .context(SupersetDBRetrieval)?
+                    .context(SupersetDBRetrievalSnafu)?
                     .status
                 {
                     superset_db_ready = status.condition == SupersetDBStatusCondition::Ready;
@@ -99,7 +98,7 @@ pub async fn reconcile_druid_connection(
                         Some(&druid_connection.spec.druid.namespace),
                     )
                     .await
-                    .context(DruidDiscoveryCheck)?;
+                    .context(DruidDiscoveryCheckSnafu)?;
 
                 if superset_db_ready && druid_discovery_cm_exists {
                     let superset_db = client
@@ -108,7 +107,7 @@ pub async fn reconcile_druid_connection(
                             Some(&druid_connection.spec.superset.namespace),
                         )
                         .await
-                        .context(SupersetDBRetrieval)?;
+                        .context(SupersetDBRetrievalSnafu)?;
                     // Everything is there, retrieve all necessary info and start the job
                     let sqlalchemy_str = get_sqlalchemy_uri_for_druid_cluster(
                         &druid_connection.spec.druid.name,
@@ -121,12 +120,12 @@ pub async fn reconcile_druid_connection(
                     client
                         .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
                         .await
-                        .context(ApplyJob)?;
+                        .context(ApplyJobSnafu)?;
                     // The job is started, update status to reflect new state
                     client
                         .apply_patch_status(FIELD_MANAGER_SCOPE, &druid_connection, &s.importing())
                         .await
-                        .context(ApplyStatus)?;
+                        .context(ApplyStatusSnafu)?;
                 }
             }
             DruidConnectionStatusCondition::Importing => {
@@ -134,12 +133,13 @@ pub async fn reconcile_druid_connection(
                     .namespace()
                     .unwrap_or_else(|| "default".to_string());
                 let job_name = druid_connection.job_name();
-                let job = client
-                    .get::<Job>(&job_name, Some(&ns))
-                    .await
-                    .context(GetImportJob {
-                        import_job: ObjectRef::<Job>::new(&job_name).within(&ns),
-                    })?;
+                let job =
+                    client
+                        .get::<Job>(&job_name, Some(&ns))
+                        .await
+                        .context(GetImportJobSnafu {
+                            import_job: ObjectRef::<Job>::new(&job_name).within(&ns),
+                        })?;
 
                 let new_status = match get_job_state(&job) {
                     JobState::Failed => Some(s.failed()),
@@ -151,7 +151,7 @@ pub async fn reconcile_druid_connection(
                     client
                         .apply_patch_status(FIELD_MANAGER_SCOPE, &druid_connection, &ns)
                         .await
-                        .context(ApplyStatus)?;
+                        .context(ApplyStatusSnafu)?;
                 }
             }
             DruidConnectionStatusCondition::Ready => (),
@@ -166,7 +166,7 @@ pub async fn reconcile_druid_connection(
                 &DruidConnectionStatus::new(),
             )
             .await
-            .context(ApplyStatus)?;
+            .context(ApplyStatusSnafu)?;
     }
 
     Ok(ReconcilerAction {
@@ -183,12 +183,12 @@ async fn get_sqlalchemy_uri_for_druid_cluster(
     client
         .get::<ConfigMap>(cluster_name, Some(namespace))
         .await
-        .context(GetDruidConnStringConfigMap {
+        .context(GetDruidConnStringConfigMapSnafu {
             config_map: ObjectRef::<ConfigMap>::new(cluster_name).within(namespace),
         })?
         .data
         .and_then(|mut data| data.remove("DRUID_SQLALCHEMY"))
-        .context(MissingDruidConnString {
+        .context(MissingDruidConnStringSnafu {
             config_map: ObjectRef::<ConfigMap>::new(cluster_name).within(namespace),
         })
 }
@@ -251,7 +251,7 @@ async fn build_import_job(
             .name(druid_connection.job_name())
             .namespace_opt(druid_connection.namespace())
             .ownerreference_from_resource(druid_connection, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRef)?
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .build(),
         spec: Some(JobSpec {
             template: pod,
