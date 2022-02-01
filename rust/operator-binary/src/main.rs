@@ -1,11 +1,17 @@
-mod init_controller;
+mod druid_connection_controller;
 mod superset_controller;
+mod superset_db_controller;
+mod util;
 
 use clap::Parser;
 use futures::StreamExt;
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
-    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
+    k8s_openapi::api::{
+        apps::v1::StatefulSet,
+        batch::v1::Job,
+        core::v1::{Secret, Service},
+    },
     kube::{
         api::{DynamicObject, ListParams},
         runtime::{
@@ -16,7 +22,9 @@ use stackable_operator::{
         CustomResourceExt, Resource,
     },
 };
-use stackable_superset_crd::{commands::Init, SupersetCluster};
+use stackable_superset_crd::{
+    druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
+};
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -50,9 +58,10 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => println!(
-            "{}{}",
+            "{}{}{}",
             serde_yaml::to_string(&SupersetCluster::crd())?,
-            serde_yaml::to_string(&Init::crd())?
+            serde_yaml::to_string(&SupersetDB::crd())?,
+            serde_yaml::to_string(&DruidConnection::crd())?
         ),
         Command::Run(ProductOperatorRun { product_config }) => {
             stackable_operator::utils::print_startup_string(
@@ -87,20 +96,108 @@ async fn main() -> anyhow::Result<()> {
                 }),
             );
 
-            let init_controller =
-                Controller::new(client.get_all_api::<Init>(), ListParams::default())
-                    .shutdown_on_signal()
-                    .run(
-                        init_controller::reconcile_init,
-                        init_controller::error_policy,
-                        Context::new(init_controller::Ctx {
-                            client: client.clone(),
-                        }),
-                    );
+            let superset_db_controller_builder =
+                Controller::new(client.get_all_api::<SupersetDB>(), ListParams::default());
+            let superset_db_store1 = superset_db_controller_builder.store();
+            let superset_db_store2 = superset_db_controller_builder.store();
+            let superset_db_controller = superset_db_controller_builder
+                .shutdown_on_signal()
+                .watches(
+                    client.get_all_api::<Secret>(),
+                    ListParams::default(),
+                    move |secret| {
+                        superset_db_store1
+                            .state()
+                            .into_iter()
+                            .filter(move |superset_db| {
+                                if let Some(n) = &secret.metadata.name {
+                                    &superset_db.spec.credentials_secret == n
+                                } else {
+                                    false
+                                }
+                            })
+                            .map(|superset_db| ObjectRef::from_obj(&superset_db))
+                    },
+                )
+                // We have to watch jobs so we can react to finished init jobs
+                // and update our status accordingly
+                .watches(
+                    client.get_all_api::<Job>(),
+                    ListParams::default(),
+                    move |job| {
+                        superset_db_store2
+                            .state()
+                            .into_iter()
+                            .filter(move |superset_db| {
+                                superset_db.metadata.namespace.as_ref().unwrap()
+                                    == job.metadata.namespace.as_ref().unwrap()
+                                    && &superset_db.job_name()
+                                        == job.metadata.name.as_ref().unwrap()
+                            })
+                            .map(|superset_db| ObjectRef::from_obj(&superset_db))
+                    },
+                )
+                .run(
+                    superset_db_controller::reconcile_superset_db,
+                    superset_db_controller::error_policy,
+                    Context::new(superset_db_controller::Ctx {
+                        client: client.clone(),
+                    }),
+                );
+            let druid_connection_controller_builder = Controller::new(
+                client.get_all_api::<DruidConnection>(),
+                ListParams::default(),
+            );
+            let druid_connection_store1 = druid_connection_controller_builder.store();
+            let druid_connection_store2 = druid_connection_controller_builder.store();
+            let druid_connection_controller = druid_connection_controller_builder
+                .shutdown_on_signal()
+                .watches(
+                    client.get_all_api::<SupersetDB>(),
+                    ListParams::default(),
+                    move |sdb| {
+                        druid_connection_store1
+                            .state()
+                            .into_iter()
+                            .filter(move |druid_connection| {
+                                &druid_connection.spec.superset.namespace
+                                    == sdb.metadata.namespace.as_ref().unwrap()
+                                    && &druid_connection.spec.superset.name
+                                        == sdb.metadata.name.as_ref().unwrap()
+                            })
+                            .map(|druid_connection| ObjectRef::from_obj(&druid_connection))
+                    },
+                )
+                .watches(
+                    client.get_all_api::<Job>(),
+                    ListParams::default(),
+                    move |job| {
+                        druid_connection_store2
+                            .state()
+                            .into_iter()
+                            .filter(move |druid_connection| {
+                                druid_connection.metadata.namespace.as_ref().unwrap()
+                                    == job.metadata.namespace.as_ref().unwrap()
+                                    && &druid_connection.job_name()
+                                        == job.metadata.name.as_ref().unwrap()
+                            })
+                            .map(|druid_connection| ObjectRef::from_obj(&druid_connection))
+                    },
+                )
+                .run(
+                    druid_connection_controller::reconcile_druid_connection,
+                    druid_connection_controller::error_policy,
+                    Context::new(druid_connection_controller::Ctx {
+                        client: client.clone(),
+                    }),
+                );
 
             futures::stream::select(
-                superset_controller.map(erase_controller_result_type),
-                init_controller.map(erase_controller_result_type),
+                futures::stream::select(
+                    superset_controller.map(erase_controller_result_type),
+                    superset_db_controller.map(erase_controller_result_type),
+                ),
+                druid_connection_controller.map(erase_controller_result_type),
             )
             .for_each(|res| async {
                 match res {

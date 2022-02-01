@@ -1,0 +1,11 @@
+apiVersion: superset.stackable.tech/v1alpha1
+kind: DruidConnection
+metadata:
+  name: superset-druid-connection
+spec:
+  superset:
+    name: superset
+    namespace: default
+  druid:
+    name: derby-druid
+    namespace: default

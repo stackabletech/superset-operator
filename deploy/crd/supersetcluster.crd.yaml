@@ -22,6 +22,11 @@ spec:
           properties:
             spec:
               properties:
+                credentialsSecret:
+                  type: string
+                loadExamplesOnInit:
+                  nullable: true
+                  type: boolean
                 nodes:
                   nullable: true
                   properties:
@@ -32,10 +37,6 @@ spec:
                       type: object
                     config:
                       default: {}
-                      properties:
-                        credentialsSecret:
-                          default: ""
-                          type: string
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -59,10 +60,6 @@ spec:
                             type: object
                           config:
                             default: {}
-                            properties:
-                              credentialsSecret:
-                                default: ""
-                                type: string
                             type: object
                           configOverrides:
                             additionalProperties:
@@ -125,6 +122,8 @@ spec:
                   description: Desired Superset version
                   nullable: true
                   type: string
+              required:
+                - credentialsSecret
               type: object
             status:
               nullable: true

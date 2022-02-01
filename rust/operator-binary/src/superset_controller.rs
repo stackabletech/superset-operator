@@ -6,16 +6,17 @@ use std::{
     time::Duration,
 };
 
-use crate::{APP_NAME, APP_PORT};
+use crate::{
+    util::{env_var_from_secret, superset_version},
+    APP_NAME, APP_PORT,
+};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{
-                EnvVar, EnvVarSource, SecretKeySelector, Service, ServicePort, ServiceSpec,
-            },
+            core::v1::{Service, ServicePort, ServiceSpec},
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
@@ -25,6 +26,7 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::RoleGroupRef,
 };
+use stackable_superset_crd::supersetdb::SupersetDB;
 use stackable_superset_crd::{SupersetCluster, SupersetConfig, SupersetRole};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
@@ -37,14 +39,23 @@ pub struct Ctx {
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
-    #[snafu(display("object defines no version"))]
-    ObjectHasNoVersion,
+    #[snafu(display("failed to retrieve superset version"))]
+    NoSupersetVersion { source: crate::util::Error },
     #[snafu(display("object defines no node role"))]
     NoNodeRole,
     #[snafu(display("failed to calculate global service name"))]
     GlobalServiceNameNotFound,
     #[snafu(display("failed to apply global Service"))]
     ApplyRoleService {
+        source: stackable_operator::error::Error,
+    },
+
+    #[snafu(display("failed to apply Superset DB"))]
+    CreateSupersetObject {
+        source: stackable_superset_crd::supersetdb::Error,
+    },
+    #[snafu(display("failed to apply Superset DB"))]
+    ApplySupersetDB {
         source: stackable_operator::error::Error,
     },
     #[snafu(display("failed to apply Service for {}", rolegroup))]
@@ -80,8 +91,15 @@ pub async fn reconcile_superset(
 
     let client = &ctx.get_ref().client;
 
+    // Ensure DB Schema is set up
+    let superset_db = SupersetDB::for_superset(&superset).context(CreateSupersetObjectSnafu)?;
+    client
+        .apply_patch(FIELD_MANAGER_SCOPE, &superset_db, &superset_db)
+        .await
+        .context(ApplySupersetDBSnafu)?;
+
     let validated_config = validate_all_roles_and_groups_config(
-        superset_version(&superset)?,
+        superset_version(&superset).context(NoSupersetVersionSnafu)?,
         &transform_all_roles_to_config(
             &superset,
             [(
@@ -150,7 +168,7 @@ pub fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
             .with_recommended_labels(
                 superset,
                 APP_NAME,
-                superset_version(superset)?,
+                superset_version(superset).context(NoSupersetVersionSnafu)?,
                 &role_name,
                 "global",
             )
@@ -186,7 +204,7 @@ fn build_node_rolegroup_service(
             .with_recommended_labels(
                 superset,
                 APP_NAME,
-                superset_version(superset)?,
+                superset_version(superset).context(NoSupersetVersionSnafu)?,
                 &rolegroup.role,
                 &rolegroup.role_group,
             )
@@ -228,7 +246,7 @@ fn build_server_rolegroup_statefulset(
         .role_groups
         .get(&rolegroup_ref.role_group);
 
-    let superset_version = superset_version(superset)?;
+    let superset_version = superset_version(superset).context(NoSupersetVersionSnafu)?;
 
     let image = format!(
         "docker.stackable.tech/stackable/superset:{}-stackable0",
@@ -304,31 +322,8 @@ fn build_server_rolegroup_statefulset(
     })
 }
 
-pub fn superset_version(superset: &SupersetCluster) -> Result<&str> {
-    superset
-        .spec
-        .version
-        .as_deref()
-        .context(ObjectHasNoVersionSnafu)
-}
-
 pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
     ReconcilerAction {
         requeue_after: Some(Duration::from_secs(5)),
-    }
-}
-
-fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> EnvVar {
-    EnvVar {
-        name: String::from(var_name),
-        value_from: Some(EnvVarSource {
-            secret_key_ref: Some(SecretKeySelector {
-                name: Some(String::from(secret)),
-                key: String::from(secret_key),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }),
-        ..Default::default()
     }
 }

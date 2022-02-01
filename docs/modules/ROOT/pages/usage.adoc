@@ -19,7 +19,7 @@ helm install superset bitnami/postgresql \
 
 == Secret with Superset credentials
 
-A secret with the necessary credentials must be created:
+A secret with the necessary credentials must be created, this entails database connection credentials as well as an admin account for superset itself:
 
 [source,yaml]
 ----
@@ -44,7 +44,7 @@ for any other security related needs by extensions. It should be a long random s
 `connections.sqlalchemyDatabaseUri` must contain the connection string to the SQL database storing
 the Superset metadata.
 
-The `adminUser` fields are used by the `init` command to create an admin user.
+The `adminUser` fields are used to create an admin user.
 
 == Creation of a Superset node
 
@@ -58,44 +58,26 @@ metadata:
   name: superset
 spec:
   version: 1.3.2
+  credentialsSecret: simple-superset-credentials
+  loadExamplesOnInit: true
   nodes:
     roleGroups:
       default:
         config:
-          credentialsSecret: simple-superset-credentials
+
 ----
 
 `metadata.name` contains the name of the Superset cluster.
 
 The label of the Docker image provided by Stackable must be set in `spec.version`.
 
-The previously created secret must be referenced in `credentialsSecret`.
-
-== Initializing the Superset database
-
-If the database is not initialized yet for Superset, the `init` command must be executed. The
-command initializes the dababase by creating the necessary database tables, creating the admin user
-account, and loading examples if desired.
-
-[source,yaml]
-----
-apiVersion: command.superset.stackable.tech/v1alpha1
-kind: Init
-metadata:
-  name: superset-cluster-command-init
-spec:
-  clusterRef:
-    name: superset
-  credentialsSecret: simple-superset-credentials
-  loadExamples: true
-----
-
-`spec.clusterRef.name` refers to the name of the Superset cluster.
-
 The previously created secret must be referenced in `spec.credentialsSecret`.
 
-Set `spec.loadExamples` to `true` if you want the dababase populated with example data and
-dashboards.
+The `spec.loadExamplesOnInit` key is optional and defaults to `false`, it can be set to `true` to load example data into superset when the database is initialized.
+
+=== Initialization of the Superset database
+
+The first time the cluster is created, the operator creates a `SupersetDB` resource with the same name as the cluster.  It ensures that the database is initialized (schema created, admin user created).
 
 A Kubernetes job is created which starts a pod to initialize the database. This can take a while.
 
@@ -120,3 +102,33 @@ image::superset-login.png[Login screen of Superset]
 If the examples were loaded then some dashboards are already available:
 
 image::superset-dashboard.png[Superset dashboard showing birth names]
+
+== Connecting Apache Druid Clusters
+
+The operator can automatically connect superset clusters to Apache Druid clusters managed by the https://docs.stackable.tech/druid/index.html[Stackable Druid Cluster].
+
+To do so, create a `DruidConnection` resource:
+
+[source,yaml]
+----
+apiVersion: superset.stackable.tech/v1alpha1
+kind: DruidConnection
+metadata:
+  name: superset-druid-connection
+spec:
+  superset:
+    name: superset
+    namespace: default
+  druid:
+    name: my-druid-cluster
+    namespace: default
+
+----
+
+The `name` and `namespace` in `spec.superset` refer to the superset cluster that you want to connect. Following our example above, the name is `superset`.
+
+In `spec.druid` you specify the `name` and `namespace` of your Druid cluster.
+
+Once the database is initialized, the connection will be added to the cluster by the operator. You can see it in the user interface under Data > Databases:
+
+image::superset-databases.png[Superset databases showing the connected Druid cluster]

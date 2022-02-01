@@ -4,8 +4,9 @@ metadata:
   name: superset
 spec:
   version: 1.3.2
+  credentialsSecret: simple-superset-credentials
+  loadExamplesOnInit: true
   nodes:
     roleGroups:
       default:
         config:
-          credentialsSecret: simple-superset-credentials

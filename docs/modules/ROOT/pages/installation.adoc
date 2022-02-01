@@ -42,7 +42,8 @@ for this operator.
 [source]
 ----
 $ kubectl apply -f supersetcluster.crd.yaml
-$ kubectl apply -f init.crd.yaml
+$ kubectl apply -f supersetdb.crd.yaml
+$ kubectl apply -f druidconnection.crd.yaml
 ----
 
 To run it straight from Docker you can use this command:
