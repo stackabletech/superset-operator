@@ -34,21 +34,16 @@ compile-chart: version crds config
 chart-clean:
 	rm -rf deploy/helm/superset-operator/configs
 	rm -rf deploy/helm/superset-operator/crds
-	rm -rf deploy/helm/superset-operator/templates/crds.yaml
 
 version:
 	yq eval -i '.version = ${VERSION} | .appVersion = ${VERSION}' deploy/helm/superset-operator/Chart.yaml
 
-config: deploy/helm/superset-operator/configs
-
-deploy/helm/superset-operator/configs:
+config:
 	cp -r deploy/config-spec deploy/helm/superset-operator/configs
 
-crds: deploy/helm/superset-operator/crds/crds.yaml
-
-deploy/helm/superset-operator/crds/crds.yaml:
+crds:
 	mkdir -p deploy/helm/superset-operator/crds
-	cat deploy/crd/*.yaml | yq eval '.metadata.annotations["helm.sh/resource-policy"]="keep"' - > ${@}
+	cat deploy/crd/*.yaml | yq eval '.metadata.annotations["helm.sh/resource-policy"]="keep"' - > deploy/helm/superset-operator/crds/crds.yaml
 
 chart-lint: compile-chart
 	docker run -it -v $(shell pwd):/build/helm-charts -w /build/helm-charts quay.io/helmpack/chart-testing:v3.5.0  ct lint --config deploy/helm/ct.yaml
