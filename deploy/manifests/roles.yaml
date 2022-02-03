@@ -20,6 +20,7 @@ rules:
       - services
       - endpoints
       - serviceaccounts
+      - secrets
     verbs:
       - create
       - delete
@@ -69,27 +70,13 @@ rules:
     verbs:
       - get
   - apiGroups:
-      - command.superset.stackable.tech
-    resources:
-      - inits
-      - restarts
-      - starts
-      - stops
-    verbs:
-      - get
-      - list
-      - patch
-      - watch
-  - apiGroups:
-      - command.superset.stackable.tech
-    resources:
-      - inits/status
-    verbs:
-      - patch
-  - apiGroups:
       - superset.stackable.tech
     resources:
       - supersetclusters
+      - druidconnections
+      - druidconnections/status
+      - supersetdbs
+      - supersetdbs/status
     verbs:
       - get
       - list
@@ -101,3 +88,10 @@ rules:
       - supersetclusters/status
     verbs:
       - patch
+  # The operator creates the supersetdb for the cluster automatically
+  - apiGroups:
+      - superset.stackable.tech
+    resources:
+      - supersetdbs
+    verbs:
+      - create
