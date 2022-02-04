@@ -1,0 +1,5 @@
+// The version ranges supported by Superset-Operator
+// This is a separate file, since it is used by both the direct Superset documentation, and the overarching
+// Stackable Platform documentation.
+
+- 1.3.2
