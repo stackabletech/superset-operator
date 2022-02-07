@@ -1,12 +1,15 @@
 ---
+# Source: superset-operator/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: superset-operator-deployment
   labels:
+    helm.sh/chart: superset-operator-0.3.0-nightly
     app.kubernetes.io/name: superset-operator
     app.kubernetes.io/instance: superset-operator
     app.kubernetes.io/version: "0.3.0-nightly"
+    app.kubernetes.io/managed-by: Helm
 spec:
   replicas: 1
   strategy:
@@ -22,13 +25,16 @@ spec:
         app.kubernetes.io/instance: superset-operator
     spec:
       serviceAccountName: superset-operator-serviceaccount
-      securityContext: {}
+      securityContext:
+        {}
       containers:
         - name: superset-operator
-          securityContext: {}
+          securityContext:
+            {}
           image: "docker.stackable.tech/stackable/superset-operator:0.3.0-nightly"
           imagePullPolicy: IfNotPresent
-          resources: {}
+          resources:
+            {}
           volumeMounts:
             - mountPath: /etc/stackable/superset-operator/config-spec
               name: config-spec

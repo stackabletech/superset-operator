@@ -1,4 +1,5 @@
 ---
+# Source: superset-operator/templates/configmap.yaml
 apiVersion: v1
 data:
   properties.yaml: |
@@ -22,6 +23,8 @@ kind: ConfigMap
 metadata:
   name: superset-operator-configmap
   labels:
+    helm.sh/chart: superset-operator-0.3.0-nightly
     app.kubernetes.io/name: superset-operator
     app.kubernetes.io/instance: superset-operator
     app.kubernetes.io/version: "0.3.0-nightly"
+    app.kubernetes.io/managed-by: Helm
