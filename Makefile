@@ -39,7 +39,10 @@ version:
 	yq eval -i '.version = ${VERSION} | .appVersion = ${VERSION}' deploy/helm/superset-operator/Chart.yaml
 
 config:
-	cp -r deploy/config-spec deploy/helm/superset-operator/configs
+	if [ -d "deploy/config-spec/" ]; then\
+		mkdir -p deploy/helm/superset-operator/configs;\
+		cp -r deploy/config-spec/* deploy/helm/superset-operator/configs;\
+	fi
 
 crds:
 	mkdir -p deploy/helm/superset-operator/crds
@@ -55,3 +58,11 @@ clean-manifests:
 
 generate-manifests: clean-manifests compile-chart
 	./scripts/generate-manifests.sh
+
+clean-crds:
+	rm -rf deploy/crd/*
+
+generate-crds:
+	cargo build
+
+regenerate-charts: clean-crds chart-clean clean-manifests generate-crds compile-chart generate-manifests
