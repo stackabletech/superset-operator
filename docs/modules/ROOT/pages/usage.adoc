@@ -58,6 +58,7 @@ metadata:
   name: superset
 spec:
   version: 1.3.2
+  statsdExporterVersion: v0.22.4
   credentialsSecret: simple-superset-credentials
   loadExamplesOnInit: true
   nodes:
@@ -70,6 +71,8 @@ spec:
 `metadata.name` contains the name of the Superset cluster.
 
 The label of the Docker image provided by Stackable must be set in `spec.version`.
+
+`spec.statsdExporterVersion` must contain the tag of a statsd-exporter Docker image in the Stackable repository.
 
 The previously created secret must be referenced in `spec.credentialsSecret`.
 
@@ -132,3 +135,8 @@ In `spec.druid` you specify the `name` and `namespace` of your Druid cluster.
 Once the database is initialized, the connection will be added to the cluster by the operator. You can see it in the user interface under Data > Databases:
 
 image::superset-databases.png[Superset databases showing the connected Druid cluster]
+
+== Monitoring
+
+The managed HBase instances are automatically configured to export Prometheus metrics. See
+xref:home::monitoring.adoc[] for more details.

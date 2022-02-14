@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    util::{env_var_from_secret, superset_version},
+    util::{env_var_from_secret, statsd_exporter_version, superset_version},
     APP_NAME, APP_PORT,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -31,6 +31,9 @@ use stackable_superset_crd::{SupersetCluster, SupersetConfig, SupersetRole};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
+const METRICS_PORT_NAME: &str = "metrics";
+const METRICS_PORT: i32 = 9102;
+
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub product_config: ProductConfigManager,
@@ -41,6 +44,8 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("failed to retrieve superset version"))]
     NoSupersetVersion { source: crate::util::Error },
+    #[snafu(display("failed to retrieve statsd exporter version"))]
+    NoStatsdExporterVersion { source: crate::util::Error },
     #[snafu(display("object defines no node role"))]
     NoNodeRole,
     #[snafu(display("failed to calculate global service name"))]
@@ -172,6 +177,10 @@ pub fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
                 &role_name,
                 "global",
             )
+            .with_label(
+                "statsd-exporter",
+                statsd_exporter_version(superset).context(NoStatsdExporterVersionSnafu)?,
+            )
             .build(),
         spec: Some(ServiceSpec {
             ports: Some(vec![ServicePort {
@@ -208,15 +217,29 @@ fn build_node_rolegroup_service(
                 &rolegroup.role,
                 &rolegroup.role_group,
             )
+            .with_label(
+                "statsd-exporter",
+                statsd_exporter_version(superset).context(NoStatsdExporterVersionSnafu)?,
+            )
+            .with_label("prometheus.io/scrape", "true")
+            .with_label("prometheus.io/port", METRICS_PORT.to_string())
             .build(),
         spec: Some(ServiceSpec {
             cluster_ip: Some("None".to_string()),
-            ports: Some(vec![ServicePort {
-                name: Some("superset".to_string()),
-                port: APP_PORT.into(),
-                protocol: Some("TCP".to_string()),
-                ..ServicePort::default()
-            }]),
+            ports: Some(vec![
+                ServicePort {
+                    name: Some("superset".to_string()),
+                    port: APP_PORT.into(),
+                    protocol: Some("TCP".to_string()),
+                    ..ServicePort::default()
+                },
+                ServicePort {
+                    name: Some(METRICS_PORT_NAME.into()),
+                    port: METRICS_PORT,
+                    protocol: Some("TCP".to_string()),
+                    ..ServicePort::default()
+                },
+            ]),
             selector: Some(role_group_selector_labels(
                 superset,
                 APP_NAME,
@@ -248,10 +271,13 @@ fn build_server_rolegroup_statefulset(
 
     let superset_version = superset_version(superset).context(NoSupersetVersionSnafu)?;
 
-    let image = format!(
-        "docker.stackable.tech/stackable/superset:{}-stackable0",
-        superset_version
-    );
+    let image = format!("docker.stackable.tech/stackable/superset:{superset_version}-stackable0");
+
+    let statsd_exporter_version =
+        statsd_exporter_version(superset).context(NoStatsdExporterVersionSnafu)?;
+
+    let statsd_exporter_image =
+        format!("docker.stackable.tech/prom/statsd-exporter:{statsd_exporter_version}");
 
     let env = node_config
         .get(&PropertyNameKind::Env)
@@ -273,6 +299,10 @@ fn build_server_rolegroup_statefulset(
         .add_env_vars(env)
         .add_container_port("http", APP_PORT.into())
         .build();
+    let metrics_container = ContainerBuilder::new("metrics")
+        .image(statsd_exporter_image)
+        .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
+        .build();
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(superset)
@@ -286,6 +316,7 @@ fn build_server_rolegroup_statefulset(
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
             )
+            .with_label("statsd-exporter", statsd_exporter_version)
             .build(),
         spec: Some(StatefulSetSpec {
             pod_management_policy: Some("Parallel".to_string()),
@@ -313,8 +344,10 @@ fn build_server_rolegroup_statefulset(
                         &rolegroup_ref.role,
                         &rolegroup_ref.role_group,
                     )
+                    .with_label("statsd-exporter", statsd_exporter_version)
                 })
                 .add_container(container)
+                .add_container(metrics_container)
                 .build_template(),
             ..StatefulSetSpec::default()
         }),

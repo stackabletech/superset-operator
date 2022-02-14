@@ -7,6 +7,7 @@
 ### Added
 
 - Druid DB connections can now be configured in a custom resource ([#71]).
+- Prometheus metrics enabled ([#128]).
 
 ### Changed
 
@@ -19,6 +20,7 @@
 [#70]: https://github.com/stackabletech/superset-operator/pull/70
 [#71]: https://github.com/stackabletech/superset-operator/pull/71
 [#82]: https://github.com/stackabletech/superset-operator/pull/82
+[#128]: https://github.com/stackabletech/superset-operator/pull/128
 
 ## [0.2.0] - 2021-12-17
 
