@@ -1,8 +1,8 @@
 ---
 apiVersion: v2
 name: superset-operator
-version: 0.3.0
-appVersion: "0.3.0"
+version: 0.4.0-nightly
+appVersion: "0.4.0-nightly"
 description: The Stackable Operator for Apache Superset
 home: https://github.com/stackabletech/superset-operator
 maintainers:
