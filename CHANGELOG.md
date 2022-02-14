@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2022-02-14
+
 ### Added
 
 - Druid DB connections can now be configured in a custom resource ([#71]).
