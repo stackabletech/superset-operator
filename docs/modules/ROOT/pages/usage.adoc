@@ -138,5 +138,5 @@ image::superset-databases.png[Superset databases showing the connected Druid clu
 
 == Monitoring
 
-The managed HBase instances are automatically configured to export Prometheus metrics. See
+The managed Superset instances are automatically configured to export Prometheus metrics. See
 xref:home::monitoring.adoc[] for more details.
