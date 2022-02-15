@@ -9,6 +9,8 @@ use stackable_superset_crd::SupersetCluster;
 pub enum Error {
     #[snafu(display("object defines no version"))]
     ObjectHasNoVersion,
+    #[snafu(display("object defines no stats exporter version"))]
+    ObjectHasNoStatsdExporterVersion,
 }
 
 pub enum JobState {
@@ -41,6 +43,14 @@ pub fn get_job_state(job: &Job) -> JobState {
 
 pub fn superset_version(superset: &SupersetCluster) -> Result<&str, Error> {
     superset.spec.version.as_deref().context(ObjectHasNoVersion)
+}
+
+pub fn statsd_exporter_version(superset: &SupersetCluster) -> Result<&str, Error> {
+    superset
+        .spec
+        .statsd_exporter_version
+        .as_deref()
+        .context(ObjectHasNoStatsdExporterVersion)
 }
 
 pub fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> EnvVar {

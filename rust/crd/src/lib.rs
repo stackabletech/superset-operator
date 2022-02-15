@@ -40,6 +40,8 @@ pub struct SupersetClusterSpec {
     /// Desired Superset version
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub statsd_exporter_version: Option<String>,
     pub credentials_secret: String,
     #[serde(default)]
     pub load_examples_on_init: Option<bool>,
