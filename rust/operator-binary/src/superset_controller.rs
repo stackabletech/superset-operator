@@ -222,7 +222,6 @@ fn build_node_rolegroup_service(
                 statsd_exporter_version(superset).context(NoStatsdExporterVersionSnafu)?,
             )
             .with_label("prometheus.io/scrape", "true")
-            .with_label("prometheus.io/port", METRICS_PORT.to_string())
             .build(),
         spec: Some(ServiceSpec {
             cluster_ip: Some("None".to_string()),

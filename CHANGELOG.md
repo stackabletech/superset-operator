@@ -7,7 +7,8 @@
 ### Added
 
 - Druid DB connections can now be configured in a custom resource ([#71]).
-- Prometheus metrics enabled ([#128]).
+- BREAKING: Prometheus metrics enabled ([#128]); The `statsdExporterVersion`
+  must be set in the cluster specification.
 
 ### Changed
 
