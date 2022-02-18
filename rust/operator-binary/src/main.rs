@@ -13,14 +13,11 @@ use stackable_operator::{
         core::v1::{Secret, Service},
     },
     kube::{
-        api::{DynamicObject, ListParams},
-        runtime::{
-            controller::{Context, ReconcilerAction},
-            reflector::ObjectRef,
-            Controller,
-        },
-        CustomResourceExt, Resource,
+        api::ListParams,
+        runtime::{controller::Context, reflector::ObjectRef, Controller},
+        CustomResourceExt,
     },
+    logging::controller::report_controller_reconciled,
 };
 use stackable_superset_crd::{
     druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
@@ -38,17 +35,6 @@ pub const APP_PORT: u16 = 8088;
 struct Opts {
     #[clap(subcommand)]
     cmd: Command,
-}
-
-/// Erases the concrete types of the controller result, so that we can merge the streams of multiple controllers for different resources.
-///
-/// In particular, we convert `ObjectRef<K>` into `ObjectRef<DynamicObject>` (which carries `K`'s metadata at runtime instead), and
-/// `E` into the trait object `anyhow::Error`.
-fn erase_controller_result_type<K: Resource, E: std::error::Error + Send + Sync + 'static>(
-    res: Result<(ObjectRef<K>, ReconcilerAction), E>,
-) -> anyhow::Result<(ObjectRef<DynamicObject>, ReconcilerAction)> {
-    let (obj_ref, action) = res?;
-    Ok((obj_ref.erase(), action))
 }
 
 #[tokio::main]
@@ -76,10 +62,12 @@ async fn main() -> anyhow::Result<()> {
                 "deploy/config-spec/properties.yaml",
                 "/etc/stackable/superset-operator/config-spec/properties.yaml",
             ])?;
+
             let client = stackable_operator::client::create_client(Some(
                 "superset.stackable.tech".to_string(),
             ))
             .await?;
+
             let superset_controller = Controller::new(
                 client.get_all_api::<SupersetCluster>(),
                 ListParams::default(),
@@ -94,7 +82,14 @@ async fn main() -> anyhow::Result<()> {
                     client: client.clone(),
                     product_config,
                 }),
-            );
+            )
+            .map(|res| {
+                report_controller_reconciled(
+                    &client,
+                    "supersetclusters.superset.stackable.tech",
+                    &res,
+                )
+            });
 
             let superset_db_controller_builder =
                 Controller::new(client.get_all_api::<SupersetDB>(), ListParams::default());
@@ -116,7 +111,7 @@ async fn main() -> anyhow::Result<()> {
                                     false
                                 }
                             })
-                            .map(|superset_db| ObjectRef::from_obj(&superset_db))
+                            .map(|superset_db| ObjectRef::from_obj(&*superset_db))
                     },
                 )
                 // We have to watch jobs so we can react to finished init jobs
@@ -134,7 +129,7 @@ async fn main() -> anyhow::Result<()> {
                                     && &superset_db.job_name()
                                         == job.metadata.name.as_ref().unwrap()
                             })
-                            .map(|superset_db| ObjectRef::from_obj(&superset_db))
+                            .map(|superset_db| ObjectRef::from_obj(&*superset_db))
                     },
                 )
                 .run(
@@ -143,7 +138,15 @@ async fn main() -> anyhow::Result<()> {
                     Context::new(superset_db_controller::Ctx {
                         client: client.clone(),
                     }),
-                );
+                )
+                .map(|res| {
+                    report_controller_reconciled(
+                        &client,
+                        "supersetdbclusters.superset.stackable.tech",
+                        &res,
+                    )
+                });
+
             let druid_connection_controller_builder = Controller::new(
                 client.get_all_api::<DruidConnection>(),
                 ListParams::default(),
@@ -165,7 +168,7 @@ async fn main() -> anyhow::Result<()> {
                                     && &druid_connection.spec.superset.name
                                         == sdb.metadata.name.as_ref().unwrap()
                             })
-                            .map(|druid_connection| ObjectRef::from_obj(&druid_connection))
+                            .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
                 )
                 .watches(
@@ -181,7 +184,7 @@ async fn main() -> anyhow::Result<()> {
                                     && &druid_connection.job_name()
                                         == job.metadata.name.as_ref().unwrap()
                             })
-                            .map(|druid_connection| ObjectRef::from_obj(&druid_connection))
+                            .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
                 )
                 .run(
@@ -190,26 +193,20 @@ async fn main() -> anyhow::Result<()> {
                     Context::new(druid_connection_controller::Ctx {
                         client: client.clone(),
                     }),
-                );
+                )
+                .map(|res| {
+                    report_controller_reconciled(
+                        &client,
+                        "druidconnection.superset.stackable.tech",
+                        &res,
+                    )
+                });
 
             futures::stream::select(
-                futures::stream::select(
-                    superset_controller.map(erase_controller_result_type),
-                    superset_db_controller.map(erase_controller_result_type),
-                ),
-                druid_connection_controller.map(erase_controller_result_type),
+                futures::stream::select(superset_controller, superset_db_controller),
+                druid_connection_controller,
             )
-            .for_each(|res| async {
-                match res {
-                    Ok((obj, _)) => tracing::info!(object = %obj, "Reconciled object"),
-                    Err(err) => {
-                        tracing::error!(
-                            error = &*err as &dyn std::error::Error,
-                            "Failed to reconcile object",
-                        )
-                    }
-                }
-            })
+            .collect::<()>()
             .await;
         }
     }

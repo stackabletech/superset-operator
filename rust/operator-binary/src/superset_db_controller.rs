@@ -1,6 +1,5 @@
-use std::time::Duration;
-
 use crate::util::{env_var_from_secret, get_job_state, JobState};
+
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder},
@@ -15,8 +14,11 @@ use stackable_operator::{
         },
         ResourceExt,
     },
+    logging::controller::ReconcilerError,
 };
 use stackable_superset_crd::supersetdb::{SupersetDB, SupersetDBStatus, SupersetDBStatusCondition};
+use std::{sync::Arc, time::Duration};
+use strum::{EnumDiscriminants, IntoStaticStr};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -24,7 +26,8 @@ pub struct Ctx {
     pub client: stackable_operator::client::Client,
 }
 
-#[derive(Snafu, Debug)]
+#[derive(Snafu, Debug, EnumDiscriminants)]
+#[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("failed to apply Job for {}", superset_db))]
@@ -51,10 +54,17 @@ pub enum Error {
         secret: ObjectRef<Secret>,
     },
 }
+
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+impl ReconcilerError for Error {
+    fn category(&self) -> &'static str {
+        ErrorDiscriminants::from(self).into()
+    }
+}
+
 pub async fn reconcile_superset_db(
-    superset_db: SupersetDB,
+    superset_db: Arc<SupersetDB>,
     ctx: Context<Ctx>,
 ) -> Result<ReconcilerAction> {
     tracing::info!("Starting reconcile");
@@ -84,11 +94,11 @@ pub async fn reconcile_superset_db(
                         .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
                         .await
                         .context(ApplyJobSnafu {
-                            superset_db: ObjectRef::from_obj(&superset_db),
+                            superset_db: ObjectRef::from_obj(&*superset_db),
                         })?;
                     // The job is started, update status to reflect new state
                     client
-                        .apply_patch_status(FIELD_MANAGER_SCOPE, &superset_db, &s.initializing())
+                        .apply_patch_status(FIELD_MANAGER_SCOPE, &*superset_db, &s.initializing())
                         .await
                         .context(ApplyStatusSnafu)?;
                 }
@@ -114,7 +124,7 @@ pub async fn reconcile_superset_db(
 
                 if let Some(ns) = new_status {
                     client
-                        .apply_patch_status(FIELD_MANAGER_SCOPE, &superset_db, &ns)
+                        .apply_patch_status(FIELD_MANAGER_SCOPE, &*superset_db, &ns)
                         .await
                         .context(ApplyStatusSnafu)?;
                 }
@@ -126,7 +136,7 @@ pub async fn reconcile_superset_db(
         // Status is none => initialize the status object as "Provisioned"
         let new_status = SupersetDBStatus::new();
         client
-            .apply_patch_status(FIELD_MANAGER_SCOPE, &superset_db, &new_status)
+            .apply_patch_status(FIELD_MANAGER_SCOPE, &*superset_db, &new_status)
             .await
             .context(ApplyStatusSnafu)?;
     }

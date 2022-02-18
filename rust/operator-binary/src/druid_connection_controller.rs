@@ -1,22 +1,23 @@
-use std::time::Duration;
-
 use crate::util::{env_var_from_secret, get_job_state, JobState};
-use crate::ObjectRef;
+
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::client::Client;
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder},
+    client::Client,
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
         core::v1::{ConfigMap, PodSpec, PodTemplateSpec},
     },
     kube::runtime::controller::{Context, ReconcilerAction},
     kube::ResourceExt,
+    logging::controller::ReconcilerError,
 };
 use stackable_superset_crd::druidconnection::{
     DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition,
 };
 use stackable_superset_crd::supersetdb::{SupersetDB, SupersetDBStatusCondition};
+use std::{sync::Arc, time::Duration};
+use strum::{EnumDiscriminants, IntoStaticStr};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -24,7 +25,8 @@ pub struct Ctx {
     pub client: stackable_operator::client::Client,
 }
 
-#[derive(Snafu, Debug)]
+#[derive(Snafu, Debug, EnumDiscriminants)]
+#[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("failed to apply Job for Druid Connection"))]
@@ -39,36 +41,36 @@ pub enum Error {
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("Failed to get Druid connection string from config map {}", config_map))]
+    #[snafu(display("Failed to get Druid connection string from config map"))]
     GetDruidConnStringConfigMap {
         source: stackable_operator::error::Error,
-        config_map: ObjectRef<ConfigMap>,
     },
-    #[snafu(display("Failed to get Druid connection string from config map {}", config_map))]
-    MissingDruidConnString { config_map: ObjectRef<ConfigMap> },
-    #[snafu(display(
-        "druid connection state is 'importing' but failed to find job {}",
-        import_job
-    ))]
+    #[snafu(display("failed to get Druid connection string from config map"))]
+    MissingDruidConnString,
+    #[snafu(display("druid connection state is 'importing' but failed to find job"))]
     GetImportJob {
         source: stackable_operator::error::Error,
-        import_job: ObjectRef<Job>,
     },
-    #[snafu(display("Failed to check if druid discovery map exists"))]
+    #[snafu(display("failed to check if druid discovery map exists"))]
     DruidDiscoveryCheck {
         source: stackable_operator::error::Error,
     },
-    SupersetDBExistsCheck {
-        source: stackable_operator::error::Error,
-    },
+    #[snafu(display("failed to retrieve superset db"))]
     SupersetDBRetrieval {
         source: stackable_operator::error::Error,
     },
 }
+
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+impl ReconcilerError for Error {
+    fn category(&self) -> &'static str {
+        ErrorDiscriminants::from(self).into()
+    }
+}
+
 pub async fn reconcile_druid_connection(
-    druid_connection: DruidConnection,
+    druid_connection: Arc<DruidConnection>,
     ctx: Context<Ctx>,
 ) -> Result<ReconcilerAction> {
     tracing::info!("Starting reconciling DruidConnections");
@@ -123,7 +125,7 @@ pub async fn reconcile_druid_connection(
                         .context(ApplyJobSnafu)?;
                     // The job is started, update status to reflect new state
                     client
-                        .apply_patch_status(FIELD_MANAGER_SCOPE, &druid_connection, &s.importing())
+                        .apply_patch_status(FIELD_MANAGER_SCOPE, &*druid_connection, &s.importing())
                         .await
                         .context(ApplyStatusSnafu)?;
                 }
@@ -133,13 +135,10 @@ pub async fn reconcile_druid_connection(
                     .namespace()
                     .unwrap_or_else(|| "default".to_string());
                 let job_name = druid_connection.job_name();
-                let job =
-                    client
-                        .get::<Job>(&job_name, Some(&ns))
-                        .await
-                        .context(GetImportJobSnafu {
-                            import_job: ObjectRef::<Job>::new(&job_name).within(&ns),
-                        })?;
+                let job = client
+                    .get::<Job>(&job_name, Some(&ns))
+                    .await
+                    .context(GetImportJobSnafu)?;
 
                 let new_status = match get_job_state(&job) {
                     JobState::Failed => Some(s.failed()),
@@ -149,7 +148,7 @@ pub async fn reconcile_druid_connection(
 
                 if let Some(ns) = new_status {
                     client
-                        .apply_patch_status(FIELD_MANAGER_SCOPE, &druid_connection, &ns)
+                        .apply_patch_status(FIELD_MANAGER_SCOPE, &*druid_connection, &ns)
                         .await
                         .context(ApplyStatusSnafu)?;
                 }
@@ -162,7 +161,7 @@ pub async fn reconcile_druid_connection(
         client
             .apply_patch_status(
                 FIELD_MANAGER_SCOPE,
-                &druid_connection,
+                &*druid_connection,
                 &DruidConnectionStatus::new(),
             )
             .await
@@ -183,14 +182,10 @@ async fn get_sqlalchemy_uri_for_druid_cluster(
     client
         .get::<ConfigMap>(cluster_name, Some(namespace))
         .await
-        .context(GetDruidConnStringConfigMapSnafu {
-            config_map: ObjectRef::<ConfigMap>::new(cluster_name).within(namespace),
-        })?
+        .context(GetDruidConnStringConfigMapSnafu)?
         .data
         .and_then(|mut data| data.remove("DRUID_SQLALCHEMY"))
-        .context(MissingDruidConnStringSnafu {
-            config_map: ObjectRef::<ConfigMap>::new(cluster_name).within(namespace),
-        })
+        .context(MissingDruidConnStringSnafu)
 }
 
 /// Returns a yaml document read to be imported with "superset import-datasources"

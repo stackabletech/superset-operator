@@ -1,15 +1,17 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashMap},
-    time::Duration,
-};
-
 use crate::{
     util::{env_var_from_secret, statsd_exporter_version, superset_version},
     APP_NAME, APP_PORT,
 };
+
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+    time::Duration,
+};
+
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
@@ -22,12 +24,15 @@ use stackable_operator::{
     },
     kube::runtime::controller::{Context, ReconcilerAction},
     labels::{role_group_selector_labels, role_selector_labels},
+    logging::controller::ReconcilerError,
     product_config::{types::PropertyNameKind, ProductConfigManager},
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::RoleGroupRef,
 };
-use stackable_superset_crd::supersetdb::SupersetDB;
-use stackable_superset_crd::{SupersetCluster, SupersetConfig, SupersetRole};
+use stackable_superset_crd::{
+    supersetdb::SupersetDB, SupersetCluster, SupersetConfig, SupersetRole,
+};
+use strum::{EnumDiscriminants, IntoStaticStr};
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -39,7 +44,8 @@ pub struct Ctx {
     pub product_config: ProductConfigManager,
 }
 
-#[derive(Snafu, Debug)]
+#[derive(Snafu, Debug, EnumDiscriminants)]
+#[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("failed to retrieve superset version"))]
@@ -86,10 +92,17 @@ pub enum Error {
         source: stackable_operator::error::Error,
     },
 }
+
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+impl ReconcilerError for Error {
+    fn category(&self) -> &'static str {
+        ErrorDiscriminants::from(self).into()
+    }
+}
+
 pub async fn reconcile_superset(
-    superset: SupersetCluster,
+    superset: Arc<SupersetCluster>,
     ctx: Context<Ctx>,
 ) -> Result<ReconcilerAction> {
     tracing::info!("Starting reconcile");
@@ -106,7 +119,7 @@ pub async fn reconcile_superset(
     let validated_config = validate_all_roles_and_groups_config(
         superset_version(&superset).context(NoSupersetVersionSnafu)?,
         &transform_all_roles_to_config(
-            &superset,
+            &*superset,
             [(
                 SupersetRole::Node.to_string(),
                 (
