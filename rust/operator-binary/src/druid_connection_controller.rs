@@ -8,8 +8,14 @@ use stackable_operator::{
         batch::v1::{Job, JobSpec},
         core::v1::{ConfigMap, PodSpec, PodTemplateSpec},
     },
-    kube::runtime::controller::{Context, ReconcilerAction},
-    kube::ResourceExt,
+    kube::{
+        core::DynamicObject,
+        runtime::{
+            controller::{Context, ReconcilerAction},
+            reflector::ObjectRef,
+        },
+        ResourceExt,
+    },
     logging::controller::ReconcilerError,
 };
 use stackable_superset_crd::druidconnection::{
@@ -41,15 +47,17 @@ pub enum Error {
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("Failed to get Druid connection string from config map"))]
+    #[snafu(display("failed to get Druid connection string from config map {config_map}"))]
     GetDruidConnStringConfigMap {
         source: stackable_operator::error::Error,
+        config_map: ObjectRef<ConfigMap>,
     },
     #[snafu(display("failed to get Druid connection string from config map"))]
     MissingDruidConnString,
-    #[snafu(display("druid connection state is 'importing' but failed to find job"))]
+    #[snafu(display("druid connection state is 'importing' but failed to find job {import_job}"))]
     GetImportJob {
         source: stackable_operator::error::Error,
+        import_job: ObjectRef<Job>,
     },
     #[snafu(display("failed to check if druid discovery map exists"))]
     DruidDiscoveryCheck {
@@ -66,6 +74,16 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 impl ReconcilerError for Error {
     fn category(&self) -> &'static str {
         ErrorDiscriminants::from(self).into()
+    }
+
+    fn secondary_object(&self) -> Option<ObjectRef<DynamicObject>> {
+        match self {
+            Error::GetDruidConnStringConfigMap { config_map, .. } => {
+                Some(config_map.clone().erase())
+            }
+            Error::GetImportJob { import_job, .. } => Some(import_job.clone().erase()),
+            _ => None,
+        }
     }
 }
 
@@ -135,10 +153,13 @@ pub async fn reconcile_druid_connection(
                     .namespace()
                     .unwrap_or_else(|| "default".to_string());
                 let job_name = druid_connection.job_name();
-                let job = client
-                    .get::<Job>(&job_name, Some(&ns))
-                    .await
-                    .context(GetImportJobSnafu)?;
+                let job =
+                    client
+                        .get::<Job>(&job_name, Some(&ns))
+                        .await
+                        .context(GetImportJobSnafu {
+                            import_job: ObjectRef::<Job>::new(&job_name).within(&ns),
+                        })?;
 
                 let new_status = match get_job_state(&job) {
                     JobState::Failed => Some(s.failed()),
@@ -182,7 +203,9 @@ async fn get_sqlalchemy_uri_for_druid_cluster(
     client
         .get::<ConfigMap>(cluster_name, Some(namespace))
         .await
-        .context(GetDruidConnStringConfigMapSnafu)?
+        .context(GetDruidConnStringConfigMapSnafu {
+            config_map: ObjectRef::<ConfigMap>::new(cluster_name).within(namespace),
+        })?
         .data
         .and_then(|mut data| data.remove("DRUID_SQLALCHEMY"))
         .context(MissingDruidConnStringSnafu)
