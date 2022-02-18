@@ -78,11 +78,16 @@ impl ReconcilerError for Error {
 
     fn secondary_object(&self) -> Option<ObjectRef<DynamicObject>> {
         match self {
+            Error::ApplyJob { .. } => None,
+            Error::ApplyStatus { .. } => None,
+            Error::ObjectMissingMetadataForOwnerRef { .. } => None,
             Error::GetDruidConnStringConfigMap { config_map, .. } => {
                 Some(config_map.clone().erase())
             }
+            Error::MissingDruidConnString => None,
             Error::GetImportJob { import_job, .. } => Some(import_job.clone().erase()),
-            _ => None,
+            Error::DruidDiscoveryCheck { .. } => None,
+            Error::SupersetDBRetrieval { .. } => None,
         }
     }
 }
