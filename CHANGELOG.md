@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- Reconciliation errors are now reported as Kubernetes events ([#132]).
+
+### Changed
+
+- `operator-rs` `0.9.0` -> `0.12.0` ([#132]).
+
+[#132]: https://github.com/stackabletech/superset-operator/pull/132
+
 ## [0.3.0] - 2022-02-14
 
 ### Added
@@ -16,7 +26,7 @@
 - All dependencies upgraded. The upgrade to operator-rs 0.8.0 does not
   force the credentials secret to be set anymore in the custom resource
   but it is still required ([#82]).
-- - `operator-rs` `0.8.0` → `0.9.0` ([#71])
+- `operator-rs` `0.8.0` → `0.9.0` ([#71])
 
 [#70]: https://github.com/stackabletech/superset-operator/pull/70
 [#71]: https://github.com/stackabletech/superset-operator/pull/71
