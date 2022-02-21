@@ -5,6 +5,7 @@
 ### Added
 
 - Reconciliation errors are now reported as Kubernetes events ([#132]).
+- Add support for Superset 1.4.1 ([#135]).
 - Use cli argument `watch-namespace` / env var `WATCH_NAMESPACE` to specify
   a single namespace to watch ([#138]).
 
@@ -13,6 +14,7 @@
 - `operator-rs` `0.9.0` -> `0.13.0` ([#132],[#138]).
 
 [#132]: https://github.com/stackabletech/superset-operator/pull/132
+[#135]: https://github.com/stackabletech/superset-operator/pull/135
 [#138]: https://github.com/stackabletech/superset-operator/pull/138
 
 ## [0.3.0] - 2022-02-14

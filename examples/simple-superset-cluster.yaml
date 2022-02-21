@@ -18,7 +18,7 @@ kind: SupersetCluster
 metadata:
   name: simple-superset
 spec:
-  version: 1.3.2
+  version: 1.4.1
   statsdExporterVersion: v0.22.4
   credentialsSecret: simple-superset-credentials
   loadExamplesOnInit: true
