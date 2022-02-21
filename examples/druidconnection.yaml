@@ -4,8 +4,8 @@ metadata:
   name: superset-druid-connection
 spec:
   superset:
-    name: superset
+    name: simple-superset
     namespace: default
   druid:
-    name: derby-druid
+    name: simple-derby-druid
     namespace: default
