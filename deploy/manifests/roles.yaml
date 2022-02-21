@@ -71,6 +71,12 @@ rules:
     verbs:
       - get
   - apiGroups:
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
+  - apiGroups:
       - superset.stackable.tech
     resources:
       - supersetclusters
