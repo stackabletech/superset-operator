@@ -49,7 +49,10 @@ async fn main() -> anyhow::Result<()> {
             serde_yaml::to_string(&SupersetDB::crd())?,
             serde_yaml::to_string(&DruidConnection::crd())?
         ),
-        Command::Run(ProductOperatorRun { product_config }) => {
+        Command::Run(ProductOperatorRun {
+            product_config,
+            watch_namespace,
+        }) => {
             stackable_operator::utils::print_startup_string(
                 built_info::PKG_DESCRIPTION,
                 built_info::PKG_VERSION,
@@ -69,11 +72,17 @@ async fn main() -> anyhow::Result<()> {
             .await?;
 
             let superset_controller = Controller::new(
-                client.get_all_api::<SupersetCluster>(),
+                watch_namespace.get_api::<SupersetCluster>(&client),
                 ListParams::default(),
             )
-            .owns(client.get_all_api::<Service>(), ListParams::default())
-            .owns(client.get_all_api::<StatefulSet>(), ListParams::default())
+            .owns(
+                watch_namespace.get_api::<Service>(&client),
+                ListParams::default(),
+            )
+            .owns(
+                watch_namespace.get_api::<StatefulSet>(&client),
+                ListParams::default(),
+            )
             .shutdown_on_signal()
             .run(
                 superset_controller::reconcile_superset,
@@ -91,14 +100,16 @@ async fn main() -> anyhow::Result<()> {
                 )
             });
 
-            let superset_db_controller_builder =
-                Controller::new(client.get_all_api::<SupersetDB>(), ListParams::default());
+            let superset_db_controller_builder = Controller::new(
+                watch_namespace.get_api::<SupersetDB>(&client),
+                ListParams::default(),
+            );
             let superset_db_store1 = superset_db_controller_builder.store();
             let superset_db_store2 = superset_db_controller_builder.store();
             let superset_db_controller = superset_db_controller_builder
                 .shutdown_on_signal()
                 .watches(
-                    client.get_all_api::<Secret>(),
+                    watch_namespace.get_api::<Secret>(&client),
                     ListParams::default(),
                     move |secret| {
                         superset_db_store1
@@ -117,7 +128,7 @@ async fn main() -> anyhow::Result<()> {
                 // We have to watch jobs so we can react to finished init jobs
                 // and update our status accordingly
                 .watches(
-                    client.get_all_api::<Job>(),
+                    watch_namespace.get_api::<Job>(&client),
                     ListParams::default(),
                     move |job| {
                         superset_db_store2
@@ -148,7 +159,7 @@ async fn main() -> anyhow::Result<()> {
                 });
 
             let druid_connection_controller_builder = Controller::new(
-                client.get_all_api::<DruidConnection>(),
+                watch_namespace.get_api::<DruidConnection>(&client),
                 ListParams::default(),
             );
             let druid_connection_store1 = druid_connection_controller_builder.store();
@@ -156,7 +167,7 @@ async fn main() -> anyhow::Result<()> {
             let druid_connection_controller = druid_connection_controller_builder
                 .shutdown_on_signal()
                 .watches(
-                    client.get_all_api::<SupersetDB>(),
+                    watch_namespace.get_api::<SupersetDB>(&client),
                     ListParams::default(),
                     move |sdb| {
                         druid_connection_store1
@@ -172,7 +183,7 @@ async fn main() -> anyhow::Result<()> {
                     },
                 )
                 .watches(
-                    client.get_all_api::<Job>(),
+                    watch_namespace.get_api::<Job>(&client),
                     ListParams::default(),
                     move |job| {
                         druid_connection_store2
