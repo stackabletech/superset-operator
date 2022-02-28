@@ -1,0 +1,28 @@
+
+=== product-config
+
+*Default value*: `/etc/stackable/superset-operator/config-spec/properties.yaml`
+
+*Required*: false
+
+*Multiple values:* false
+
+[source]
+----
+stackable-superset-operator run --product-config /foo/bar/properties.yaml
+----
+
+=== watch-namespace
+
+*Default value*: All namespaces
+
+*Required*: false
+
+*Multiple values:* false
+
+The operator will **only** watch for resources in the provided namespace `test`:
+
+[source]
+----
+stackable-superset-operator run --watch-namespace test
+----

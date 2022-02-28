@@ -9,8 +9,7 @@ use stackable_operator::kube::CustomResource;
 use stackable_operator::product_config_utils::{ConfigError, Configuration};
 use stackable_operator::role_utils::{Role, RoleGroupRef};
 use stackable_operator::schemars::{self, JsonSchema};
-use strum_macros::Display;
-use strum_macros::EnumIter;
+use strum::{Display, EnumIter};
 
 pub const APP_NAME: &str = "superset";
 pub const MANAGED_BY: &str = "superset-operator";
