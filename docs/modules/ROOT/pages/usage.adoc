@@ -12,9 +12,9 @@ For testing purposes, you can spin up a PostgreSQL database with the following c
 helm repo add bitnami https://charts.bitnami.com/bitnami
 
 helm install superset bitnami/postgresql \
-    --set postgresqlUsername=superset \
-    --set postgresqlPassword=superset \
-    --set postgresqlDatabase=superset
+    --set auth.username=superset \
+    --set auth.password=superset \
+    --set auth.database=superset
 ----
 
 == Secret with Superset credentials
