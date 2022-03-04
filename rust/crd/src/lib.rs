@@ -1,3 +1,4 @@
+pub mod authentication;
 pub mod druidconnection;
 pub mod supersetdb;
 
@@ -46,6 +47,20 @@ pub struct SupersetClusterSpec {
     pub load_examples_on_init: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nodes: Option<Role<SupersetConfig>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authentication_config: Option<SupersetClusterAuthenticationConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetClusterAuthenticationConfig {
+    pub methods: Vec<SupersetClusterAuthenticationConfigMethod>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetClusterAuthenticationConfigMethod {
+    pub authentication_class: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

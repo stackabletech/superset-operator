@@ -22,6 +22,21 @@ spec:
           properties:
             spec:
               properties:
+                authenticationConfig:
+                  nullable: true
+                  properties:
+                    methods:
+                      items:
+                        properties:
+                          authenticationClass:
+                            type: string
+                        required:
+                          - authenticationClass
+                        type: object
+                      type: array
+                  required:
+                    - methods
+                  type: object
                 credentialsSecret:
                   type: string
                 loadExamplesOnInit:

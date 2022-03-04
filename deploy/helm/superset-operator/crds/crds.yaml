@@ -2,6 +2,73 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  name: authenticationclasses.authentication.stackable.tech
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  group: authentication.stackable.tech
+  names:
+    categories: []
+    kind: AuthenticationClass
+    plural: authenticationclasses
+    shortNames: []
+    singular: authenticationclass
+  scope: Cluster
+  versions:
+    - additionalPrinterColumns: []
+      name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: "Auto-generated derived type for AuthenticationClassSpec via `CustomResource`"
+          properties:
+            spec:
+              properties:
+                protocol:
+                  oneOf:
+                    - required:
+                        - ldap
+                  properties:
+                    ldap:
+                      properties:
+                        bindCredentials:
+                          properties:
+                            scope:
+                              type: string
+                            secretClass:
+                              type: string
+                          required:
+                            - scope
+                            - secretClass
+                          type: object
+                        domain:
+                          type: string
+                        hostname:
+                          type: string
+                        port:
+                          format: uint16
+                          minimum: 0.0
+                          type: integer
+                      required:
+                        - bindCredentials
+                        - domain
+                        - hostname
+                        - port
+                      type: object
+                  type: object
+              required:
+                - protocol
+              type: object
+          required:
+            - spec
+          title: AuthenticationClass
+          type: object
+      served: true
+      storage: true
+      subresources: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
   name: druidconnections.superset.stackable.tech
   annotations:
     helm.sh/resource-policy: keep
@@ -99,6 +166,21 @@ spec:
           properties:
             spec:
               properties:
+                authenticationConfig:
+                  nullable: true
+                  properties:
+                    methods:
+                      items:
+                        properties:
+                          authenticationClass:
+                            type: string
+                        required:
+                          - authenticationClass
+                        type: object
+                      type: array
+                  required:
+                    - methods
+                  type: object
                 credentialsSecret:
                   type: string
                 loadExamplesOnInit:
