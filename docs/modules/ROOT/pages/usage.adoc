@@ -93,7 +93,7 @@ The Superset port which defaults to `8088` can be forwarded to the local host:
 
 [source,bash]
 ----
-kubectl port-forward superset-node-default-0 8088
+kubectl port-forward service/simple-superset-external 8088
 ----
 
 Then it can be opened in the browser with `http://localhost:8088`.
