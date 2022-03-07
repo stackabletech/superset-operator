@@ -22,6 +22,7 @@ use stackable_operator::{
 use stackable_superset_crd::{
     druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
 };
+use stackable_superset_crd::authentication::AuthenticationClass;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -44,10 +45,11 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => println!(
-            "{}{}{}",
+            "{}{}{}{}",
             serde_yaml::to_string(&SupersetCluster::crd())?,
             serde_yaml::to_string(&SupersetDB::crd())?,
-            serde_yaml::to_string(&DruidConnection::crd())?
+            serde_yaml::to_string(&DruidConnection::crd())?,
+            serde_yaml::to_string(&AuthenticationClass::crd())?,
         ),
         Command::Run(ProductOperatorRun {
             product_config,
