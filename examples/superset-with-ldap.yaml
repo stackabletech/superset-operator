@@ -1,0 +1,74 @@
+# helm repo add bitnami https://charts.bitnami.com/bitnami
+# helm install superset bitnami/postgresql     --set auth.username=superset     --set auth.password=superset     --set auth.database=superset
+#
+# helm repo add stackable https://repo.stackable.tech/repository/helm-stable/
+# helm install secret-operator stackable/secret-operator
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-with-ldap-credentials
+type: Opaque
+stringData:
+  adminUser.username: admin
+  adminUser.firstname: Superset
+  adminUser.lastname: Admin
+  adminUser.email: admin@superset.com
+  adminUser.password: admin
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql.default.svc.cluster.local/superset
+---
+apiVersion: authentication.stackable.tech/v1alpha1
+kind: AuthenticationClass
+metadata:
+  name: myldap
+spec:
+  protocol:
+    ldap:
+      hostname: ldap.server
+      port: 389
+      domain: domain.local
+      bindCredentials:
+        secretClass: superset-with-ldap-ldap-bind-secret-class
+#        scope:
+#          node: true
+#          pod: true
+#          services:
+#            - myservice
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: superset-with-ldap-ldap-bind-secret-class
+spec:
+  backend:
+    k8sSearch:
+      searchNamespace:
+        pod: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-with-ldap-ldap-bind
+  labels:
+    secrets.stackable.tech/class: superset-with-ldap-ldap-bind-secret-class
+stringData:
+  user: myLdapUser
+  password: myLdapPassword
+---
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: superset-with-ldap
+spec:
+  version: 1.4.1
+  statsdExporterVersion: v0.22.4
+  credentialsSecret: superset-with-ldap-credentials
+  loadExamplesOnInit: true
+  nodes:
+    roleGroups:
+      default:
+        config:
+  authenticationConfig:
+    methods:
+      - authenticationClass: myldap

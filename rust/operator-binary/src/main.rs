@@ -19,10 +19,10 @@ use stackable_operator::{
     },
     logging::controller::report_controller_reconciled,
 };
+use stackable_superset_crd::authentication::AuthenticationClass;
 use stackable_superset_crd::{
     druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
 };
-use stackable_superset_crd::authentication::AuthenticationClass;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));

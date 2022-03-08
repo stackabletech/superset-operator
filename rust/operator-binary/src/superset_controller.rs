@@ -5,14 +5,11 @@ use crate::{
     APP_NAME, APP_PORT,
 };
 
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-    time::Duration,
+use snafu::{ensure, OptionExt, ResultExt, Snafu};
+use stackable_operator::builder::{
+    PodSecurityContextBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder, VolumeMountBuilder,
 };
-
-use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::client::Client;
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     k8s_openapi::{
@@ -29,8 +26,16 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::RoleGroupRef,
 };
+use stackable_superset_crd::authentication::AuthenticationClassType;
 use stackable_superset_crd::{
-    supersetdb::SupersetDB, SupersetCluster, SupersetConfig, SupersetRole,
+    authentication::AuthenticationClass, supersetdb::SupersetDB, SupersetCluster, SupersetConfig,
+    SupersetRole,
+};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+    time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -89,6 +94,12 @@ pub enum Error {
     },
     #[snafu(display("object is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("superset only supports a single authentication method"))]
+    MultipleAuthenticationMethods,
+    #[snafu(display("failed to retrieve authentication class"))]
+    AuthenticationClassRetrieval {
         source: stackable_operator::error::Error,
     },
 }
@@ -150,7 +161,8 @@ pub async fn reconcile_superset(
 
         let rg_service = build_node_rolegroup_service(&rolegroup, &superset)?;
         let rg_statefulset =
-            build_server_rolegroup_statefulset(&rolegroup, &superset, rolegroup_config)?;
+            build_server_rolegroup_statefulset(&rolegroup, &superset, rolegroup_config, client)
+                .await?;
         client
             .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
             .await
@@ -268,10 +280,11 @@ fn build_node_rolegroup_service(
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_node_rolegroup_service`]).
-fn build_server_rolegroup_statefulset(
+async fn build_server_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     superset: &SupersetCluster,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    client: &Client,
 ) -> Result<StatefulSet> {
     let rolegroup = superset
         .spec
@@ -306,10 +319,60 @@ fn build_server_rolegroup_statefulset(
         })
         .unwrap_or_default();
 
+    let mut volumes = vec![];
+    let mut volume_mounts = vec![];
+
+    if let Some(authentication_config) = superset.spec.authentication_config.as_ref() {
+        ensure!(
+            authentication_config.methods.len() == 1,
+            MultipleAuthenticationMethodsSnafu
+        );
+
+        for method in &authentication_config.methods {
+            let authentication_class_name = &method.authentication_class;
+            let authentication_class = client
+                .get::<AuthenticationClass>(authentication_class_name, None) // AuthenticationClass has ClusterScope
+                .await
+                .context(AuthenticationClassRetrievalSnafu)?;
+            match authentication_class.spec.protocol {
+                AuthenticationClassType::Ldap(ldap) => {
+                    let mut secret_operator_volume_builder =
+                        SecretOperatorVolumeSourceBuilder::new(ldap.bind_credentials.secret_class);
+
+                    if let Some(scope) = ldap.bind_credentials.scope {
+                        if scope.pod.is_some() {
+                            secret_operator_volume_builder.with_pod_scope();
+                        }
+                        if scope.node.is_some() {
+                            secret_operator_volume_builder.with_node_scope();
+                        }
+                        if let Some(services) = scope.services {
+                            for service in services {
+                                secret_operator_volume_builder.with_service_scope(service);
+                            }
+                        }
+                    }
+                    let volume_name = format!("authentication-config-{authentication_class_name}");
+                    volumes.push(
+                        VolumeBuilder::new(volume_name.clone())
+                            .csi(secret_operator_volume_builder.build())
+                            .build(),
+                    );
+                    volume_mounts.push(
+                        VolumeMountBuilder::new(volume_name.clone(), format!("/{volume_name}"))
+                            .read_only(true)
+                            .build(),
+                    );
+                }
+            }
+        }
+    }
+
     let container = ContainerBuilder::new("superset")
         .image(image)
         .add_env_vars(env)
         .add_container_port("http", APP_PORT.into())
+        .add_volume_mounts(volume_mounts)
         .build();
     let metrics_container = ContainerBuilder::new("metrics")
         .image(statsd_exporter_image)
@@ -358,6 +421,8 @@ fn build_server_rolegroup_statefulset(
                     )
                     .with_label("statsd-exporter", statsd_exporter_version)
                 })
+                .add_volumes(volumes)
+                .security_context(PodSecurityContextBuilder::new().fs_group(1000).build()) // Needed for secret-operator
                 .add_container(container)
                 .add_container(metrics_container)
                 .build_template(),

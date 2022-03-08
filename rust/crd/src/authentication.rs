@@ -41,13 +41,13 @@ pub struct AuthenticationClassLdap {
 #[serde(rename_all = "camelCase")]
 pub struct AuthenticationClassSecretClass {
     pub secret_class: String,
-    pub scope: AuthenticationClassSecretClassScope,
+    pub scope: Option<AuthenticationClassSecretClassScope>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthenticationClassSecretClassScope {
-    pub pod: Option<()>,
-    pub node: Option<()>,
+    pub pod: Option<bool>,
+    pub node: Option<bool>,
     pub services: Option<Vec<String>>,
 }

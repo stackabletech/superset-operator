@@ -33,13 +33,14 @@ spec:
                         bindCredentials:
                           properties:
                             scope:
+                              nullable: true
                               properties:
                                 node:
                                   nullable: true
-                                  type: "null"
+                                  type: boolean
                                 pod:
                                   nullable: true
-                                  type: "null"
+                                  type: boolean
                                 services:
                                   items:
                                     type: string
@@ -49,7 +50,6 @@ spec:
                             secretClass:
                               type: string
                           required:
-                            - scope
                             - secretClass
                           type: object
                         domain:
