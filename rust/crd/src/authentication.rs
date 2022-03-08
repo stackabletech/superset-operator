@@ -34,12 +34,20 @@ pub struct AuthenticationClassLdap {
     pub hostname: String,
     pub port: u16,
     pub domain: String,
-    pub bind_credentials: AuthenticationClassLdapBindCredentials,
+    pub bind_credentials: AuthenticationClassSecretClass,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AuthenticationClassLdapBindCredentials {
+pub struct AuthenticationClassSecretClass {
     pub secret_class: String,
-    pub scope: String,
+    pub scope: AuthenticationClassSecretClassScope,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthenticationClassSecretClassScope {
+    pub pod: Option<()>,
+    pub node: Option<()>,
+    pub services: Option<Vec<String>>,
 }

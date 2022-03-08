@@ -33,7 +33,19 @@ spec:
                         bindCredentials:
                           properties:
                             scope:
-                              type: string
+                              properties:
+                                node:
+                                  nullable: true
+                                  type: "null"
+                                pod:
+                                  nullable: true
+                                  type: "null"
+                                services:
+                                  items:
+                                    type: string
+                                  nullable: true
+                                  type: array
+                              type: object
                             secretClass:
                               type: string
                           required:
