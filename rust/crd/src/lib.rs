@@ -10,12 +10,12 @@ use stackable_operator::kube::CustomResource;
 use stackable_operator::product_config_utils::{ConfigError, Configuration};
 use stackable_operator::role_utils::{Role, RoleGroupRef};
 use stackable_operator::schemars::{self, JsonSchema};
-use strum::{Display, EnumIter};
+use strum::{Display, EnumIter, EnumString};
 
 pub const APP_NAME: &str = "superset";
 pub const MANAGED_BY: &str = "superset-operator";
 
-pub const HTTP_PORT: &str = "http";
+pub const SUPERSET_CONFIG: &str = "superset_config.py";
 
 #[derive(Clone, CustomResource, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
@@ -88,7 +88,17 @@ pub struct Connections {
 }
 
 #[derive(
-    Clone, Debug, Deserialize, Display, EnumIter, Eq, Hash, JsonSchema, PartialEq, Serialize,
+    Clone,
+    Debug,
+    Deserialize,
+    Display,
+    EnumIter,
+    EnumString,
+    Eq,
+    Hash,
+    JsonSchema,
+    PartialEq,
+    Serialize,
 )]
 pub enum SupersetRole {
     #[strum(serialize = "node")]
@@ -120,7 +130,7 @@ impl Configuration for SupersetConfig {
 
     fn compute_cli(
         &self,
-        _resource: &Self::Configurable,
+        _cluster: &Self::Configurable,
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         Ok(BTreeMap::new())
@@ -128,7 +138,7 @@ impl Configuration for SupersetConfig {
 
     fn compute_files(
         &self,
-        _resource: &Self::Configurable,
+        _cluster: &Self::Configurable,
         _role_name: &str,
         _file: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {

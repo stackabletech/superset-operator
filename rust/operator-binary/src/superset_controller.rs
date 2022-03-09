@@ -5,11 +5,13 @@ use crate::{
     APP_NAME, APP_PORT,
 };
 
-use snafu::{ensure, OptionExt, ResultExt, Snafu};
+use crate::config::compute_superset_config;
+use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::builder::{
-    PodSecurityContextBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder, VolumeMountBuilder,
+    ConfigMapBuilder, PodSecurityContextBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
+    VolumeMountBuilder,
 };
-use stackable_operator::client::Client;
+use stackable_operator::k8s_openapi::api::core::v1::ConfigMap;
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     k8s_openapi::{
@@ -29,7 +31,7 @@ use stackable_operator::{
 use stackable_superset_crd::authentication::AuthenticationClassType;
 use stackable_superset_crd::{
     authentication::AuthenticationClass, supersetdb::SupersetDB, SupersetCluster, SupersetConfig,
-    SupersetRole,
+    SupersetRole, SUPERSET_CONFIG,
 };
 use std::{
     borrow::Cow,
@@ -79,6 +81,11 @@ pub enum Error {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
+    #[snafu(display("failed to apply ConfigMap for {}", rolegroup))]
+    ApplyRoleGroupConfigMap {
+        source: stackable_operator::error::Error,
+        rolegroup: RoleGroupRef<SupersetCluster>,
+    },
     #[snafu(display("failed to apply StatefulSet for {}", rolegroup))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::error::Error,
@@ -98,9 +105,15 @@ pub enum Error {
     },
     #[snafu(display("superset only supports a single authentication method"))]
     MultipleAuthenticationMethods,
-    #[snafu(display("failed to retrieve authentication class"))]
+    #[snafu(display("failed to retrieve authentication class {}", authentication_class))]
     AuthenticationClassRetrieval {
         source: stackable_operator::error::Error,
+        authentication_class: String,
+    },
+    #[snafu(display("failed to build ConfigMap for {}", rolegroup))]
+    BuildRoleGroupConfig {
+        source: stackable_operator::error::Error,
+        rolegroup: RoleGroupRef<SupersetCluster>,
     },
 }
 
@@ -134,7 +147,10 @@ pub async fn reconcile_superset(
             [(
                 SupersetRole::Node.to_string(),
                 (
-                    vec![PropertyNameKind::Env],
+                    vec![
+                        PropertyNameKind::Env,
+                        PropertyNameKind::File(SUPERSET_CONFIG.to_string()),
+                    ],
                     superset.spec.nodes.clone().context(NoNodeRoleSnafu)?,
                 ),
             )]
@@ -159,14 +175,57 @@ pub async fn reconcile_superset(
     for (rolegroup_name, rolegroup_config) in role_node_config.iter() {
         let rolegroup = superset.node_rolegroup_ref(rolegroup_name);
 
+        let authentication_classes: Vec<_> = superset
+            .spec
+            .authentication_config
+            .as_ref()
+            .iter()
+            .flat_map(|config| &config.methods)
+            .map(|method| &method.authentication_class)
+            .collect();
+
+        // async closures inside .map() are unstable... If they are stable we can use a simple authentication_classes.map(...)
+        let authentication_class = match authentication_classes.len() {
+            0 => None,
+            1 => {
+                let authentication_class_name = authentication_classes.get(0).unwrap();
+                Some(
+                    client
+                        .get::<AuthenticationClass>(authentication_class_name, None) // AuthenticationClass has ClusterScope
+                        .await
+                        .context(AuthenticationClassRetrievalSnafu {
+                            authentication_class: authentication_class_name.to_string(),
+                        })?,
+                )
+            }
+            _ => {
+                return MultipleAuthenticationMethodsSnafu.fail(); // Superset (or underlying Flask) only supports 0 or 1 authentication methods
+            }
+        };
+
         let rg_service = build_node_rolegroup_service(&rolegroup, &superset)?;
-        let rg_statefulset =
-            build_server_rolegroup_statefulset(&rolegroup, &superset, rolegroup_config, client)
-                .await?;
+        let rg_configmap = build_rolegroup_config_map(
+            &rolegroup,
+            &superset,
+            rolegroup_config,
+            &authentication_class,
+        )?;
+        let rg_statefulset = build_server_rolegroup_statefulset(
+            &rolegroup,
+            &superset,
+            rolegroup_config,
+            &authentication_class,
+        )?;
         client
             .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
             .await
             .with_context(|_| ApplyRoleGroupServiceSnafu {
+                rolegroup: rolegroup.clone(),
+            })?;
+        client
+            .apply_patch(FIELD_MANAGER_SCOPE, &rg_configmap, &rg_configmap)
+            .await
+            .with_context(|_| ApplyRoleGroupConfigMapSnafu {
                 rolegroup: rolegroup.clone(),
             })?;
         client
@@ -184,7 +243,7 @@ pub async fn reconcile_superset(
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside of the cluster.
-pub fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
+fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
     let role_name = SupersetRole::Node.to_string();
     let role_svc_name = superset
         .node_role_service_name()
@@ -277,14 +336,59 @@ fn build_node_rolegroup_service(
     })
 }
 
+/// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
+fn build_rolegroup_config_map(
+    rolegroup: &RoleGroupRef<SupersetCluster>,
+    superset: &SupersetCluster,
+    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    authentication_class: &Option<AuthenticationClass>,
+) -> Result<ConfigMap> {
+    let mut cm_conf_data = BTreeMap::new(); // filename -> filecontent
+
+    for property_name_kind in rolegroup_config.keys() {
+        match property_name_kind {
+            PropertyNameKind::File(file_name) if file_name == SUPERSET_CONFIG => {
+                let superset_config = compute_superset_config(authentication_class);
+                cm_conf_data.insert(SUPERSET_CONFIG.to_string(), superset_config);
+            }
+            _ => {}
+        }
+    }
+
+    let mut config_map_builder = ConfigMapBuilder::new();
+    config_map_builder.metadata(
+        ObjectMetaBuilder::new()
+            .name_and_namespace(superset)
+            .name(rolegroup.object_name())
+            .ownerreference_from_resource(superset, None, Some(true))
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
+            .with_recommended_labels(
+                superset,
+                APP_NAME,
+                superset_version(superset).context(NoSupersetVersionSnafu)?,
+                &rolegroup.role,
+                &rolegroup.role_group,
+            )
+            .build(),
+    );
+    for (filename, file_content) in cm_conf_data.iter() {
+        config_map_builder.add_data(filename, file_content);
+    }
+    config_map_builder
+        .build()
+        .with_context(|_| BuildRoleGroupConfigSnafu {
+            rolegroup: rolegroup.clone(),
+        })
+}
+
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_node_rolegroup_service`]).
-async fn build_server_rolegroup_statefulset(
+fn build_server_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     superset: &SupersetCluster,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    client: &Client,
+    authentication_class: &Option<AuthenticationClass>,
 ) -> Result<StatefulSet> {
     let rolegroup = superset
         .spec
@@ -319,34 +423,28 @@ async fn build_server_rolegroup_statefulset(
         })
         .unwrap_or_default();
 
-    let mut volumes = vec![];
-    let mut volume_mounts = vec![];
+    let mut volumes = vec![VolumeBuilder::new("config")
+        .with_config_map(rolegroup_ref.object_name())
+        .build()];
+    let mut volume_mounts = vec![VolumeMountBuilder::new("config", "/app/pythonpath/").build()];
 
-    if let Some(authentication_config) = superset.spec.authentication_config.as_ref() {
-        ensure!(
-            authentication_config.methods.len() == 1,
-            MultipleAuthenticationMethodsSnafu
-        );
-
-        for method in &authentication_config.methods {
-            let authentication_class_name = &method.authentication_class;
-            let authentication_class = client
-                .get::<AuthenticationClass>(authentication_class_name, None) // AuthenticationClass has ClusterScope
-                .await
-                .context(AuthenticationClassRetrievalSnafu)?;
-            match authentication_class.spec.protocol {
+    match authentication_class {
+        None => {}
+        Some(authentication_class) => {
+            let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
+            match &authentication_class.spec.protocol {
                 AuthenticationClassType::Ldap(ldap) => {
                     let mut secret_operator_volume_builder =
-                        SecretOperatorVolumeSourceBuilder::new(ldap.bind_credentials.secret_class);
+                        SecretOperatorVolumeSourceBuilder::new(&ldap.bind_credentials.secret_class);
 
-                    if let Some(scope) = ldap.bind_credentials.scope {
+                    if let Some(scope) = &ldap.bind_credentials.scope {
                         if scope.pod.is_some() {
                             secret_operator_volume_builder.with_pod_scope();
                         }
                         if scope.node.is_some() {
                             secret_operator_volume_builder.with_node_scope();
                         }
-                        if let Some(services) = scope.services {
+                        if let Some(services) = &scope.services {
                             for service in services {
                                 secret_operator_volume_builder.with_service_scope(service);
                             }
