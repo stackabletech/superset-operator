@@ -25,9 +25,9 @@ metadata:
 spec:
   protocol:
     ldap:
-      hostname: ldap.server
-      port: 389
-      domain: domain.local
+      hostname: openldap.default.svc.cluster.local
+      port: 1389
+      domain: ou=users,dc=example,dc=org
       bindCredentials:
         secretClass: superset-with-ldap-ldap-bind-secret-class
 #        scope:
@@ -53,8 +53,8 @@ metadata:
   labels:
     secrets.stackable.tech/class: superset-with-ldap-ldap-bind-secret-class
 stringData:
-  user: myLdapUser
-  password: myLdapPassword
+  user: cn=admin,dc=example,dc=org
+  password: admin
 ---
 apiVersion: superset.stackable.tech/v1alpha1
 kind: SupersetCluster

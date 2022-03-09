@@ -31,19 +31,24 @@ STATS_LOGGER = StatsdStatsLogger(host='0.0.0.0', port=9125)
                         r#"
 # authentication configs
 AUTH_TYPE = AUTH_LDAP
-AUTH_LDAP_SERVER = "ldap://{}"
+AUTH_LDAP_SERVER = "ldap://{}:{}"
 AUTH_LDAP_USE_TLS = False
-# AUTH_USER_REGISTRATION = True
-# AUTH_USER_REGISTRATION_ROLE = "Public"
+
+AUTH_USER_REGISTRATION = True
+AUTH_USER_REGISTRATION_ROLE = "Admin"
+AUTH_ROLES_SYNC_AT_LOGIN = True # If we should replace ALL the user's roles each login, or only on registration
 AUTH_LDAP_FIRSTNAME_FIELD = "givenName"
 AUTH_LDAP_LASTNAME_FIELD = "sn"
 AUTH_LDAP_EMAIL_FIELD = "mail"
-# AUTH_LDAP_SEARCH = "ou=users,dc=example,dc=com"
+
+AUTH_LDAP_SEARCH = "{}"
 AUTH_LDAP_UID_FIELD = "uid"
 AUTH_LDAP_BIND_USER = open('/authentication-config-{authentication_class_name}/user').read()
 AUTH_LDAP_BIND_PASSWORD = open('/authentication-config-{authentication_class_name}/password').read()
 "#,
-                        ldap.hostname
+                        ldap.hostname,
+                        ldap.port,
+                        ldap.domain,
                     )
                 }
             }
