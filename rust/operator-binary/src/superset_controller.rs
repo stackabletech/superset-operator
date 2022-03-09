@@ -452,12 +452,12 @@ fn build_server_rolegroup_statefulset(
                     }
                     let volume_name = format!("authentication-config-{authentication_class_name}");
                     volumes.push(
-                        VolumeBuilder::new(volume_name.clone())
+                        VolumeBuilder::new(&volume_name)
                             .csi(secret_operator_volume_builder.build())
                             .build(),
                     );
                     volume_mounts.push(
-                        VolumeMountBuilder::new(volume_name.clone(), format!("/{volume_name}"))
+                        VolumeMountBuilder::new(&volume_name, format!("/{volume_name}"))
                             .read_only(true)
                             .build(),
                     );
