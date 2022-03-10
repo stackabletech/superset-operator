@@ -1,5 +1,5 @@
 # helm repo add bitnami https://charts.bitnami.com/bitnami
-# helm install superset bitnami/postgresql     --set auth.username=superset     --set auth.password=superset     --set auth.database=superset
+# helm install superset bitnami/postgresql --set auth.username=superset --set auth.password=superset --set auth.database=superset
 #
 # helm repo add stackable https://repo.stackable.tech/repository/helm-stable/
 # helm install secret-operator stackable/secret-operator
