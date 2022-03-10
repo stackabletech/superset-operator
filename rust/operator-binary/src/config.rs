@@ -46,9 +46,7 @@ AUTH_LDAP_UID_FIELD = "uid"
 AUTH_LDAP_BIND_USER = open('/authentication-config-{authentication_class_name}/user').read()
 AUTH_LDAP_BIND_PASSWORD = open('/authentication-config-{authentication_class_name}/password').read()
 "#,
-                        ldap.hostname,
-                        ldap.port,
-                        ldap.domain,
+                        ldap.hostname, ldap.port, ldap.domain,
                     )
                 }
             }
