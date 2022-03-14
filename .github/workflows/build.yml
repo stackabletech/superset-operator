@@ -315,3 +315,46 @@ jobs:
           -u 'github:${{ secrets.NEXUS_PASSWORD }}'
           --upload-file "./$(find  target/helm/ -name '*.tgz')"
           "${{ env.REPO }}/"
+
+  trivy_scan:
+    name: Trivy vulnerability scan
+    needs:
+      - package_and_publish
+    runs-on: ubuntu-latest
+    if: needs.select_repo.outputs.repository != 'skip'
+    steps:
+      - name: Create report folder
+        run: |
+          mkdir -p trivy-report/
+      - id: docker-image-version
+        run: |
+          echo "::set-output name=version::$(cargo metadata --format-version 1 | jq '.packages[] | select(.name==\"stackable-superset-operator\") | .version')"
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'docker.stackable.tech/stackable/superset-operator:${{ steps.docker-image-version.outputs.version }}'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: false
+          vuln-type: 'os,library'
+          output: "trivy-report/trivy-report.txt"
+
+      - id: get-trivy-report
+        run: |
+          report="$(cat trivy-report/trivy-report.txt)"
+          report="${report//'%'/'%25'}"
+          report="${report//$'\n'/'%0A'}"
+          report="${report//$'\r'/'%0D'}" 
+          echo "::set-output name=report::$report"
+
+      - name: Create comment
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          token: ${{ secrets.STACKY_MC_STACKFACE_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            **Trivy vulnerability report**
+            
+            ```
+            ${{ steps.get-trivy-report.outputs.report }}
+            ```
