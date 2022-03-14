@@ -1,5 +1,5 @@
 # helm repo add bitnami https://charts.bitnami.com/bitnami
-# helm install superset bitnami/postgresql --set auth.username=superset --set auth.password=superset --set auth.database=superset
+# helm install superset bitnami/postgresql --set auth.username=superset --set auth.password=superset --set auth.database=superset # pragma: allowlist secret
 #
 # helm repo add stackable https://repo.stackable.tech/repository/helm-stable/
 # helm install secret-operator stackable/secret-operator
@@ -14,9 +14,9 @@ stringData:
   adminUser.firstname: Superset
   adminUser.lastname: Admin
   adminUser.email: admin@superset.com
-  adminUser.password: admin
-  connections.secretKey: thisISaSECRET_1234
-  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql.default.svc.cluster.local/superset
+  adminUser.password: admin # pragma: allowlist secret
+  connections.secretKey: thisISaSECRET_1234 # pragma: allowlist secret
+  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql.default.svc.cluster.local/superset # pragma: allowlist secret
 ---
 apiVersion: authentication.stackable.tech/v1alpha1
 kind: AuthenticationClass
@@ -29,7 +29,7 @@ spec:
       port: 1389
       domain: ou=users,dc=example,dc=org
       bindCredentials:
-        secretClass: superset-with-ldap-ldap-bind-secret-class
+        secretClass: superset-with-ldap-ldap-bind-secret-class # pragma: allowlist secret
 #        scope:
 #          node: true
 #          pod: true
@@ -54,7 +54,7 @@ metadata:
     secrets.stackable.tech/class: superset-with-ldap-ldap-bind-secret-class
 stringData:
   user: cn=admin,dc=example,dc=org
-  password: admin
+  password: admin # pragma: allowlist secret
 ---
 apiVersion: superset.stackable.tech/v1alpha1
 kind: SupersetCluster
@@ -63,7 +63,7 @@ metadata:
 spec:
   version: 1.4.1
   statsdExporterVersion: v0.22.4
-  credentialsSecret: superset-with-ldap-credentials
+  credentialsSecret: superset-with-ldap-credentials # pragma: allowlist secret
   loadExamplesOnInit: true
   nodes:
     roleGroups:
