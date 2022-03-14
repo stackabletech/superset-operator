@@ -38,15 +38,15 @@ spec:
                               nullable: true
                               properties:
                                 node:
-                                  nullable: true
+                                  default: false
                                   type: boolean
                                 pod:
-                                  nullable: true
+                                  default: false
                                   type: boolean
                                 services:
+                                  default: []
                                   items:
                                     type: string
-                                  nullable: true
                                   type: array
                               type: object
                             secretClass:

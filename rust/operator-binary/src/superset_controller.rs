@@ -438,16 +438,14 @@ fn build_server_rolegroup_statefulset(
                         SecretOperatorVolumeSourceBuilder::new(&ldap.bind_credentials.secret_class);
 
                     if let Some(scope) = &ldap.bind_credentials.scope {
-                        if scope.pod.is_some() {
+                        if scope.pod {
                             secret_operator_volume_builder.with_pod_scope();
                         }
-                        if scope.node.is_some() {
+                        if scope.node {
                             secret_operator_volume_builder.with_node_scope();
                         }
-                        if let Some(services) = &scope.services {
-                            for service in services {
-                                secret_operator_volume_builder.with_service_scope(service);
-                            }
+                        for service in &scope.services {
+                            secret_operator_volume_builder.with_service_scope(service);
                         }
                     }
                     let volume_name = format!("authentication-config-{authentication_class_name}");

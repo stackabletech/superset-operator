@@ -47,7 +47,10 @@ pub struct AuthenticationClassSecretClass {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthenticationClassSecretClassScope {
-    pub pod: Option<bool>,
-    pub node: Option<bool>,
-    pub services: Option<Vec<String>>,
+    #[serde(default)]
+    pub pod: bool,
+    #[serde(default)]
+    pub node: bool,
+    #[serde(default)]
+    pub services: Vec<String>,
 }
