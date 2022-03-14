@@ -315,3 +315,74 @@ jobs:
           -u 'github:${{ secrets.NEXUS_PASSWORD }}'
           --upload-file "./$(find  target/helm/ -name '*.tgz')"
           "${{ env.REPO }}/"
+
+  trivy_scan:
+    name: Trivy vulnerability scans
+    needs:
+      - package_and_publish
+    runs-on: ubuntu-latest
+    if: needs.select_repo.outputs.repository != 'skip'
+    steps:
+      - uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846 # tag=v3.0.0
+      - name: Create Trivy report folder
+        run: |
+          mkdir -p trivy-report/
+      - id: docker-image-version
+        run: |
+          echo "::set-output name=version::$(cargo metadata --format-version 1 | jq '.packages[] | select(.name==\"stackable-superset-operator\") | .version')"
+      - name: scan Dockerfile
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: config
+          format: 'table'
+          exit-code: '0'
+          scan-ref: ./docker/
+          ignore-unfixed: false
+          vuln-type: 'os,library'
+          output: "trivy-report/trivy-report-dockerfile.txt"
+          hide-progress: false
+      - name: scan Docker image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'docker.stackable.tech/stackable/superset-operator:${{ steps.docker-image-version.outputs.version }}'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: false
+          vuln-type: 'os,library'
+          output: "trivy-report/trivy-report.txt"
+      - id: get-trivy-report-dockerfile
+        run: |
+          report="$(cat trivy-report/trivy-report-dockerfile.txt)"
+          report="${report//'%'/'%25'}"
+          report="${report//$'\n'/'%0A'}"
+          report="${report//$'\r'/'%0D'}"
+          echo "::set-output name=report::$report"
+      - name: Create comment for Dockerfile scan
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          token: ${{ secrets.STACKY_MC_STACKFACE_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            **Trivy scan: Dockerfile**
+
+            ```
+            ${{ steps.get-trivy-report-dockerfile.outputs.report }}
+            ```
+      - id: get-trivy-report
+        run: |
+          report="$(cat trivy-report/trivy-report.txt)"
+          report="${report//'%'/'%25'}"
+          report="${report//$'\n'/'%0A'}"
+          report="${report//$'\r'/'%0D'}"
+          echo "::set-output name=report::$report"
+      - name: Create comment for Docker image scan
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          token: ${{ secrets.STACKY_MC_STACKFACE_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            **Trivy scan: Docker image**
+
+            ```
+            ${{ steps.get-trivy-report.outputs.report }}
+            ```
