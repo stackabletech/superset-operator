@@ -337,7 +337,7 @@ jobs:
           exit-code: '0'
           ignore-unfixed: false
           vuln-type: 'os,library'
-          output: "report/trivy-report-dockerfile.txt"
+          output: "trivy-report/trivy-report-dockerfile.txt"
           hide-progress: false
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
