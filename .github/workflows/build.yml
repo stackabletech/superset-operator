@@ -12,6 +12,7 @@ on:
       - "*"
   pull_request:
 
+jobs:
   trivy_scan:
     name: Trivy vulnerability scans
     runs-on: ubuntu-latest
