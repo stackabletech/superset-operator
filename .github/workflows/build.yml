@@ -317,7 +317,7 @@ jobs:
           "${{ env.REPO }}/"
 
   trivy_scan:
-    name: Trivy vulnerability scan
+    name: Trivy vulnerability scans
     needs:
       - package_and_publish
     runs-on: ubuntu-latest
@@ -329,6 +329,16 @@ jobs:
       - id: docker-image-version
         run: |
           echo "::set-output name=version::$(cargo metadata --format-version 1 | jq '.packages[] | select(.name==\"stackable-superset-operator\") | .version')"
+      - name: Trivy - scan config (Dockerfile e.a.)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: config
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: false
+          vuln-type: 'os,library'
+          output: "report/trivy-report-dockerfile.txt"
+          hide-progress: false
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
@@ -338,23 +348,40 @@ jobs:
           ignore-unfixed: false
           vuln-type: 'os,library'
           output: "trivy-report/trivy-report.txt"
-
-      - id: get-trivy-report
+      - id: get-trivy-report-dockerfile
         run: |
-          report="$(cat trivy-report/trivy-report.txt)"
+          report="$(cat trivy-report/trivy-report-dockerfile.txt)"
           report="${report//'%'/'%25'}"
           report="${report//$'\n'/'%0A'}"
-          report="${report//$'\r'/'%0D'}" 
+          report="${report//$'\r'/'%0D'}"
           echo "::set-output name=report::$report"
-
-      - name: Create comment
+      - name: Create comment1
         uses: peter-evans/create-or-update-comment@v1
         with:
           token: ${{ secrets.STACKY_MC_STACKFACE_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            **Trivy vulnerability report**
-            
+            **Trivy scanned your code**
+
+            ```
+            ${{ steps.get-trivy-report-dockerfile.outputs.report }}
+            ```
+      - id: get-trivy-report
+        run: |
+          report="$(cat trivy-report/trivy-report.txt)"
+          report="${report//'%'/'%25'}"
+          report="${report//$'\n'/'%0A'}"
+          report="${report//$'\r'/'%0D'}"
+          echo "::set-output name=report::$report"
+      - name: Create comment2
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          token: ${{ secrets.STACKY_MC_STACKFACE_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            **Trivy scanned your Docker image**
+
             ```
             ${{ steps.get-trivy-report.outputs.report }}
             ```
+
