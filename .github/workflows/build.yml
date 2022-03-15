@@ -323,6 +323,7 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.select_repo.outputs.repository != 'skip'
     steps:
+      - uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846 # tag=v3.0.0
       - name: Create Trivy report folder
         run: |
           mkdir -p trivy-report/
