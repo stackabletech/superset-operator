@@ -8,9 +8,9 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal AS operator
 LABEL maintainer="Stackable GmbH"
 
 # Update image
-RUN microdnf update --disablerepo=* --enablerepo=ubi-8-baseos --enablerepo=ubi-8-baseos -y \
+RUN dnf update --disablerepo=* --enablerepo=ubi-8-baseos --enablerepo=ubi-8-baseos -y \
   && rm -rf /var/cache/yum \
-  && microdnf install --disablerepo=* --enablerepo=ubi-8-baseos shadow-utils -y \
+  && dnf install --disablerepo=* --enablerepo=ubi-8-baseos shadow-utils -y \
   && rm -rf /var/cache/yum
 
 COPY --from=builder /app/stackable-superset-operator /
