@@ -386,3 +386,24 @@ jobs:
             ```
             ${{ steps.get-trivy-report.outputs.report }}
             ```
+  sign_with_cosign:
+    runs-on: ubuntu-latest
+    needs:
+      - package_and_publish
+    steps:
+      - name: create cosign keyfile
+        run: |
+          echo '${{ secrets.COSIGN_KEY }}' > ./cosign.key
+      - name: Login to Stackable Docker registry
+        run: |
+          docker login --username github --password ${{ secrets.NEXUS_PASSWORD }} docker.stackable.tech
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@main
+        with:
+          cosign-release: 'v1.6.0'
+      - name: Sign image with the Stackable cosign key
+        run: |
+          cosign sign --key ./cosign.key ${TAG}
+        env:
+          COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
+          TAG: 'docker.stackable.tech/stackable/superset-operator:${{ steps.docker-image-version.outputs.version }}'
