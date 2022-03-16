@@ -270,6 +270,8 @@ jobs:
       - tests_passed
       - select_repo
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read-version.outputs.version }}
     env:
       NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
       REPO: ${{ needs.select_repo.outputs.repository }}
@@ -301,6 +303,11 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         run: make chart-clean clean-manifests compile-chart generate-manifests
 
+      # Version # as output of this step AND job
+      - id: read-version
+        run: |
+          echo "::set-output name=version::$(cargo metadata --format-version 1 | jq '.packages[] | select(.name==\"stackable-superset-operator\") | .version')"
+
       # Package and publish charts
       - name: Package Chart
         run: mkdir -p target/helm && helm package --destination target/helm deploy/helm/${{ env.PRODUCT_NAME }}-operator
@@ -323,13 +330,9 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.select_repo.outputs.repository != 'skip'
     steps:
-      - uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846 # tag=v3.0.0
       - name: Create Trivy report folder
         run: |
           mkdir -p trivy-report/
-      - id: docker-image-version
-        run: |
-          echo "::set-output name=version::$(cargo metadata --format-version 1 | jq '.packages[] | select(.name==\"stackable-superset-operator\") | .version')"
       - name: scan Dockerfile
         uses: aquasecurity/trivy-action@master
         with:
@@ -344,7 +347,7 @@ jobs:
       - name: scan Docker image
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'docker.stackable.tech/stackable/superset-operator:${{ steps.docker-image-version.outputs.version }}'
+          image-ref: 'docker.stackable.tech/stackable/superset-operator:${{needs.package_and_publish.outputs.version}}'
           format: 'table'
           exit-code: '0'
           ignore-unfixed: false
@@ -392,10 +395,6 @@ jobs:
     needs:
       - package_and_publish
     steps:
-      - uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846 # tag=v3.0.0
-      - id: docker-image-version
-        run: |
-          echo "::set-output name=version::$(cargo metadata --format-version 1 | jq '.packages[] | select(.name==\"stackable-superset-operator\") | .version')"
       - name: create cosign keyfile
         run: |
           echo '${{ secrets.COSIGN_KEY }}' > ./cosign.key
@@ -411,4 +410,4 @@ jobs:
           cosign sign --key ./cosign.key "${TAG}"
         env:
           COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
-          TAG: 'docker.stackable.tech/stackable/superset-operator:${{ steps.docker-image-version.outputs.version }}'
+          TAG: 'docker.stackable.tech/stackable/superset-operator:${{needs.package_and_publish.outputs.version}}'
