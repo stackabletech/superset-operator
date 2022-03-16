@@ -391,6 +391,9 @@ jobs:
     needs:
       - package_and_publish
     steps:
+      - id: docker-image-version
+        run: |
+          echo "::set-output name=version::$(cargo metadata --format-version 1 | jq '.packages[] | select(.name==\"stackable-superset-operator\") | .version')"
       - name: create cosign keyfile
         run: |
           echo '${{ secrets.COSIGN_KEY }}' > ./cosign.key
@@ -403,7 +406,7 @@ jobs:
           cosign-release: 'v1.6.0'
       - name: Sign image with the Stackable cosign key
         run: |
-          cosign sign --key ./cosign.key ${TAG}
+          cosign sign --key ./cosign.key "${TAG}"
         env:
           COSIGN_PASSWORD: ${{secrets.COSIGN_PASSWORD}}
           TAG: 'docker.stackable.tech/stackable/superset-operator:${{ steps.docker-image-version.outputs.version }}'
