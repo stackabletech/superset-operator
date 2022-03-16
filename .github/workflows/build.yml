@@ -306,7 +306,7 @@ jobs:
       # Version # as output of this step AND job
       - id: read-version
         run: |
-          echo "::set-output name=version::$(cargo metadata --format-version 1 | jq '.packages[] | select(.name=="stackable-superset-operator") | .version')"
+          echo "::set-output name=version::$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name=="stackable-superset-operator") | .version')"
 
       # Package and publish charts
       - name: Package Chart
