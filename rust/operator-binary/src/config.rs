@@ -52,7 +52,7 @@ fn compute_authentication_config(
                 r#"
 # Authentication configs
 AUTH_TYPE = AUTH_LDAP
-AUTH_LDAP_SERVER = "ldap://{}:{}"
+AUTH_LDAP_SERVER = "{}{}:{}"
 
 AUTH_LDAP_SEARCH = "{}"
 AUTH_LDAP_UID_FIELD = "{}"
@@ -66,6 +66,10 @@ AUTH_USER_REGISTRATION_ROLE = "{}"
 AUTH_ROLES_SYNC_AT_LOGIN = {}
 
 "#,
+                match ldap.tls {
+                    None => "ldap://",
+                    Some(_) => "ldaps://",
+                },
                 ldap.hostname,
                 ldap.port,
                 ldap.search_base,
@@ -119,7 +123,7 @@ AUTH_LDAP_USE_TLS = False
                 Some(AuthenticationClassTls::Insecure(_)) => {
                     result.push_str(
                         r#"
-AUTH_LDAP_USE_TLS = True
+AUTH_LDAP_USE_TLS = False # Strangely we don't want True here because it will use TLS and we need to use SSL.
 AUTH_LDAP_ALLOW_SELF_SIGNED = True
 "#,
                     );
@@ -127,7 +131,7 @@ AUTH_LDAP_ALLOW_SELF_SIGNED = True
                 Some(AuthenticationClassTls::ServerVerification(server_verification)) => {
                     result.push_str(
                         r#"
-AUTH_LDAP_USE_TLS = True
+AUTH_LDAP_USE_TLS = False # Strangely we don't want True here because it will use TLS and we need to use SSL.
 AUTH_LDAP_ALLOW_SELF_SIGNED = False
 AUTH_LDAP_TLS_DEMAND = True
 "#,
@@ -156,7 +160,7 @@ AUTH_LDAP_TLS_CACERTFILE = "{}"
                     format!(
                         r#"
 AUTH_LDAP_BIND_USER = open('/secrets/{authentication_class_name}-bind-credentials/user').read()
-AUTH_LDAP_BIND_PASSWORD = open('/secrets/{authentication_class_name}-bind-credentials/user').read()
+AUTH_LDAP_BIND_PASSWORD = open('/secrets/{authentication_class_name}-bind-credentials/password').read()
 "#
                     )
                     .as_str(),
