@@ -338,39 +338,35 @@ fn build_rolegroup_config_map(
     authentication_method: &Option<&SupersetClusterAuthenticationConfigMethod>,
     authentication_class: &Option<AuthenticationClass>,
 ) -> Result<ConfigMap> {
-    let mut cm_conf_data = BTreeMap::new(); // filename -> filecontent
+    let mut config_map_builder = ConfigMapBuilder::new();
 
     for property_name_kind in rolegroup_config.keys() {
         match property_name_kind {
             PropertyNameKind::File(file_name) if file_name == SUPERSET_CONFIG => {
                 let superset_config =
                     compute_superset_config(authentication_method, authentication_class);
-                cm_conf_data.insert(SUPERSET_CONFIG.to_string(), superset_config);
+                config_map_builder.add_data(SUPERSET_CONFIG.to_string(), superset_config);
             }
             _ => {}
         }
     }
 
-    let mut config_map_builder = ConfigMapBuilder::new();
-    config_map_builder.metadata(
-        ObjectMetaBuilder::new()
-            .name_and_namespace(superset)
-            .name(rolegroup.object_name())
-            .ownerreference_from_resource(superset, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(
-                superset,
-                APP_NAME,
-                superset_version(superset).context(NoSupersetVersionSnafu)?,
-                &rolegroup.role,
-                &rolegroup.role_group,
-            )
-            .build(),
-    );
-    for (filename, file_content) in cm_conf_data.iter() {
-        config_map_builder.add_data(filename, file_content);
-    }
     config_map_builder
+        .metadata(
+            ObjectMetaBuilder::new()
+                .name_and_namespace(superset)
+                .name(rolegroup.object_name())
+                .ownerreference_from_resource(superset, None, Some(true))
+                .context(ObjectMissingMetadataForOwnerRefSnafu)?
+                .with_recommended_labels(
+                    superset,
+                    APP_NAME,
+                    superset_version(superset).context(NoSupersetVersionSnafu)?,
+                    &rolegroup.role,
+                    &rolegroup.role_group,
+                )
+                .build(),
+        )
         .build()
         .with_context(|_| BuildRoleGroupConfigSnafu {
             rolegroup: rolegroup.clone(),
