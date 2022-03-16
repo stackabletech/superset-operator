@@ -27,7 +27,7 @@ spec:
     ldap:
       hostname: openldap.default.svc.cluster.local
       port: 1389
-      domain: ou=users,dc=example,dc=org
+      searchBase: ou=users,dc=example,dc=org
       bindCredentials:
         secretClass: superset-with-ldap-ldap-bind-secret-class # pragma: allowlist secret
 #        scope:

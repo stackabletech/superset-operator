@@ -28,10 +28,10 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::RoleGroupRef,
 };
-use stackable_superset_crd::authentication::AuthenticationClassType;
+use stackable_superset_crd::authentication::AuthenticationClassProtocol;
 use stackable_superset_crd::{
-    authentication::AuthenticationClass, supersetdb::SupersetDB, SupersetCluster, SupersetConfig,
-    SupersetRole, SUPERSET_CONFIG,
+    authentication::AuthenticationClass, supersetdb::SupersetDB, SupersetCluster,
+    SupersetClusterAuthenticationConfigMethod, SupersetConfig, SupersetRole, SUPERSET_CONFIG,
 };
 use std::{
     borrow::Cow,
@@ -175,31 +175,33 @@ pub async fn reconcile_superset(
     for (rolegroup_name, rolegroup_config) in role_node_config.iter() {
         let rolegroup = superset.node_rolegroup_ref(rolegroup_name);
 
-        let authentication_classes: Vec<_> = superset
+        let authentication_methods: Vec<_> = superset
             .spec
             .authentication_config
-            .as_ref()
             .iter()
             .flat_map(|config| &config.methods)
-            .map(|method| &method.authentication_class)
             .collect();
 
-        // async closures inside .map() are unstable... If they are stable we can use a simple authentication_classes.map(...)
-        let authentication_class = match authentication_classes.len() {
-            0 => None,
-            1 => {
-                let authentication_class_name = authentication_classes.get(0).unwrap();
+        if authentication_methods.len() > 1 {
+            return MultipleAuthenticationMethodsSnafu.fail();
+        }
+
+        let authentication_method = authentication_methods.get(0);
+        // async closures inside .map() are unstable
+        let authentication_class = match authentication_method {
+            None => None,
+            Some(authentication_method) => {
                 Some(
                     client
-                        .get::<AuthenticationClass>(authentication_class_name, None) // AuthenticationClass has ClusterScope
+                        .get::<AuthenticationClass>(
+                            &authentication_method.authentication_class,
+                            None,
+                        ) // AuthenticationClass has ClusterScope
                         .await
                         .context(AuthenticationClassRetrievalSnafu {
-                            authentication_class: authentication_class_name.to_string(),
+                            authentication_class: &authentication_method.authentication_class,
                         })?,
                 )
-            }
-            _ => {
-                return MultipleAuthenticationMethodsSnafu.fail(); // Superset (or underlying Flask) only supports 0 or 1 authentication methods
             }
         };
 
@@ -208,6 +210,7 @@ pub async fn reconcile_superset(
             &rolegroup,
             &superset,
             rolegroup_config,
+            &authentication_method,
             &authentication_class,
         )?;
         let rg_statefulset = build_server_rolegroup_statefulset(
@@ -341,6 +344,7 @@ fn build_rolegroup_config_map(
     rolegroup: &RoleGroupRef<SupersetCluster>,
     superset: &SupersetCluster,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    authentication_method: &Option<&&SupersetClusterAuthenticationConfigMethod>,
     authentication_class: &Option<AuthenticationClass>,
 ) -> Result<ConfigMap> {
     let mut cm_conf_data = BTreeMap::new(); // filename -> filecontent
@@ -348,7 +352,8 @@ fn build_rolegroup_config_map(
     for property_name_kind in rolegroup_config.keys() {
         match property_name_kind {
             PropertyNameKind::File(file_name) if file_name == SUPERSET_CONFIG => {
-                let superset_config = compute_superset_config(authentication_class);
+                let superset_config =
+                    compute_superset_config(authentication_method, authentication_class);
                 cm_conf_data.insert(SUPERSET_CONFIG.to_string(), superset_config);
             }
             _ => {}
@@ -428,16 +433,15 @@ fn build_server_rolegroup_statefulset(
         .build()];
     let mut volume_mounts = vec![VolumeMountBuilder::new("config", "/app/pythonpath/").build()];
 
-    match authentication_class {
-        None => {}
-        Some(authentication_class) => {
-            let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
-            match &authentication_class.spec.protocol {
-                AuthenticationClassType::Ldap(ldap) => {
+    if let Some(authentication_class) = authentication_class {
+        let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
+        match &authentication_class.spec.protocol {
+            AuthenticationClassProtocol::Ldap(ldap) => {
+                if let Some(bind_credentials) = &ldap.bind_credentials {
                     let mut secret_operator_volume_builder =
-                        SecretOperatorVolumeSourceBuilder::new(&ldap.bind_credentials.secret_class);
+                        SecretOperatorVolumeSourceBuilder::new(&bind_credentials.secret_class);
 
-                    if let Some(scope) = &ldap.bind_credentials.scope {
+                    if let Some(scope) = &bind_credentials.scope {
                         if scope.pod {
                             secret_operator_volume_builder.with_pod_scope();
                         }
@@ -448,14 +452,15 @@ fn build_server_rolegroup_statefulset(
                             secret_operator_volume_builder.with_service_scope(service);
                         }
                     }
-                    let volume_name = format!("authentication-config-{authentication_class_name}");
+                    let volume_name = format!("{authentication_class_name}-bind-credentials");
+                    let volume_mount_path = format!("/secrets/{volume_name}");
                     volumes.push(
                         VolumeBuilder::new(&volume_name)
                             .csi(secret_operator_volume_builder.build())
                             .build(),
                     );
                     volume_mounts.push(
-                        VolumeMountBuilder::new(&volume_name, format!("/{volume_name}"))
+                        VolumeMountBuilder::new(&volume_name, volume_mount_path)
                             .read_only(true)
                             .build(),
                     );

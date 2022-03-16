@@ -61,16 +61,53 @@ pub struct SupersetClusterAuthenticationConfig {
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClusterAuthenticationConfigMethod {
     pub authentication_class: String,
+    pub ldap_extras: Option<SupersetClusterAuthenticationConfigLdapExtras>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+/// Additional configs to LDAP Authentication in Superset. See https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap
+pub struct SupersetClusterAuthenticationConfigLdapExtras {
+    /// Allow users who are not already in the FAB DB
+    /// mapped to AUTH_USER_REGISTRATION
+    #[serde(default = "default_user_registration")]
+    pub user_registration: bool,
+
+    /// This role will be given in addition to any AUTH_ROLES_MAPPING
+    /// mapped to AUTH_USER_REGISTRATION_ROLE
+    #[serde(default = "default_user_registration_role")]
+    pub user_registration_role: String,
+
+    /// If we should replace ALL the user's roles each login, or only on registration
+    /// mapped to AUTH_ROLES_SYNC_AT_LOGIN
+    #[serde(default = "default_roles_sync_at_login")]
+    pub roles_sync_at_login: bool,
+
+    /// You can limit the LDAP search scope
+    /// mapped to AUTH_LDAP_SEARCH_FILTER
+    pub ldap_search_filter: Option<String>,
+}
+
+pub fn default_user_registration() -> bool {
+    true
+}
+
+pub fn default_user_registration_role() -> String {
+    "Public".to_string()
+}
+
+pub fn default_roles_sync_at_login() -> bool {
+    true
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetCredentials {
     pub admin_user: AdminUserCredentials,
     pub connections: Connections,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AdminUserCredentials {
     pub username: String,
@@ -80,7 +117,7 @@ pub struct AdminUserCredentials {
     pub password: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Connections {
     pub secret_key: String,
@@ -170,7 +207,7 @@ impl SupersetCluster {
 }
 
 /// A reference to a [`SupersetCluster`]
-#[derive(Clone, Default, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClusterRef {
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -26,6 +26,7 @@ spec:
             spec:
               properties:
                 protocol:
+                  description: Protocol used for authentication
                   oneOf:
                     - required:
                         - ldap
@@ -33,6 +34,8 @@ spec:
                     ldap:
                       properties:
                         bindCredentials:
+                          description: In case you need a special account for searching the LDAP server you can specify it here
+                          nullable: true
                           properties:
                             scope:
                               nullable: true
@@ -54,19 +57,90 @@ spec:
                           required:
                             - secretClass
                           type: object
-                        domain:
+                        emailField:
+                          default: mail
+                          description: The name of the email field
+                          type: string
+                        firstnameField:
+                          default: givenName
+                          description: The name of the firstname field
+                          type: string
+                        groupField:
+                          default: memberof
+                          description: The name of the group field
                           type: string
                         hostname:
+                          description: Hostname of the LDAP server
+                          type: string
+                        lastnameField:
+                          default: sn
+                          description: The name of the lastname field
                           type: string
                         port:
+                          default: 389
+                          description: Port of the LDAP server
                           format: uint16
                           minimum: 0.0
                           type: integer
+                        searchBase:
+                          default: ""
+                          description: LDAP search base
+                          type: string
+                        tls:
+                          description: Use a TLS connection. If not specified no TLS will be used
+                          nullable: true
+                          oneOf:
+                            - required:
+                                - insecure
+                            - required:
+                                - serverVerification
+                            - required:
+                                - mutualVerification
+                          properties:
+                            insecure:
+                              type: object
+                            mutualVerification:
+                              properties:
+                                clientCaCert:
+                                  oneOf:
+                                    - required:
+                                        - path
+                                  properties:
+                                    path:
+                                      type: string
+                                  type: object
+                                serverCaCert:
+                                  oneOf:
+                                    - required:
+                                        - path
+                                  properties:
+                                    path:
+                                      type: string
+                                  type: object
+                              required:
+                                - clientCaCert
+                                - serverCaCert
+                              type: object
+                            serverVerification:
+                              properties:
+                                serverCaCert:
+                                  oneOf:
+                                    - required:
+                                        - path
+                                  properties:
+                                    path:
+                                      type: string
+                                  type: object
+                              required:
+                                - serverCaCert
+                              type: object
+                          type: object
+                        uidField:
+                          default: uid
+                          description: The name of the username field
+                          type: string
                       required:
-                        - bindCredentials
-                        - domain
                         - hostname
-                        - port
                       type: object
                   type: object
               required:
@@ -188,6 +262,27 @@ spec:
                         properties:
                           authenticationClass:
                             type: string
+                          ldapExtras:
+                            description: "Additional configs to LDAP Authentication in Superset. See https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap"
+                            nullable: true
+                            properties:
+                              ldapSearchFilter:
+                                description: You can limit the LDAP search scope mapped to AUTH_LDAP_SEARCH_FILTER
+                                nullable: true
+                                type: string
+                              rolesSyncAtLogin:
+                                default: true
+                                description: "If we should replace ALL the user's roles each login, or only on registration mapped to AUTH_ROLES_SYNC_AT_LOGIN"
+                                type: boolean
+                              userRegistration:
+                                default: true
+                                description: Allow users who are not already in the FAB DB mapped to AUTH_USER_REGISTRATION
+                                type: boolean
+                              userRegistrationRole:
+                                default: Public
+                                description: This role will be given in addition to any AUTH_ROLES_MAPPING mapped to AUTH_USER_REGISTRATION_ROLE
+                                type: string
+                            type: object
                         required:
                           - authenticationClass
                         type: object
