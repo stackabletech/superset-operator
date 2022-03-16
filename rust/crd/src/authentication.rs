@@ -141,6 +141,6 @@ pub enum AuthenticationClassCaCert {
     // Configmap(String),
     // Name of the Secret containing the ca cert
     // Secret(String),
-    // Path to the cert
+    // Path to the ca cert
     Path(String),
 }

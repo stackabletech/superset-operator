@@ -1,5 +1,6 @@
 use stackable_superset_crd::authentication::{
-    AuthenticationClass, AuthenticationClassProtocol, AuthenticationClassTls,
+    AuthenticationClass, AuthenticationClassCaCert, AuthenticationClassProtocol,
+    AuthenticationClassTls,
 };
 use stackable_superset_crd::SupersetClusterAuthenticationConfigMethod;
 
@@ -100,7 +101,7 @@ AUTH_ROLES_SYNC_AT_LOGIN = {}
                 },
             );
 
-            // See https://flask-appbuilder.readthedocs.io/en/latest/_modules/flask_appbuilder/security/manager.html?highlight=AUTH_LDAP_TLS_CACERTFILE#
+            // See https://github.com/dpgaspar/Flask-AppBuilder/blob/master/flask_appbuilder/security/manager.py
             // # TLS possible options
             // app.config.setdefault("AUTH_LDAP_USE_TLS", False)
             // app.config.setdefault("AUTH_LDAP_ALLOW_SELF_SIGNED", False)
@@ -123,11 +124,30 @@ AUTH_LDAP_ALLOW_SELF_SIGNED = True
 "#,
                     );
                 }
-                Some(AuthenticationClassTls::ServerVerification(_server_verification)) => {
-                    todo!();
+                Some(AuthenticationClassTls::ServerVerification(server_verification)) => {
+                    result.push_str(
+                        r#"
+AUTH_LDAP_USE_TLS = True
+AUTH_LDAP_ALLOW_SELF_SIGNED = False
+AUTH_LDAP_TLS_DEMAND = True
+"#,
+                    );
+                    match &server_verification.server_ca_cert {
+                        AuthenticationClassCaCert::Path(cacert_path) => {
+                            result.push_str(
+                                format!(
+                                    r#"
+AUTH_LDAP_TLS_CACERTFILE = "{}"
+"#,
+                                    cacert_path
+                                )
+                                .as_str(),
+                            );
+                        }
+                    }
                 }
                 Some(AuthenticationClassTls::MutualVerification(_mutual_verification)) => {
-                    todo!();
+                    todo!()
                 }
             }
 
