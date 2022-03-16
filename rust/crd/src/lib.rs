@@ -66,7 +66,7 @@ pub struct SupersetClusterAuthenticationConfigMethod {
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-/// Additional configs to LDAP Authentication in Superset. See https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap
+/// Additional configs to LDAP Authentication in Superset. See <https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap>
 pub struct SupersetClusterAuthenticationConfigLdapExtras {
     /// Allow users who are not already in the FAB DB
     /// mapped to AUTH_USER_REGISTRATION

@@ -31,7 +31,7 @@ spec:
                           authenticationClass:
                             type: string
                           ldapExtras:
-                            description: "Additional configs to LDAP Authentication in Superset. See https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap"
+                            description: "Additional configs to LDAP Authentication in Superset. See <https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap>"
                             nullable: true
                             properties:
                               ldapSearchFilter:
