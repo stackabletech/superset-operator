@@ -182,27 +182,18 @@ pub async fn reconcile_superset(
             .flat_map(|config| &config.methods)
             .collect();
 
-        if authentication_methods.len() > 1 {
-            return MultipleAuthenticationMethodsSnafu.fail();
-        }
-
-        let authentication_method = authentication_methods.get(0);
-        // async closures inside .map() are unstable
-        let authentication_class = match authentication_method {
-            None => None,
-            Some(authentication_method) => {
-                Some(
-                    client
-                        .get::<AuthenticationClass>(
-                            &authentication_method.authentication_class,
-                            None,
-                        ) // AuthenticationClass has ClusterScope
-                        .await
-                        .context(AuthenticationClassRetrievalSnafu {
-                            authentication_class: &authentication_method.authentication_class,
-                        })?,
-                )
+        let (authentication_method, authentication_class) = match authentication_methods[..] {
+            [] => (None, None),
+            [authentication_method] => {
+                let authentication_class = client
+                    .get::<AuthenticationClass>(&authentication_method.authentication_class, None) // AuthenticationClass has ClusterScope
+                    .await
+                    .context(AuthenticationClassRetrievalSnafu {
+                        authentication_class: &authentication_method.authentication_class,
+                    })?;
+                (Some(authentication_method), Some(authentication_class))
             }
+            _ => return MultipleAuthenticationMethodsSnafu.fail(),
         };
 
         let rg_service = build_node_rolegroup_service(&rolegroup, &superset)?;
@@ -344,7 +335,7 @@ fn build_rolegroup_config_map(
     rolegroup: &RoleGroupRef<SupersetCluster>,
     superset: &SupersetCluster,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    authentication_method: &Option<&&SupersetClusterAuthenticationConfigMethod>,
+    authentication_method: &Option<&SupersetClusterAuthenticationConfigMethod>,
     authentication_class: &Option<AuthenticationClass>,
 ) -> Result<ConfigMap> {
     let mut cm_conf_data = BTreeMap::new(); // filename -> filecontent

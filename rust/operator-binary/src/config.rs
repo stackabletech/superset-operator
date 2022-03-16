@@ -5,7 +5,7 @@ use stackable_superset_crd::authentication::{
 use stackable_superset_crd::SupersetClusterAuthenticationConfigMethod;
 
 pub fn compute_superset_config(
-    authentication_method: &Option<&&SupersetClusterAuthenticationConfigMethod>,
+    authentication_method: &Option<&SupersetClusterAuthenticationConfigMethod>,
     authentication_class: &Option<AuthenticationClass>,
 ) -> String {
     // We don't calculate the secrets here directly, as the operator should not be able to see the actual credentials.
