@@ -20,8 +20,9 @@ helm install superset-operator deploy/helm/superset-operator
 
 The usage of this operator and its CRDs is described in the [documentation](https://docs.stackable.tech/superset/index.html)
 
-The operator has example requests included in the [`/examples`](https://github.com/stackabletech/superset/operator/tree/main/examples) directory.
+The operator has example requests included in the [`/examples`](https://github.com/stackabletech/superset-operator/tree/main/examples) directory.
 
 ## Links
 
 https://github.com/stackabletech/superset-operator
+
