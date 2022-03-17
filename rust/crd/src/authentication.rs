@@ -173,56 +173,12 @@ impl AuthenticationClass {
                         AuthenticationClassTls::ServerVerification(
                             AuthenticationClassTlsServerVerification { server_ca_cert },
                         ) => {
-                            let volume_name =
-                                format!("{authentication_class_name}-tls-certificate");
-                            let volume_mount_path = format!("/certificates/{volume_name}");
-                            match server_ca_cert {
-                                AuthenticationClassCaCert::Path(_) => {}
-                                AuthenticationClassCaCert::Secret(secret_name) => {
-                                    volumes.push(
-                                        VolumeBuilder::new(&volume_name)
-                                            .with_secret(secret_name, false)
-                                            .build(),
-                                    );
-                                    volume_mounts.push(
-                                        VolumeMountBuilder::new(&volume_name, volume_mount_path)
-                                            .read_only(true)
-                                            .build(),
-                                    );
-                                }
-                                AuthenticationClassCaCert::Configmap(configmap_name) => {
-                                    volumes.push(
-                                        VolumeBuilder::new(&volume_name)
-                                            .with_config_map(configmap_name)
-                                            .build(),
-                                    );
-                                    volume_mounts.push(
-                                        VolumeMountBuilder::new(&volume_name, volume_mount_path)
-                                            .read_only(true)
-                                            .build(),
-                                    );
-                                }
-                                AuthenticationClassCaCert::SecretClass(secret_class_name) => {
-                                    // We add a SecretClass Volume here to get the ca.crt of the underlying SecretClass.
-                                    // We actually don't care about the generated cert and key, so we set the scope to pod
-                                    volumes.push(
-                                        VolumeBuilder::new(&volume_name)
-                                            .csi(
-                                                SecretOperatorVolumeSourceBuilder::new(
-                                                    secret_class_name,
-                                                )
-                                                .with_pod_scope()
-                                                .build(),
-                                            )
-                                            .build(),
-                                    );
-                                    volume_mounts.push(
-                                        VolumeMountBuilder::new(&volume_name, volume_mount_path)
-                                            .read_only(true)
-                                            .build(),
-                                    );
-                                }
-                            }
+                            Self::append_server_ca_cert(
+                                volumes,
+                                volume_mounts,
+                                authentication_class_name,
+                                server_ca_cert,
+                            );
                         }
                     }
                 }
@@ -231,7 +187,7 @@ impl AuthenticationClass {
     }
 
     fn build_secret_operator_volume(
-        secret_class_name: &String,
+        secret_class_name: &str,
         scope: &Option<AuthenticationClassSecretClassScope>,
     ) -> CSIVolumeSource {
         let mut secret_operator_volume_builder =
@@ -250,5 +206,60 @@ impl AuthenticationClass {
         }
 
         secret_operator_volume_builder.build()
+    }
+
+    fn append_server_ca_cert(
+        volumes: &mut Vec<Volume>,
+        volume_mounts: &mut Vec<VolumeMount>,
+        authentication_class_name: &str,
+        server_ca_cert: &AuthenticationClassCaCert,
+    ) {
+        let volume_name = format!("{authentication_class_name}-tls-certificate");
+        let volume_mount_path = format!("/certificates/{volume_name}");
+        match server_ca_cert {
+            AuthenticationClassCaCert::Path(_) => {}
+            AuthenticationClassCaCert::Secret(secret_name) => {
+                volumes.push(
+                    VolumeBuilder::new(&volume_name)
+                        .with_secret(secret_name, false)
+                        .build(),
+                );
+                volume_mounts.push(
+                    VolumeMountBuilder::new(&volume_name, volume_mount_path)
+                        .read_only(true)
+                        .build(),
+                );
+            }
+            AuthenticationClassCaCert::Configmap(configmap_name) => {
+                volumes.push(
+                    VolumeBuilder::new(&volume_name)
+                        .with_config_map(configmap_name)
+                        .build(),
+                );
+                volume_mounts.push(
+                    VolumeMountBuilder::new(&volume_name, volume_mount_path)
+                        .read_only(true)
+                        .build(),
+                );
+            }
+            AuthenticationClassCaCert::SecretClass(secret_class_name) => {
+                // We add a SecretClass Volume here to get the ca.crt of the underlying SecretClass.
+                // We actually don't care about the generated cert and key, so we set the scope to pod
+                volumes.push(
+                    VolumeBuilder::new(&volume_name)
+                        .csi(
+                            SecretOperatorVolumeSourceBuilder::new(secret_class_name)
+                                .with_pod_scope()
+                                .build(),
+                        )
+                        .build(),
+                );
+                volume_mounts.push(
+                    VolumeMountBuilder::new(&volume_name, volume_mount_path)
+                        .read_only(true)
+                        .build(),
+                );
+            }
+        }
     }
 }
