@@ -150,8 +150,9 @@ AUTH_LDAP_TLS_DEMAND = True
                 AuthenticationClassCaCert::Path(path) => {
                     config.push_str(format!("AUTH_LDAP_TLS_CACERTFILE = \"{}\"\n", path).as_str());
                 }
-                AuthenticationClassCaCert::Configmap { .. }
-                | AuthenticationClassCaCert::Secret { .. } => {
+                AuthenticationClassCaCert::Configmap(_)
+                | AuthenticationClassCaCert::Secret(_)
+                | AuthenticationClassCaCert::SecretClass(_) => {
                     config.push_str(
                         format!(
                             "AUTH_LDAP_TLS_CACERTFILE = \"/certificates/{authentication_class_name}-tls-certificate/ca.crt\"\n"
@@ -160,9 +161,6 @@ AUTH_LDAP_TLS_DEMAND = True
                     );
                 }
             }
-        }
-        Some(AuthenticationClassTls::MutualVerification(_mutual_verification)) => {
-            todo!()
         }
     }
 

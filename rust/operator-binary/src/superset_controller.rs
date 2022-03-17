@@ -459,6 +459,7 @@ fn build_server_rolegroup_statefulset(
 
                 if let Some(tls) = &ldap.tls {
                     match tls {
+                        AuthenticationClassTls::Insecure {} => {}
                         AuthenticationClassTls::ServerVerification(
                             AuthenticationClassTlsServerVerification { server_ca_cert },
                         ) => {
@@ -466,6 +467,7 @@ fn build_server_rolegroup_statefulset(
                                 format!("{authentication_class_name}-tls-certificate");
                             let volume_mount_path = format!("/certificates/{volume_name}");
                             match server_ca_cert {
+                                AuthenticationClassCaCert::Path(_) => {}
                                 AuthenticationClassCaCert::Secret(secret_name) => {
                                     volumes.push(
                                         VolumeBuilder::new(&volume_name)
@@ -490,13 +492,28 @@ fn build_server_rolegroup_statefulset(
                                             .build(),
                                     );
                                 }
-                                _ => {}
+                                AuthenticationClassCaCert::SecretClass(secret_class_name) => {
+                                    // We add a SecretClass Volume here to get the ca.crt of the underlying SecretClass.
+                                    // We actually don't care about the generated cert and key, so we set the scope to pod
+                                    volumes.push(
+                                        VolumeBuilder::new(&volume_name)
+                                            .csi(
+                                                SecretOperatorVolumeSourceBuilder::new(
+                                                    secret_class_name,
+                                                )
+                                                .with_pod_scope()
+                                                .build(),
+                                            )
+                                            .build(),
+                                    );
+                                    volume_mounts.push(
+                                        VolumeMountBuilder::new(&volume_name, volume_mount_path)
+                                            .read_only(true)
+                                            .build(),
+                                    );
+                                }
                             }
                         }
-                        AuthenticationClassTls::MutualVerification(..) => {
-                            todo!()
-                        }
-                        _ => {}
                     }
                 }
             }

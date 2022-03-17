@@ -90,48 +90,8 @@ spec:
                                 - insecure
                             - required:
                                 - serverVerification
-                            - required:
-                                - mutualVerification
                           properties:
                             insecure:
-                              type: object
-                            mutualVerification:
-                              properties:
-                                clientCaCert:
-                                  oneOf:
-                                    - required:
-                                        - configmap
-                                    - required:
-                                        - secret
-                                    - required:
-                                        - path
-                                  properties:
-                                    configmap:
-                                      type: string
-                                    path:
-                                      type: string
-                                    secret:
-                                      type: string
-                                  type: object
-                                serverCaCert:
-                                  oneOf:
-                                    - required:
-                                        - configmap
-                                    - required:
-                                        - secret
-                                    - required:
-                                        - path
-                                  properties:
-                                    configmap:
-                                      type: string
-                                    path:
-                                      type: string
-                                    secret:
-                                      type: string
-                                  type: object
-                              required:
-                                - clientCaCert
-                                - serverCaCert
                               type: object
                             serverVerification:
                               properties:
@@ -143,12 +103,16 @@ spec:
                                         - secret
                                     - required:
                                         - path
+                                    - required:
+                                        - secretClass
                                   properties:
                                     configmap:
                                       type: string
                                     path:
                                       type: string
                                     secret:
+                                      type: string
+                                    secretClass:
                                       type: string
                                   type: object
                               required:
