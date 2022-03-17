@@ -1,6 +1,10 @@
 // TODO: To be moved to separate commons operator
 
 use serde::{Deserialize, Serialize};
+use stackable_operator::builder::{
+    SecretOperatorVolumeSourceBuilder, VolumeBuilder, VolumeMountBuilder,
+};
+use stackable_operator::k8s_openapi::api::core::v1::{CSIVolumeSource, Volume, VolumeMount};
 
 use stackable_operator::kube::CustomResource;
 use stackable_operator::schemars::{self, JsonSchema};
@@ -133,4 +137,118 @@ pub enum AuthenticationClassCaCert {
     Path(String),
     // SecretClass reference
     SecretClass(String),
+}
+
+impl AuthenticationClass {
+    pub fn append_volumes_and_volume_mounts(
+        &self,
+        volumes: &mut Vec<Volume>,
+        volume_mounts: &mut Vec<VolumeMount>,
+    ) {
+        let authentication_class_name = self.metadata.name.as_ref().unwrap();
+
+        match &self.spec.protocol {
+            AuthenticationClassProtocol::Ldap(ldap) => {
+                if let Some(bind_credentials) = &ldap.bind_credentials {
+                    let volume_name = format!("{authentication_class_name}-bind-credentials");
+                    let volume_mount_path = format!("/secrets/{volume_name}");
+                    volumes.push(
+                        VolumeBuilder::new(&volume_name)
+                            .csi(Self::build_secret_operator_volume(
+                                &bind_credentials.secret_class,
+                                &bind_credentials.scope,
+                            ))
+                            .build(),
+                    );
+                    volume_mounts.push(
+                        VolumeMountBuilder::new(&volume_name, volume_mount_path)
+                            .read_only(true)
+                            .build(),
+                    );
+                }
+
+                if let Some(tls) = &ldap.tls {
+                    match tls {
+                        AuthenticationClassTls::Insecure {} => {}
+                        AuthenticationClassTls::ServerVerification(
+                            AuthenticationClassTlsServerVerification { server_ca_cert },
+                        ) => {
+                            let volume_name =
+                                format!("{authentication_class_name}-tls-certificate");
+                            let volume_mount_path = format!("/certificates/{volume_name}");
+                            match server_ca_cert {
+                                AuthenticationClassCaCert::Path(_) => {}
+                                AuthenticationClassCaCert::Secret(secret_name) => {
+                                    volumes.push(
+                                        VolumeBuilder::new(&volume_name)
+                                            .with_secret(secret_name, false)
+                                            .build(),
+                                    );
+                                    volume_mounts.push(
+                                        VolumeMountBuilder::new(&volume_name, volume_mount_path)
+                                            .read_only(true)
+                                            .build(),
+                                    );
+                                }
+                                AuthenticationClassCaCert::Configmap(configmap_name) => {
+                                    volumes.push(
+                                        VolumeBuilder::new(&volume_name)
+                                            .with_config_map(configmap_name)
+                                            .build(),
+                                    );
+                                    volume_mounts.push(
+                                        VolumeMountBuilder::new(&volume_name, volume_mount_path)
+                                            .read_only(true)
+                                            .build(),
+                                    );
+                                }
+                                AuthenticationClassCaCert::SecretClass(secret_class_name) => {
+                                    // We add a SecretClass Volume here to get the ca.crt of the underlying SecretClass.
+                                    // We actually don't care about the generated cert and key, so we set the scope to pod
+                                    volumes.push(
+                                        VolumeBuilder::new(&volume_name)
+                                            .csi(
+                                                SecretOperatorVolumeSourceBuilder::new(
+                                                    secret_class_name,
+                                                )
+                                                .with_pod_scope()
+                                                .build(),
+                                            )
+                                            .build(),
+                                    );
+                                    volume_mounts.push(
+                                        VolumeMountBuilder::new(&volume_name, volume_mount_path)
+                                            .read_only(true)
+                                            .build(),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn build_secret_operator_volume(
+        secret_class_name: &String,
+        scope: &Option<AuthenticationClassSecretClassScope>,
+    ) -> CSIVolumeSource {
+        let mut secret_operator_volume_builder =
+            SecretOperatorVolumeSourceBuilder::new(secret_class_name);
+
+        if let Some(scope) = scope {
+            if scope.pod {
+                secret_operator_volume_builder.with_pod_scope();
+            }
+            if scope.node {
+                secret_operator_volume_builder.with_node_scope();
+            }
+            for service in &scope.services {
+                secret_operator_volume_builder.with_service_scope(service);
+            }
+        }
+
+        secret_operator_volume_builder.build()
+    }
 }
