@@ -116,7 +116,7 @@ pub enum AuthenticationClassTls {
     // Use TLS and ca certificate to verify the server
     ServerVerification(AuthenticationClassTlsServerVerification),
     // Use TLS and ca certificate to verify the server and the client
-    // MutualVerification(AuthenticationClassTlsMutualVerification),
+    MutualVerification(AuthenticationClassTlsMutualVerification),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -128,6 +128,13 @@ pub struct AuthenticationClassTlsServerVerification {
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AuthenticationClassTlsMutualVerification {
+    // SecretClass which will provide ca.crt, tls.crt and tls.key
+    pub secret_class: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum AuthenticationClassCaCert {
     // Name of the ConfigMap containing the ca cert
     Configmap(String),
@@ -135,7 +142,7 @@ pub enum AuthenticationClassCaCert {
     Secret(String),
     // Path to the ca cert
     Path(String),
-    // SecretClass reference
+    // SecretClass which will provide the ca cert
     SecretClass(String),
 }
 
@@ -178,6 +185,17 @@ impl AuthenticationClass {
                                 volume_mounts,
                                 authentication_class_name,
                                 server_ca_cert,
+                            );
+                        }
+                        AuthenticationClassTls::MutualVerification(
+                            AuthenticationClassTlsMutualVerification { secret_class },
+                        ) => {
+                            // This will not only add the ca.crt but also the tls.crt and tls.key
+                            Self::append_server_ca_cert(
+                                volumes,
+                                volume_mounts,
+                                authentication_class_name,
+                                &AuthenticationClassCaCert::SecretClass(secret_class.to_string()),
                             );
                         }
                     }
@@ -243,8 +261,8 @@ impl AuthenticationClass {
                 );
             }
             AuthenticationClassCaCert::SecretClass(secret_class_name) => {
-                // We add a SecretClass Volume here to get the ca.crt of the underlying SecretClass.
-                // We actually don't care about the generated cert and key, so we set the scope to pod
+                // We add a SecretClass Volume here to get the ca.crt, tls.crt and tls.key of the underlying SecretClass.
+                // The tls.crt and tls.key will only be used when we use the AuthenticationClassTls::MutualVerification
                 volumes.push(
                     VolumeBuilder::new(&volume_name)
                         .csi(

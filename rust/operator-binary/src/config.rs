@@ -139,28 +139,29 @@ AUTH_LDAP_ALLOW_SELF_SIGNED = True
             );
         }
         Some(AuthenticationClassTls::ServerVerification(server_verification)) => {
-            config.push_str(
-                r#"
-AUTH_LDAP_USE_TLS = False # Strangely we don't want True here because it will use TLS and we need to use SSL.
-AUTH_LDAP_ALLOW_SELF_SIGNED = False
-AUTH_LDAP_TLS_DEMAND = True
-"#,
+            append_server_ca_cert(
+                config,
+                authentication_class_name,
+                &server_verification.server_ca_cert,
             );
-            match &server_verification.server_ca_cert {
-                AuthenticationClassCaCert::Path(path) => {
-                    config.push_str(format!("AUTH_LDAP_TLS_CACERTFILE = \"{}\"\n", path).as_str());
-                }
-                AuthenticationClassCaCert::Configmap(_)
-                | AuthenticationClassCaCert::Secret(_)
-                | AuthenticationClassCaCert::SecretClass(_) => {
-                    config.push_str(
-                        format!(
-                            "AUTH_LDAP_TLS_CACERTFILE = \"/certificates/{authentication_class_name}-tls-certificate/ca.crt\"\n"
-                        )
-                            .as_str(),
-                    );
-                }
-            }
+        }
+        Some(AuthenticationClassTls::MutualVerification(mutual_verification)) => {
+            append_server_ca_cert(
+                config,
+                authentication_class_name,
+                &AuthenticationClassCaCert::SecretClass(
+                    mutual_verification.secret_class.to_string(),
+                ),
+            );
+            config.push_str(
+                format!(
+                    r#"
+AUTH_LDAP_TLS_CERTFILE = "/certificates/{authentication_class_name}-tls-certificate/tls.crt"
+AUTH_LDAP_TLS_KEYFILE = "/certificates/{authentication_class_name}-tls-certificate/tls.key"
+"#
+                )
+                .as_str(),
+            );
         }
     }
 
@@ -174,5 +175,34 @@ AUTH_LDAP_BIND_PASSWORD = open('/secrets/{authentication_class_name}-bind-creden
             )
                 .as_str(),
         );
+    }
+}
+
+fn append_server_ca_cert(
+    config: &mut String,
+    authentication_class_name: &str,
+    server_ca_cert: &AuthenticationClassCaCert,
+) {
+    config.push_str(
+        r#"
+AUTH_LDAP_USE_TLS = False # Strangely we don't want True here because it will use TLS and we need to use SSL.
+AUTH_LDAP_ALLOW_SELF_SIGNED = False
+AUTH_LDAP_TLS_DEMAND = True
+"#,
+    );
+    match server_ca_cert {
+        AuthenticationClassCaCert::Path(path) => {
+            config.push_str(format!("AUTH_LDAP_TLS_CACERTFILE = \"{}\"\n", path).as_str());
+        }
+        AuthenticationClassCaCert::Configmap(_)
+        | AuthenticationClassCaCert::Secret(_)
+        | AuthenticationClassCaCert::SecretClass(_) => {
+            config.push_str(
+                format!(
+                    "AUTH_LDAP_TLS_CACERTFILE = \"/certificates/{authentication_class_name}-tls-certificate/ca.crt\"\n"
+                )
+                    .as_str(),
+            );
+        }
     }
 }

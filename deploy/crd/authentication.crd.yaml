@@ -90,8 +90,17 @@ spec:
                                 - insecure
                             - required:
                                 - serverVerification
+                            - required:
+                                - mutualVerification
                           properties:
                             insecure:
+                              type: object
+                            mutualVerification:
+                              properties:
+                                secretClass:
+                                  type: string
+                              required:
+                                - secretClass
                               type: object
                             serverVerification:
                               properties:
