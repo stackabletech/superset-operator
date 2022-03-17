@@ -108,15 +108,12 @@ pub struct AuthenticationClassSecretClassScope {
 pub enum AuthenticationClassTls {
     // Use TLS but don't verify certificates.
     // We have to use an empty struct instead of an empty Enum, otherwise we will get invalid CRDs
-    Insecure(AuthenticationClassTlsInsecure),
+    Insecure {},
     // Use TLS and a ca certificate to verify the server
     ServerVerification(AuthenticationClassTlsServerVerification),
     // Use TLS and a ca certificate to verify the server and the client
     MutualVerification(AuthenticationClassTlsMutualVerification),
 }
-
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-pub struct AuthenticationClassTlsInsecure {}
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -138,9 +135,9 @@ pub struct AuthenticationClassTlsMutualVerification {
 #[serde(rename_all = "camelCase")]
 pub enum AuthenticationClassCaCert {
     // Name of the ConfigMap containing the ca cert
-    // Configmap(String),
+    Configmap(String),
     // Name of the Secret containing the ca cert
-    // Secret(String),
+    Secret(String),
     // Path to the ca cert
     Path(String),
 }

@@ -28,7 +28,10 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::RoleGroupRef,
 };
-use stackable_superset_crd::authentication::AuthenticationClassProtocol;
+use stackable_superset_crd::authentication::{
+    AuthenticationClassCaCert, AuthenticationClassProtocol, AuthenticationClassTls,
+    AuthenticationClassTlsServerVerification,
+};
 use stackable_superset_crd::{
     authentication::AuthenticationClass, supersetdb::SupersetDB, SupersetCluster,
     SupersetClusterAuthenticationConfigMethod, SupersetConfig, SupersetRole, SUPERSET_CONFIG,
@@ -422,6 +425,7 @@ fn build_server_rolegroup_statefulset(
 
     if let Some(authentication_class) = authentication_class {
         let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
+
         match &authentication_class.spec.protocol {
             AuthenticationClassProtocol::Ldap(ldap) => {
                 if let Some(bind_credentials) = &ldap.bind_credentials {
@@ -451,6 +455,49 @@ fn build_server_rolegroup_statefulset(
                             .read_only(true)
                             .build(),
                     );
+                }
+
+                if let Some(tls) = &ldap.tls {
+                    match tls {
+                        AuthenticationClassTls::ServerVerification(
+                            AuthenticationClassTlsServerVerification { server_ca_cert },
+                        ) => {
+                            let volume_name =
+                                format!("{authentication_class_name}-tls-certificate");
+                            let volume_mount_path = format!("/certificates/{volume_name}");
+                            match server_ca_cert {
+                                AuthenticationClassCaCert::Secret(secret_name) => {
+                                    volumes.push(
+                                        VolumeBuilder::new(&volume_name)
+                                            .with_secret(secret_name, false)
+                                            .build(),
+                                    );
+                                    volume_mounts.push(
+                                        VolumeMountBuilder::new(&volume_name, volume_mount_path)
+                                            .read_only(true)
+                                            .build(),
+                                    );
+                                }
+                                AuthenticationClassCaCert::Configmap(configmap_name) => {
+                                    volumes.push(
+                                        VolumeBuilder::new(&volume_name)
+                                            .with_config_map(configmap_name)
+                                            .build(),
+                                    );
+                                    volume_mounts.push(
+                                        VolumeMountBuilder::new(&volume_name, volume_mount_path)
+                                            .read_only(true)
+                                            .build(),
+                                    );
+                                }
+                                _ => {}
+                            }
+                        }
+                        AuthenticationClassTls::MutualVerification(..) => {
+                            todo!()
+                        }
+                        _ => {}
+                    }
                 }
             }
         }

@@ -102,17 +102,33 @@ spec:
                                 clientCaCert:
                                   oneOf:
                                     - required:
+                                        - configmap
+                                    - required:
+                                        - secret
+                                    - required:
                                         - path
                                   properties:
+                                    configmap:
+                                      type: string
                                     path:
+                                      type: string
+                                    secret:
                                       type: string
                                   type: object
                                 serverCaCert:
                                   oneOf:
                                     - required:
+                                        - configmap
+                                    - required:
+                                        - secret
+                                    - required:
                                         - path
                                   properties:
+                                    configmap:
+                                      type: string
                                     path:
+                                      type: string
+                                    secret:
                                       type: string
                                   type: object
                               required:
@@ -124,9 +140,17 @@ spec:
                                 serverCaCert:
                                   oneOf:
                                     - required:
+                                        - configmap
+                                    - required:
+                                        - secret
+                                    - required:
                                         - path
                                   properties:
+                                    configmap:
+                                      type: string
                                     path:
+                                      type: string
+                                    secret:
                                       type: string
                                   type: object
                               required:
