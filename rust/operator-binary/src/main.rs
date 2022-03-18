@@ -24,6 +24,7 @@ use stackable_superset_crd::authentication::AuthenticationClass;
 use stackable_superset_crd::{
     druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
 };
+use std::sync::Arc;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -74,34 +75,66 @@ async fn main() -> anyhow::Result<()> {
             ))
             .await?;
 
-            let superset_controller = Controller::new(
+            let superset_controller_builder = Controller::new(
                 watch_namespace.get_api::<SupersetCluster>(&client),
                 ListParams::default(),
-            )
-            .owns(
-                watch_namespace.get_api::<Service>(&client),
-                ListParams::default(),
-            )
-            .owns(
-                watch_namespace.get_api::<StatefulSet>(&client),
-                ListParams::default(),
-            )
-            .shutdown_on_signal()
-            .run(
-                superset_controller::reconcile_superset,
-                superset_controller::error_policy,
-                Context::new(superset_controller::Ctx {
-                    client: client.clone(),
-                    product_config,
-                }),
-            )
-            .map(|res| {
-                report_controller_reconciled(
-                    &client,
-                    "supersetclusters.superset.stackable.tech",
-                    &res,
+            );
+            let superset_store = superset_controller_builder.store();
+            let superset_controller = superset_controller_builder
+                .owns(
+                    watch_namespace.get_api::<Service>(&client),
+                    ListParams::default(),
                 )
-            });
+                .owns(
+                    watch_namespace.get_api::<StatefulSet>(&client),
+                    ListParams::default(),
+                )
+                .shutdown_on_signal()
+                .watches(
+                    watch_namespace.get_api::<AuthenticationClass>(&client),
+                    ListParams::default(),
+                    move |authentication_class| {
+                        superset_store
+                            .state()
+                            .into_iter()
+                            .filter(move |superset: &Arc<SupersetCluster>| {
+                                match &superset.spec.authentication_config {
+                                    Some(authentication_config) => {
+                                        match &authentication_config.methods[..] {
+                                            [authentication_method]
+                                                if &authentication_method.authentication_class
+                                                    == authentication_class
+                                                        .metadata
+                                                        .name
+                                                        .as_ref()
+                                                        .unwrap() =>
+                                            {
+                                                true
+                                            }
+                                            _ => false,
+                                        }
+                                    }
+                                    None => false,
+                                }
+                            })
+                            .map(|superset| ObjectRef::from_obj(&*superset))
+                    },
+                )
+                .run(
+                    superset_controller::reconcile_superset,
+                    superset_controller::error_policy,
+                    Context::new(superset_controller::Ctx {
+                        client: client.clone(),
+                        product_config,
+                    }),
+                )
+                .map(|res| {
+                    report_controller_reconciled(
+                        &client,
+                        "supersetclusters.superset.stackable.tech",
+                        &res,
+                    )
+                });
 
             let superset_db_controller_builder = Controller::new(
                 watch_namespace.get_api::<SupersetDB>(&client),
