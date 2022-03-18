@@ -34,6 +34,7 @@ spec:
                           nullable: true
                           properties:
                             scope:
+                              description: "[Scope](https://docs.stackable.tech/secret-operator/scope.html) of the [SecretClass](https://docs.stackable.tech/secret-operator/secretclass.html)"
                               nullable: true
                               properties:
                                 node:
@@ -49,6 +50,7 @@ spec:
                                   type: array
                               type: object
                             secretClass:
+                              description: "[SecretClass](https://docs.stackable.tech/secret-operator/secretclass.html) containing the LDAP bind credentials"
                               type: string
                           required:
                             - secretClass
@@ -98,6 +100,7 @@ spec:
                             mutualVerification:
                               properties:
                                 secretClass:
+                                  description: "[SecretClass](https://docs.stackable.tech/secret-operator/secretclass.html) which will provide ca.crt, tls.crt and tls.key"
                                   type: string
                               required:
                                 - secretClass
@@ -105,6 +108,7 @@ spec:
                             serverVerification:
                               properties:
                                 serverCaCert:
+                                  description: Ca cert to verify the server
                                   oneOf:
                                     - required:
                                         - configmap

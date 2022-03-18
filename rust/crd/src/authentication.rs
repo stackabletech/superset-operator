@@ -92,7 +92,9 @@ fn default_email_field() -> String {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthenticationClassLdapBindCredentials {
+    /// [SecretClass](https://docs.stackable.tech/secret-operator/secretclass.html) containing the LDAP bind credentials
     pub secret_class: String,
+    /// [Scope](https://docs.stackable.tech/secret-operator/scope.html) of the [SecretClass](https://docs.stackable.tech/secret-operator/secretclass.html)
     pub scope: Option<AuthenticationClassSecretClassScope>,
 }
 
@@ -111,7 +113,7 @@ pub struct AuthenticationClassSecretClassScope {
 #[serde(rename_all = "camelCase")]
 pub enum AuthenticationClassTls {
     // Use TLS but don't verify certificates.
-    // We have to use an empty struct instead of an empty Enum, otherwise we will get invalid CRDs
+    // We have to use an empty struct instead of an empty Enum because of limitations of [kube-rs](https://github.com/kube-rs/kube-rs/)
     Insecure {},
     // Use TLS and ca certificate to verify the server
     ServerVerification(AuthenticationClassTlsServerVerification),
@@ -122,14 +124,14 @@ pub enum AuthenticationClassTls {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthenticationClassTlsServerVerification {
-    // Ca cert to verify the server
+    /// Ca cert to verify the server
     pub server_ca_cert: AuthenticationClassCaCert,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthenticationClassTlsMutualVerification {
-    // SecretClass which will provide ca.crt, tls.crt and tls.key
+    /// [SecretClass](https://docs.stackable.tech/secret-operator/secretclass.html) which will provide ca.crt, tls.crt and tls.key
     pub secret_class: String,
 }
 
