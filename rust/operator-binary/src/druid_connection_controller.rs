@@ -11,7 +11,7 @@ use stackable_operator::{
     kube::{
         core::DynamicObject,
         runtime::{
-            controller::{Context, ReconcilerAction},
+            controller::{Action, Context},
             reflector::ObjectRef,
         },
         ResourceExt,
@@ -95,7 +95,7 @@ impl ReconcilerError for Error {
 pub async fn reconcile_druid_connection(
     druid_connection: Arc<DruidConnection>,
     ctx: Context<Ctx>,
-) -> Result<ReconcilerAction> {
+) -> Result<Action> {
     tracing::info!("Starting reconciling DruidConnections");
 
     let client = &ctx.get_ref().client;
@@ -194,9 +194,7 @@ pub async fn reconcile_druid_connection(
             .context(ApplyStatusSnafu)?;
     }
 
-    Ok(ReconcilerAction {
-        requeue_after: None,
-    })
+    Ok(Action::await_change())
 }
 
 /// Takes a druid cluster name and namespace and returns the SQLAlchemy connect string
@@ -286,8 +284,6 @@ async fn build_import_job(
     Ok(job)
 }
 
-pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(5)),
-    }
+pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> Action {
+    Action::requeue(Duration::from_secs(5))
 }

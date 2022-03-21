@@ -20,7 +20,7 @@ use stackable_operator::{
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
-    kube::runtime::controller::{Context, ReconcilerAction},
+    kube::runtime::controller::{Action, Context},
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
     product_config::{types::PropertyNameKind, ProductConfigManager},
@@ -126,7 +126,7 @@ impl ReconcilerError for Error {
 pub async fn reconcile_superset(
     superset: Arc<SupersetCluster>,
     ctx: Context<Ctx>,
-) -> Result<ReconcilerAction> {
+) -> Result<Action> {
     tracing::info!("Starting reconcile");
 
     let client = &ctx.get_ref().client;
@@ -228,9 +228,7 @@ pub async fn reconcile_superset(
             })?;
     }
 
-    Ok(ReconcilerAction {
-        requeue_after: None,
-    })
+    Ok(Action::await_change())
 }
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
@@ -486,8 +484,6 @@ fn build_server_rolegroup_statefulset(
     })
 }
 
-pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(5)),
-    }
+pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> Action {
+    Action::requeue(Duration::from_secs(5))
 }
