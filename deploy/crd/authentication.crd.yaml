@@ -123,13 +123,13 @@ spec:
                                         - secretClass
                                   properties:
                                     configmap:
-                                      description: Name of the ConfigMap containing the ca cert
+                                      description: "Name of the ConfigMap containing the ca cert. Key must be \"ca.crt\"."
                                       type: string
                                     path:
                                       description: Path to the ca cert
                                       type: string
                                     secret:
-                                      description: Name of the Secret containing the ca cert
+                                      description: "Name of the Secret containing the ca cert. Key must be \"ca.crt\"."
                                       type: string
                                     secretClass:
                                       description: Name of the SecretClass which will provide the ca cert

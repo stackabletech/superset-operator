@@ -138,9 +138,9 @@ pub struct AuthenticationClassTlsMutualVerification {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum AuthenticationClassCaCert {
-    /// Name of the ConfigMap containing the ca cert
+    /// Name of the ConfigMap containing the ca cert. Key must be "ca.crt".
     Configmap(String),
-    /// Name of the Secret containing the ca cert
+    /// Name of the Secret containing the ca cert. Key must be "ca.crt".
     Secret(String),
     /// Path to the ca cert
     Path(String),
