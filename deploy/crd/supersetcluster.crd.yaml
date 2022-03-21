@@ -29,9 +29,10 @@ spec:
                       items:
                         properties:
                           authenticationClass:
+                            description: Name of the AuthenticationClass used to authenticate the users
                             type: string
                           ldapExtras:
-                            description: "Additional configs to LDAP Authentication in Superset. See <https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap>"
+                            description: "Additional LDAP settings. Can only be specified when the specified AuthenticationClass uses the LDAP protocol See [FLASK LDAP documentation](https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap)"
                             nullable: true
                             properties:
                               ldapSearchFilter:

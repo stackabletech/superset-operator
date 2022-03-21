@@ -60,7 +60,11 @@ pub struct SupersetClusterAuthenticationConfig {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClusterAuthenticationConfigMethod {
+    /// Name of the AuthenticationClass used to authenticate the users
     pub authentication_class: String,
+    /// Additional LDAP settings.
+    /// Can only be specified when the specified AuthenticationClass uses the LDAP protocol
+    /// See [FLASK LDAP documentation](https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap)
     pub ldap_extras: Option<SupersetClusterAuthenticationConfigLdapExtras>,
 }
 

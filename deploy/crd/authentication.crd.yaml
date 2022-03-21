@@ -96,8 +96,10 @@ spec:
                                 - mutualVerification
                           properties:
                             insecure:
+                              description: "Use TLS but don't verify certificates. We have to use an empty struct instead of an empty Enum because of limitations of [kube-rs](https://github.com/kube-rs/kube-rs/)"
                               type: object
                             mutualVerification:
+                              description: Use TLS and ca certificate to verify the server and the client
                               properties:
                                 secretClass:
                                   description: "[SecretClass](https://docs.stackable.tech/secret-operator/secretclass.html) which will provide ca.crt, tls.crt and tls.key"
@@ -106,6 +108,7 @@ spec:
                                 - secretClass
                               type: object
                             serverVerification:
+                              description: Use TLS and ca certificate to verify the server
                               properties:
                                 serverCaCert:
                                   description: Ca cert to verify the server
@@ -120,12 +123,16 @@ spec:
                                         - secretClass
                                   properties:
                                     configmap:
+                                      description: Name of the ConfigMap containing the ca cert
                                       type: string
                                     path:
+                                      description: Path to the ca cert
                                       type: string
                                     secret:
+                                      description: Name of the Secret containing the ca cert
                                       type: string
                                     secretClass:
+                                      description: Name of the SecretClass which will provide the ca cert
                                       type: string
                                   type: object
                               required:

@@ -112,12 +112,12 @@ pub struct AuthenticationClassSecretClassScope {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum AuthenticationClassTls {
-    // Use TLS but don't verify certificates.
-    // We have to use an empty struct instead of an empty Enum because of limitations of [kube-rs](https://github.com/kube-rs/kube-rs/)
+    /// Use TLS but don't verify certificates.
+    /// We have to use an empty struct instead of an empty Enum because of limitations of [kube-rs](https://github.com/kube-rs/kube-rs/)
     Insecure {},
-    // Use TLS and ca certificate to verify the server
+    /// Use TLS and ca certificate to verify the server
     ServerVerification(AuthenticationClassTlsServerVerification),
-    // Use TLS and ca certificate to verify the server and the client
+    /// Use TLS and ca certificate to verify the server and the client
     MutualVerification(AuthenticationClassTlsMutualVerification),
 }
 
@@ -138,13 +138,13 @@ pub struct AuthenticationClassTlsMutualVerification {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum AuthenticationClassCaCert {
-    // Name of the ConfigMap containing the ca cert
+    /// Name of the ConfigMap containing the ca cert
     Configmap(String),
-    // Name of the Secret containing the ca cert
+    /// Name of the Secret containing the ca cert
     Secret(String),
-    // Path to the ca cert
+    /// Path to the ca cert
     Path(String),
-    // SecretClass which will provide the ca cert
+    /// Name of the SecretClass which will provide the ca cert
     SecretClass(String),
 }
 
