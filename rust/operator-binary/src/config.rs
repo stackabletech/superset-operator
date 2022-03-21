@@ -87,31 +87,25 @@ AUTH_ROLES_SYNC_AT_LOGIN = {}
             ldap.firstname_field,
             ldap.lastname_field,
             ldap.email_field,
-            if authentication_method
-                .ldap_extras
-                .as_ref()
-                .map(|extra| extra.user_registration)
-                .unwrap_or_else(stackable_superset_crd::default_user_registration)
-            {
-                "True"
-            } else {
-                "False"
-            },
+            to_python_bool(
+                authentication_method
+                    .ldap_extras
+                    .as_ref()
+                    .map(|extra| extra.user_registration)
+                    .unwrap_or_else(stackable_superset_crd::default_user_registration)
+            ),
             authentication_method
                 .ldap_extras
                 .as_ref()
                 .map(|extra| &extra.user_registration_role)
                 .unwrap_or(&stackable_superset_crd::default_user_registration_role()),
-            if authentication_method
-                .ldap_extras
-                .as_ref()
-                .map(|extra| extra.roles_sync_at_login)
-                .unwrap_or_else(stackable_superset_crd::default_roles_sync_at_login)
-            {
-                "True"
-            } else {
-                "False"
-            },
+            to_python_bool(
+                authentication_method
+                    .ldap_extras
+                    .as_ref()
+                    .map(|extra| extra.roles_sync_at_login)
+                    .unwrap_or_else(stackable_superset_crd::default_roles_sync_at_login)
+            ),
         )
         .as_str(),
     );
@@ -204,5 +198,13 @@ AUTH_LDAP_TLS_DEMAND = True
                     .as_str(),
             );
         }
+    }
+}
+
+fn to_python_bool<'a>(value: bool) -> &'a str {
+    if value {
+        "True"
+    } else {
+        "False"
     }
 }
