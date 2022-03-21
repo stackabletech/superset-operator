@@ -9,7 +9,7 @@ use stackable_operator::{
     },
     kube::{
         runtime::{
-            controller::{Context, ReconcilerAction},
+            controller::{Action, Context},
             reflector::ObjectRef,
         },
         ResourceExt,
@@ -66,7 +66,7 @@ impl ReconcilerError for Error {
 pub async fn reconcile_superset_db(
     superset_db: Arc<SupersetDB>,
     ctx: Context<Ctx>,
-) -> Result<ReconcilerAction> {
+) -> Result<Action> {
     tracing::info!("Starting reconcile");
 
     let client = &ctx.get_ref().client;
@@ -141,9 +141,7 @@ pub async fn reconcile_superset_db(
             .context(ApplyStatusSnafu)?;
     }
 
-    Ok(ReconcilerAction {
-        requeue_after: None,
-    })
+    Ok(Action::await_change())
 }
 
 fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
@@ -222,8 +220,6 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
     Ok(job)
 }
 
-pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(5)),
-    }
+pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> Action {
+    Action::requeue(Duration::from_secs(5))
 }
