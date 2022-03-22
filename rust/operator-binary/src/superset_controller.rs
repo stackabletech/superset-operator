@@ -7,6 +7,7 @@ use crate::{
 
 use crate::config::compute_superset_config;
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_commons_crd::authentication::AuthenticationClass;
 use stackable_operator::builder::{
     ConfigMapBuilder, PodSecurityContextBuilder, VolumeBuilder, VolumeMountBuilder,
 };
@@ -28,8 +29,8 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 use stackable_superset_crd::{
-    authentication::AuthenticationClass, supersetdb::SupersetDB, SupersetCluster,
-    SupersetClusterAuthenticationConfigMethod, SupersetConfig, SupersetRole, SUPERSET_CONFIG,
+    supersetdb::SupersetDB, SupersetCluster, SupersetClusterAuthenticationConfigMethod,
+    SupersetConfig, SupersetRole, SUPERSET_CONFIG,
 };
 use std::{
     borrow::Cow,

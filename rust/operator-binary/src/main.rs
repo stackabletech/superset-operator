@@ -6,6 +6,7 @@ mod util;
 
 use clap::Parser;
 use futures::StreamExt;
+use stackable_commons_crd::authentication::AuthenticationClass;
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     k8s_openapi::api::{
@@ -20,7 +21,6 @@ use stackable_operator::{
     },
     logging::controller::report_controller_reconciled,
 };
-use stackable_superset_crd::authentication::AuthenticationClass;
 use stackable_superset_crd::{
     druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
 };

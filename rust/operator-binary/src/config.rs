@@ -1,5 +1,5 @@
 use indoc::{formatdoc, indoc};
-use stackable_superset_crd::authentication::{
+use stackable_commons_crd::authentication::{
     AuthenticationClass, AuthenticationClassCaCert, AuthenticationClassLdap,
     AuthenticationClassProtocol, AuthenticationClassTls,
 };

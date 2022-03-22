@@ -1,4 +1,3 @@
-pub mod authentication;
 pub mod druidconnection;
 pub mod supersetdb;
 

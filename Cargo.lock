@@ -1528,6 +1528,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "stackable-commons-crd"
+version = "0.1.0-nightly"
+source = "git+https://github.com/stackabletech/commons-operator.git#aac2ad94327ebd4b1c1bc7b96decc6333822fed2"
+dependencies = [
+ "serde",
+ "serde_json",
+ "stackable-operator",
+]
+
+[[package]]
 name = "stackable-operator"
 version = "0.15.0"
 source = "git+https://github.com/stackabletech/operator-rs.git?tag=0.15.0#c7c408d476c0b7ba06833c19e5c9d2aefa5875ae"
@@ -1581,6 +1591,7 @@ dependencies = [
  "serde",
  "serde_yaml",
  "snafu",
+ "stackable-commons-crd",
  "stackable-operator",
  "stackable-superset-crd",
  "strum",

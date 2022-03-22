@@ -1,5 +1,4 @@
 use stackable_operator::crd::CustomResourceExt;
-use stackable_superset_crd::authentication::AuthenticationClass;
 use stackable_superset_crd::druidconnection::DruidConnection;
 use stackable_superset_crd::supersetdb::SupersetDB;
 use stackable_superset_crd::SupersetCluster;
@@ -10,5 +9,4 @@ fn main() {
     SupersetCluster::write_yaml_schema("../../deploy/crd/supersetcluster.crd.yaml").unwrap();
     SupersetDB::write_yaml_schema("../../deploy/crd/supersetdb.crd.yaml").unwrap();
     DruidConnection::write_yaml_schema("../../deploy/crd/druidconnection.crd.yaml").unwrap();
-    AuthenticationClass::write_yaml_schema("../../deploy/crd/authentication.crd.yaml").unwrap();
 }
