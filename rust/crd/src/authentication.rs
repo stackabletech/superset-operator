@@ -115,6 +115,9 @@ pub enum AuthenticationClassTls {
     /// Use TLS but don't verify certificates.
     /// We have to use an empty struct instead of an empty Enum because of limitations of [kube-rs](https://github.com/kube-rs/kube-rs/)
     Insecure {},
+    /// Use TLS and the ca certificates provided by the system - in this case the Docker image - to verify the server.
+    /// This can be useful when you e.g. use public AWS S3 or other public available services.
+    SystemProvided {},
     /// Use TLS and ca certificate to verify the server
     ServerVerification(AuthenticationClassTlsServerVerification),
     /// Use TLS and ca certificate to verify the server and the client
@@ -178,7 +181,8 @@ impl AuthenticationClass {
 
                 if let Some(tls) = &ldap.tls {
                     match tls {
-                        AuthenticationClassTls::Insecure {} => {}
+                        AuthenticationClassTls::Insecure {}
+                        | AuthenticationClassTls::SystemProvided {} => {}
                         AuthenticationClassTls::ServerVerification(
                             AuthenticationClassTlsServerVerification { server_ca_cert },
                         ) => {

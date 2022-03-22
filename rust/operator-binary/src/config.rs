@@ -126,6 +126,13 @@ fn append_ldap_config(
             "#}
             );
         }
+        Some(AuthenticationClassTls::SystemProvided {}) => {
+            config.push_str(indoc! {r#"
+                AUTH_LDAP_USE_TLS = False # Strangely we don't want True here because it will use TLS and we need to use SSL.
+                AUTH_LDAP_ALLOW_SELF_SIGNED = False
+            "#}
+            );
+        }
         Some(AuthenticationClassTls::ServerVerification(server_verification)) => {
             append_server_ca_cert(
                 config,

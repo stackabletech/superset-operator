@@ -91,6 +91,8 @@ spec:
                             - required:
                                 - insecure
                             - required:
+                                - systemProvided
+                            - required:
                                 - serverVerification
                             - required:
                                 - mutualVerification
@@ -137,6 +139,9 @@ spec:
                                   type: object
                               required:
                                 - serverCaCert
+                              type: object
+                            systemProvided:
+                              description: Use TLS and the ca certificates provided by the system - in this case the Docker image - to verify the server. This can be useful when you e.g. use public AWS S3 or other public available services.
                               type: object
                           type: object
                         uidField:
