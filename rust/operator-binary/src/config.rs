@@ -64,6 +64,7 @@ fn append_ldap_config(
                 AUTH_LDAP_SERVER = "{}{}:{}"
 
                 AUTH_LDAP_SEARCH = "{}"
+                AUTH_LDAP_SEARCH_FILTER = "{}"
                 AUTH_LDAP_UID_FIELD = "{}"
                 AUTH_LDAP_GROUP_FIELD = "{}"
                 AUTH_LDAP_FIRSTNAME_FIELD = "{}"
@@ -81,6 +82,7 @@ fn append_ldap_config(
             ldap.hostname,
             ldap.port,
             ldap.search_base,
+            ldap.search_filter,
             ldap.uid_field,
             ldap.group_field,
             ldap.firstname_field,

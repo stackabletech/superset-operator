@@ -84,6 +84,10 @@ spec:
                           default: ""
                           description: LDAP search base
                           type: string
+                        searchFilter:
+                          default: ""
+                          description: LDAP query to filter users
+                          type: string
                         tls:
                           description: Use a TLS connection. If not specified no TLS will be used
                           nullable: true

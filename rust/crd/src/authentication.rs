@@ -44,6 +44,9 @@ pub struct AuthenticationClassLdap {
     /// LDAP search base
     #[serde(default)]
     pub search_base: String,
+    /// LDAP query to filter users
+    #[serde(default)]
+    pub search_filter: String,
     /// The name of the username field
     #[serde(default = "default_uid_field")]
     pub uid_field: String,
