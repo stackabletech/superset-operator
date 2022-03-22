@@ -47,11 +47,10 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => println!(
-            "{}{}{}{}",
+            "{}{}{}",
             serde_yaml::to_string(&SupersetCluster::crd())?,
             serde_yaml::to_string(&SupersetDB::crd())?,
             serde_yaml::to_string(&DruidConnection::crd())?,
-            serde_yaml::to_string(&AuthenticationClass::crd())?,
         ),
         Command::Run(ProductOperatorRun {
             product_config,
