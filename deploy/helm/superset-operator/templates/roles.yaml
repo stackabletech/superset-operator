@@ -107,3 +107,5 @@ rules:
       - authenticationclasses
     verbs:
       - get
+      - list
+      - watch
