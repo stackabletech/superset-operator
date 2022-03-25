@@ -1192,7 +1192,7 @@ dependencies = [
 [[package]]
 name = "product-config"
 version = "0.3.1"
-source = "git+https://github.com/stackabletech/product-config.git?tag=0.3.1#40c93e5283beef100c9fecdb6368f1e1480db3e8"
+source = "git+https://github.com//stackabletech/product-config.git?branch=flask_app_config_writer#c70afb92515f1b46504db5fc62f00be62ba5a521"
 dependencies = [
  "fancy-regex",
  "java-properties",

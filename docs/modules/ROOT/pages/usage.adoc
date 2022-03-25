@@ -65,7 +65,7 @@ spec:
     roleGroups:
       default:
         config:
-
+          rowLimit: 10000
 ----
 
 `metadata.name` contains the name of the Superset cluster.
@@ -77,6 +77,8 @@ The label of the Docker image provided by Stackable must be set in `spec.version
 The previously created secret must be referenced in `spec.credentialsSecret`.
 
 The `spec.loadExamplesOnInit` key is optional and defaults to `false`, it can be set to `true` to load example data into superset when the database is initialized.
+
+The `rowLimit` configuration option defines the row limit when requesting chart data.
 
 === Initialization of the Superset database
 
@@ -140,3 +142,92 @@ image::superset-databases.png[Superset databases showing the connected Druid clu
 
 The managed Superset instances are automatically configured to export Prometheus metrics. See
 xref:home::monitoring.adoc[] for more details.
+
+== Configuration & Environment Overrides
+
+The cluster definition also supports overriding configuration properties and environment variables,
+either per role or per role group, where the more specific override (role group) has precedence over
+the less specific one (role).
+
+IMPORTANT: Overriding certain properties which are set by the operator (such as the `STATS_LOGGER`)
+can interfere with the operator and can lead to problems.
+
+=== Configuration Properties
+
+For a role or role group, at the same level of `config`, you can specify `configOverrides` for the
+`superset_config.py`. For example, if you want to set the CSV export encoding and the preferred
+databases adapt the `nodes` section of the cluster resource like so:
+
+[source,yaml]
+----
+nodes:
+  roleGroups:
+    default:
+      config: {}
+      configOverrides:
+        superset_config.py:
+          CSV_EXPORT: "{'encoding': 'utf-8'}"
+          PREFERRED_DATABASES: |-
+            [
+                'PostgreSQL',
+                'Presto',
+                'MySQL',
+                'SQLite',
+                # etc.
+            ]
+----
+
+Just as for the `config`, it is possible to specify this at the role level as well:
+
+[source,yaml]
+----
+nodes:
+  configOverrides:
+    superset_config.py:
+      CSV_EXPORT: "{'encoding': 'utf-8'}"
+      PREFERRED_DATABASES: |-
+        [
+            'PostgreSQL',
+            'Presto',
+            'MySQL',
+            'SQLite',
+            # etc.
+        ]
+  roleGroups:
+    default:
+      config: {}
+----
+
+All override property values must be strings. They are treated as Python expressions. So care must
+be taken to not produce an invalid configuration.
+
+For a full list of configuration options we refer to the
+https://github.com/apache/superset/blob/master/superset/config.py[main config file for Superset].
+
+=== Environment Variables
+
+In a similar fashion, environment variables can be (over)written. For example per role group:
+
+[source,yaml]
+----
+nodes:
+  roleGroups:
+    default:
+      config: {}
+      envOverrides:
+        FLASK_ENV: development
+----
+
+or per role:
+
+[source,yaml]
+----
+nodes:
+  envOverrides:
+    FLASK_ENV: development
+  roleGroups:
+    default:
+      config: {}
+----
+
+// cliOverrides don't make sense for this operator, so the feature is omitted for now

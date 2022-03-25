@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- Configuration option `rowLimit` added ([#173]).
+- Configuration and environment overrides enabled ([#173]).
+
+[#173]: https://github.com/stackabletech/superset-operator/pull/173
+
 ## [0.4.0] - 2022-04-05
 
 ### Added
