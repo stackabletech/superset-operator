@@ -85,10 +85,6 @@ pub struct SupersetClusterAuthenticationConfigLdapExtras {
     /// mapped to AUTH_ROLES_SYNC_AT_LOGIN
     #[serde(default = "default_roles_sync_at_login")]
     pub roles_sync_at_login: bool,
-
-    /// You can limit the LDAP search scope
-    /// mapped to AUTH_LDAP_SEARCH_FILTER
-    pub ldap_search_filter: Option<String>,
 }
 
 pub fn default_user_registration() -> bool {
