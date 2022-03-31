@@ -7,11 +7,16 @@ use crate::{
 
 use crate::config::compute_superset_config;
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_commons_crd::authentication::AuthenticationClass;
+use stackable_commons_crd::authentication::{AuthenticationClass, AuthenticationClassProvider};
+use stackable_commons_crd::tls::{CaCert, TlsVerification};
+use stackable_commons_crd::SecretClassVolumeScope;
 use stackable_operator::builder::{
-    ConfigMapBuilder, PodSecurityContextBuilder, VolumeBuilder, VolumeMountBuilder,
+    ConfigMapBuilder, PodSecurityContextBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
+    VolumeMountBuilder,
 };
-use stackable_operator::k8s_openapi::api::core::v1::ConfigMap;
+use stackable_operator::k8s_openapi::api::core::v1::{
+    CSIVolumeSource, ConfigMap, Volume, VolumeMount,
+};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     k8s_openapi::{
@@ -418,7 +423,11 @@ fn build_server_rolegroup_statefulset(
     let mut volume_mounts = vec![VolumeMountBuilder::new("config", "/app/pythonpath/").build()];
 
     if let Some(authentication_class) = authentication_class {
-        authentication_class.append_volumes_and_volume_mounts(&mut volumes, &mut volume_mounts);
+        append_authentication_volumes_and_volume_mounts(
+            authentication_class,
+            &mut volumes,
+            &mut volume_mounts,
+        );
     }
 
     let container = ContainerBuilder::new("superset")
@@ -487,4 +496,110 @@ fn build_server_rolegroup_statefulset(
 
 pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
+}
+
+pub fn append_authentication_volumes_and_volume_mounts(
+    authentication_class: &AuthenticationClass,
+    volumes: &mut Vec<Volume>,
+    volume_mounts: &mut Vec<VolumeMount>,
+) {
+    let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
+
+    match &authentication_class.spec.provider {
+        AuthenticationClassProvider::Ldap(ldap) => {
+            if let Some(bind_credentials) = &ldap.bind_credentials {
+                let volume_name = format!("{authentication_class_name}-bind-credentials");
+                let volume_mount_path = format!("/secrets/{volume_name}");
+                volumes.push(
+                    VolumeBuilder::new(&volume_name)
+                        .csi(build_secret_operator_volume(
+                            &bind_credentials.secret_class,
+                            &bind_credentials.scope,
+                        ))
+                        .build(),
+                );
+                volume_mounts.push(
+                    VolumeMountBuilder::new(&volume_name, volume_mount_path)
+                        .read_only(true)
+                        .build(),
+                );
+            }
+
+            if let Some(tls) = &ldap.tls {
+                match &tls.verification {
+                    TlsVerification::None {} => {}
+                    TlsVerification::Server(server_verification) => {
+                        match &server_verification.ca_cert {
+                            CaCert::WebPki {} => {}
+                            CaCert::SecretClass(secret_class_nane) => {
+                                append_certificate_secret_class(
+                                    volumes,
+                                    volume_mounts,
+                                    authentication_class_name,
+                                    secret_class_nane,
+                                );
+                            }
+                        }
+                    }
+                    TlsVerification::Mutual(mutual_verification) => {
+                        append_certificate_secret_class(
+                            volumes,
+                            volume_mounts,
+                            authentication_class_name,
+                            &mutual_verification.cert_secret_class,
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn append_certificate_secret_class(
+    volumes: &mut Vec<Volume>,
+    volume_mounts: &mut Vec<VolumeMount>,
+    authentication_class_name: &str,
+    secret_class_name: &str,
+) {
+    let volume_name = format!("{authentication_class_name}-tls-certificate");
+    let volume_mount_path = format!("/certificates/{volume_name}");
+
+    // We add a SecretClass Volume here to get the ca.crt, tls.crt and tls.key of the underlying SecretClass.
+    // The tls.crt and tls.key will only be used when we use the AuthenticationClassTls::MutualVerification
+    volumes.push(
+        VolumeBuilder::new(&volume_name)
+            .csi(
+                SecretOperatorVolumeSourceBuilder::new(secret_class_name)
+                    .with_pod_scope()
+                    .build(),
+            )
+            .build(),
+    );
+    volume_mounts.push(
+        VolumeMountBuilder::new(&volume_name, volume_mount_path)
+            .read_only(true)
+            .build(),
+    );
+}
+
+fn build_secret_operator_volume(
+    secret_class_name: &str,
+    scope: &Option<SecretClassVolumeScope>,
+) -> CSIVolumeSource {
+    let mut secret_operator_volume_builder =
+        SecretOperatorVolumeSourceBuilder::new(secret_class_name);
+
+    if let Some(scope) = scope {
+        if scope.pod {
+            secret_operator_volume_builder.with_pod_scope();
+        }
+        if scope.node {
+            secret_operator_volume_builder.with_node_scope();
+        }
+        for service in &scope.services {
+            secret_operator_volume_builder.with_service_scope(service);
+        }
+    }
+
+    secret_operator_volume_builder.build()
 }

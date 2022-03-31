@@ -1530,7 +1530,7 @@ dependencies = [
 [[package]]
 name = "stackable-commons-crd"
 version = "0.1.0-nightly"
-source = "git+https://github.com/stackabletech/commons-operator.git?branch=feature/authN#b7ca4086bb01de172b7754818ab5c5d89a982696"
+source = "git+https://github.com/stackabletech/commons-operator.git?branch=fix-tls-verification-visibility#2d8a7a1a212ea54b515e3bd121bd12592a846a96"
 dependencies = [
  "serde",
  "serde_json",

@@ -1,8 +1,8 @@
 use indoc::{formatdoc, indoc};
 use stackable_commons_crd::authentication::{
-    AuthenticationClass, AuthenticationClassCaCert, AuthenticationClassLdap,
-    AuthenticationClassProtocol, AuthenticationClassTls,
+    AuthenticationClass, AuthenticationClassProvider, LdapAuthenticationProvider,
 };
+use stackable_commons_crd::tls::{CaCert, TlsVerification};
 use stackable_superset_crd::SupersetClusterAuthenticationConfigMethod;
 
 pub fn compute_superset_config(
@@ -43,8 +43,8 @@ fn append_authentication_config(
     authentication_method: &SupersetClusterAuthenticationConfigMethod,
     authentication_class: &AuthenticationClass,
 ) {
-    match &authentication_class.spec.protocol {
-        AuthenticationClassProtocol::Ldap(ldap) => {
+    match &authentication_class.spec.provider {
+        AuthenticationClassProvider::Ldap(ldap) => {
             append_ldap_config(config, authentication_method, ldap);
         }
     }
@@ -53,7 +53,7 @@ fn append_authentication_config(
 fn append_ldap_config(
     config: &mut String,
     authentication_method: &SupersetClusterAuthenticationConfigMethod,
-    ldap: &AuthenticationClassLdap,
+    ldap: &LdapAuthenticationProvider,
 ) {
     let authentication_class_name = &authentication_method.authentication_class;
 
@@ -80,14 +80,14 @@ fn append_ldap_config(
                 Some(_) => "ldaps://",
             },
             ldap.hostname,
-            ldap.port,
+            ldap.port.unwrap_or_else(|| ldap.default_port()),
             ldap.search_base,
             ldap.search_filter,
-            ldap.uid_field,
-            ldap.group_field,
-            ldap.firstname_field,
-            ldap.lastname_field,
-            ldap.email_field,
+            ldap.ldap_field_names.uid,
+            ldap.ldap_field_names.group,
+            ldap.ldap_field_names.given_name,
+            ldap.ldap_field_names.surname,
+            ldap.ldap_field_names.email,
             to_python_bool(
                 authentication_method
                     .ldap_extras
@@ -121,41 +121,34 @@ fn append_ldap_config(
     // app.config.setdefault("AUTH_LDAP_TLS_KEYFILE", "")
     match &ldap.tls {
         None => config.push_str("AUTH_LDAP_USE_TLS = False\n"),
-        Some(AuthenticationClassTls::Insecure {}) => {
-            config.push_str(indoc! {r#"
-                AUTH_LDAP_USE_TLS = False # Strangely we don't want True here because it will use TLS and we need to use SSL.
-                AUTH_LDAP_ALLOW_SELF_SIGNED = True
-            "#}
-            );
-        }
-        Some(AuthenticationClassTls::SystemProvided {}) => {
-            config.push_str(indoc! {r#"
-                AUTH_LDAP_USE_TLS = False # Strangely we don't want True here because it will use TLS and we need to use SSL.
-                AUTH_LDAP_ALLOW_SELF_SIGNED = False
-            "#}
-            );
-        }
-        Some(AuthenticationClassTls::ServerVerification(server_verification)) => {
-            append_server_ca_cert(
-                config,
-                authentication_class_name,
-                &server_verification.server_ca_cert,
-            );
-        }
-        Some(AuthenticationClassTls::MutualVerification(mutual_verification)) => {
-            append_server_ca_cert(
-                config,
-                authentication_class_name,
-                &AuthenticationClassCaCert::SecretClass(
-                    mutual_verification.secret_class.to_string(),
-                ),
-            );
-            config.push_str(formatdoc! {r#"
+        Some(tls) => match &tls.verification {
+            TlsVerification::None {} => {
+                config.push_str(indoc! {r#"
+                    AUTH_LDAP_USE_TLS = False # Strangely we don't want True here because it will use TLS and we need to use SSL.
+                    AUTH_LDAP_ALLOW_SELF_SIGNED = True
+                "#}
+                );
+            }
+            TlsVerification::Server(server_verification) => {
+                append_server_ca_cert(
+                    config,
+                    authentication_class_name,
+                    &server_verification.ca_cert,
+                );
+            }
+            TlsVerification::Mutual(mutual_verification) => {
+                append_server_ca_cert(
+                    config,
+                    authentication_class_name,
+                    &CaCert::SecretClass(mutual_verification.cert_secret_class.to_string()),
+                );
+                config.push_str(formatdoc! {r#"
                     AUTH_LDAP_TLS_CERTFILE = "/certificates/{authentication_class_name}-tls-certificate/tls.crt"
                     AUTH_LDAP_TLS_KEYFILE = "/certificates/{authentication_class_name}-tls-certificate/tls.key"
                 "#}
                 .as_str());
-        }
+            }
+        },
     }
 
     if ldap.bind_credentials.is_some() {
@@ -172,7 +165,7 @@ fn append_ldap_config(
 fn append_server_ca_cert(
     config: &mut String,
     authentication_class_name: &str,
-    server_ca_cert: &AuthenticationClassCaCert,
+    server_ca_cert: &CaCert,
 ) {
     config.push_str(
         indoc! {r#"
@@ -182,14 +175,10 @@ fn append_server_ca_cert(
         "#},
     );
     match server_ca_cert {
-        AuthenticationClassCaCert::Path(path) => {
-            config.push_str(format!("AUTH_LDAP_TLS_CACERTFILE = \"{}\"\n", path).as_str());
-        }
-        AuthenticationClassCaCert::Configmap(_)
-        | AuthenticationClassCaCert::Secret(_)
-        | AuthenticationClassCaCert::SecretClass(_) => {
+        CaCert::SecretClass(..) => {
             config.push_str(format!("AUTH_LDAP_TLS_CACERTFILE = \"/certificates/{authentication_class_name}-tls-certificate/ca.crt\"\n").as_str());
         }
+        CaCert::WebPki {} => {}
     }
 }
 
