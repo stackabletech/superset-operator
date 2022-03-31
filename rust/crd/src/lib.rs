@@ -63,7 +63,7 @@ pub struct SupersetClusterAuthenticationConfigMethod {
     pub authentication_class: String,
     /// Additional LDAP settings.
     /// Can only be specified when the specified AuthenticationClass uses the LDAP protocol
-    /// See [FLASK LDAP documentation](https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap)
+    /// See [Flask LDAP documentation](https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap)
     pub ldap_extras: Option<SupersetClusterAuthenticationConfigLdapExtras>,
 }
 
