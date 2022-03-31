@@ -71,18 +71,18 @@ pub struct SupersetClusterAuthenticationConfigMethod {
 #[serde(rename_all = "camelCase")]
 /// Additional configs to LDAP Authentication in Superset. See <https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap>
 pub struct SupersetClusterAuthenticationConfigLdapExtras {
-    /// Allow users who are not already in the FAB DB
-    /// mapped to AUTH_USER_REGISTRATION
+    /// Allow users who are not already in the FAB DB.
+    /// Gets mapped to AUTH_USER_REGISTRATION
     #[serde(default = "default_user_registration")]
     pub user_registration: bool,
 
-    /// This role will be given in addition to any AUTH_ROLES_MAPPING
-    /// mapped to AUTH_USER_REGISTRATION_ROLE
+    /// This role will be given in addition to any AUTH_ROLES_MAPPING.
+    /// Gets mapped to AUTH_USER_REGISTRATION_ROLE
     #[serde(default = "default_user_registration_role")]
     pub user_registration_role: String,
 
-    /// If we should replace ALL the user's roles each login, or only on registration
-    /// mapped to AUTH_ROLES_SYNC_AT_LOGIN
+    /// If we should replace ALL the user's roles each login, or only on registration.
+    /// Gets mapped to AUTH_ROLES_SYNC_AT_LOGIN
     #[serde(default = "default_roles_sync_at_login")]
     pub roles_sync_at_login: bool,
 }
