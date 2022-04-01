@@ -10,12 +10,11 @@ helm template --output-dir "$tmp" \
               --name-template superset-operator \
               deploy/helm/superset-operator
 
-while IFS= read -r -d '' file
-do
-    yq eval -i 'del(.. | select(has("app.kubernetes.io/managed-by")) | ."app.kubernetes.io/managed-by")' /dev/stdin < "$file"
-    yq eval -i 'del(.. | select(has("helm.sh/chart")) | ."helm.sh/chart")' /dev/stdin < "$file"
-    sed -i '/# Source: .*/d' "$file"
-done <   <(find "$tmp" -type f)
+for file in "$tmp"/superset-operator/*/*; do
+  yq eval -i 'del(.. | select(has("app.kubernetes.io/managed-by")) | ."app.kubernetes.io/managed-by")' /dev/stdin < "$file"
+  yq eval -i 'del(.. | select(has("helm.sh/chart")) | ."helm.sh/chart")' /dev/stdin < "$file"
+  sed -i '/# Source: .*/d' "$file"
+done
 
 cp -r "$tmp"/superset-operator/*/* deploy/manifests/
 
