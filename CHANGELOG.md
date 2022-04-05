@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2022-04-05
+
 ### Added
 
 - Reconciliation errors are now reported as Kubernetes events ([#132]).
