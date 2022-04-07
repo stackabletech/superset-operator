@@ -26,7 +26,10 @@ use stackable_operator::{
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
-    kube::runtime::controller::{Action, Context},
+    kube::runtime::{
+        controller::{Action, Context},
+        reflector::ObjectRef,
+    },
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
     product_config::{types::PropertyNameKind, ProductConfigManager},
@@ -109,10 +112,10 @@ pub enum Error {
     },
     #[snafu(display("Superset only supports a single authentication method"))]
     MultipleAuthenticationMethods,
-    #[snafu(display("failed to retrieve authentication class {}", authentication_class))]
+    #[snafu(display("failed to retrieve {}", authentication_class))]
     AuthenticationClassRetrieval {
         source: stackable_operator::error::Error,
-        authentication_class: String,
+        authentication_class: ObjectRef<AuthenticationClass>,
     },
     #[snafu(display("failed to build ConfigMap for {}", rolegroup))]
     BuildRoleGroupConfig {
@@ -193,7 +196,9 @@ pub async fn reconcile_superset(
                     .get::<AuthenticationClass>(&authentication_method.authentication_class, None) // AuthenticationClass has ClusterScope
                     .await
                     .context(AuthenticationClassRetrievalSnafu {
-                        authentication_class: &authentication_method.authentication_class,
+                        authentication_class: ObjectRef::<AuthenticationClass>::new(
+                            &authentication_method.authentication_class,
+                        ),
                     })?;
                 (Some(authentication_method), Some(authentication_class))
             }
