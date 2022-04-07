@@ -3,7 +3,7 @@ use stackable_commons_crd::authentication::{
     AuthenticationClass, AuthenticationClassProvider, LdapAuthenticationProvider,
 };
 use stackable_commons_crd::tls::{CaCert, TlsVerification};
-use stackable_superset_crd::SupersetClusterAuthenticationConfigMethod;
+use stackable_superset_crd::{LdapRolesSyncMoment, SupersetClusterAuthenticationConfigMethod};
 
 pub fn compute_superset_config(
     authentication_method: &Option<&SupersetClusterAuthenticationConfigMethod>,
@@ -104,21 +104,15 @@ fn append_ldap_config(
                 authentication_method
                     .ldap_extras
                     .as_ref()
-                    .map(|extra| extra.roles_sync_at_login)
-                    .unwrap_or_else(stackable_superset_crd::default_roles_sync_at_login)
+                    .map(|extra| &extra.sync_roles_at)
+                    .unwrap_or(&stackable_superset_crd::default_sync_roles_at())
+                == &LdapRolesSyncMoment::Login
             ),
         }
         .as_str(),
     );
 
-    // Possible TLS options, see https://github.com/dpgaspar/Flask-AppBuilder/blob/master/flask_appbuilder/security/manager.py
-    // app.config.setdefault("AUTH_LDAP_USE_TLS", False)
-    // app.config.setdefault("AUTH_LDAP_ALLOW_SELF_SIGNED", False)
-    // app.config.setdefault("AUTH_LDAP_TLS_DEMAND", False)
-    // app.config.setdefault("AUTH_LDAP_TLS_CACERTDIR", "")
-    // app.config.setdefault("AUTH_LDAP_TLS_CACERTFILE", "")
-    // app.config.setdefault("AUTH_LDAP_TLS_CERTFILE", "")
-    // app.config.setdefault("AUTH_LDAP_TLS_KEYFILE", "")
+    // Possible TLS options, see https://github.com/dpgaspar/Flask-AppBuilder/blob/f6f66fc1bcc0163a213e4a2e6f960e91082d201f/flask_appbuilder/security/manager.py#L243-L250
     match &ldap.tls {
         None => config.push_str("AUTH_LDAP_USE_TLS = False\n"),
         Some(tls) => match &tls.verification {
@@ -180,7 +174,7 @@ fn append_server_ca_cert(
     }
 }
 
-fn to_python_bool<'a>(value: bool) -> &'a str {
+fn to_python_bool(value: bool) -> &'static str {
     if value {
         "True"
     } else {

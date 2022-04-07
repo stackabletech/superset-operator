@@ -83,8 +83,8 @@ pub struct SupersetClusterAuthenticationConfigLdapExtras {
 
     /// If we should replace ALL the user's roles each login, or only on registration.
     /// Gets mapped to AUTH_ROLES_SYNC_AT_LOGIN
-    #[serde(default = "default_roles_sync_at_login")]
-    pub roles_sync_at_login: bool,
+    #[serde(default = "default_sync_roles_at")]
+    pub sync_roles_at: LdapRolesSyncMoment,
 }
 
 pub fn default_user_registration() -> bool {
@@ -95,8 +95,16 @@ pub fn default_user_registration_role() -> String {
     "Public".to_string()
 }
 
-pub fn default_roles_sync_at_login() -> bool {
-    true
+/// Matches FLASKs default mode of syncing at registration
+pub fn default_sync_roles_at() -> LdapRolesSyncMoment {
+    LdapRolesSyncMoment::Registration
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LdapRolesSyncMoment {
+    Registration,
+    Login,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]

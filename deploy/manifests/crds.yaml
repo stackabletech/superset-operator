@@ -39,10 +39,13 @@ spec:
                             description: "Additional LDAP settings. Can only be specified when the specified AuthenticationClass uses the LDAP protocol See [Flask LDAP documentation](https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap)"
                             nullable: true
                             properties:
-                              rolesSyncAtLogin:
-                                default: true
+                              syncRolesAt:
+                                default: registration
                                 description: "If we should replace ALL the user's roles each login, or only on registration. Gets mapped to AUTH_ROLES_SYNC_AT_LOGIN"
-                                type: boolean
+                                enum:
+                                  - registration
+                                  - login
+                                type: string
                               userRegistration:
                                 default: true
                                 description: Allow users who are not already in the FAB DB. Gets mapped to AUTH_USER_REGISTRATION

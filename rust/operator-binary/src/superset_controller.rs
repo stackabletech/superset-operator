@@ -107,7 +107,7 @@ pub enum Error {
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("superset only supports a single authentication method"))]
+    #[snafu(display("Superset only supports a single authentication method"))]
     MultipleAuthenticationMethods,
     #[snafu(display("failed to retrieve authentication class {}", authentication_class))]
     AuthenticationClassRetrieval {
