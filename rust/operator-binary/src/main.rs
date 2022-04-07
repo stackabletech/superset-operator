@@ -23,6 +23,7 @@ use stackable_operator::{
 };
 use stackable_superset_crd::{
     druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
+    SupersetClusterAuthenticationConfig,
 };
 use std::sync::Arc;
 
@@ -97,20 +98,10 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |superset: &Arc<SupersetCluster>| {
-                                match &superset.spec.authentication_config {
-                                    Some(authentication_config) => authentication_config
-                                        .methods
-                                        .iter()
-                                        .any(|authentication_method| {
-                                            &authentication_method.authentication_class
-                                                == authentication_class
-                                                    .metadata
-                                                    .name
-                                                    .as_ref()
-                                                    .unwrap()
-                                        }),
-                                    None => false,
-                                }
+                                references_authentication_class(
+                                    &superset.spec.authentication_config,
+                                    &authentication_class,
+                                )
                             })
                             .map(|superset| ObjectRef::from_obj(&*superset))
                     },
@@ -254,4 +245,22 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn references_authentication_class(
+    authentication_config: &Option<SupersetClusterAuthenticationConfig>,
+    authentication_class: &AuthenticationClass,
+) -> bool {
+    match authentication_config {
+        Some(authentication_config) => {
+            authentication_config
+                .methods
+                .iter()
+                .any(|authentication_method| {
+                    &authentication_method.authentication_class
+                        == authentication_class.metadata.name.as_ref().unwrap()
+                })
+        }
+        None => false,
+    }
 }
