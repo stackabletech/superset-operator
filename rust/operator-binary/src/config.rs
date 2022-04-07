@@ -61,46 +61,46 @@ fn append_ldap_config(
         formatdoc! {r#"
                 # Authentication configs
                 AUTH_TYPE = AUTH_LDAP
-                AUTH_LDAP_SERVER = "{}{}:{}"
+                AUTH_LDAP_SERVER = "{protocol}{server_hostname}:{server_port}"
 
-                AUTH_LDAP_SEARCH = "{}"
-                AUTH_LDAP_SEARCH_FILTER = "{}"
-                AUTH_LDAP_UID_FIELD = "{}"
-                AUTH_LDAP_GROUP_FIELD = "{}"
-                AUTH_LDAP_FIRSTNAME_FIELD = "{}"
-                AUTH_LDAP_LASTNAME_FIELD = "{}"
-                AUTH_LDAP_EMAIL_FIELD = "{}"
+                AUTH_LDAP_SEARCH = "{search}"
+                AUTH_LDAP_SEARCH_FILTER = "{search_filter}"
+                AUTH_LDAP_UID_FIELD = "{uid_field}"
+                AUTH_LDAP_GROUP_FIELD = "{group_field}"
+                AUTH_LDAP_FIRSTNAME_FIELD = "{firstname_field}"
+                AUTH_LDAP_LASTNAME_FIELD = "{lastname_field}"
+                AUTH_LDAP_EMAIL_FIELD = "{email_field}"
 
-                AUTH_USER_REGISTRATION = "{}"
-                AUTH_USER_REGISTRATION_ROLE = "{}"
-                AUTH_ROLES_SYNC_AT_LOGIN = "{}"
+                AUTH_USER_REGISTRATION = "{user_registration}"
+                AUTH_USER_REGISTRATION_ROLE = "{user_registration_role}"
+                AUTH_ROLES_SYNC_AT_LOGIN = "{roles_sync_at_login}"
             "#,
-            match ldap.tls {
+            protocol = match ldap.tls {
                 None => "ldap://",
                 Some(_) => "ldaps://",
             },
-            ldap.hostname,
-            ldap.port.unwrap_or_else(|| ldap.default_port()),
-            ldap.search_base,
-            ldap.search_filter,
-            ldap.ldap_field_names.uid,
-            ldap.ldap_field_names.group,
-            ldap.ldap_field_names.given_name,
-            ldap.ldap_field_names.surname,
-            ldap.ldap_field_names.email,
-            to_python_bool(
+            server_hostname = ldap.hostname,
+            server_port = ldap.port.unwrap_or_else(|| ldap.default_port()),
+            search = ldap.search_base,
+            search_filter = ldap.search_filter,
+            uid_field = ldap.ldap_field_names.uid,
+            group_field = ldap.ldap_field_names.group,
+            firstname_field = ldap.ldap_field_names.given_name,
+            lastname_field = ldap.ldap_field_names.surname,
+            email_field = ldap.ldap_field_names.email,
+            user_registration = to_python_bool(
                 authentication_method
                     .ldap_extras
                     .as_ref()
                     .map(|extra| extra.user_registration)
                     .unwrap_or_else(stackable_superset_crd::default_user_registration)
             ),
-            authentication_method
+            user_registration_role = authentication_method
                 .ldap_extras
                 .as_ref()
                 .map(|extra| &extra.user_registration_role)
                 .unwrap_or(&stackable_superset_crd::default_user_registration_role()),
-            to_python_bool(
+            roles_sync_at_login = to_python_bool(
                 authentication_method
                     .ldap_extras
                     .as_ref()
