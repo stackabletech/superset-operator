@@ -98,21 +98,17 @@ async fn main() -> anyhow::Result<()> {
                             .into_iter()
                             .filter(move |superset: &Arc<SupersetCluster>| {
                                 match &superset.spec.authentication_config {
-                                    Some(authentication_config) => {
-                                        match &authentication_config.methods[..] {
-                                            [authentication_method]
-                                                if &authentication_method.authentication_class
-                                                    == authentication_class
-                                                        .metadata
-                                                        .name
-                                                        .as_ref()
-                                                        .unwrap() =>
-                                            {
-                                                true
-                                            }
-                                            _ => false,
-                                        }
-                                    }
+                                    Some(authentication_config) => authentication_config
+                                        .methods
+                                        .iter()
+                                        .any(|authentication_method| {
+                                            &authentication_method.authentication_class
+                                                == authentication_class
+                                                    .metadata
+                                                    .name
+                                                    .as_ref()
+                                                    .unwrap()
+                                        }),
                                     None => false,
                                 }
                             })
