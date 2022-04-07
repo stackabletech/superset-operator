@@ -1530,7 +1530,7 @@ dependencies = [
 [[package]]
 name = "stackable-commons-crd"
 version = "0.1.0-nightly"
-source = "git+https://github.com/stackabletech/commons-operator.git?branch=fix-tls-verification-visibility#2d8a7a1a212ea54b515e3bd121bd12592a846a96"
+source = "git+https://github.com/stackabletech/commons-operator.git#67b4e3c26637bd83b85c1baabfd8ccc1d799d955"
 dependencies = [
  "serde",
  "serde_json",

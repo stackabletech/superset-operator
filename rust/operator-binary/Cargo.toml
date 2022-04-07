@@ -17,7 +17,7 @@ serde = "1.0"
 serde_yaml = "0.8"
 snafu = "0.7"
 stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.15.0" }
-stackable-commons-crd = { git = "https://github.com/stackabletech/commons-operator.git", branch = "fix-tls-verification-visibility" } # TODO use tag when available
+stackable-commons-crd = { git = "https://github.com/stackabletech/commons-operator.git" } # TODO use tag when available
 stackable-superset-crd = { path = "../crd" }
 strum = { version = "0.24", features = ["derive"] }
 tokio = { version = "1.17", features = ["macros", "rt-multi-thread"] }
@@ -26,5 +26,5 @@ tracing = "0.1"
 [build-dependencies]
 built = { version =  "0.5", features = ["chrono", "git2"] }
 stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.15.0" }
-stackable-commons-crd = { git = "https://github.com/stackabletech/commons-operator.git", branch = "fix-tls-verification-visibility" } # TODO use tag when available
+stackable-commons-crd = { git = "https://github.com/stackabletech/commons-operator.git" } # TODO use tag when available
 stackable-superset-crd = { path = "../crd" }
