@@ -13,7 +13,7 @@ spec:
   backend:
     autoTls:
       ca:
-#        autoGenerate: true # Needed in a future secret-operator version
+        # autoGenerate: true # Needed in a future secret-operator version
         secret:
           name: openldap-tls-ca
           namespace: default
@@ -56,8 +56,8 @@ spec:
             - name: LDAP_TLS_CA_FILE
               value: /tls/ca.crt
           ports:
-#            - name: ldap
-#              containerPort: 1389
+            # - name: ldap
+            #   containerPort: 1389
             - name: tls-ldap
               containerPort: 1636
           volumeMounts:
@@ -80,9 +80,9 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-#    - name: ldap
-#      port: 1389
-#      targetPort: ldap
+    # - name: ldap
+    #   port: 1389
+    #   targetPort: ldap
     - name: tls-ldap
       port: 1636
       targetPort: tls-ldap
