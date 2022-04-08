@@ -1,0 +1,160 @@
+# helm install --repo https://repo.stackable.tech/repository/helm-stable/ secret-operator secret-operator
+# helm install --repo https://repo.stackable.tech/repository/helm-stable/ commons-operator commons-operator
+# Until commons-operator is available officially: helm install --version 0.1.0-pr11 --repo https://repo.stackable.tech/repository/helm-test/ commons-operator commons-operator
+# helm install --repo https://charts.bitnami.com/bitnami --set auth.username=superset --set auth.password=superset --set auth.database=superset postgresql-superset postgresql
+
+# Log in with user01/user01 or user02/user02
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: openldap-tls
+spec:
+  backend:
+    autoTls:
+      ca:
+#        autoGenerate: true # Needed in a future secret-operator version
+        secret:
+          name: openldap-tls-ca
+          namespace: default
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: openldap
+  labels:
+    app.kubernetes.io/name: openldap
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openldap
+  serviceName: openldap
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openldap
+    spec:
+      containers:
+        - name: openldap
+          image: docker.io/bitnami/openldap:2.5
+          env:
+            - name: LDAP_ADMIN_USERNAME
+              value: admin
+            - name: LDAP_ADMIN_PASSWORD
+              value: admin
+            - name: LDAP_USERS
+              value: user01,user02
+            - name: LDAP_PASSWORDS
+              value: user01,user02
+            - name: LDAP_ENABLE_TLS
+              value: "yes"
+            - name: LDAP_TLS_CERT_FILE
+              value: /tls/tls.crt
+            - name: LDAP_TLS_KEY_FILE
+              value: /tls/tls.key
+            - name: LDAP_TLS_CA_FILE
+              value: /tls/ca.crt
+          ports:
+#            - name: ldap
+#              containerPort: 1389
+            - name: tls-ldap
+              containerPort: 1636
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+      volumes:
+        - name: tls
+          csi:
+            driver: secrets.stackable.tech
+            volumeAttributes:
+              secrets.stackable.tech/class: openldap-tls
+              secrets.stackable.tech/scope: pod
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openldap
+  labels:
+    app.kubernetes.io/name: openldap
+spec:
+  type: ClusterIP
+  ports:
+#    - name: ldap
+#      port: 1389
+#      targetPort: ldap
+    - name: tls-ldap
+      port: 1636
+      targetPort: tls-ldap
+  selector:
+    app.kubernetes.io/name: openldap
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-with-ldap-server-veri-tls-credentials
+type: Opaque
+stringData:
+  adminUser.username: admin
+  adminUser.firstname: Superset
+  adminUser.lastname: Admin
+  adminUser.email: admin@superset.com
+  adminUser.password: admin
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@postgresql-superset.default.svc.cluster.local/superset
+---
+apiVersion: authentication.stackable.tech/v1alpha1
+kind: AuthenticationClass
+metadata:
+  name: superset-with-ldap-server-veri-tls-ldap
+spec:
+  provider:
+    ldap:
+      hostname: openldap.default.svc.cluster.local
+      port: 1636
+      searchBase: ou=users,dc=example,dc=org
+      ldapFieldNames:
+        uid: uid
+      bindCredentials:
+        secretClass: superset-with-ldap-server-veri-tls-ldap-bind
+      tls:
+        verification:
+          server:
+            caCert:
+              secretClass: openldap-tls
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: superset-with-ldap-server-veri-tls-ldap-bind
+spec:
+  backend:
+    k8sSearch:
+      searchNamespace:
+        pod: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-with-ldap-server-veri-tls-ldap-bind
+  labels:
+    secrets.stackable.tech/class: superset-with-ldap-server-veri-tls-ldap-bind
+stringData:
+  user: cn=admin,dc=example,dc=org
+  password: admin
+---
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: superset-with-ldap-server-veri-tls
+spec:
+  version: 1.4.1
+  statsdExporterVersion: v0.22.4
+  credentialsSecret: superset-with-ldap-server-veri-tls-credentials
+  nodes:
+    roleGroups:
+      default:
+        config:
+  authenticationConfig:
+    methods:
+      - authenticationClass: superset-with-ldap-server-veri-tls-ldap
