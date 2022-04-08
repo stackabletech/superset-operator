@@ -71,9 +71,9 @@ fn append_ldap_config(
                 AUTH_LDAP_LASTNAME_FIELD = "{lastname_field}"
                 AUTH_LDAP_EMAIL_FIELD = "{email_field}"
 
-                AUTH_USER_REGISTRATION = "{user_registration}"
+                AUTH_USER_REGISTRATION = {user_registration}
                 AUTH_USER_REGISTRATION_ROLE = "{user_registration_role}"
-                AUTH_ROLES_SYNC_AT_LOGIN = "{roles_sync_at_login}"
+                AUTH_ROLES_SYNC_AT_LOGIN = {roles_sync_at_login}
             "#,
             protocol = match ldap.tls {
                 None => "ldap://",
@@ -118,7 +118,7 @@ fn append_ldap_config(
         Some(tls) => match &tls.verification {
             TlsVerification::None {} => {
                 config.push_str(indoc! {r#"
-                    AUTH_LDAP_USE_TLS = False # Strangely we don't want True here because it will use TLS and we need to use SSL.
+                    AUTH_LDAP_USE_TLS = False # This setting is for STARTTLS which we dont support at the moment, we use dedicated Tls.
                     AUTH_LDAP_ALLOW_SELF_SIGNED = True
                 "#});
             }
@@ -162,7 +162,7 @@ fn append_server_ca_cert(
 ) {
     config.push_str(
         indoc! {r#"
-            AUTH_LDAP_USE_TLS = False # Strangely we don't want True here because it will use TLS and we need to use SSL.
+            AUTH_LDAP_USE_TLS = True # This setting is for STARTTLS which we dont support at the moment, we use dedicated Tls.
             AUTH_LDAP_ALLOW_SELF_SIGNED = False
             AUTH_LDAP_TLS_DEMAND = True
         "#});
