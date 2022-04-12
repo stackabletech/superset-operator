@@ -163,7 +163,7 @@ fn append_server_ca_cert(
 ) {
     config.push_str(
         indoc! {r#"
-            AUTH_LDAP_USE_TLS = True # This setting is for STARTTLS which we dont support at the moment, we use dedicated Tls.
+            AUTH_LDAP_USE_TLS = False # This setting is for STARTTLS which we dont support at the moment, we use dedicated Tls.
             AUTH_LDAP_ALLOW_SELF_SIGNED = False
             AUTH_LDAP_TLS_DEMAND = True
         "#});
