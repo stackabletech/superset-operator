@@ -516,7 +516,7 @@ pub fn append_authentication_volumes_and_volume_mounts(
         AuthenticationClassProvider::Ldap(ldap) => {
             if let Some(bind_credentials) = &ldap.bind_credentials {
                 let volume_name = format!("{authentication_class_name}-bind-credentials");
-                let volume_mount_path = format!("/secrets/{volume_name}");
+                let volume_mount_path = format!("/stackable/secrets/{volume_name}");
                 volumes.push(
                     VolumeBuilder::new(&volume_name)
                         .csi(build_secret_operator_volume(
@@ -569,7 +569,7 @@ fn append_certificate_secret_class(
     secret_class_name: &str,
 ) {
     let volume_name = format!("{authentication_class_name}-tls-certificate");
-    let volume_mount_path = format!("/certificates/{volume_name}");
+    let volume_mount_path = format!("/stackable/certificates/{volume_name}");
 
     // We add a SecretClass Volume here to get the ca.crt, tls.crt and tls.key of the underlying SecretClass.
     // The tls.crt and tls.key will only be used when we use the AuthenticationClassTls::MutualVerification

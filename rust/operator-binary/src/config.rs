@@ -137,8 +137,8 @@ fn append_ldap_config(
                     &CaCert::SecretClass(mutual_verification.cert_secret_class.to_string()),
                 );
                 config.push_str(formatdoc! {r#"
-                    AUTH_LDAP_TLS_CERTFILE = "/certificates/{authentication_class_name}-tls-certificate/tls.crt"
-                    AUTH_LDAP_TLS_KEYFILE = "/certificates/{authentication_class_name}-tls-certificate/tls.key"
+                    AUTH_LDAP_TLS_CERTFILE = "/stackable/certificates/{authentication_class_name}-tls-certificate/tls.crt"
+                    AUTH_LDAP_TLS_KEYFILE = "/stackable/certificates/{authentication_class_name}-tls-certificate/tls.key"
                 "#}
                 .as_str());
             }
@@ -148,8 +148,8 @@ fn append_ldap_config(
     if ldap.bind_credentials.is_some() {
         config.push_str(
         formatdoc! {r#"
-                AUTH_LDAP_BIND_USER = open('/secrets/{authentication_class_name}-bind-credentials/user').read()
-                AUTH_LDAP_BIND_PASSWORD = open('/secrets/{authentication_class_name}-bind-credentials/password').read()
+                AUTH_LDAP_BIND_USER = open('/stackable/secrets/{authentication_class_name}-bind-credentials/user').read()
+                AUTH_LDAP_BIND_PASSWORD = open('/stackable/secrets/{authentication_class_name}-bind-credentials/password').read()
             "#}
             .as_str()
         );
@@ -167,7 +167,7 @@ fn append_server_ca_cert(
         "#});
     match server_ca_cert {
         CaCert::SecretClass(..) => {
-            config.push_str(format!("AUTH_LDAP_TLS_CACERTFILE = \"/certificates/{authentication_class_name}-tls-certificate/ca.crt\"\n").as_str());
+            config.push_str(format!("AUTH_LDAP_TLS_CACERTFILE = \"/stackable/certificates/{authentication_class_name}-tls-certificate/ca.crt\"\n").as_str());
         }
         CaCert::WebPki {} => {}
     }
