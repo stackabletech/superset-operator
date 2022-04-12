@@ -115,11 +115,11 @@ fn append_ldap_config(
 
     // Possible TLS options, see https://github.com/dpgaspar/Flask-AppBuilder/blob/f6f66fc1bcc0163a213e4a2e6f960e91082d201f/flask_appbuilder/security/manager.py#L243-L250
     match &ldap.tls {
-        None => config.push_str("AUTH_LDAP_USE_TLS = False\n"),
+        None => config.push_str("AUTH_LDAP_TLS_DEMAND = False\n"),
         Some(tls) => match &tls.verification {
             TlsVerification::None {} => {
                 config.push_str(indoc! {r#"
-                    AUTH_LDAP_USE_TLS = False # This setting is for STARTTLS which we dont support at the moment, we use dedicated Tls.
+                    AUTH_LDAP_TLS_DEMAND = True
                     AUTH_LDAP_ALLOW_SELF_SIGNED = True
                 "#});
             }
@@ -163,9 +163,8 @@ fn append_server_ca_cert(
 ) {
     config.push_str(
         indoc! {r#"
-            AUTH_LDAP_USE_TLS = False # This setting is for STARTTLS which we dont support at the moment, we use dedicated Tls.
-            AUTH_LDAP_ALLOW_SELF_SIGNED = False
             AUTH_LDAP_TLS_DEMAND = True
+            AUTH_LDAP_ALLOW_SELF_SIGNED = False
         "#});
     match server_ca_cert {
         CaCert::SecretClass(..) => {
