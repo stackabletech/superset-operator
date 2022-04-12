@@ -82,7 +82,7 @@ pub struct SupersetClusterAuthenticationConfigLdapExtras {
     pub user_registration_role: String,
 
     /// If we should replace ALL the user's roles each login, or only on registration.
-    /// Gets mapped to AUTH_ROLES_SYNC_AT_LOGIN
+    /// Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
     #[serde(default = "default_sync_roles_at")]
     pub sync_roles_at: LdapRolesSyncMoment,
 }
