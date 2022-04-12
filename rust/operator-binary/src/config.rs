@@ -161,8 +161,7 @@ fn append_server_ca_cert(
     authentication_class_name: &str,
     server_ca_cert: &CaCert,
 ) {
-    config.push_str(
-        indoc! {r#"
+    config.push_str(indoc! {r#"
             AUTH_LDAP_TLS_DEMAND = True
             AUTH_LDAP_ALLOW_SELF_SIGNED = False
         "#});
