@@ -101,7 +101,7 @@ pub fn default_sync_roles_at() -> LdapRolesSyncMoment {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "PascalCase")]
 pub enum LdapRolesSyncMoment {
     Registration,
     Login,
