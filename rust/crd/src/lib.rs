@@ -95,7 +95,7 @@ pub fn default_user_registration_role() -> String {
     "Public".to_string()
 }
 
-/// Matches FLASKs default mode of syncing at registration
+/// Matches Flask's default mode of syncing at registration
 pub fn default_sync_roles_at() -> LdapRolesSyncMoment {
     LdapRolesSyncMoment::Registration
 }
