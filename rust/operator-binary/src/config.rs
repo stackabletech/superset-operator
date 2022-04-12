@@ -1,8 +1,9 @@
 use indoc::{formatdoc, indoc};
-use stackable_commons_crd::authentication::{
-    AuthenticationClass, AuthenticationClassProvider, LdapAuthenticationProvider,
+use stackable_operator::commons::{
+    authentication::{AuthenticationClass, AuthenticationClassProvider},
+    ldap::LdapAuthenticationProvider,
+    tls::{CaCert, TlsVerification},
 };
-use stackable_commons_crd::tls::{CaCert, TlsVerification};
 use stackable_superset_crd::{LdapRolesSyncMoment, SupersetClusterAuthenticationConfigMethod};
 
 pub fn compute_superset_config(

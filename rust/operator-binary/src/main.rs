@@ -6,9 +6,9 @@ mod util;
 
 use clap::Parser;
 use futures::StreamExt;
-use stackable_commons_crd::authentication::AuthenticationClass;
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
+    commons::authentication::AuthenticationClass,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         batch::v1::Job,

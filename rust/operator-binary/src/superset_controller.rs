@@ -7,22 +7,23 @@ use crate::{
 
 use crate::config::compute_superset_config;
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_commons_crd::authentication::{AuthenticationClass, AuthenticationClassProvider};
-use stackable_commons_crd::tls::{CaCert, TlsVerification};
-use stackable_commons_crd::SecretClassVolumeScope;
-use stackable_operator::builder::{
-    ConfigMapBuilder, PodSecurityContextBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
-    VolumeMountBuilder,
-};
-use stackable_operator::k8s_openapi::api::core::v1::{
-    CSIVolumeSource, ConfigMap, Volume, VolumeMount,
-};
 use stackable_operator::{
-    builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
+    builder::{
+        ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
+        PodSecurityContextBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
+        VolumeMountBuilder,
+    },
+    commons::{
+        authentication::{AuthenticationClass, AuthenticationClassProvider},
+        secret_class::SecretClassVolumeScope,
+        tls::{CaCert, TlsVerification},
+    },
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{Service, ServicePort, ServiceSpec},
+            core::v1::{
+                CSIVolumeSource, ConfigMap, Service, ServicePort, ServiceSpec, Volume, VolumeMount,
+            },
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
