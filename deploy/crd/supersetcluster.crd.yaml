@@ -37,7 +37,7 @@ spec:
                             properties:
                               syncRolesAt:
                                 default: Registration
-                                description: "If we should replace ALL the user's roles each login, or only on registration. Gets mapped to AUTH_ROLES_SYNC_AT_LOGIN"
+                                description: "If we should replace ALL the user's roles each login, or only on registration. Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`"
                                 enum:
                                   - Registration
                                   - Login
