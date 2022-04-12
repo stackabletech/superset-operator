@@ -77,7 +77,7 @@ pub struct SupersetClusterAuthenticationConfigLdapExtras {
     pub user_registration: bool,
 
     /// This role will be given in addition to any AUTH_ROLES_MAPPING.
-    /// Gets mapped to AUTH_USER_REGISTRATION_ROLE
+    /// Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
     #[serde(default = "default_user_registration_role")]
     pub user_registration_role: String,
 
