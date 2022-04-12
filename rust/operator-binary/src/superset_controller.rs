@@ -521,7 +521,7 @@ pub fn append_authentication_volumes_and_volume_mounts(
                     VolumeBuilder::new(&volume_name)
                         .csi(build_secret_operator_volume(
                             &bind_credentials.secret_class,
-                            &bind_credentials.scope,
+                            bind_credentials.scope.as_ref(),
                         ))
                         .build(),
                 );
@@ -591,7 +591,7 @@ fn append_certificate_secret_class(
 
 fn build_secret_operator_volume(
     secret_class_name: &str,
-    scope: &Option<SecretClassVolumeScope>,
+    scope: Option<&SecretClassVolumeScope>,
 ) -> CSIVolumeSource {
     let mut secret_operator_volume_builder =
         SecretOperatorVolumeSourceBuilder::new(secret_class_name);
