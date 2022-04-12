@@ -81,10 +81,10 @@ spec:
   type: ClusterIP
   ports:
     # - name: ldap
-    #   port: 1389
+    #   port: 389
     #   targetPort: ldap
     - name: tls-ldap
-      port: 1636
+      port: 636
       targetPort: tls-ldap
   selector:
     app.kubernetes.io/name: openldap
@@ -111,7 +111,7 @@ spec:
   provider:
     ldap:
       hostname: openldap.default.svc.cluster.local
-      port: 1636
+      port: 636
       searchBase: ou=users,dc=example,dc=org
       ldapFieldNames:
         uid: uid
