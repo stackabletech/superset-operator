@@ -2,17 +2,63 @@ pub mod druidconnection;
 pub mod supersetdb;
 
 use std::collections::BTreeMap;
+use std::num::ParseIntError;
 
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use stackable_operator::kube::runtime::reflector::ObjectRef;
 use stackable_operator::kube::CustomResource;
+use stackable_operator::product_config::flask_app_config_writer::{
+    FlaskAppConfigOptions, PythonType,
+};
 use stackable_operator::product_config_utils::{ConfigError, Configuration};
 use stackable_operator::role_utils::{Role, RoleGroupRef};
 use stackable_operator::schemars::{self, JsonSchema};
-use strum::{Display, EnumIter};
+use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub const APP_NAME: &str = "superset";
 pub const MANAGED_BY: &str = "superset-operator";
+
+pub const PYTHONPATH: &str = "/app/pythonpath";
+pub const SUPERSET_CONFIG_FILENAME: &str = "superset_config.py";
+
+#[derive(Debug, Snafu)]
+pub enum Error {
+    #[snafu(display("invalid int config value"))]
+    InvalidIntConfigValue { source: ParseIntError },
+}
+
+#[derive(Display, EnumIter, EnumString)]
+#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
+pub enum SupersetConfigOptions {
+    SecretKey,
+    SqlalchemyDatabaseUri,
+    StatsLogger,
+    RowLimit,
+}
+
+impl SupersetConfigOptions {
+    /// Mapping from `SupersetConfigOptions` to the values set in `SupersetConfig`.
+    /// `None` is returned if either the according option is not set or is not exposed in the
+    /// `SupersetConfig`.
+    fn config_type_to_string(&self, superset_config: &SupersetConfig) -> Option<String> {
+        match self {
+            SupersetConfigOptions::RowLimit => superset_config.row_limit.map(|v| v.to_string()),
+            _ => None,
+        }
+    }
+}
+
+impl FlaskAppConfigOptions for SupersetConfigOptions {
+    fn python_type(&self) -> PythonType {
+        match self {
+            SupersetConfigOptions::RowLimit => PythonType::IntLiteral,
+            SupersetConfigOptions::SecretKey => PythonType::Expression,
+            SupersetConfigOptions::SqlalchemyDatabaseUri => PythonType::Expression,
+            SupersetConfigOptions::StatsLogger => PythonType::Expression,
+        }
+    }
+}
 
 pub const HTTP_PORT: &str = "http";
 
@@ -82,7 +128,9 @@ pub enum SupersetRole {
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SupersetConfig {}
+pub struct SupersetConfig {
+    pub row_limit: Option<i32>,
+}
 
 impl SupersetConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
@@ -115,9 +163,19 @@ impl Configuration for SupersetConfig {
         &self,
         _resource: &Self::Configurable,
         _role_name: &str,
-        _file: &str,
+        file: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
-        Ok(BTreeMap::new())
+        let mut result = BTreeMap::new();
+
+        if file == SUPERSET_CONFIG_FILENAME {
+            for option in SupersetConfigOptions::iter() {
+                if let Some(value) = option.config_type_to_string(self) {
+                    result.insert(option.to_string(), Some(value));
+                }
+            }
+        }
+
+        Ok(result)
     }
 }
 

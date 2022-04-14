@@ -18,6 +18,25 @@ data:
               required: true
           asOfVersion: "0.0.0"
           description: "The secret where the Superset credentials are stored."
+      - property: &rowLimit
+          propertyNames:
+            - name: "ROW_LIMIT"
+              kind:
+                type: "file"
+                file: "superset_config.py"
+          datatype:
+            type: "integer"
+          defaultValues:
+            - fromVersion: "0.0.0"
+              value: "50000"
+          recommendedValues:
+            - fromVersion: "0.0.0"
+              value: "50000"
+          roles:
+            - name: "node"
+              required: false
+          asOfVersion: "0.0.0"
+          description: "row limit when requesting chart data"
 kind: ConfigMap
 metadata:
   name: superset-operator-configmap

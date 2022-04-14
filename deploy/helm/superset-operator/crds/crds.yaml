@@ -39,6 +39,11 @@ spec:
                       type: object
                     config:
                       default: {}
+                      properties:
+                        rowLimit:
+                          format: int32
+                          nullable: true
+                          type: integer
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -62,6 +67,11 @@ spec:
                             type: object
                           config:
                             default: {}
+                            properties:
+                              rowLimit:
+                                format: int32
+                                nullable: true
+                                type: integer
                             type: object
                           configOverrides:
                             additionalProperties:

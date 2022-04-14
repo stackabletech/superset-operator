@@ -1,7 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 
 use crate::{
-    util::{env_var_from_secret, statsd_exporter_version, superset_version},
+    util::{statsd_exporter_version, superset_version},
     APP_NAME, APP_PORT,
 };
 
@@ -14,23 +14,30 @@ use std::{
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    builder::{ContainerBuilder, ObjectMetaBuilder, PodBuilder},
+    builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{Service, ServicePort, ServiceSpec},
+            core::v1::{
+                ConfigMap, ConfigMapVolumeSource, Service, ServicePort, ServiceSpec, Volume,
+            },
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
     kube::runtime::controller::{Action, Context},
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
-    product_config::{types::PropertyNameKind, ProductConfigManager},
+    product_config::{
+        flask_app_config_writer::{self, FlaskAppConfigWriterError},
+        types::PropertyNameKind,
+        ProductConfigManager,
+    },
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     role_utils::RoleGroupRef,
 };
 use stackable_superset_crd::{
-    supersetdb::SupersetDB, SupersetCluster, SupersetConfig, SupersetRole,
+    supersetdb::SupersetDB, SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole,
+    PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -71,6 +78,21 @@ pub enum Error {
     },
     #[snafu(display("failed to apply Service for {}", rolegroup))]
     ApplyRoleGroupService {
+        source: stackable_operator::error::Error,
+        rolegroup: RoleGroupRef<SupersetCluster>,
+    },
+    #[snafu(display("failed to build config file for {}", rolegroup))]
+    BuildRoleGroupConfigFile {
+        source: FlaskAppConfigWriterError,
+        rolegroup: RoleGroupRef<SupersetCluster>,
+    },
+    #[snafu(display("failed to build ConfigMap for {}", rolegroup))]
+    BuildRoleGroupConfig {
+        source: stackable_operator::error::Error,
+        rolegroup: RoleGroupRef<SupersetCluster>,
+    },
+    #[snafu(display("failed to apply ConfigMap for {}", rolegroup))]
+    ApplyRoleGroupConfig {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
@@ -123,7 +145,10 @@ pub async fn reconcile_superset(
             [(
                 SupersetRole::Node.to_string(),
                 (
-                    vec![PropertyNameKind::Env],
+                    vec![
+                        PropertyNameKind::Env,
+                        PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
+                    ],
                     superset.spec.nodes.clone().context(NoNodeRoleSnafu)?,
                 ),
             )]
@@ -149,12 +174,19 @@ pub async fn reconcile_superset(
         let rolegroup = superset.node_rolegroup_ref(rolegroup_name);
 
         let rg_service = build_node_rolegroup_service(&rolegroup, &superset)?;
+        let rg_configmap = build_rolegroup_config_map(&superset, &rolegroup, rolegroup_config)?;
         let rg_statefulset =
             build_server_rolegroup_statefulset(&rolegroup, &superset, rolegroup_config)?;
         client
             .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
             .await
             .with_context(|_| ApplyRoleGroupServiceSnafu {
+                rolegroup: rolegroup.clone(),
+            })?;
+        client
+            .apply_patch(FIELD_MANAGER_SCOPE, &rg_configmap, &rg_configmap)
+            .await
+            .with_context(|_| ApplyRoleGroupConfigSnafu {
                 rolegroup: rolegroup.clone(),
             })?;
         client
@@ -206,6 +238,73 @@ pub fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
         }),
         status: None,
     })
+}
+
+/// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
+fn build_rolegroup_config_map(
+    superset: &SupersetCluster,
+    rolegroup: &RoleGroupRef<SupersetCluster>,
+    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+) -> Result<ConfigMap, Error> {
+    let mut config = rolegroup_config
+        .get(&PropertyNameKind::File(
+            SUPERSET_CONFIG_FILENAME.to_string(),
+        ))
+        .cloned()
+        .unwrap_or_default();
+
+    config.insert(
+        SupersetConfigOptions::SecretKey.to_string(),
+        "os.environ.get('SECRET_KEY')".into(),
+    );
+    config.insert(
+        SupersetConfigOptions::SqlalchemyDatabaseUri.to_string(),
+        "os.environ.get('SQLALCHEMY_DATABASE_URI')".into(),
+    );
+    config.insert(
+        SupersetConfigOptions::StatsLogger.to_string(),
+        "StatsdStatsLogger(host='0.0.0.0', port=9125)".into(),
+    );
+
+    let imports = [
+        "import os",
+        "from superset.stats_logger import StatsdStatsLogger",
+    ];
+
+    let mut config_file = Vec::new();
+    flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
+        &mut config_file,
+        config.iter(),
+        &imports,
+    )
+    .with_context(|_| BuildRoleGroupConfigFileSnafu {
+        rolegroup: rolegroup.clone(),
+    })?;
+
+    ConfigMapBuilder::new()
+        .metadata(
+            ObjectMetaBuilder::new()
+                .name_and_namespace(superset)
+                .name(rolegroup.object_name())
+                .ownerreference_from_resource(superset, None, Some(true))
+                .context(ObjectMissingMetadataForOwnerRefSnafu)?
+                .with_recommended_labels(
+                    superset,
+                    APP_NAME,
+                    superset_version(superset).context(NoSupersetVersionSnafu)?,
+                    &rolegroup.role,
+                    &rolegroup.role_group,
+                )
+                .build(),
+        )
+        .add_data(
+            SUPERSET_CONFIG_FILENAME,
+            String::from_utf8(config_file).unwrap(),
+        )
+        .build()
+        .with_context(|_| BuildRoleGroupConfigSnafu {
+            rolegroup: rolegroup.clone(),
+        })
 }
 
 /// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a certain rolegroup
@@ -281,7 +380,7 @@ fn build_server_rolegroup_statefulset(
 
     let superset_version = superset_version(superset).context(NoSupersetVersionSnafu)?;
 
-    let image = format!("docker.stackable.tech/stackable/superset:{superset_version}-stackable0");
+    let image = format!("docker.stackable.tech/stackable/superset:{superset_version}-stackable1");
 
     let statsd_exporter_version =
         statsd_exporter_version(superset).context(NoStatsdExporterVersionSnafu)?;
@@ -289,25 +388,29 @@ fn build_server_rolegroup_statefulset(
     let statsd_exporter_image =
         format!("docker.stackable.tech/prom/statsd-exporter:{statsd_exporter_version}");
 
-    let env = node_config
-        .get(&PropertyNameKind::Env)
-        .and_then(|vars| vars.get(SupersetConfig::CREDENTIALS_SECRET_PROPERTY))
-        .map(|secret| {
-            vec![
-                env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
-                env_var_from_secret(
-                    "SQLALCHEMY_DATABASE_URI",
-                    secret,
-                    "connections.sqlalchemyDatabaseUri",
-                ),
-            ]
-        })
-        .unwrap_or_default();
+    let mut cb = ContainerBuilder::new("superset");
 
-    let container = ContainerBuilder::new("superset")
+    for (name, value) in node_config
+        .get(&PropertyNameKind::Env)
+        .cloned()
+        .unwrap_or_default()
+    {
+        if name == SupersetConfig::CREDENTIALS_SECRET_PROPERTY {
+            cb.add_env_var_from_secret("SECRET_KEY", &value, "connections.secretKey");
+            cb.add_env_var_from_secret(
+                "SQLALCHEMY_DATABASE_URI",
+                &value,
+                "connections.sqlalchemyDatabaseUri",
+            );
+        } else {
+            cb.add_env_var(name, value);
+        };
+    }
+
+    let container = cb
         .image(image)
-        .add_env_vars(env)
         .add_container_port("http", APP_PORT.into())
+        .add_volume_mount("config", PYTHONPATH)
         .build();
     let metrics_container = ContainerBuilder::new("metrics")
         .image(statsd_exporter_image)
@@ -358,6 +461,14 @@ fn build_server_rolegroup_statefulset(
                 })
                 .add_container(container)
                 .add_container(metrics_container)
+                .add_volume(Volume {
+                    name: "config".to_string(),
+                    config_map: Some(ConfigMapVolumeSource {
+                        name: Some(rolegroup_ref.object_name()),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })
                 .build_template(),
             ..StatefulSetSpec::default()
         }),

@@ -39,8 +39,6 @@ struct Opts {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    stackable_operator::logging::initialize_logging("SUPERSET_OPERATOR_LOG");
-
     let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => println!(
@@ -52,6 +50,7 @@ async fn main() -> anyhow::Result<()> {
         Command::Run(ProductOperatorRun {
             product_config,
             watch_namespace,
+            tracing_target,
         }) => {
             stackable_operator::utils::print_startup_string(
                 built_info::PKG_DESCRIPTION,
@@ -61,6 +60,12 @@ async fn main() -> anyhow::Result<()> {
                 built_info::BUILT_TIME_UTC,
                 built_info::RUSTC_VERSION,
             );
+            stackable_operator::logging::initialize_logging(
+                "SUPERSET_OPERATOR_LOG",
+                APP_NAME,
+                tracing_target,
+            );
+
             let product_config = product_config.load(&[
                 "deploy/config-spec/properties.yaml",
                 "/etc/stackable/superset-operator/config-spec/properties.yaml",

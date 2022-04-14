@@ -26,3 +26,4 @@ spec:
     roleGroups:
       default:
         config:
+          rowLimit: 10000

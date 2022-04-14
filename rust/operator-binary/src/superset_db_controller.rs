@@ -1,4 +1,4 @@
-use crate::util::{env_var_from_secret, get_job_state, JobState};
+use crate::util::{get_job_state, JobState};
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -16,7 +16,10 @@ use stackable_operator::{
     },
     logging::controller::ReconcilerError,
 };
-use stackable_superset_crd::supersetdb::{SupersetDB, SupersetDBStatus, SupersetDBStatusCondition};
+use stackable_superset_crd::{
+    supersetdb::{SupersetDB, SupersetDBStatus, SupersetDBStatusCondition},
+    PYTHONPATH, SUPERSET_CONFIG_FILENAME,
+};
 use std::{sync::Arc, time::Duration};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -145,7 +148,11 @@ pub async fn reconcile_superset_db(
 }
 
 fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
+    let config = "import os; SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI')";
+
     let mut commands = vec![
+        format!("mkdir -p {PYTHONPATH}"),
+        format!("echo \"{config}\" > {PYTHONPATH}/{SUPERSET_CONFIG_FILENAME}"),
         String::from(
             "superset fab create-admin \
                     --username \"$ADMIN_USERNAME\" \
@@ -165,7 +172,7 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
 
     let container = ContainerBuilder::new("superset-init-db")
         .image(format!(
-            "docker.stackable.tech/stackable/superset:{}-stackable0",
+            "docker.stackable.tech/stackable/superset:{}-stackable1",
             superset_db.spec.superset_version
         ))
         .command(vec!["/bin/bash".to_string()])
@@ -175,19 +182,12 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
             String::from("-c"),
             commands.join("; "),
         ])
-        .add_env_vars(vec![
-            env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
-            env_var_from_secret(
-                "SQLALCHEMY_DATABASE_URI",
-                secret,
-                "connections.sqlalchemyDatabaseUri",
-            ),
-            env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username"),
-            env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname"),
-            env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname"),
-            env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email"),
-            env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password"),
-        ])
+        .add_env_var_from_secret("DATABASE_URI", secret, "connections.sqlalchemyDatabaseUri")
+        .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
+        .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
+        .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
+        .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
+        .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
         .build();
 
     let pod = PodTemplateSpec {
