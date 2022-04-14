@@ -17,7 +17,7 @@ use stackable_operator::{
         runtime::{controller::Context, reflector::ObjectRef, Controller},
         CustomResourceExt,
     },
-    logging::controller::report_controller_reconciled,
+    logging::{controller::report_controller_reconciled, TracingTarget},
 };
 use stackable_superset_crd::{
     druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
@@ -39,7 +39,11 @@ struct Opts {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    stackable_operator::logging::initialize_logging("SUPERSET_OPERATOR_LOG");
+    stackable_operator::logging::initialize_logging(
+        "SUPERSET_OPERATOR_LOG",
+        APP_NAME,
+        TracingTarget::None,
+    );
 
     let opts = Opts::parse();
     match opts.cmd {
@@ -52,6 +56,7 @@ async fn main() -> anyhow::Result<()> {
         Command::Run(ProductOperatorRun {
             product_config,
             watch_namespace,
+            ..
         }) => {
             stackable_operator::utils::print_startup_string(
                 built_info::PKG_DESCRIPTION,

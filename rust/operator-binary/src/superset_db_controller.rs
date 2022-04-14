@@ -1,4 +1,4 @@
-use crate::util::{env_var_from_secret, get_job_state, JobState};
+use crate::util::{get_job_state, JobState};
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -175,19 +175,17 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
             String::from("-c"),
             commands.join("; "),
         ])
-        .add_env_vars(vec![
-            env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
-            env_var_from_secret(
-                "SQLALCHEMY_DATABASE_URI",
-                secret,
-                "connections.sqlalchemyDatabaseUri",
-            ),
-            env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username"),
-            env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname"),
-            env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname"),
-            env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email"),
-            env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password"),
-        ])
+        .add_env_var_from_secret("SECRET_KEY", secret, "connections.secretKey")
+        .add_env_var_from_secret(
+            "SQLALCHEMY_DATABASE_URI",
+            secret,
+            "connections.sqlalchemyDatabaseUri",
+        )
+        .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
+        .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
+        .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
+        .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
+        .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
         .build();
 
     let pod = PodTemplateSpec {

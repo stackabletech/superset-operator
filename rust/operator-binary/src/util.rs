@@ -1,6 +1,5 @@
 use snafu::{OptionExt, Snafu};
 use stackable_operator::k8s_openapi::api::batch::v1::Job;
-use stackable_operator::k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, SecretKeySelector};
 use stackable_superset_crd::SupersetCluster;
 
 #[derive(Snafu, Debug)]
@@ -51,19 +50,4 @@ pub fn statsd_exporter_version(superset: &SupersetCluster) -> Result<&str, Error
         .statsd_exporter_version
         .as_deref()
         .context(ObjectHasNoStatsdExporterVersion)
-}
-
-pub fn env_var_from_secret(var_name: &str, secret: &str, secret_key: &str) -> EnvVar {
-    EnvVar {
-        name: String::from(var_name),
-        value_from: Some(EnvVarSource {
-            secret_key_ref: Some(SecretKeySelector {
-                name: Some(String::from(secret)),
-                key: String::from(secret_key),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }),
-        ..Default::default()
-    }
 }

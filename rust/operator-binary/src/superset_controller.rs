@@ -1,7 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 
 use crate::{
-    util::{env_var_from_secret, statsd_exporter_version, superset_version},
+    util::{statsd_exporter_version, superset_version},
     APP_NAME, APP_PORT,
 };
 
@@ -19,7 +19,7 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, ConfigMapVolumeSource, EnvVar, Service, ServicePort, ServiceSpec, Volume,
+                ConfigMap, ConfigMapVolumeSource, Service, ServicePort, ServiceSpec, Volume,
             },
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
@@ -388,33 +388,27 @@ fn build_server_rolegroup_statefulset(
     let statsd_exporter_image =
         format!("docker.stackable.tech/prom/statsd-exporter:{statsd_exporter_version}");
 
-    let mut env_vars = Vec::new();
+    let mut cb = ContainerBuilder::new("superset");
+
     for (name, value) in node_config
         .get(&PropertyNameKind::Env)
         .cloned()
         .unwrap_or_default()
     {
         if name == SupersetConfig::CREDENTIALS_SECRET_PROPERTY {
-            env_vars.extend(vec![
-                env_var_from_secret("SECRET_KEY", &value, "connections.secretKey"),
-                env_var_from_secret(
-                    "SQLALCHEMY_DATABASE_URI",
-                    &value,
-                    "connections.sqlalchemyDatabaseUri",
-                ),
-            ]);
+            cb.add_env_var_from_secret("SECRET_KEY", &value, "connections.secretKey");
+            cb.add_env_var_from_secret(
+                "SQLALCHEMY_DATABASE_URI",
+                &value,
+                "connections.sqlalchemyDatabaseUri",
+            );
         } else {
-            env_vars.push(EnvVar {
-                name: name.to_owned(),
-                value: Some(value.to_owned()),
-                ..Default::default()
-            });
+            cb.add_env_var(name, value);
         };
     }
 
-    let container = ContainerBuilder::new("superset")
+    let container = cb
         .image(image)
-        .add_env_vars(env_vars)
         .add_container_port("http", APP_PORT.into())
         .add_volume_mount("config", "/app/pythonpath/")
         .build();

@@ -1,6 +1,2 @@
 [workspace]
 members = ["rust/crd", "rust/operator-binary"]
-
-# TODO Remove when the new product-config version is incorporated into operator-rs
-[patch."https://github.com/stackabletech/product-config.git"]
-product-config = { git = "https://github.com//stackabletech/product-config.git", branch = "flask_app_config_writer" }

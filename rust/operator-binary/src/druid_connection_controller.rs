@@ -1,4 +1,4 @@
-use crate::util::{env_var_from_secret, get_job_state, JobState};
+use crate::util::{get_job_state, JobState};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -244,14 +244,12 @@ async fn build_import_job(
         ))
         .command(vec!["/bin/sh".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
-        .add_env_vars(vec![
-            env_var_from_secret("SECRET_KEY", secret, "connections.secretKey"),
-            env_var_from_secret(
-                "SQLALCHEMY_DATABASE_URI",
-                secret,
-                "connections.sqlalchemyDatabaseUri",
-            ),
-        ])
+        .add_env_var_from_secret("SECRET_KEY", secret, "connections.secretKey")
+        .add_env_var_from_secret(
+            "SQLALCHEMY_DATABASE_URI",
+            secret,
+            "connections.sqlalchemyDatabaseUri",
+        )
         .build();
 
     let pod = PodTemplateSpec {
