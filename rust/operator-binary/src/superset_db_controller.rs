@@ -16,7 +16,10 @@ use stackable_operator::{
     },
     logging::controller::ReconcilerError,
 };
-use stackable_superset_crd::supersetdb::{SupersetDB, SupersetDBStatus, SupersetDBStatusCondition};
+use stackable_superset_crd::{
+    supersetdb::{SupersetDB, SupersetDBStatus, SupersetDBStatusCondition},
+    PYTHONPATH, SUPERSET_CONFIG_FILENAME,
+};
 use std::{sync::Arc, time::Duration};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -145,7 +148,11 @@ pub async fn reconcile_superset_db(
 }
 
 fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
+    let config = "import os; SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI')";
+
     let mut commands = vec![
+        format!("mkdir -p {PYTHONPATH}"),
+        format!("echo \"{config}\" > {PYTHONPATH}/{SUPERSET_CONFIG_FILENAME}"),
         String::from(
             "superset fab create-admin \
                     --username \"$ADMIN_USERNAME\" \
@@ -175,12 +182,7 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
             String::from("-c"),
             commands.join("; "),
         ])
-        .add_env_var_from_secret("SECRET_KEY", secret, "connections.secretKey")
-        .add_env_var_from_secret(
-            "SQLALCHEMY_DATABASE_URI",
-            secret,
-            "connections.sqlalchemyDatabaseUri",
-        )
+        .add_env_var_from_secret("DATABASE_URI", secret, "connections.sqlalchemyDatabaseUri")
         .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
         .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
         .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")

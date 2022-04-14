@@ -19,6 +19,7 @@ use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 pub const APP_NAME: &str = "superset";
 pub const MANAGED_BY: &str = "superset-operator";
 
+pub const PYTHONPATH: &str = "/app/pythonpath";
 pub const SUPERSET_CONFIG_FILENAME: &str = "superset_config.py";
 
 #[derive(Debug, Snafu)]

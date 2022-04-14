@@ -37,7 +37,7 @@ use stackable_operator::{
 };
 use stackable_superset_crd::{
     supersetdb::SupersetDB, SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole,
-    SUPERSET_CONFIG_FILENAME,
+    PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -410,7 +410,7 @@ fn build_server_rolegroup_statefulset(
     let container = cb
         .image(image)
         .add_container_port("http", APP_PORT.into())
-        .add_volume_mount("config", "/app/pythonpath/")
+        .add_volume_mount("config", PYTHONPATH)
         .build();
     let metrics_container = ContainerBuilder::new("metrics")
         .image(statsd_exporter_image)

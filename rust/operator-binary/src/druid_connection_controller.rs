@@ -18,10 +18,11 @@ use stackable_operator::{
     },
     logging::controller::ReconcilerError,
 };
-use stackable_superset_crd::druidconnection::{
-    DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition,
+use stackable_superset_crd::{
+    druidconnection::{DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition},
+    supersetdb::{SupersetDB, SupersetDBStatusCondition},
+    PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
-use stackable_superset_crd::supersetdb::{SupersetDB, SupersetDBStatusCondition};
 use std::{sync::Arc, time::Duration};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -229,6 +230,13 @@ async fn build_import_job(
     sqlalchemy_str: &str,
 ) -> Result<Job> {
     let mut commands = vec![];
+
+    let config = "import os; SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI')";
+    commands.push(format!("mkdir -p {PYTHONPATH}"));
+    commands.push(format!(
+        "echo \"{config}\" > {PYTHONPATH}/{SUPERSET_CONFIG_FILENAME}"
+    ));
+
     let druid_info = build_druid_db_yaml(&druid_connection.spec.druid.name, sqlalchemy_str)?;
     commands.push(format!("echo \"{}\" > /tmp/druids.yaml", druid_info));
     commands.push(String::from(
@@ -244,12 +252,7 @@ async fn build_import_job(
         ))
         .command(vec!["/bin/sh".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
-        .add_env_var_from_secret("SECRET_KEY", secret, "connections.secretKey")
-        .add_env_var_from_secret(
-            "SQLALCHEMY_DATABASE_URI",
-            secret,
-            "connections.sqlalchemyDatabaseUri",
-        )
+        .add_env_var_from_secret("DATABASE_URI", secret, "connections.sqlalchemyDatabaseUri")
         .build();
 
     let pod = PodTemplateSpec {
