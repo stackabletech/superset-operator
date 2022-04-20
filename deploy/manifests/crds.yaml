@@ -30,6 +30,9 @@ spec:
                 loadExamplesOnInit:
                   nullable: true
                   type: boolean
+                mapboxSecret:
+                  nullable: true
+                  type: string
                 nodes:
                   nullable: true
                   properties:

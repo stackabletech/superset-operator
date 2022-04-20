@@ -402,6 +402,8 @@ fn build_server_rolegroup_statefulset(
                 &value,
                 "connections.sqlalchemyDatabaseUri",
             );
+        } else if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
+            cb.add_env_var_from_secret("MAPBOX_API_KEY", &value, "connections.mapboxApiKey");
         } else {
             cb.add_env_var(name, value);
         };
