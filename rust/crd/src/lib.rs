@@ -88,6 +88,7 @@ pub struct SupersetClusterSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub statsd_exporter_version: Option<String>,
     pub credentials_secret: String,
+    pub mapbox_secret: Option<String>,
     #[serde(default)]
     pub load_examples_on_init: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -134,6 +135,7 @@ pub struct SupersetConfig {
 
 impl SupersetConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
+    pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
 }
 
 impl Configuration for SupersetConfig {
@@ -144,11 +146,14 @@ impl Configuration for SupersetConfig {
         cluster: &Self::Configurable,
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
-        Ok([(
-            Self::CREDENTIALS_SECRET_PROPERTY.to_string(),
-            Some(cluster.spec.credentials_secret.clone()),
-        )]
-        .into())
+        let mut result = BTreeMap::new();
+
+        result.insert(Self::CREDENTIALS_SECRET_PROPERTY.to_string(), Some(cluster.spec.credentials_secret.clone()));
+        if let Some(msec) = &cluster.spec.mapbox_secret {
+            result.insert(Self::MAPBOX_SECRET_PROPERTY.to_string(), Some(msec.clone()));
+        }
+
+        Ok(result)
     }
 
     fn compute_cli(

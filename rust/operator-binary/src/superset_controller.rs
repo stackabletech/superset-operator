@@ -19,13 +19,12 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, ConfigMapVolumeSource, Service, ServicePort, ServiceSpec, Volume, Secret
+                ConfigMap, ConfigMapVolumeSource, Service, ServicePort, ServiceSpec, Volume
             },
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
-    kube::{runtime::controller::{Action, Context}, ResourceExt},
-    error::OperatorResult,
+    kube::{runtime::controller::{Action, Context}},
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
     product_config::{
@@ -177,7 +176,7 @@ pub async fn reconcile_superset(
         let rg_service = build_node_rolegroup_service(&rolegroup, &superset)?;
         let rg_configmap = build_rolegroup_config_map(&superset, &rolegroup, rolegroup_config)?;
         let rg_statefulset =
-            build_server_rolegroup_statefulset(&rolegroup, &superset, rolegroup_config, &ctx).await?;
+            build_server_rolegroup_statefulset(&rolegroup, &superset, rolegroup_config)?;
         client
             .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
             .await
@@ -366,11 +365,10 @@ fn build_node_rolegroup_service(
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_node_rolegroup_service`]).
-async fn build_server_rolegroup_statefulset(
+fn build_server_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     superset: &SupersetCluster,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    ctx: &Context<Ctx>,
 ) -> Result<StatefulSet> {
     let rolegroup = superset
         .spec
@@ -404,42 +402,12 @@ async fn build_server_rolegroup_statefulset(
                 &value,
                 "connections.sqlalchemyDatabaseUri",
             );
+        }
+        else if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
+            cb.add_env_var_from_secret("MAPBOX_API_KEY", &value, "connections.mapboxApiKey");
         } else {
             cb.add_env_var(name, value);
         };
-    }
-
-    let secret_name = node_config
-        .get(&PropertyNameKind::Env)
-        .and_then(|vars| vars.get(SupersetConfig::CREDENTIALS_SECRET_PROPERTY))
-        .unwrap();
-    
-    let namespace_name = superset
-        .namespace()
-        .unwrap();
-
-    let client = &ctx.get_ref().client;
-
-    let s : OperatorResult<Secret> = client.get(secret_name, Some(&namespace_name)).await;
-
-    let s = match s {
-        Ok(sec) => sec,
-        Err(error) => {
-            panic!("Problem obtaining secret {:?}", error)
-        },
-    };
-   
-    // if the mapbox api key is configured set the env variable
-    if let Some(map) = s.data {
-        match map.get("connections.mapBoxApiKey") { 
-            Some(api_key) => {
-
-                let key = String::from_utf8(api_key.0.clone()).unwrap(); 
-
-                cb.add_env_var("MAPBOX_API_KEY", key);
-            },
-            None => ()
-        }
     }
 
     let container = cb
