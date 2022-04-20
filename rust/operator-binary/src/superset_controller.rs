@@ -19,12 +19,12 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, ConfigMapVolumeSource, Service, ServicePort, ServiceSpec, Volume
+                ConfigMap, ConfigMapVolumeSource, Service, ServicePort, ServiceSpec, Volume,
             },
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
-    kube::{runtime::controller::{Action, Context}},
+    kube::runtime::controller::{Action, Context},
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
     product_config::{
@@ -402,8 +402,7 @@ fn build_server_rolegroup_statefulset(
                 &value,
                 "connections.sqlalchemyDatabaseUri",
             );
-        }
-        else if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
+        } else if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
             cb.add_env_var_from_secret("MAPBOX_API_KEY", &value, "connections.mapboxApiKey");
         } else {
             cb.add_env_var(name, value);

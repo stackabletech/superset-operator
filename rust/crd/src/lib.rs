@@ -147,8 +147,10 @@ impl Configuration for SupersetConfig {
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         let mut result = BTreeMap::new();
-
-        result.insert(Self::CREDENTIALS_SECRET_PROPERTY.to_string(), Some(cluster.spec.credentials_secret.clone()));
+        result.insert(
+            Self::CREDENTIALS_SECRET_PROPERTY.to_string(),
+            Some(cluster.spec.credentials_secret.clone()),
+        );
         if let Some(msec) = &cluster.spec.mapbox_secret {
             result.insert(Self::MAPBOX_SECRET_PROPERTY.to_string(), Some(msec.clone()));
         }
