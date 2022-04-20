@@ -4,6 +4,14 @@
 
 ### Added
 
+- Ability to add MAPBOX_API_KEY from secret added ([#178]).
+
+[#178]: https://github.com/stackabletech/superset-operator/pull/178
+
+## [Unreleased]
+
+### Added
+
 - Configuration option `rowLimit` added ([#173]).
 - Configuration and environment overrides enabled ([#173]).
 
