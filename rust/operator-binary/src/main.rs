@@ -1,3 +1,4 @@
+mod config;
 mod druid_connection_controller;
 mod superset_controller;
 mod superset_db_controller;

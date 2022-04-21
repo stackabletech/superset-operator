@@ -1,6 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 
 use crate::{
+    config,
     util::{statsd_exporter_version, superset_version},
     APP_NAME, APP_PORT,
 };
@@ -307,34 +308,13 @@ fn build_rolegroup_config_map(
         .cloned()
         .unwrap_or_default();
 
-    config.insert(
-        SupersetConfigOptions::MapboxApiKey.to_string(),
-        "os.environ.get('MAPBOX_API_KEY')".into(),
-    );
-
-    config.insert(
-        SupersetConfigOptions::SecretKey.to_string(),
-        "os.environ.get('SECRET_KEY')".into(),
-    );
-    config.insert(
-        SupersetConfigOptions::SqlalchemyDatabaseUri.to_string(),
-        "os.environ.get('SQLALCHEMY_DATABASE_URI')".into(),
-    );
-    config.insert(
-        SupersetConfigOptions::StatsLogger.to_string(),
-        "StatsdStatsLogger(host='0.0.0.0', port=9125)".into(),
-    );
-
-    let imports = [
-        "import os",
-        "from superset.stats_logger import StatsdStatsLogger",
-    ];
+    config::add_superset_config(&mut config);
 
     let mut config_file = Vec::new();
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
         &mut config_file,
         config.iter(),
-        &imports,
+        config::get_imports(),
     )
     .with_context(|_| BuildRoleGroupConfigFileSnafu {
         rolegroup: rolegroup.clone(),
