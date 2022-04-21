@@ -254,6 +254,11 @@ fn build_rolegroup_config_map(
         .unwrap_or_default();
 
     config.insert(
+        SupersetConfigOptions::MapboxApiKey.to_string(),
+        "os.environ.get('MAPBOX_API_KEY')".into(),
+    );
+
+    config.insert(
         SupersetConfigOptions::SecretKey.to_string(),
         "os.environ.get('SECRET_KEY')".into(),
     );
