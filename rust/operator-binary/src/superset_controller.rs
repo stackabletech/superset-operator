@@ -14,7 +14,15 @@ use std::{
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
+    builder::{
+        ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
+        PodSecurityContextBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
+    },
+    commons::{
+        authentication::{AuthenticationClass, AuthenticationClassProvider},
+        secret_class::SecretClassVolumeScope,
+        tls::{CaCert, TlsMutualVerification, TlsServerVerification, TlsVerification},
+    },
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -24,7 +32,10 @@ use stackable_operator::{
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
-    kube::runtime::controller::{Action, Context},
+    kube::runtime::{
+        controller::{Action, Context},
+        reflector::ObjectRef,
+    },
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
     product_config::{
@@ -36,8 +47,8 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 use stackable_superset_crd::{
-    supersetdb::SupersetDB, SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole,
-    PYTHONPATH, SUPERSET_CONFIG_FILENAME,
+    supersetdb::SupersetDB, SupersetCluster, SupersetClusterAuthenticationConfigMethod,
+    SupersetConfig, SupersetConfigOptions, SupersetRole, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -113,6 +124,13 @@ pub enum Error {
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
+    #[snafu(display("Superset only supports a single authentication method"))]
+    MultipleAuthenticationMethods,
+    #[snafu(display("failed to retrieve {}", authentication_class))]
+    AuthenticationClassRetrieval {
+        source: stackable_operator::error::Error,
+        authentication_class: ObjectRef<AuthenticationClass>,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -170,13 +188,47 @@ pub async fn reconcile_superset(
         .apply_patch(FIELD_MANAGER_SCOPE, &node_role_service, &node_role_service)
         .await
         .context(ApplyRoleServiceSnafu)?;
+
+    let authentication_methods: Vec<_> = superset
+        .spec
+        .authentication_config
+        .iter()
+        .flat_map(|config| &config.methods)
+        .collect();
+
+    let (authentication_method, authentication_class) = match authentication_methods[..] {
+        [] => (None, None),
+        [authentication_method] => {
+            let authentication_class = client
+                .get::<AuthenticationClass>(&authentication_method.authentication_class, None) // AuthenticationClass has ClusterScope
+                .await
+                .context(AuthenticationClassRetrievalSnafu {
+                    authentication_class: ObjectRef::<AuthenticationClass>::new(
+                        &authentication_method.authentication_class,
+                    ),
+                })?;
+            (Some(authentication_method), Some(authentication_class))
+        }
+        _ => return MultipleAuthenticationMethodsSnafu.fail(),
+    };
+
     for (rolegroup_name, rolegroup_config) in role_node_config.iter() {
         let rolegroup = superset.node_rolegroup_ref(rolegroup_name);
 
         let rg_service = build_node_rolegroup_service(&rolegroup, &superset)?;
-        let rg_configmap = build_rolegroup_config_map(&superset, &rolegroup, rolegroup_config)?;
-        let rg_statefulset =
-            build_server_rolegroup_statefulset(&rolegroup, &superset, rolegroup_config)?;
+        let rg_configmap = build_rolegroup_config_map(
+            &superset,
+            &rolegroup,
+            rolegroup_config,
+            authentication_method,
+            authentication_class.as_ref(),
+        )?;
+        let rg_statefulset = build_server_rolegroup_statefulset(
+            &rolegroup,
+            &superset,
+            rolegroup_config,
+            authentication_class.as_ref(),
+        )?;
         client
             .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
             .await
@@ -202,7 +254,7 @@ pub async fn reconcile_superset(
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside of the cluster.
-pub fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
+fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
     let role_name = SupersetRole::Node.to_string();
     let role_svc_name = superset
         .node_role_service_name()
@@ -245,6 +297,8 @@ fn build_rolegroup_config_map(
     superset: &SupersetCluster,
     rolegroup: &RoleGroupRef<SupersetCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    authentication_method: Option<&SupersetClusterAuthenticationConfigMethod>,
+    authentication_class: Option<&AuthenticationClass>,
 ) -> Result<ConfigMap, Error> {
     let mut config = rolegroup_config
         .get(&PropertyNameKind::File(
@@ -374,6 +428,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     superset: &SupersetCluster,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    authentication_class: Option<&AuthenticationClass>,
 ) -> Result<StatefulSet> {
     let rolegroup = superset
         .spec
@@ -394,6 +449,7 @@ fn build_server_rolegroup_statefulset(
         format!("docker.stackable.tech/prom/statsd-exporter:{statsd_exporter_version}");
 
     let mut cb = ContainerBuilder::new("superset");
+    let mut pb = PodBuilder::new();
 
     for (name, value) in node_config
         .get(&PropertyNameKind::Env)
@@ -412,6 +468,10 @@ fn build_server_rolegroup_statefulset(
         } else {
             cb.add_env_var(name, value);
         };
+    }
+
+    if let Some(authentication_class) = authentication_class {
+        add_authentication_volumes_and_volume_mounts(authentication_class, &mut cb, &mut pb);
     }
 
     let container = cb
@@ -437,6 +497,7 @@ fn build_server_rolegroup_statefulset(
                 &rolegroup_ref.role_group,
             )
             .with_label("statsd-exporter", statsd_exporter_version)
+            .with_label("restarter.stackable.tech/enabled", "true")
             .build(),
         spec: Some(StatefulSetSpec {
             pod_management_policy: Some("Parallel".to_string()),
@@ -455,7 +516,7 @@ fn build_server_rolegroup_statefulset(
                 ..LabelSelector::default()
             },
             service_name: rolegroup_ref.object_name(),
-            template: PodBuilder::new()
+            template: pb
                 .metadata_builder(|m| {
                     m.with_recommended_labels(
                         superset,
@@ -476,11 +537,86 @@ fn build_server_rolegroup_statefulset(
                     }),
                     ..Default::default()
                 })
+                .security_context(PodSecurityContextBuilder::new().fs_group(1000).build()) // Needed for secret-operator
                 .build_template(),
             ..StatefulSetSpec::default()
         }),
         status: None,
     })
+}
+
+fn add_authentication_volumes_and_volume_mounts(
+    authentication_class: &AuthenticationClass,
+    cb: &mut ContainerBuilder,
+    pb: &mut PodBuilder,
+) {
+    let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
+
+    match &authentication_class.spec.provider {
+        AuthenticationClassProvider::Ldap(ldap) => {
+            if let Some(bind_credentials) = &ldap.bind_credentials {
+                let volume_name = format!("{authentication_class_name}-bind-credentials");
+
+                pb.add_volume(build_secret_operator_volume(
+                    &volume_name,
+                    &bind_credentials.secret_class,
+                    bind_credentials.scope.as_ref(),
+                ));
+                cb.add_volume_mount(&volume_name, format!("/stackable/secrets/{volume_name}"));
+            }
+
+            if let Some(tls) = &ldap.tls {
+                match &tls.verification {
+                    TlsVerification::Server(TlsServerVerification {
+                        ca_cert: CaCert::SecretClass(cert_secret_class),
+                    })
+                    | TlsVerification::Mutual(TlsMutualVerification { cert_secret_class }) => {
+                        let volume_name = format!("{authentication_class_name}-tls-certificate");
+
+                        pb.add_volume(build_secret_operator_volume(
+                            &volume_name,
+                            cert_secret_class,
+                            None,
+                        ));
+                        cb.add_volume_mount(
+                            &volume_name,
+                            format!("/stackable/certificates/{volume_name}"),
+                        );
+                    }
+                    // Explicitly listing other possibilities to not oversee new enum variants in the future
+                    TlsVerification::None {}
+                    | TlsVerification::Server(TlsServerVerification {
+                        ca_cert: CaCert::WebPki {},
+                    }) => {}
+                }
+            }
+        }
+    }
+}
+
+fn build_secret_operator_volume(
+    volume_name: &str,
+    secret_class_name: &str,
+    scope: Option<&SecretClassVolumeScope>,
+) -> Volume {
+    let mut secret_operator_volume_source_builder =
+        SecretOperatorVolumeSourceBuilder::new(secret_class_name);
+
+    if let Some(scope) = scope {
+        if scope.pod {
+            secret_operator_volume_source_builder.with_pod_scope();
+        }
+        if scope.node {
+            secret_operator_volume_source_builder.with_node_scope();
+        }
+        for service in &scope.services {
+            secret_operator_volume_source_builder.with_service_scope(service);
+        }
+    }
+
+    VolumeBuilder::new(volume_name)
+        .csi(secret_operator_volume_source_builder.build())
+        .build()
 }
 
 pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> Action {
