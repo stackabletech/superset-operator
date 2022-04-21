@@ -7,6 +7,7 @@ use clap::Parser;
 use futures::StreamExt;
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
+    commons::authentication::AuthenticationClass,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         batch::v1::Job,
@@ -21,7 +22,9 @@ use stackable_operator::{
 };
 use stackable_superset_crd::{
     druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
+    SupersetClusterAuthenticationConfig,
 };
+use std::sync::Arc;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -76,34 +79,52 @@ async fn main() -> anyhow::Result<()> {
             ))
             .await?;
 
-            let superset_controller = Controller::new(
+            let superset_controller_builder = Controller::new(
                 watch_namespace.get_api::<SupersetCluster>(&client),
                 ListParams::default(),
-            )
-            .owns(
-                watch_namespace.get_api::<Service>(&client),
-                ListParams::default(),
-            )
-            .owns(
-                watch_namespace.get_api::<StatefulSet>(&client),
-                ListParams::default(),
-            )
-            .shutdown_on_signal()
-            .run(
-                superset_controller::reconcile_superset,
-                superset_controller::error_policy,
-                Context::new(superset_controller::Ctx {
-                    client: client.clone(),
-                    product_config,
-                }),
-            )
-            .map(|res| {
-                report_controller_reconciled(
-                    &client,
-                    "supersetclusters.superset.stackable.tech",
-                    &res,
+            );
+            let superset_store = superset_controller_builder.store();
+            let superset_controller = superset_controller_builder
+                .owns(
+                    watch_namespace.get_api::<Service>(&client),
+                    ListParams::default(),
                 )
-            });
+                .owns(
+                    watch_namespace.get_api::<StatefulSet>(&client),
+                    ListParams::default(),
+                )
+                .shutdown_on_signal()
+                .watches(
+                    watch_namespace.get_api::<AuthenticationClass>(&client),
+                    ListParams::default(),
+                    move |authentication_class| {
+                        superset_store
+                            .state()
+                            .into_iter()
+                            .filter(move |superset: &Arc<SupersetCluster>| {
+                                references_authentication_class(
+                                    &superset.spec.authentication_config,
+                                    &authentication_class,
+                                )
+                            })
+                            .map(|superset| ObjectRef::from_obj(&*superset))
+                    },
+                )
+                .run(
+                    superset_controller::reconcile_superset,
+                    superset_controller::error_policy,
+                    Context::new(superset_controller::Ctx {
+                        client: client.clone(),
+                        product_config,
+                    }),
+                )
+                .map(|res| {
+                    report_controller_reconciled(
+                        &client,
+                        "supersetclusters.superset.stackable.tech",
+                        &res,
+                    )
+                });
 
             let superset_db_controller_builder = Controller::new(
                 watch_namespace.get_api::<SupersetDB>(&client),
@@ -228,4 +249,22 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn references_authentication_class(
+    authentication_config: &Option<SupersetClusterAuthenticationConfig>,
+    authentication_class: &AuthenticationClass,
+) -> bool {
+    match authentication_config {
+        Some(authentication_config) => {
+            authentication_config
+                .methods
+                .iter()
+                .any(|authentication_method| {
+                    &authentication_method.authentication_class
+                        == authentication_class.metadata.name.as_ref().unwrap()
+                })
+        }
+        None => false,
+    }
 }
