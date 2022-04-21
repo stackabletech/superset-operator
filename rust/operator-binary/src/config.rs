@@ -33,6 +33,10 @@ pub fn add_superset_config(
         SupersetConfigOptions::StatsLogger.to_string(),
         "StatsdStatsLogger(host='0.0.0.0', port=9125)".into(),
     );
+    config.insert(
+        SupersetConfigOptions::MapboxApiKey.to_string(),
+        "os.environ.get('MAPBOX_API_KEY')".into(),
+    );
 
     if let Some(authentication_method) = authentication_method {
         if let Some(authentication_class) = authentication_class {
