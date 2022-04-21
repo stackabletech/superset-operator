@@ -308,7 +308,7 @@ fn build_rolegroup_config_map(
         .cloned()
         .unwrap_or_default();
 
-    config::add_superset_config(&mut config);
+    config::add_superset_config(&mut config, authentication_method, authentication_class);
 
     let mut config_file = Vec::new();
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(

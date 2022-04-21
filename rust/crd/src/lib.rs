@@ -36,6 +36,25 @@ pub enum SupersetConfigOptions {
     StatsLogger,
     RowLimit,
     MapboxApiKey,
+    AuthType,
+    AuthUserRegistration,
+    AuthUserRegistrationRole,
+    AuthRolesSyncAtLogin,
+    AuthLdapServer,
+    AuthLdapBindUser,
+    AuthLdapBindPassword,
+    AuthLdapSearch,
+    AuthLdapSearchFilter,
+    AuthLdapUidField,
+    AuthLdapGroupField,
+    AuthLdapFirstnameField,
+    AuthLdapLastnameField,
+    AuthLdapEmailField,
+    AuthLdapAllowSelfSigned,
+    AuthLdapTlsDemand,
+    AuthLdapTlsCertfile,
+    AuthLdapTlsKeyfile,
+    AuthLdapTlsCacertfile,
 }
 
 impl SupersetConfigOptions {
@@ -53,11 +72,30 @@ impl SupersetConfigOptions {
 impl FlaskAppConfigOptions for SupersetConfigOptions {
     fn python_type(&self) -> PythonType {
         match self {
-            SupersetConfigOptions::RowLimit => PythonType::IntLiteral,
             SupersetConfigOptions::SecretKey => PythonType::Expression,
             SupersetConfigOptions::SqlalchemyDatabaseUri => PythonType::Expression,
             SupersetConfigOptions::StatsLogger => PythonType::Expression,
+            SupersetConfigOptions::RowLimit => PythonType::IntLiteral,
             SupersetConfigOptions::MapboxApiKey => PythonType::Expression,
+            SupersetConfigOptions::AuthType => PythonType::Expression,
+            SupersetConfigOptions::AuthUserRegistration => PythonType::BoolLiteral,
+            SupersetConfigOptions::AuthUserRegistrationRole => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthRolesSyncAtLogin => PythonType::BoolLiteral,
+            SupersetConfigOptions::AuthLdapServer => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapBindUser => PythonType::Expression,
+            SupersetConfigOptions::AuthLdapBindPassword => PythonType::Expression,
+            SupersetConfigOptions::AuthLdapSearch => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapSearchFilter => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapUidField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapGroupField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapFirstnameField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapLastnameField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapEmailField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapAllowSelfSigned => PythonType::BoolLiteral,
+            SupersetConfigOptions::AuthLdapTlsDemand => PythonType::BoolLiteral,
+            SupersetConfigOptions::AuthLdapTlsCertfile => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapTlsKeyfile => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapTlsCacertfile => PythonType::StringLiteral,
         }
     }
 }
