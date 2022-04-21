@@ -37,7 +37,7 @@ exceptions = [
     { name = "stackable-superset-crd", allow = ["OSL-3.0"] },
     { name = "stackable-superset-operator", allow = ["OSL-3.0"] },
     { name = "stackable-superset-operator-binary", allow = ["OSL-3.0"] },
-    ]
+]
 
 [[licenses.clarify]]
 name = "ring"
