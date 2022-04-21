@@ -7,9 +7,11 @@
 - Configuration option `rowLimit` added ([#173]).
 - Configuration and environment overrides enabled ([#173]).
 - Ability to add MAPBOX_API_KEY from secret added ([#178]).
+- Update SupersetConfigOptions to include explicit config for MapboxApiKey ([#179])
 
 [#173]: https://github.com/stackabletech/superset-operator/pull/173
 [#178]: https://github.com/stackabletech/superset-operator/pull/178
+[#179]: https://github.com/stackabletech/superset-operator/pull/179
 
 ## [0.4.0] - 2022-04-05
 
