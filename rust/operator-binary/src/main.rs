@@ -56,6 +56,11 @@ async fn main() -> anyhow::Result<()> {
             watch_namespace,
             tracing_target,
         }) => {
+            stackable_operator::logging::initialize_logging(
+                "SUPERSET_OPERATOR_LOG",
+                APP_NAME,
+                tracing_target,
+            );
             stackable_operator::utils::print_startup_string(
                 built_info::PKG_DESCRIPTION,
                 built_info::PKG_VERSION,
@@ -63,11 +68,6 @@ async fn main() -> anyhow::Result<()> {
                 built_info::TARGET,
                 built_info::BUILT_TIME_UTC,
                 built_info::RUSTC_VERSION,
-            );
-            stackable_operator::logging::initialize_logging(
-                "SUPERSET_OPERATOR_LOG",
-                APP_NAME,
-                tracing_target,
             );
 
             let product_config = product_config.load(&[
