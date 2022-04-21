@@ -35,6 +35,7 @@ pub enum SupersetConfigOptions {
     SqlalchemyDatabaseUri,
     StatsLogger,
     RowLimit,
+    MapboxApiKey,
 }
 
 impl SupersetConfigOptions {
@@ -56,6 +57,7 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::SecretKey => PythonType::Expression,
             SupersetConfigOptions::SqlalchemyDatabaseUri => PythonType::Expression,
             SupersetConfigOptions::StatsLogger => PythonType::Expression,
+            SupersetConfigOptions::MapboxApiKey => PythonType::Expression,
         }
     }
 }
