@@ -102,13 +102,12 @@ fn append_ldap_config(
     );
     config.insert(
         SupersetConfigOptions::AuthUserRegistration.to_string(),
-        to_python_bool(
-            authentication_method
-                .ldap_extras
-                .as_ref()
-                .map(|extra| extra.user_registration)
-                .unwrap_or_else(stackable_superset_crd::default_user_registration),
-        ),
+        authentication_method
+            .ldap_extras
+            .as_ref()
+            .map(|extra| extra.user_registration)
+            .unwrap_or_else(stackable_superset_crd::default_user_registration)
+            .to_string(),
     );
     config.insert(
         SupersetConfigOptions::AuthUserRegistrationRole.to_string(),
@@ -121,14 +120,13 @@ fn append_ldap_config(
     );
     config.insert(
         SupersetConfigOptions::AuthRolesSyncAtLogin.to_string(),
-        to_python_bool(
-            authentication_method
-                .ldap_extras
-                .as_ref()
-                .map(|extra| &extra.sync_roles_at)
-                .unwrap_or(&stackable_superset_crd::default_sync_roles_at())
-                == &LdapRolesSyncMoment::Login,
-        ),
+        (authentication_method
+            .ldap_extras
+            .as_ref()
+            .map(|extra| &extra.sync_roles_at)
+            .unwrap_or(&stackable_superset_crd::default_sync_roles_at())
+            == &LdapRolesSyncMoment::Login)
+            .to_string(),
     );
 
     // Possible TLS options, see https://github.com/dpgaspar/Flask-AppBuilder/blob/f6f66fc1bcc0163a213e4a2e6f960e91082d201f/flask_appbuilder/security/manager.py#L243-L250
@@ -136,18 +134,18 @@ fn append_ldap_config(
         None => {
             config.insert(
                 SupersetConfigOptions::AuthLdapTlsDemand.to_string(),
-                "False".into(),
+                false.to_string(),
             );
         }
         Some(tls) => match &tls.verification {
             TlsVerification::None {} => {
                 config.insert(
                     SupersetConfigOptions::AuthLdapTlsDemand.to_string(),
-                    "True".into(),
+                    true.to_string(),
                 );
                 config.insert(
                     SupersetConfigOptions::AuthLdapAllowSelfSigned.to_string(),
-                    "True".into(),
+                    true.to_string(),
                 );
             }
             TlsVerification::Server(server_verification) => {
@@ -194,11 +192,11 @@ fn append_server_ca_cert(
 ) {
     config.insert(
         SupersetConfigOptions::AuthLdapTlsDemand.to_string(),
-        "True".into(),
+        true.to_string(),
     );
     config.insert(
         SupersetConfigOptions::AuthLdapAllowSelfSigned.to_string(),
-        "True".into(),
+        true.to_string(),
     );
     match server_ca_cert {
         CaCert::SecretClass(..) => {
@@ -210,13 +208,5 @@ fn append_server_ca_cert(
             );
         }
         CaCert::WebPki {} => {}
-    }
-}
-
-fn to_python_bool(value: bool) -> String {
-    if value {
-        "True".into()
-    } else {
-        "False".into()
     }
 }
