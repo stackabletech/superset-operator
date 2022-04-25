@@ -17,6 +17,13 @@ installation method. First ensure that you have installed the Stackable Operator
 $ helm repo add stackable https://repo.stackable.tech/repository/helm-stable/
 ----
 
+We also need some addition components of the Stackable Data Platform (if not installed already)
+[source,bash]
+----
+$ helm install commons-operator stackable/commons-operator
+$ helm install secret-operator stackable/secret-operator
+----
+
 Then install the Stackable Operator for Apache Superset
 [source,bash]
 ----
