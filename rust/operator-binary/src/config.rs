@@ -1,3 +1,4 @@
+use crate::superset_controller::{CERTS_DIR, SECRETS_DIR};
 use stackable_operator::commons::{
     authentication::{AuthenticationClass, AuthenticationClassProvider},
     ldap::LdapAuthenticationProvider,
@@ -167,11 +168,11 @@ fn append_ldap_config(
                 );
                 config.insert(
                     SupersetConfigOptions::AuthLdapTlsCertfile.to_string(),
-                    format!("/stackable/certificates/{authentication_class_name}-tls-certificate/tls.crt"),
+                    format!("{CERTS_DIR}{authentication_class_name}-tls-certificate/tls.crt"),
                 );
                 config.insert(
                     SupersetConfigOptions::AuthLdapTlsKeyfile.to_string(),
-                    format!("/stackable/certificates/{authentication_class_name}-tls-certificate/tls.key"),
+                    format!("{CERTS_DIR}{authentication_class_name}-tls-certificate/tls.key"),
                 );
             }
         },
@@ -180,11 +181,15 @@ fn append_ldap_config(
     if ldap.bind_credentials.is_some() {
         config.insert(
             SupersetConfigOptions::AuthLdapBindUser.to_string(),
-            format!("open('/stackable/secrets/{authentication_class_name}-bind-credentials/user').read()"),
+            format!(
+                "open('{SECRETS_DIR}{authentication_class_name}-bind-credentials/user').read()"
+            ),
         );
         config.insert(
             SupersetConfigOptions::AuthLdapBindPassword.to_string(),
-            format!("open('/stackable/secrets/{authentication_class_name}-bind-credentials/password').read()"),
+            format!(
+                "open('{SECRETS_DIR}{authentication_class_name}-bind-credentials/password').read()"
+            ),
         );
     }
 }
@@ -206,9 +211,7 @@ fn append_server_ca_cert(
         CaCert::SecretClass(..) => {
             config.insert(
                 SupersetConfigOptions::AuthLdapTlsCacertfile.to_string(),
-                format!(
-                    "/stackable/certificates/{authentication_class_name}-tls-certificate/ca.crt"
-                ),
+                format!("{CERTS_DIR}{authentication_class_name}-tls-certificate/ca.crt"),
             );
         }
         CaCert::WebPki {} => {}

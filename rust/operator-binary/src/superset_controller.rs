@@ -57,6 +57,8 @@ const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
+pub const SECRETS_DIR: &str = "/stackable/secrets/";
+pub const CERTS_DIR: &str = "/stackable/certificates/";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -542,7 +544,7 @@ fn add_authentication_volumes_and_volume_mounts(
                     &bind_credentials.secret_class,
                     bind_credentials.scope.as_ref(),
                 ));
-                cb.add_volume_mount(&volume_name, format!("/stackable/secrets/{volume_name}"));
+                cb.add_volume_mount(&volume_name, format!("{SECRETS_DIR}{volume_name}"));
             }
 
             if let Some(tls) = &ldap.tls {
@@ -558,10 +560,7 @@ fn add_authentication_volumes_and_volume_mounts(
                             cert_secret_class,
                             None,
                         ));
-                        cb.add_volume_mount(
-                            &volume_name,
-                            format!("/stackable/certificates/{volume_name}"),
-                        );
+                        cb.add_volume_mount(&volume_name, format!("{CERTS_DIR}{volume_name}"));
                     }
                     // Explicitly listing other possibilities to not oversee new enum variants in the future
                     TlsVerification::None {}
