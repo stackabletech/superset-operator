@@ -9,7 +9,7 @@ use stackable_operator::schemars::{self, JsonSchema};
 #[serde(rename_all = "camelCase")]
 pub struct ClusterRef {
     pub name: String,
-    pub namespace: String,
+    pub namespace: Option<String>,
 }
 
 #[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -35,6 +35,34 @@ pub struct DruidConnectionSpec {
 impl DruidConnection {
     pub fn job_name(&self) -> String {
         format!("{}-import", self.name())
+    }
+
+    pub fn superset_name(&self) -> String {
+        self.spec.superset.name.clone()
+    }
+
+    pub fn superset_namespace(&self) -> String {
+        if let Some(ns) = &self.spec.superset.namespace {
+            ns.to_string()
+        } else if let Some(ns) = &self.namespace() {
+            ns.to_string()
+        } else {
+            "default".to_string()
+        }
+    }
+
+    pub fn druid_name(&self) -> String {
+        self.spec.druid.name.clone()
+    }
+
+    pub fn druid_namespace(&self) -> String {
+        if let Some(ns) = &self.spec.druid.namespace {
+            ns.to_string()
+        } else if let Some(ns) = &self.namespace() {
+            ns.to_string()
+        } else {
+            "default".to_string()
+        }
     }
 }
 

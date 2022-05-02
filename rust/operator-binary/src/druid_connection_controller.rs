@@ -108,8 +108,8 @@ pub async fn reconcile_druid_connection(
                 let mut superset_db_ready = false;
                 if let Some(status) = client
                     .get::<SupersetDB>(
-                        &druid_connection.spec.superset.name,
-                        Some(&druid_connection.spec.superset.namespace),
+                        &druid_connection.superset_name(),
+                        Some(&druid_connection.superset_namespace()),
                     )
                     .await
                     .context(SupersetDBRetrievalSnafu)?
@@ -120,8 +120,8 @@ pub async fn reconcile_druid_connection(
                 // Is the referenced druid discovery configmap there?
                 let druid_discovery_cm_exists = client
                     .exists::<ConfigMap>(
-                        &druid_connection.spec.druid.name,
-                        Some(&druid_connection.spec.druid.namespace),
+                        &druid_connection.druid_name(),
+                        Some(&druid_connection.druid_namespace()),
                     )
                     .await
                     .context(DruidDiscoveryCheckSnafu)?;
@@ -129,15 +129,15 @@ pub async fn reconcile_druid_connection(
                 if superset_db_ready && druid_discovery_cm_exists {
                     let superset_db = client
                         .get::<SupersetDB>(
-                            &druid_connection.spec.superset.name,
-                            Some(&druid_connection.spec.superset.namespace),
+                            &druid_connection.superset_name(),
+                            Some(&druid_connection.superset_namespace()),
                         )
                         .await
                         .context(SupersetDBRetrievalSnafu)?;
                     // Everything is there, retrieve all necessary info and start the job
                     let sqlalchemy_str = get_sqlalchemy_uri_for_druid_cluster(
-                        &druid_connection.spec.druid.name,
-                        &druid_connection.spec.druid.namespace,
+                        &druid_connection.druid_name(),
+                        &druid_connection.druid_namespace(),
                         client,
                     )
                     .await?;
