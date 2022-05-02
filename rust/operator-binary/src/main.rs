@@ -5,6 +5,7 @@ mod util;
 
 use clap::Parser;
 use futures::StreamExt;
+use stackable_operator::k8s_openapi::api::core::v1::ConfigMap;
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     k8s_openapi::api::{
@@ -19,7 +20,6 @@ use stackable_operator::{
     },
     logging::controller::report_controller_reconciled,
 };
-use stackable_operator::k8s_openapi::api::core::v1::ConfigMap;
 use stackable_superset_crd::{
     druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
 };
@@ -216,7 +216,7 @@ async fn main() -> anyhow::Result<()> {
                                 &druid_connection.druid_namespace()
                                     == config_map.metadata.namespace.as_ref().unwrap()
                                     && &druid_connection.druid_name()
-                                    == config_map.metadata.name.as_ref().unwrap()
+                                        == config_map.metadata.name.as_ref().unwrap()
                             })
                             .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
