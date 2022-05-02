@@ -12,11 +12,17 @@
 ### Changed
 
 - Required product image version changed to 2 ([#182]).
+- DruidConnection namespace properties are optional now ([#187]).
+
+### Fixed
+
+- A DruidConnection was not established if the Druid instance was started after the Superset instance, this was fixed ([#187]).
 
 [#173]: https://github.com/stackabletech/superset-operator/pull/173
 [#178]: https://github.com/stackabletech/superset-operator/pull/178
 [#179]: https://github.com/stackabletech/superset-operator/pull/179
 [#182]: https://github.com/stackabletech/superset-operator/pull/182
+[#187]: https://github.com/stackabletech/superset-operator/pull/187
 
 ## [0.4.0] - 2022-04-05
 
