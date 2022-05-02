@@ -172,7 +172,7 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
 
     let container = ContainerBuilder::new("superset-init-db")
         .image(format!(
-            "docker.stackable.tech/stackable/superset:{}-stackable1",
+            "docker.stackable.tech/stackable/superset:{}-stackable2",
             superset_db.spec.superset_version
         ))
         .command(vec!["/bin/bash".to_string()])
