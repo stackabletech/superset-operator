@@ -5,13 +5,12 @@ mod util;
 
 use clap::Parser;
 use futures::StreamExt;
-use stackable_operator::k8s_openapi::api::core::v1::ConfigMap;
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         batch::v1::Job,
-        core::v1::{Secret, Service},
+        core::v1::{Secret, Service, ConfigMap},
     },
     kube::{
         api::ListParams,
