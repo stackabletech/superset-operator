@@ -141,7 +141,7 @@ image::superset-databases.png[Superset databases showing the connected Druid clu
 == Monitoring
 
 The managed Superset instances are automatically configured to export Prometheus metrics. See
-xref:home::monitoring.adoc[] for more details.
+xref:home:operators:monitoring.adoc[] for more details.
 
 == Configuration & Environment Overrides
 
