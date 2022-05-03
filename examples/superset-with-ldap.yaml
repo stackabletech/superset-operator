@@ -95,11 +95,6 @@ metadata:
   name: superset-with-ldap-server-veri-tls-credentials
 type: Opaque
 stringData:
-  adminUser.username: admin
-  adminUser.firstname: Superset
-  adminUser.lastname: Admin
-  adminUser.email: admin@superset.com
-  adminUser.password: admin
   connections.secretKey: thisISaSECRET_1234
   connections.sqlalchemyDatabaseUri: postgresql://superset:superset@postgresql-superset.default.svc.cluster.local/superset
 ---
