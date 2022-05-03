@@ -36,7 +36,7 @@ pub fn add_superset_config(
     );
     config.insert(
         SupersetConfigOptions::MapboxApiKey.to_string(),
-        "os.environ.get('MAPBOX_API_KEY')".into(),
+        "os.environ.get('MAPBOX_API_KEY', '')".into(),
     );
 
     if let Some(authentication_method) = authentication_method {
