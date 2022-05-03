@@ -10,7 +10,7 @@ use stackable_operator::{
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         batch::v1::Job,
-        core::v1::{Secret, Service, ConfigMap},
+        core::v1::{ConfigMap, Secret, Service},
     },
     kube::{
         api::ListParams,
