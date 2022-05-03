@@ -109,7 +109,7 @@ If the examples were loaded then some dashboards are already available:
 image::superset-dashboard.png[Superset dashboard showing birth names]
 
 == Authenticate users using LDAP
-Superset supports authentication users against an LDAP server.
+Superset supports authentication of users against an LDAP server.
 Have a look at https://github.com/stackabletech/superset-operator/blob/main/examples/superset-with-ldap.yaml[the LDAP example] and the general xref:commons-operator::authenticationclass.adoc[Stackable Authentication] documentation.
 
 == Connecting Apache Druid Clusters
