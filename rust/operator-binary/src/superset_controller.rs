@@ -1,7 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 
 use crate::{
-    config,
+    config::{self, PYTHON_IMPORTS},
     util::{statsd_exporter_version, superset_version},
     APP_NAME, APP_PORT,
 };
@@ -316,7 +316,7 @@ fn build_rolegroup_config_map(
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
         &mut config_file,
         config.iter(),
-        config::get_imports(),
+        PYTHON_IMPORTS,
     )
     .with_context(|_| BuildRoleGroupConfigFileSnafu {
         rolegroup: rolegroup.clone(),
