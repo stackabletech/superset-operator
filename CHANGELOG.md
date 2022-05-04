@@ -22,7 +22,7 @@
 [#173]: https://github.com/stackabletech/superset-operator/pull/173
 [#178]: https://github.com/stackabletech/superset-operator/pull/178
 [#179]: https://github.com/stackabletech/superset-operator/pull/179
-[#180]: https://github.com/stackabletech/superset-operator/pull/179
+[#180]: https://github.com/stackabletech/superset-operator/pull/180
 [#182]: https://github.com/stackabletech/superset-operator/pull/182
 [#190]: https://github.com/stackabletech/superset-operator/pull/190
 
