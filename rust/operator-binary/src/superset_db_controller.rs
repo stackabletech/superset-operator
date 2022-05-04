@@ -148,7 +148,12 @@ pub async fn reconcile_superset_db(
 }
 
 fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
-    let config = "import os; SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI')";
+    let config = [
+        "import os",
+        "SECRET_KEY = os.environ.get('SECRET_KEY')",
+        "SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI')",
+    ]
+    .join("; ");
 
     let mut commands = vec![
         format!("mkdir -p {PYTHONPATH}"),
@@ -172,7 +177,7 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
 
     let container = ContainerBuilder::new("superset-init-db")
         .image(format!(
-            "docker.stackable.tech/stackable/superset:{}-stackable1",
+            "docker.stackable.tech/stackable/superset:{}-stackable2",
             superset_db.spec.superset_version
         ))
         .command(vec!["/bin/bash".to_string()])
@@ -182,6 +187,7 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
             String::from("-c"),
             commands.join("; "),
         ])
+        .add_env_var_from_secret("SECRET_KEY", secret, "connections.secretKey")
         .add_env_var_from_secret("DATABASE_URI", secret, "connections.sqlalchemyDatabaseUri")
         .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
         .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
