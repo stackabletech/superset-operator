@@ -13,10 +13,16 @@
 
 - Required product image version changed to 2 ([#182]).
 
+### Fixed
+
+- The correct secret key is used when upgrading the Superset database. This
+  issue was introduced in [#173] ([#190]).
+
 [#173]: https://github.com/stackabletech/superset-operator/pull/173
 [#178]: https://github.com/stackabletech/superset-operator/pull/178
 [#179]: https://github.com/stackabletech/superset-operator/pull/179
 [#182]: https://github.com/stackabletech/superset-operator/pull/182
+[#190]: https://github.com/stackabletech/superset-operator/pull/190
 
 ## [0.4.0] - 2022-04-05
 
