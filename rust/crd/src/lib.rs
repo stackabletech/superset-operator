@@ -140,24 +140,11 @@ pub struct SupersetClusterSpec {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClusterAuthenticationConfig {
-    pub methods: Vec<SupersetClusterAuthenticationConfigMethod>,
-}
+    /// Name of the AuthenticationClass used to authenticate the users.
+    /// At the moment only LDAP is supported.
+    /// If not specified the default authentication (AUTH_DB) will be used.
+    pub authentication_class: Option<String>,
 
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetClusterAuthenticationConfigMethod {
-    /// Name of the AuthenticationClass used to authenticate the users
-    pub authentication_class: String,
-    /// Additional LDAP settings.
-    /// Can only be specified when the specified AuthenticationClass uses the LDAP protocol
-    /// See [Flask LDAP documentation](https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap)
-    pub ldap_extras: Option<SupersetClusterAuthenticationConfigLdapExtras>,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-/// Additional configs to LDAP Authentication in Superset. See <https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-ldap>
-pub struct SupersetClusterAuthenticationConfigLdapExtras {
     /// Allow users who are not already in the FAB DB.
     /// Gets mapped to `AUTH_USER_REGISTRATION`
     #[serde(default = "default_user_registration")]

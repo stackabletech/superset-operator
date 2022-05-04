@@ -5,7 +5,7 @@ use stackable_operator::commons::{
     tls::{CaCert, TlsVerification},
 };
 use stackable_superset_crd::{
-    LdapRolesSyncMoment, SupersetClusterAuthenticationConfigMethod, SupersetConfigOptions,
+    LdapRolesSyncMoment, SupersetClusterAuthenticationConfig, SupersetConfigOptions,
 };
 use std::collections::BTreeMap;
 
@@ -17,7 +17,7 @@ pub const PYTHON_IMPORTS: &[&str; 3] = &[
 
 pub fn add_superset_config(
     config: &mut BTreeMap<String, String>,
-    authentication_method: Option<&SupersetClusterAuthenticationConfigMethod>,
+    authentication_config: Option<&SupersetClusterAuthenticationConfig>,
     authentication_class: Option<&AuthenticationClass>,
 ) {
     config.insert(
@@ -37,32 +37,44 @@ pub fn add_superset_config(
         "os.environ.get('MAPBOX_API_KEY', '')".into(),
     );
 
-    if let Some(authentication_method) = authentication_method {
+    if let Some(authentication_config) = authentication_config {
         if let Some(authentication_class) = authentication_class {
-            append_authentication_config(config, authentication_method, authentication_class);
+            append_authentication_config(config, authentication_config, authentication_class);
         }
     }
 }
 
 fn append_authentication_config(
     config: &mut BTreeMap<String, String>,
-    authentication_method: &SupersetClusterAuthenticationConfigMethod,
+    authentication_config: &SupersetClusterAuthenticationConfig,
     authentication_class: &AuthenticationClass,
 ) {
+    let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
     match &authentication_class.spec.provider {
         AuthenticationClassProvider::Ldap(ldap) => {
-            append_ldap_config(config, authentication_method, ldap);
+            append_ldap_config(config, ldap, authentication_class_name);
         }
     }
+
+    config.insert(
+        SupersetConfigOptions::AuthUserRegistration.to_string(),
+        authentication_config.user_registration.to_string(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthUserRegistrationRole.to_string(),
+        authentication_config.user_registration_role.to_string(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthRolesSyncAtLogin.to_string(),
+        (authentication_config.sync_roles_at == LdapRolesSyncMoment::Login).to_string(),
+    );
 }
 
 fn append_ldap_config(
     config: &mut BTreeMap<String, String>,
-    authentication_method: &SupersetClusterAuthenticationConfigMethod,
     ldap: &LdapAuthenticationProvider,
+    authentication_class_name: &str,
 ) {
-    let authentication_class_name = &authentication_method.authentication_class;
-
     config.insert(
         SupersetConfigOptions::AuthType.to_string(),
         "AUTH_LDAP".into(),
@@ -102,34 +114,6 @@ fn append_ldap_config(
     config.insert(
         SupersetConfigOptions::AuthLdapLastnameField.to_string(),
         ldap.ldap_field_names.surname.clone(),
-    );
-    config.insert(
-        SupersetConfigOptions::AuthUserRegistration.to_string(),
-        authentication_method
-            .ldap_extras
-            .as_ref()
-            .map(|extra| extra.user_registration)
-            .unwrap_or_else(stackable_superset_crd::default_user_registration)
-            .to_string(),
-    );
-    config.insert(
-        SupersetConfigOptions::AuthUserRegistrationRole.to_string(),
-        authentication_method
-            .ldap_extras
-            .as_ref()
-            .map(|extra| &extra.user_registration_role)
-            .unwrap_or(&stackable_superset_crd::default_user_registration_role())
-            .into(),
-    );
-    config.insert(
-        SupersetConfigOptions::AuthRolesSyncAtLogin.to_string(),
-        (authentication_method
-            .ldap_extras
-            .as_ref()
-            .map(|extra| &extra.sync_roles_at)
-            .unwrap_or(&stackable_superset_crd::default_sync_roles_at())
-            == &LdapRolesSyncMoment::Login)
-            .to_string(),
     );
 
     // Possible TLS options, see https://github.com/dpgaspar/Flask-AppBuilder/blob/f6f66fc1bcc0163a213e4a2e6f960e91082d201f/flask_appbuilder/security/manager.py#L243-L250

@@ -256,16 +256,12 @@ fn references_authentication_class(
     authentication_config: &Option<SupersetClusterAuthenticationConfig>,
     authentication_class: &AuthenticationClass,
 ) -> bool {
-    match authentication_config {
-        Some(authentication_config) => {
-            authentication_config
-                .methods
-                .iter()
-                .any(|authentication_method| {
-                    &authentication_method.authentication_class
-                        == authentication_class.metadata.name.as_ref().unwrap()
-                })
+    if let Some(authentication_config) = authentication_config {
+        if let Some(authentication_class_name) = &authentication_config.authentication_class {
+            return authentication_class_name
+                == authentication_class.metadata.name.as_ref().unwrap();
         }
-        None => false,
     }
+
+    false
 }

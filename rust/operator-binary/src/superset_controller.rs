@@ -48,8 +48,8 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 use stackable_superset_crd::{
-    supersetdb::SupersetDB, SupersetCluster, SupersetClusterAuthenticationConfigMethod,
-    SupersetConfig, SupersetConfigOptions, SupersetRole, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
+    supersetdb::SupersetDB, SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole,
+    PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -192,27 +192,25 @@ pub async fn reconcile_superset(
         .await
         .context(ApplyRoleServiceSnafu)?;
 
-    let authentication_methods: Vec<_> = superset
-        .spec
-        .authentication_config
-        .iter()
-        .flat_map(|config| &config.methods)
-        .collect();
-
-    let (authentication_method, authentication_class) = match authentication_methods[..] {
-        [] => (None, None),
-        [authentication_method] => {
-            let authentication_class = client
-                .get::<AuthenticationClass>(&authentication_method.authentication_class, None) // AuthenticationClass has ClusterScope
-                .await
-                .context(AuthenticationClassRetrievalSnafu {
-                    authentication_class: ObjectRef::<AuthenticationClass>::new(
-                        &authentication_method.authentication_class,
-                    ),
-                })?;
-            (Some(authentication_method), Some(authentication_class))
+    let authentication_class = match &superset.spec.authentication_config {
+        Some(authentication_config) => {
+            match &authentication_config.authentication_class {
+                Some(authentication_class) => {
+                    Some(
+                        client
+                            .get::<AuthenticationClass>(authentication_class, None) // AuthenticationClass has ClusterScope
+                            .await
+                            .context(AuthenticationClassRetrievalSnafu {
+                                authentication_class: ObjectRef::<AuthenticationClass>::new(
+                                    authentication_class,
+                                ),
+                            })?,
+                    )
+                }
+                None => None,
+            }
         }
-        _ => return MultipleAuthenticationMethodsSnafu.fail(),
+        None => None,
     };
 
     for (rolegroup_name, rolegroup_config) in role_node_config.iter() {
@@ -223,7 +221,6 @@ pub async fn reconcile_superset(
             &superset,
             &rolegroup,
             rolegroup_config,
-            authentication_method,
             authentication_class.as_ref(),
         )?;
         let rg_statefulset = build_server_rolegroup_statefulset(
@@ -300,7 +297,6 @@ fn build_rolegroup_config_map(
     superset: &SupersetCluster,
     rolegroup: &RoleGroupRef<SupersetCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    authentication_method: Option<&SupersetClusterAuthenticationConfigMethod>,
     authentication_class: Option<&AuthenticationClass>,
 ) -> Result<ConfigMap, Error> {
     let mut config = rolegroup_config
@@ -310,7 +306,11 @@ fn build_rolegroup_config_map(
         .cloned()
         .unwrap_or_default();
 
-    config::add_superset_config(&mut config, authentication_method, authentication_class);
+    config::add_superset_config(
+        &mut config,
+        superset.spec.authentication_config.as_ref(),
+        authentication_class,
+    );
 
     let mut config_file = Vec::new();
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
