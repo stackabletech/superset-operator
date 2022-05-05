@@ -574,15 +574,11 @@ fn add_authentication_volumes_and_volume_mounts(
 
             Ok(())
         }
-        _ => {
-            AuthenticationClassProviderNotSupportedSnafu {
-                authentication_class_provider: authentication_class.spec.provider.to_string(),
-                authentication_class: ObjectRef::<AuthenticationClass>::new(
-                    authentication_class_name,
-                ),
-            }
-            .fail()
+        _ => AuthenticationClassProviderNotSupportedSnafu {
+            authentication_class_provider: authentication_class.spec.provider.to_string(),
+            authentication_class: ObjectRef::<AuthenticationClass>::new(authentication_class_name),
         }
+        .fail(),
     }
 }
 
