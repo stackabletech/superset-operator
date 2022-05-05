@@ -574,9 +574,9 @@ fn add_authentication_volumes_and_volume_mounts(
 
             Ok(())
         }
-        AuthenticationClassProvider::Tls(_) => {
+        _ => {
             AuthenticationClassProviderNotSupportedSnafu {
-                authentication_class_provider: "tls".to_string(), // TODO: Change to authentication_class.spec.provider.to_string() when operators-rs > 0.18.0 released
+                authentication_class_provider: authentication_class.spec.provider.to_string(),
                 authentication_class: ObjectRef::<AuthenticationClass>::new(
                     authentication_class_name,
                 ),
