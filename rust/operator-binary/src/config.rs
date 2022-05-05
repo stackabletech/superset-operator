@@ -50,10 +50,8 @@ fn append_authentication_config(
     authentication_class: &AuthenticationClass,
 ) {
     let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
-    match &authentication_class.spec.provider {
-        AuthenticationClassProvider::Ldap(ldap) => {
-            append_ldap_config(config, ldap, authentication_class_name);
-        }
+    if let AuthenticationClassProvider::Ldap(ldap) = &authentication_class.spec.provider {
+        append_ldap_config(config, ldap, authentication_class_name);
     }
 
     config.insert(
@@ -142,21 +140,6 @@ fn append_ldap_config(
                     &server_verification.ca_cert,
                 );
             }
-            TlsVerification::Mutual(mutual_verification) => {
-                append_server_ca_cert(
-                    config,
-                    authentication_class_name,
-                    &CaCert::SecretClass(mutual_verification.cert_secret_class.to_string()),
-                );
-                config.insert(
-                    SupersetConfigOptions::AuthLdapTlsCertfile.to_string(),
-                    format!("{CERTS_DIR}{authentication_class_name}-tls-certificate/tls.crt"),
-                );
-                config.insert(
-                    SupersetConfigOptions::AuthLdapTlsKeyfile.to_string(),
-                    format!("{CERTS_DIR}{authentication_class_name}-tls-certificate/tls.key"),
-                );
-            }
         },
     }
 
@@ -187,7 +170,7 @@ fn append_server_ca_cert(
     );
     config.insert(
         SupersetConfigOptions::AuthLdapAllowSelfSigned.to_string(),
-        true.to_string(),
+        false.to_string(),
     );
     match server_ca_cert {
         CaCert::SecretClass(..) => {

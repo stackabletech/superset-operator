@@ -22,7 +22,7 @@ use stackable_operator::{
     commons::{
         authentication::{AuthenticationClass, AuthenticationClassProvider},
         secret_class::SecretClassVolumeScope,
-        tls::{CaCert, TlsMutualVerification, TlsServerVerification, TlsVerification},
+        tls::{CaCert, TlsServerVerification, TlsVerification},
     },
     k8s_openapi::{
         api::{
@@ -90,27 +90,27 @@ pub enum Error {
     ApplySupersetDB {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to apply Service for {}", rolegroup))]
+    #[snafu(display("failed to apply Service for {rolegroup}"))]
     ApplyRoleGroupService {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
-    #[snafu(display("failed to build config file for {}", rolegroup))]
+    #[snafu(display("failed to build config file for {rolegroup}"))]
     BuildRoleGroupConfigFile {
         source: FlaskAppConfigWriterError,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
-    #[snafu(display("failed to build ConfigMap for {}", rolegroup))]
+    #[snafu(display("failed to build ConfigMap for {rolegroup}"))]
     BuildRoleGroupConfig {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
-    #[snafu(display("failed to apply ConfigMap for {}", rolegroup))]
+    #[snafu(display("failed to apply ConfigMap for {rolegroup}"))]
     ApplyRoleGroupConfig {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
-    #[snafu(display("failed to apply StatefulSet for {}", rolegroup))]
+    #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
@@ -127,16 +127,19 @@ pub enum Error {
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("Superset only supports a single authentication method"))]
-    MultipleAuthenticationMethods,
-    #[snafu(display("failed to retrieve {}", authentication_class))]
+    #[snafu(display("Superset doesn't support the AuthenticationClass provider {authentication_class_provider} from AuthenticationClass {authentication_class}"))]
+    AuthenticationClassProviderNotSupported {
+        authentication_class_provider: String,
+        authentication_class: ObjectRef<AuthenticationClass>,
+    },
+    #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
     AuthenticationClassRetrieval {
         source: stackable_operator::error::Error,
         authentication_class: ObjectRef<AuthenticationClass>,
     },
 }
 
-type Result<T, E = Error> = std::result::Result<T, E>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 impl ReconcilerError for Error {
     fn category(&self) -> &'static str {
@@ -453,7 +456,7 @@ fn build_server_rolegroup_statefulset(
     }
 
     if let Some(authentication_class) = authentication_class {
-        add_authentication_volumes_and_volume_mounts(authentication_class, &mut cb, &mut pb);
+        add_authentication_volumes_and_volume_mounts(authentication_class, &mut cb, &mut pb)?;
     }
 
     let container = cb
@@ -531,7 +534,7 @@ fn add_authentication_volumes_and_volume_mounts(
     authentication_class: &AuthenticationClass,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
-) {
+) -> Result<()> {
     let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
 
     match &authentication_class.spec.provider {
@@ -551,8 +554,7 @@ fn add_authentication_volumes_and_volume_mounts(
                 match &tls.verification {
                     TlsVerification::Server(TlsServerVerification {
                         ca_cert: CaCert::SecretClass(cert_secret_class),
-                    })
-                    | TlsVerification::Mutual(TlsMutualVerification { cert_secret_class }) => {
+                    }) => {
                         let volume_name = format!("{authentication_class_name}-tls-certificate");
 
                         pb.add_volume(build_secret_operator_volume(
@@ -569,6 +571,17 @@ fn add_authentication_volumes_and_volume_mounts(
                     }) => {}
                 }
             }
+
+            Ok(())
+        }
+        AuthenticationClassProvider::Tls(_) => {
+            AuthenticationClassProviderNotSupportedSnafu {
+                authentication_class_provider: "tls".to_string(), // TODO: Change to authentication_class.spec.provider.to_string() when operators-rs > 0.18.0 released
+                authentication_class: ObjectRef::<AuthenticationClass>::new(
+                    authentication_class_name,
+                ),
+            }
+            .fail()
         }
     }
 }
