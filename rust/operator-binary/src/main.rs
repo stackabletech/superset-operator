@@ -180,13 +180,8 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                if let Ok(ns) = druid_connection.superset_namespace() {
-                                    Some(ns) == sdb.metadata.namespace
-                                        && Some(druid_connection.superset_name())
-                                            == sdb.metadata.name
-                                } else {
-                                    false
-                                }
+                                druid_connection.superset_namespace().ok() == sdb.metadata.namespace
+                                    && Some(druid_connection.superset_name()) == sdb.metadata.name
                             })
                             .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
@@ -213,13 +208,10 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                if let Ok(ns) = druid_connection.druid_namespace() {
-                                    Some(ns) == config_map.metadata.namespace
-                                        && Some(druid_connection.druid_name())
-                                            == config_map.metadata.name
-                                } else {
-                                    false
-                                }
+                                druid_connection.druid_namespace().ok()
+                                    == config_map.metadata.namespace
+                                    && Some(druid_connection.druid_name())
+                                        == config_map.metadata.name
                             })
                             .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
