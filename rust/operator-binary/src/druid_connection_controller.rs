@@ -120,7 +120,7 @@ pub async fn reconcile_druid_connection(
                         Some(
                             &druid_connection
                                 .superset_namespace()
-                                .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::new(&druid_connection.name())})?,
+                                .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::from_obj(&*druid_connection)})?,
                         ),
                     )
                     .await
@@ -136,7 +136,7 @@ pub async fn reconcile_druid_connection(
                         Some(
                             &druid_connection
                                 .druid_namespace()
-                                .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::new(&druid_connection.name())})?,
+                                .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::from_obj(&*druid_connection)})?,
                         ),
                     )
                     .await
@@ -149,7 +149,7 @@ pub async fn reconcile_druid_connection(
                             Some(
                                 &druid_connection
                                     .superset_namespace()
-                                    .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::new(&druid_connection.name())})?,
+                                    .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::from_obj(&*druid_connection)})?,
                             ),
                         )
                         .await
@@ -160,7 +160,7 @@ pub async fn reconcile_druid_connection(
                         Some(
                             &druid_connection
                                 .druid_namespace()
-                                .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::new(&druid_connection.name())})?,
+                                .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::from_obj(&*druid_connection)})?,
                         ),
                         client,
                     )
