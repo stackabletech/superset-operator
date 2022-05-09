@@ -68,9 +68,10 @@ pub enum Error {
     SupersetDBRetrieval {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("namespace missing on Druid Connection"))]
+    #[snafu(display("namespace missing on DruidConnection {druid_connection}"))]
     DruidConnectionNoNamespace {
         source: stackable_superset_crd::druidconnection::Error,
+        druid_connection: ObjectRef<DruidConnection>,
     },
 }
 
@@ -93,7 +94,9 @@ impl ReconcilerError for Error {
             Error::GetImportJob { import_job, .. } => Some(import_job.clone().erase()),
             Error::DruidDiscoveryCheck { .. } => None,
             Error::SupersetDBRetrieval { .. } => None,
-            Error::DruidConnectionNoNamespace { .. } => None,
+            Error::DruidConnectionNoNamespace { druid_connection, .. } => {
+                Some(druid_connection.clone().erase())
+            },
         }
     }
 }
@@ -117,7 +120,7 @@ pub async fn reconcile_druid_connection(
                         Some(
                             &druid_connection
                                 .superset_namespace()
-                                .context(DruidConnectionNoNamespaceSnafu)?,
+                                .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::new(&druid_connection.name())})?,
                         ),
                     )
                     .await
@@ -133,7 +136,7 @@ pub async fn reconcile_druid_connection(
                         Some(
                             &druid_connection
                                 .druid_namespace()
-                                .context(DruidConnectionNoNamespaceSnafu)?,
+                                .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::new(&druid_connection.name())})?,
                         ),
                     )
                     .await
@@ -146,7 +149,7 @@ pub async fn reconcile_druid_connection(
                             Some(
                                 &druid_connection
                                     .superset_namespace()
-                                    .context(DruidConnectionNoNamespaceSnafu)?,
+                                    .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::new(&druid_connection.name())})?,
                             ),
                         )
                         .await
@@ -157,7 +160,7 @@ pub async fn reconcile_druid_connection(
                         Some(
                             &druid_connection
                                 .druid_namespace()
-                                .context(DruidConnectionNoNamespaceSnafu)?,
+                                .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::new(&druid_connection.name())})?,
                         ),
                         client,
                     )
