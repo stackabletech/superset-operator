@@ -1,9 +1,18 @@
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use stackable_operator::k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use stackable_operator::k8s_openapi::chrono::Utc;
 use stackable_operator::kube::CustomResource;
 use stackable_operator::kube::ResourceExt;
 use stackable_operator::schemars::{self, JsonSchema};
+
+#[derive(Snafu, Debug)]
+#[allow(clippy::enum_variant_names)]
+pub enum Error {
+    #[snafu(display("{druid_connection} is missing a namespace, this should not happen!"))]
+    NoNamespace { druid_connection: String },
+}
+type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -41,13 +50,16 @@ impl DruidConnection {
         self.spec.superset.name.clone()
     }
 
-    pub fn superset_namespace(&self) -> Option<String> {
-        if self.spec.superset.namespace.is_some() {
-            self.spec.superset.namespace.clone()
-        } else if self.namespace().is_some() {
-            self.namespace()
+    pub fn superset_namespace(&self) -> Result<String> {
+        if let Some(superset_ns) = &self.spec.superset.namespace {
+            Ok(superset_ns.clone())
+        } else if let Some(ns) = self.namespace() {
+            Ok(ns)
         } else {
-            None
+            NoNamespaceSnafu {
+                druid_connection: self.name(),
+            }
+            .fail()
         }
     }
 
@@ -55,13 +67,16 @@ impl DruidConnection {
         self.spec.druid.name.clone()
     }
 
-    pub fn druid_namespace(&self) -> Option<String> {
-        if self.spec.druid.namespace.is_some() {
-            self.spec.druid.namespace.clone()
-        } else if self.namespace().is_some() {
-            self.namespace()
+    pub fn druid_namespace(&self) -> Result<String> {
+        if let Some(druid_ns) = &self.spec.druid.namespace {
+            Ok(druid_ns.clone())
+        } else if let Some(ns) = self.namespace() {
+            Ok(ns)
         } else {
-            None
+            NoNamespaceSnafu {
+                druid_connection: self.name(),
+            }
+            .fail()
         }
     }
 }
