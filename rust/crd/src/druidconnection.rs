@@ -41,13 +41,13 @@ impl DruidConnection {
         self.spec.superset.name.clone()
     }
 
-    pub fn superset_namespace(&self) -> String {
-        if let Some(ns) = &self.spec.superset.namespace {
-            ns.to_string()
-        } else if let Some(ns) = &self.namespace() {
-            ns.to_string()
+    pub fn superset_namespace(&self) -> Option<String> {
+        if self.spec.superset.namespace.is_some() {
+            self.spec.superset.namespace.clone()
+        } else if self.namespace().is_some() {
+            self.namespace()
         } else {
-            "default".to_string()
+            None
         }
     }
 
@@ -55,13 +55,13 @@ impl DruidConnection {
         self.spec.druid.name.clone()
     }
 
-    pub fn druid_namespace(&self) -> String {
-        if let Some(ns) = &self.spec.druid.namespace {
-            ns.to_string()
-        } else if let Some(ns) = &self.namespace() {
-            ns.to_string()
+    pub fn druid_namespace(&self) -> Option<String> {
+        if self.spec.druid.namespace.is_some() {
+            self.spec.druid.namespace.clone()
+        } else if self.namespace().is_some() {
+            self.namespace()
         } else {
-            "default".to_string()
+            None
         }
     }
 }

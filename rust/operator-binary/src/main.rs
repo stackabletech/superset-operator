@@ -180,8 +180,8 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                &druid_connection.superset_namespace()
-                                    == sdb.metadata.namespace.as_ref().unwrap()
+                                druid_connection.superset_namespace()
+                                    == sdb.metadata.namespace
                                     && &druid_connection.superset_name()
                                         == sdb.metadata.name.as_ref().unwrap()
                             })
@@ -212,8 +212,8 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                &druid_connection.druid_namespace()
-                                    == config_map.metadata.namespace.as_ref().unwrap()
+                                druid_connection.druid_namespace()
+                                    == config_map.metadata.namespace
                                     && &druid_connection.druid_name()
                                         == config_map.metadata.name.as_ref().unwrap()
                             })

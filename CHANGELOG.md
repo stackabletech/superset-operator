@@ -16,13 +16,17 @@
 
 ### Fixed
 
-- A DruidConnection was not established if the Druid instance was started after the Superset instance, this was fixed ([#187]).
+- A DruidConnection was not established if the Druid instance was started after
+  the Superset instance, this was fixed ([#187]).
+- The correct secret key is used when upgrading the Superset database. This
+  issue was introduced in [#173] ([#190]).
 
 [#173]: https://github.com/stackabletech/superset-operator/pull/173
 [#178]: https://github.com/stackabletech/superset-operator/pull/178
 [#179]: https://github.com/stackabletech/superset-operator/pull/179
 [#182]: https://github.com/stackabletech/superset-operator/pull/182
 [#187]: https://github.com/stackabletech/superset-operator/pull/187
+[#190]: https://github.com/stackabletech/superset-operator/pull/190
 
 ## [0.4.0] - 2022-04-05
 

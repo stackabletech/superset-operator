@@ -109,7 +109,7 @@ pub async fn reconcile_druid_connection(
                 if let Some(status) = client
                     .get::<SupersetDB>(
                         &druid_connection.superset_name(),
-                        Some(&druid_connection.superset_namespace()),
+                        druid_connection.superset_namespace().as_deref(),
                     )
                     .await
                     .context(SupersetDBRetrievalSnafu)?
@@ -121,7 +121,7 @@ pub async fn reconcile_druid_connection(
                 let druid_discovery_cm_exists = client
                     .exists::<ConfigMap>(
                         &druid_connection.druid_name(),
-                        Some(&druid_connection.druid_namespace()),
+                        druid_connection.druid_namespace().as_deref(),
                     )
                     .await
                     .context(DruidDiscoveryCheckSnafu)?;
@@ -130,14 +130,14 @@ pub async fn reconcile_druid_connection(
                     let superset_db = client
                         .get::<SupersetDB>(
                             &druid_connection.superset_name(),
-                            Some(&druid_connection.superset_namespace()),
+                            druid_connection.superset_namespace().as_deref(),
                         )
                         .await
                         .context(SupersetDBRetrievalSnafu)?;
                     // Everything is there, retrieve all necessary info and start the job
                     let sqlalchemy_str = get_sqlalchemy_uri_for_druid_cluster(
                         &druid_connection.druid_name(),
-                        &druid_connection.druid_namespace(),
+                        druid_connection.druid_namespace().as_deref(),
                         client,
                     )
                     .await?;
@@ -201,14 +201,18 @@ pub async fn reconcile_druid_connection(
 /// Takes a druid cluster name and namespace and returns the SQLAlchemy connect string
 async fn get_sqlalchemy_uri_for_druid_cluster(
     cluster_name: &str,
-    namespace: &str,
+    namespace: Option<&str>,
     client: &Client,
 ) -> Result<String> {
     client
-        .get::<ConfigMap>(cluster_name, Some(namespace))
+        .get::<ConfigMap>(cluster_name, namespace)
         .await
         .context(GetDruidConnStringConfigMapSnafu {
-            config_map: ObjectRef::<ConfigMap>::new(cluster_name).within(namespace),
+            config_map: if let Some(ns) = namespace {
+                ObjectRef::<ConfigMap>::new(cluster_name).within(ns)
+            }  else {
+                ObjectRef::<ConfigMap>::new(cluster_name)
+            }
         })?
         .data
         .and_then(|mut data| data.remove("DRUID_SQLALCHEMY"))
