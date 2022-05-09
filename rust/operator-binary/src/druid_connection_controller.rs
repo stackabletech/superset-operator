@@ -94,9 +94,9 @@ impl ReconcilerError for Error {
             Error::GetImportJob { import_job, .. } => Some(import_job.clone().erase()),
             Error::DruidDiscoveryCheck { .. } => None,
             Error::SupersetDBRetrieval { .. } => None,
-            Error::DruidConnectionNoNamespace { druid_connection, .. } => {
-                Some(druid_connection.clone().erase())
-            },
+            Error::DruidConnectionNoNamespace {
+                druid_connection, ..
+            } => Some(druid_connection.clone().erase()),
         }
     }
 }
@@ -117,11 +117,11 @@ pub async fn reconcile_druid_connection(
                 if let Some(status) = client
                     .get::<SupersetDB>(
                         &druid_connection.superset_name(),
-                        Some(
-                            &druid_connection
-                                .superset_namespace()
-                                .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::from_obj(&*druid_connection)})?,
-                        ),
+                        Some(&druid_connection.superset_namespace().context(
+                            DruidConnectionNoNamespaceSnafu {
+                                druid_connection: ObjectRef::from_obj(&*druid_connection),
+                            },
+                        )?),
                     )
                     .await
                     .context(SupersetDBRetrievalSnafu)?
@@ -133,11 +133,11 @@ pub async fn reconcile_druid_connection(
                 let druid_discovery_cm_exists = client
                     .exists::<ConfigMap>(
                         &druid_connection.druid_name(),
-                        Some(
-                            &druid_connection
-                                .druid_namespace()
-                                .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::from_obj(&*druid_connection)})?,
-                        ),
+                        Some(&druid_connection.druid_namespace().context(
+                            DruidConnectionNoNamespaceSnafu {
+                                druid_connection: ObjectRef::from_obj(&*druid_connection),
+                            },
+                        )?),
                     )
                     .await
                     .context(DruidDiscoveryCheckSnafu)?;
@@ -146,22 +146,22 @@ pub async fn reconcile_druid_connection(
                     let superset_db = client
                         .get::<SupersetDB>(
                             &druid_connection.superset_name(),
-                            Some(
-                                &druid_connection
-                                    .superset_namespace()
-                                    .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::from_obj(&*druid_connection)})?,
-                            ),
+                            Some(&druid_connection.superset_namespace().context(
+                                DruidConnectionNoNamespaceSnafu {
+                                    druid_connection: ObjectRef::from_obj(&*druid_connection),
+                                },
+                            )?),
                         )
                         .await
                         .context(SupersetDBRetrievalSnafu)?;
                     // Everything is there, retrieve all necessary info and start the job
                     let sqlalchemy_str = get_sqlalchemy_uri_for_druid_cluster(
                         &druid_connection.druid_name(),
-                        Some(
-                            &druid_connection
-                                .druid_namespace()
-                                .context(DruidConnectionNoNamespaceSnafu {druid_connection: ObjectRef::from_obj(&*druid_connection)})?,
-                        ),
+                        Some(&druid_connection.druid_namespace().context(
+                            DruidConnectionNoNamespaceSnafu {
+                                druid_connection: ObjectRef::from_obj(&*druid_connection),
+                            },
+                        )?),
                         client,
                     )
                     .await?;

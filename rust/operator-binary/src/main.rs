@@ -181,9 +181,9 @@ async fn main() -> anyhow::Result<()> {
                             .into_iter()
                             .filter(move |druid_connection| {
                                 if let Ok(ns) = druid_connection.superset_namespace() {
-                                    &ns == sdb.metadata.namespace.as_ref().unwrap()
-                                        && &druid_connection.superset_name()
-                                            == sdb.metadata.name.as_ref().unwrap()
+                                    Some(ns) == sdb.metadata.namespace
+                                        && Some(druid_connection.superset_name())
+                                            == sdb.metadata.name
                                 } else {
                                     false
                                 }
@@ -199,10 +199,8 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                druid_connection.metadata.namespace.as_ref().unwrap()
-                                    == job.metadata.namespace.as_ref().unwrap()
-                                    && &druid_connection.job_name()
-                                        == job.metadata.name.as_ref().unwrap()
+                                druid_connection.metadata.namespace == job.metadata.namespace
+                                    && Some(druid_connection.job_name()) == job.metadata.name
                             })
                             .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
@@ -216,9 +214,9 @@ async fn main() -> anyhow::Result<()> {
                             .into_iter()
                             .filter(move |druid_connection| {
                                 if let Ok(ns) = druid_connection.druid_namespace() {
-                                    &ns == config_map.metadata.namespace.as_ref().unwrap()
-                                        && &druid_connection.druid_name()
-                                            == config_map.metadata.name.as_ref().unwrap()
+                                    Some(ns) == config_map.metadata.namespace
+                                        && Some(druid_connection.druid_name())
+                                            == config_map.metadata.name
                                 } else {
                                     false
                                 }
