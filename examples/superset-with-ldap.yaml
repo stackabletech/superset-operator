@@ -1,6 +1,6 @@
 # helm install --repo https://repo.stackable.tech/repository/helm-stable/ secret-operator secret-operator
 # helm install --repo https://repo.stackable.tech/repository/helm-stable/ commons-operator commons-operator
-# helm install --repo https://charts.bitnami.com/bitnami --set auth.username=superset --set auth.password=superset --set auth.database=superset postgresql-superset postgresql
+# helm install --repo https://charts.bitnami.com/bitnami --set auth.username=superset --set auth.password=superset --set auth.database=superset superset-postgresql postgresql
 
 # Log in with user01/user01 or user02/user02
 ---
@@ -95,7 +95,7 @@ metadata:
 type: Opaque
 stringData:
   connections.secretKey: thisISaSECRET_1234
-  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@postgresql-superset.default.svc.cluster.local/superset
+  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql.default.svc.cluster.local/superset
 ---
 apiVersion: authentication.stackable.tech/v1alpha1
 kind: AuthenticationClass
