@@ -474,7 +474,8 @@ fn build_server_rolegroup_statefulset(
             --timeout 60 \
             --limit-request-line 0 \
             --limit-request-field_size 0 \
-            'superset.app:create_app()'".to_string()
+            'superset.app:create_app()'"
+                .to_string(),
         ])
         .build();
     let metrics_container = ContainerBuilder::new("metrics")
