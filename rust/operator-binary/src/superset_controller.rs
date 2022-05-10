@@ -463,6 +463,19 @@ fn build_server_rolegroup_statefulset(
         .image(image)
         .add_container_port("http", APP_PORT.into())
         .add_volume_mount("config", PYTHONPATH)
+        .command(vec![
+            "/bin/sh".to_string(),
+            "-c".to_string(),
+            "superset init && \
+            gunicorn \
+            --bind 0.0.0.0:${SUPERSET_PORT} \
+            --worker-class gthread \
+            --threads 20 \
+            --timeout 60 \
+            --limit-request-line 0 \
+            --limit-request-field_size 0 \
+            'superset.app:create_app()'".to_string()
+        ])
         .build();
     let metrics_container = ContainerBuilder::new("metrics")
         .image(statsd_exporter_image)
