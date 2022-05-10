@@ -96,6 +96,12 @@ type: Opaque
 stringData:
   connections.secretKey: thisISaSECRET_1234
   connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql.default.svc.cluster.local/superset
+  # The adminUser has to be configured, but has no use (it can't log in). See https://github.com/stackabletech/superset-operator/issues/193
+  adminUser.username: admin
+  adminUser.firstname: Superset
+  adminUser.lastname: Admin
+  adminUser.email: admin@superset.com
+  adminUser.password: admin
 ---
 apiVersion: authentication.stackable.tech/v1alpha1
 kind: AuthenticationClass

@@ -45,6 +45,7 @@ for any other security related needs by extensions. It should be a long random s
 the Superset metadata.
 
 The `adminUser` fields are used to create an admin user.
+Please note that the admin user will be disabled if you use a non-default authentication mechanism like LDAP.
 
 == Creation of a Superset node
 
