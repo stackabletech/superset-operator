@@ -91,6 +91,8 @@ pub enum Error {
     SupersetDBRetrieval {
         source: stackable_operator::error::Error,
     },
+    #[snafu(display("superset db {superset_db} initialization failed, not starting superset"))]
+    SupersetDBFailed { superset_db: ObjectRef<SupersetDB> },
     #[snafu(display("failed to apply Superset DB"))]
     CreateSupersetObject {
         source: stackable_superset_crd::supersetdb::Error,
@@ -176,7 +178,7 @@ pub async fn reconcile_superset(
         .await
         .context(SupersetDBRetrievalSnafu)?;
 
-    if let Some(status) = superset_db.status {
+    if let Some(ref status) = superset_db.status {
         match status.condition {
             SupersetDBStatusCondition::Pending | SupersetDBStatusCondition::Initializing => {
                 debug!(
@@ -184,7 +186,13 @@ pub async fn reconcile_superset(
                 );
                 return Ok(Action::await_change());
             }
-            SupersetDBStatusCondition::Ready | SupersetDBStatusCondition::Failed => (),
+            SupersetDBStatusCondition::Failed => {
+                return SupersetDBFailedSnafu {
+                    superset_db: ObjectRef::from_obj(&superset_db),
+                }
+                .fail();
+            }
+            SupersetDBStatusCondition::Ready => (), // Continue starting Superset
         }
     } else {
         debug!("Waiting for SupersetDBStatus to be reported, not starting Superset yet");
