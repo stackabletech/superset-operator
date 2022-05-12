@@ -12,7 +12,7 @@ use stackable_operator::{
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         batch::v1::Job,
-        core::v1::{Secret, Service},
+        core::v1::{ConfigMap, Secret, Service},
     },
     kube::{
         api::ListParams,
@@ -204,6 +204,7 @@ async fn main() -> anyhow::Result<()> {
             );
             let druid_connection_store_1 = druid_connection_controller_builder.store();
             let druid_connection_store_2 = druid_connection_controller_builder.store();
+            let druid_connection_store_3 = druid_connection_controller_builder.store();
             let druid_connection_controller = druid_connection_controller_builder
                 .shutdown_on_signal()
                 .watches(
@@ -214,9 +215,9 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                druid_connection.spec.superset.name == superset_db.name()
-                                    && druid_connection.spec.superset.namespace
-                                        == superset_db.namespace().unwrap()
+                                druid_connection.superset_name() == superset_db.name()
+                                    && druid_connection.superset_namespace().ok()
+                                        == superset_db.namespace()
                             })
                             .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
@@ -229,10 +230,24 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                druid_connection.metadata.namespace.as_ref().unwrap()
-                                    == job.metadata.namespace.as_ref().unwrap()
-                                    && &druid_connection.job_name()
-                                        == job.metadata.name.as_ref().unwrap()
+                                druid_connection.metadata.namespace == job.metadata.namespace
+                                    && Some(druid_connection.job_name()) == job.metadata.name
+                            })
+                            .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
+                    },
+                )
+                .watches(
+                    watch_namespace.get_api::<ConfigMap>(&client),
+                    ListParams::default(),
+                    move |config_map| {
+                        druid_connection_store_3
+                            .state()
+                            .into_iter()
+                            .filter(move |druid_connection| {
+                                druid_connection.druid_namespace().ok()
+                                    == config_map.metadata.namespace
+                                    && Some(druid_connection.druid_name())
+                                        == config_map.metadata.name
                             })
                             .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
