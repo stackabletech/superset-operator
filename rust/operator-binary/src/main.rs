@@ -17,7 +17,7 @@ use stackable_operator::{
     kube::{
         api::ListParams,
         runtime::{controller::Context, reflector::ObjectRef, Controller},
-        CustomResourceExt,
+        CustomResourceExt, ResourceExt,
     },
     logging::controller::report_controller_reconciled,
 };
@@ -84,7 +84,8 @@ async fn main() -> anyhow::Result<()> {
                 watch_namespace.get_api::<SupersetCluster>(&client),
                 ListParams::default(),
             );
-            let superset_store = superset_controller_builder.store();
+            let superset_store_1 = superset_controller_builder.store();
+            let superset_store_2 = superset_controller_builder.store();
             let superset_controller = superset_controller_builder
                 .owns(
                     watch_namespace.get_api::<Service>(&client),
@@ -99,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
                     watch_namespace.get_api::<AuthenticationClass>(&client),
                     ListParams::default(),
                     move |authentication_class| {
-                        superset_store
+                        superset_store_1
                             .state()
                             .into_iter()
                             .filter(move |superset: &Arc<SupersetCluster>| {
@@ -109,6 +110,20 @@ async fn main() -> anyhow::Result<()> {
                                 )
                             })
                             .map(|superset| ObjectRef::from_obj(&*superset))
+                    },
+                )
+                .watches(
+                    watch_namespace.get_api::<SupersetDB>(&client),
+                    ListParams::default(),
+                    move |superset_db| {
+                        superset_store_2
+                            .state()
+                            .into_iter()
+                            .filter(move |superset| {
+                                superset_db.name() == superset.name()
+                                    && superset_db.namespace() == superset.namespace()
+                            })
+                            .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
                 )
                 .run(
@@ -162,10 +177,8 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |superset_db| {
-                                superset_db.metadata.namespace.as_ref().unwrap()
-                                    == job.metadata.namespace.as_ref().unwrap()
-                                    && &superset_db.job_name()
-                                        == job.metadata.name.as_ref().unwrap()
+                                job.name() == superset_db.name()
+                                    && job.namespace() == superset_db.namespace()
                             })
                             .map(|superset_db| ObjectRef::from_obj(&*superset_db))
                     },
@@ -189,22 +202,21 @@ async fn main() -> anyhow::Result<()> {
                 watch_namespace.get_api::<DruidConnection>(&client),
                 ListParams::default(),
             );
-            let druid_connection_store1 = druid_connection_controller_builder.store();
-            let druid_connection_store2 = druid_connection_controller_builder.store();
+            let druid_connection_store_1 = druid_connection_controller_builder.store();
+            let druid_connection_store_2 = druid_connection_controller_builder.store();
             let druid_connection_controller = druid_connection_controller_builder
                 .shutdown_on_signal()
                 .watches(
                     watch_namespace.get_api::<SupersetDB>(&client),
                     ListParams::default(),
-                    move |sdb| {
-                        druid_connection_store1
+                    move |superset_db| {
+                        druid_connection_store_1
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                &druid_connection.spec.superset.namespace
-                                    == sdb.metadata.namespace.as_ref().unwrap()
-                                    && &druid_connection.spec.superset.name
-                                        == sdb.metadata.name.as_ref().unwrap()
+                                druid_connection.spec.superset.name == superset_db.name()
+                                    && druid_connection.spec.superset.namespace
+                                        == superset_db.namespace().unwrap()
                             })
                             .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
@@ -213,7 +225,7 @@ async fn main() -> anyhow::Result<()> {
                     watch_namespace.get_api::<Job>(&client),
                     ListParams::default(),
                     move |job| {
-                        druid_connection_store2
+                        druid_connection_store_2
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {

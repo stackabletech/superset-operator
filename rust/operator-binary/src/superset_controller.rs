@@ -33,9 +33,12 @@ use stackable_operator::{
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
-    kube::runtime::{
-        controller::{Action, Context},
-        reflector::ObjectRef,
+    kube::{
+        runtime::{
+            controller::{Action, Context},
+            reflector::ObjectRef,
+        },
+        ResourceExt,
     },
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
@@ -48,10 +51,12 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 use stackable_superset_crd::{
-    supersetdb::SupersetDB, SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole,
-    PYTHONPATH, SUPERSET_CONFIG_FILENAME,
+    supersetdb::{SupersetDB, SupersetDBStatusCondition},
+    SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole, PYTHONPATH,
+    SUPERSET_CONFIG_FILENAME,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
+use tracing::log::debug;
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
@@ -82,6 +87,10 @@ pub enum Error {
         source: stackable_operator::error::Error,
     },
 
+    #[snafu(display("failed to retrieve superset db"))]
+    SupersetDBRetrieval {
+        source: stackable_operator::error::Error,
+    },
     #[snafu(display("failed to apply Superset DB"))]
     CreateSupersetObject {
         source: stackable_superset_crd::supersetdb::Error,
@@ -155,12 +164,32 @@ pub async fn reconcile_superset(
 
     let client = &ctx.get_ref().client;
 
-    // Ensure DB Schema is set up
+    // Ensure DB Schema exists
     let superset_db = SupersetDB::for_superset(&superset).context(CreateSupersetObjectSnafu)?;
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &superset_db, &superset_db)
         .await
         .context(ApplySupersetDBSnafu)?;
+
+    let superset_db = client
+        .get::<SupersetDB>(&superset.name(), superset.namespace().as_deref())
+        .await
+        .context(SupersetDBRetrievalSnafu)?;
+
+    if let Some(status) = superset_db.status {
+        match status.condition {
+            SupersetDBStatusCondition::Pending | SupersetDBStatusCondition::Initializing => {
+                debug!(
+                    "Waiting for SupersetDB initialization to complete, not starting Superset yet"
+                );
+                return Ok(Action::await_change());
+            }
+            SupersetDBStatusCondition::Ready | SupersetDBStatusCondition::Failed => (),
+        }
+    } else {
+        debug!("Waiting for SupersetDBStatus to be reported, not starting Superset yet");
+        return Ok(Action::await_change());
+    }
 
     let validated_config = validate_all_roles_and_groups_config(
         superset_version(&superset).context(NoSupersetVersionSnafu)?,
