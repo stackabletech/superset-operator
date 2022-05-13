@@ -101,3 +101,11 @@ rules:
       - supersetdbs
     verbs:
       - create
+  - apiGroups:
+      - authentication.stackable.tech
+    resources:
+      - authenticationclasses
+    verbs:
+      - get
+      - list
+      - watch

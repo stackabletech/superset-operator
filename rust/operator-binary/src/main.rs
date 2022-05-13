@@ -1,3 +1,4 @@
+mod config;
 mod druid_connection_controller;
 mod superset_controller;
 mod superset_db_controller;
@@ -7,6 +8,7 @@ use clap::Parser;
 use futures::StreamExt;
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
+    commons::authentication::AuthenticationClass,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         batch::v1::Job,
@@ -15,13 +17,15 @@ use stackable_operator::{
     kube::{
         api::ListParams,
         runtime::{controller::Context, reflector::ObjectRef, Controller},
-        CustomResourceExt,
+        CustomResourceExt, ResourceExt,
     },
     logging::controller::report_controller_reconciled,
 };
 use stackable_superset_crd::{
     druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
+    SupersetClusterAuthenticationConfig,
 };
+use std::sync::Arc;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -52,6 +56,11 @@ async fn main() -> anyhow::Result<()> {
             watch_namespace,
             tracing_target,
         }) => {
+            stackable_operator::logging::initialize_logging(
+                "SUPERSET_OPERATOR_LOG",
+                APP_NAME,
+                tracing_target,
+            );
             stackable_operator::utils::print_startup_string(
                 built_info::PKG_DESCRIPTION,
                 built_info::PKG_VERSION,
@@ -59,11 +68,6 @@ async fn main() -> anyhow::Result<()> {
                 built_info::TARGET,
                 built_info::BUILT_TIME_UTC,
                 built_info::RUSTC_VERSION,
-            );
-            stackable_operator::logging::initialize_logging(
-                "SUPERSET_OPERATOR_LOG",
-                APP_NAME,
-                tracing_target,
             );
 
             let product_config = product_config.load(&[
@@ -76,34 +80,67 @@ async fn main() -> anyhow::Result<()> {
             ))
             .await?;
 
-            let superset_controller = Controller::new(
+            let superset_controller_builder = Controller::new(
                 watch_namespace.get_api::<SupersetCluster>(&client),
                 ListParams::default(),
-            )
-            .owns(
-                watch_namespace.get_api::<Service>(&client),
-                ListParams::default(),
-            )
-            .owns(
-                watch_namespace.get_api::<StatefulSet>(&client),
-                ListParams::default(),
-            )
-            .shutdown_on_signal()
-            .run(
-                superset_controller::reconcile_superset,
-                superset_controller::error_policy,
-                Context::new(superset_controller::Ctx {
-                    client: client.clone(),
-                    product_config,
-                }),
-            )
-            .map(|res| {
-                report_controller_reconciled(
-                    &client,
-                    "supersetclusters.superset.stackable.tech",
-                    &res,
+            );
+            let superset_store_1 = superset_controller_builder.store();
+            let superset_store_2 = superset_controller_builder.store();
+            let superset_controller = superset_controller_builder
+                .owns(
+                    watch_namespace.get_api::<Service>(&client),
+                    ListParams::default(),
                 )
-            });
+                .owns(
+                    watch_namespace.get_api::<StatefulSet>(&client),
+                    ListParams::default(),
+                )
+                .shutdown_on_signal()
+                .watches(
+                    watch_namespace.get_api::<AuthenticationClass>(&client),
+                    ListParams::default(),
+                    move |authentication_class| {
+                        superset_store_1
+                            .state()
+                            .into_iter()
+                            .filter(move |superset: &Arc<SupersetCluster>| {
+                                references_authentication_class(
+                                    &superset.spec.authentication_config,
+                                    &authentication_class,
+                                )
+                            })
+                            .map(|superset| ObjectRef::from_obj(&*superset))
+                    },
+                )
+                .watches(
+                    watch_namespace.get_api::<SupersetDB>(&client),
+                    ListParams::default(),
+                    move |superset_db| {
+                        superset_store_2
+                            .state()
+                            .into_iter()
+                            .filter(move |superset| {
+                                superset_db.name() == superset.name()
+                                    && superset_db.namespace() == superset.namespace()
+                            })
+                            .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
+                    },
+                )
+                .run(
+                    superset_controller::reconcile_superset,
+                    superset_controller::error_policy,
+                    Context::new(superset_controller::Ctx {
+                        client: client.clone(),
+                        product_config,
+                    }),
+                )
+                .map(|res| {
+                    report_controller_reconciled(
+                        &client,
+                        "supersetclusters.superset.stackable.tech",
+                        &res,
+                    )
+                });
 
             let superset_db_controller_builder = Controller::new(
                 watch_namespace.get_api::<SupersetDB>(&client),
@@ -140,10 +177,8 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |superset_db| {
-                                superset_db.metadata.namespace.as_ref().unwrap()
-                                    == job.metadata.namespace.as_ref().unwrap()
-                                    && &superset_db.job_name()
-                                        == job.metadata.name.as_ref().unwrap()
+                                job.name() == superset_db.name()
+                                    && job.namespace() == superset_db.namespace()
                             })
                             .map(|superset_db| ObjectRef::from_obj(&*superset_db))
                     },
@@ -167,21 +202,22 @@ async fn main() -> anyhow::Result<()> {
                 watch_namespace.get_api::<DruidConnection>(&client),
                 ListParams::default(),
             );
-            let druid_connection_store1 = druid_connection_controller_builder.store();
-            let druid_connection_store2 = druid_connection_controller_builder.store();
-            let druid_connection_store3 = druid_connection_controller_builder.store();
+            let druid_connection_store_1 = druid_connection_controller_builder.store();
+            let druid_connection_store_2 = druid_connection_controller_builder.store();
+            let druid_connection_store_3 = druid_connection_controller_builder.store();
             let druid_connection_controller = druid_connection_controller_builder
                 .shutdown_on_signal()
                 .watches(
                     watch_namespace.get_api::<SupersetDB>(&client),
                     ListParams::default(),
-                    move |sdb| {
-                        druid_connection_store1
+                    move |superset_db| {
+                        druid_connection_store_1
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                druid_connection.superset_namespace().ok() == sdb.metadata.namespace
-                                    && Some(druid_connection.superset_name()) == sdb.metadata.name
+                                druid_connection.superset_name() == superset_db.name()
+                                    && druid_connection.superset_namespace().ok()
+                                        == superset_db.namespace()
                             })
                             .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
@@ -190,7 +226,7 @@ async fn main() -> anyhow::Result<()> {
                     watch_namespace.get_api::<Job>(&client),
                     ListParams::default(),
                     move |job| {
-                        druid_connection_store2
+                        druid_connection_store_2
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
@@ -204,7 +240,7 @@ async fn main() -> anyhow::Result<()> {
                     watch_namespace.get_api::<ConfigMap>(&client),
                     ListParams::default(),
                     move |config_map| {
-                        druid_connection_store3
+                        druid_connection_store_3
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
@@ -241,4 +277,16 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn references_authentication_class(
+    authentication_config: &Option<SupersetClusterAuthenticationConfig>,
+    authentication_class: &AuthenticationClass,
+) -> bool {
+    assert!(authentication_class.metadata.name.is_some());
+
+    authentication_config
+        .as_ref()
+        .and_then(|c| c.authentication_class.as_ref())
+        == authentication_class.metadata.name.as_ref()
 }

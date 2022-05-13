@@ -1,6 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 
 use crate::{
+    config::{self, PYTHON_IMPORTS},
     util::{statsd_exporter_version, superset_version},
     APP_NAME, APP_PORT,
 };
@@ -14,7 +15,15 @@ use std::{
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
+    builder::{
+        ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
+        PodSecurityContextBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
+    },
+    commons::{
+        authentication::{AuthenticationClass, AuthenticationClassProvider},
+        secret_class::SecretClassVolumeScope,
+        tls::{CaCert, TlsServerVerification, TlsVerification},
+    },
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -24,7 +33,13 @@ use stackable_operator::{
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
-    kube::runtime::controller::{Action, Context},
+    kube::{
+        runtime::{
+            controller::{Action, Context},
+            reflector::ObjectRef,
+        },
+        ResourceExt,
+    },
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
     product_config::{
@@ -36,15 +51,19 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 use stackable_superset_crd::{
-    supersetdb::SupersetDB, SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole,
-    PYTHONPATH, SUPERSET_CONFIG_FILENAME,
+    supersetdb::{SupersetDB, SupersetDBStatusCondition},
+    SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole, PYTHONPATH,
+    SUPERSET_CONFIG_FILENAME,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
+use tracing::log::debug;
 
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
+pub const SECRETS_DIR: &str = "/stackable/secrets/";
+pub const CERTS_DIR: &str = "/stackable/certificates/";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -68,6 +87,12 @@ pub enum Error {
         source: stackable_operator::error::Error,
     },
 
+    #[snafu(display("failed to retrieve superset db"))]
+    SupersetDBRetrieval {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("superset db {superset_db} initialization failed, not starting superset"))]
+    SupersetDBFailed { superset_db: ObjectRef<SupersetDB> },
     #[snafu(display("failed to apply Superset DB"))]
     CreateSupersetObject {
         source: stackable_superset_crd::supersetdb::Error,
@@ -76,27 +101,27 @@ pub enum Error {
     ApplySupersetDB {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to apply Service for {}", rolegroup))]
+    #[snafu(display("failed to apply Service for {rolegroup}"))]
     ApplyRoleGroupService {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
-    #[snafu(display("failed to build config file for {}", rolegroup))]
+    #[snafu(display("failed to build config file for {rolegroup}"))]
     BuildRoleGroupConfigFile {
         source: FlaskAppConfigWriterError,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
-    #[snafu(display("failed to build ConfigMap for {}", rolegroup))]
+    #[snafu(display("failed to build ConfigMap for {rolegroup}"))]
     BuildRoleGroupConfig {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
-    #[snafu(display("failed to apply ConfigMap for {}", rolegroup))]
+    #[snafu(display("failed to apply ConfigMap for {rolegroup}"))]
     ApplyRoleGroupConfig {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
-    #[snafu(display("failed to apply StatefulSet for {}", rolegroup))]
+    #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
@@ -112,6 +137,16 @@ pub enum Error {
     #[snafu(display("object is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
+    },
+    #[snafu(display("Superset doesn't support the AuthenticationClass provider {authentication_class_provider} from AuthenticationClass {authentication_class}"))]
+    AuthenticationClassProviderNotSupported {
+        authentication_class_provider: String,
+        authentication_class: ObjectRef<AuthenticationClass>,
+    },
+    #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
+    AuthenticationClassRetrieval {
+        source: stackable_operator::error::Error,
+        authentication_class: ObjectRef<AuthenticationClass>,
     },
 }
 
@@ -131,12 +166,38 @@ pub async fn reconcile_superset(
 
     let client = &ctx.get_ref().client;
 
-    // Ensure DB Schema is set up
+    // Ensure DB Schema exists
     let superset_db = SupersetDB::for_superset(&superset).context(CreateSupersetObjectSnafu)?;
     client
         .apply_patch(FIELD_MANAGER_SCOPE, &superset_db, &superset_db)
         .await
         .context(ApplySupersetDBSnafu)?;
+
+    let superset_db = client
+        .get::<SupersetDB>(&superset.name(), superset.namespace().as_deref())
+        .await
+        .context(SupersetDBRetrievalSnafu)?;
+
+    if let Some(ref status) = superset_db.status {
+        match status.condition {
+            SupersetDBStatusCondition::Pending | SupersetDBStatusCondition::Initializing => {
+                debug!(
+                    "Waiting for SupersetDB initialization to complete, not starting Superset yet"
+                );
+                return Ok(Action::await_change());
+            }
+            SupersetDBStatusCondition::Failed => {
+                return SupersetDBFailedSnafu {
+                    superset_db: ObjectRef::from_obj(&superset_db),
+                }
+                .fail();
+            }
+            SupersetDBStatusCondition::Ready => (), // Continue starting Superset
+        }
+    } else {
+        debug!("Waiting for SupersetDBStatus to be reported, not starting Superset yet");
+        return Ok(Action::await_change());
+    }
 
     let validated_config = validate_all_roles_and_groups_config(
         superset_version(&superset).context(NoSupersetVersionSnafu)?,
@@ -170,13 +231,44 @@ pub async fn reconcile_superset(
         .apply_patch(FIELD_MANAGER_SCOPE, &node_role_service, &node_role_service)
         .await
         .context(ApplyRoleServiceSnafu)?;
+
+    let authentication_class = match &superset.spec.authentication_config {
+        Some(authentication_config) => {
+            match &authentication_config.authentication_class {
+                Some(authentication_class) => {
+                    Some(
+                        client
+                            .get::<AuthenticationClass>(authentication_class, None) // AuthenticationClass has ClusterScope
+                            .await
+                            .context(AuthenticationClassRetrievalSnafu {
+                                authentication_class: ObjectRef::<AuthenticationClass>::new(
+                                    authentication_class,
+                                ),
+                            })?,
+                    )
+                }
+                None => None,
+            }
+        }
+        None => None,
+    };
+
     for (rolegroup_name, rolegroup_config) in role_node_config.iter() {
         let rolegroup = superset.node_rolegroup_ref(rolegroup_name);
 
         let rg_service = build_node_rolegroup_service(&rolegroup, &superset)?;
-        let rg_configmap = build_rolegroup_config_map(&superset, &rolegroup, rolegroup_config)?;
-        let rg_statefulset =
-            build_server_rolegroup_statefulset(&rolegroup, &superset, rolegroup_config)?;
+        let rg_configmap = build_rolegroup_config_map(
+            &superset,
+            &rolegroup,
+            rolegroup_config,
+            authentication_class.as_ref(),
+        )?;
+        let rg_statefulset = build_server_rolegroup_statefulset(
+            &rolegroup,
+            &superset,
+            rolegroup_config,
+            authentication_class.as_ref(),
+        )?;
         client
             .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
             .await
@@ -202,7 +294,7 @@ pub async fn reconcile_superset(
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside of the cluster.
-pub fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
+fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
     let role_name = SupersetRole::Node.to_string();
     let role_svc_name = superset
         .node_role_service_name()
@@ -245,6 +337,7 @@ fn build_rolegroup_config_map(
     superset: &SupersetCluster,
     rolegroup: &RoleGroupRef<SupersetCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    authentication_class: Option<&AuthenticationClass>,
 ) -> Result<ConfigMap, Error> {
     let mut config = rolegroup_config
         .get(&PropertyNameKind::File(
@@ -253,34 +346,17 @@ fn build_rolegroup_config_map(
         .cloned()
         .unwrap_or_default();
 
-    config.insert(
-        SupersetConfigOptions::MapboxApiKey.to_string(),
-        "os.environ.get('MAPBOX_API_KEY')".into(),
+    config::add_superset_config(
+        &mut config,
+        superset.spec.authentication_config.as_ref(),
+        authentication_class,
     );
-
-    config.insert(
-        SupersetConfigOptions::SecretKey.to_string(),
-        "os.environ.get('SECRET_KEY')".into(),
-    );
-    config.insert(
-        SupersetConfigOptions::SqlalchemyDatabaseUri.to_string(),
-        "os.environ.get('SQLALCHEMY_DATABASE_URI')".into(),
-    );
-    config.insert(
-        SupersetConfigOptions::StatsLogger.to_string(),
-        "StatsdStatsLogger(host='0.0.0.0', port=9125)".into(),
-    );
-
-    let imports = [
-        "import os",
-        "from superset.stats_logger import StatsdStatsLogger",
-    ];
 
     let mut config_file = Vec::new();
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
         &mut config_file,
         config.iter(),
-        &imports,
+        PYTHON_IMPORTS,
     )
     .with_context(|_| BuildRoleGroupConfigFileSnafu {
         rolegroup: rolegroup.clone(),
@@ -374,6 +450,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     superset: &SupersetCluster,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    authentication_class: Option<&AuthenticationClass>,
 ) -> Result<StatefulSet> {
     let rolegroup = superset
         .spec
@@ -394,6 +471,7 @@ fn build_server_rolegroup_statefulset(
         format!("docker.stackable.tech/prom/statsd-exporter:{statsd_exporter_version}");
 
     let mut cb = ContainerBuilder::new("superset");
+    let mut pb = PodBuilder::new();
 
     for (name, value) in node_config
         .get(&PropertyNameKind::Env)
@@ -414,10 +492,28 @@ fn build_server_rolegroup_statefulset(
         };
     }
 
+    if let Some(authentication_class) = authentication_class {
+        add_authentication_volumes_and_volume_mounts(authentication_class, &mut cb, &mut pb)?;
+    }
+
     let container = cb
         .image(image)
         .add_container_port("http", APP_PORT.into())
         .add_volume_mount("config", PYTHONPATH)
+        .command(vec![
+            "/bin/sh".to_string(),
+            "-c".to_string(),
+            "superset init && \
+            gunicorn \
+            --bind 0.0.0.0:${SUPERSET_PORT} \
+            --worker-class gthread \
+            --threads 20 \
+            --timeout 60 \
+            --limit-request-line 0 \
+            --limit-request-field_size 0 \
+            'superset.app:create_app()'"
+                .to_string(),
+        ])
         .build();
     let metrics_container = ContainerBuilder::new("metrics")
         .image(statsd_exporter_image)
@@ -437,6 +533,7 @@ fn build_server_rolegroup_statefulset(
                 &rolegroup_ref.role_group,
             )
             .with_label("statsd-exporter", statsd_exporter_version)
+            .with_label("restarter.stackable.tech/enabled", "true")
             .build(),
         spec: Some(StatefulSetSpec {
             pod_management_policy: Some("Parallel".to_string()),
@@ -455,7 +552,7 @@ fn build_server_rolegroup_statefulset(
                 ..LabelSelector::default()
             },
             service_name: rolegroup_ref.object_name(),
-            template: PodBuilder::new()
+            template: pb
                 .metadata_builder(|m| {
                     m.with_recommended_labels(
                         superset,
@@ -476,11 +573,89 @@ fn build_server_rolegroup_statefulset(
                     }),
                     ..Default::default()
                 })
+                .security_context(PodSecurityContextBuilder::new().fs_group(1000).build()) // Needed for secret-operator
                 .build_template(),
             ..StatefulSetSpec::default()
         }),
         status: None,
     })
+}
+
+fn add_authentication_volumes_and_volume_mounts(
+    authentication_class: &AuthenticationClass,
+    cb: &mut ContainerBuilder,
+    pb: &mut PodBuilder,
+) -> Result<()> {
+    let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
+
+    match &authentication_class.spec.provider {
+        AuthenticationClassProvider::Ldap(ldap) => {
+            if let Some(bind_credentials) = &ldap.bind_credentials {
+                let volume_name = format!("{authentication_class_name}-bind-credentials");
+
+                pb.add_volume(build_secret_operator_volume(
+                    &volume_name,
+                    &bind_credentials.secret_class,
+                    bind_credentials.scope.as_ref(),
+                ));
+                cb.add_volume_mount(&volume_name, format!("{SECRETS_DIR}{volume_name}"));
+            }
+
+            if let Some(tls) = &ldap.tls {
+                match &tls.verification {
+                    TlsVerification::Server(TlsServerVerification {
+                        ca_cert: CaCert::SecretClass(cert_secret_class),
+                    }) => {
+                        let volume_name = format!("{authentication_class_name}-tls-certificate");
+
+                        pb.add_volume(build_secret_operator_volume(
+                            &volume_name,
+                            cert_secret_class,
+                            None,
+                        ));
+                        cb.add_volume_mount(&volume_name, format!("{CERTS_DIR}{volume_name}"));
+                    }
+                    // Explicitly listing other possibilities to not oversee new enum variants in the future
+                    TlsVerification::None {}
+                    | TlsVerification::Server(TlsServerVerification {
+                        ca_cert: CaCert::WebPki {},
+                    }) => {}
+                }
+            }
+
+            Ok(())
+        }
+        _ => AuthenticationClassProviderNotSupportedSnafu {
+            authentication_class_provider: authentication_class.spec.provider.to_string(),
+            authentication_class: ObjectRef::<AuthenticationClass>::new(authentication_class_name),
+        }
+        .fail(),
+    }
+}
+
+fn build_secret_operator_volume(
+    volume_name: &str,
+    secret_class_name: &str,
+    scope: Option<&SecretClassVolumeScope>,
+) -> Volume {
+    let mut secret_operator_volume_source_builder =
+        SecretOperatorVolumeSourceBuilder::new(secret_class_name);
+
+    if let Some(scope) = scope {
+        if scope.pod {
+            secret_operator_volume_source_builder.with_pod_scope();
+        }
+        if scope.node {
+            secret_operator_volume_source_builder.with_node_scope();
+        }
+        for service in &scope.services {
+            secret_operator_volume_source_builder.with_service_scope(service);
+        }
+    }
+
+    VolumeBuilder::new(volume_name)
+        .csi(secret_operator_volume_source_builder.build())
+        .build()
 }
 
 pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> Action {

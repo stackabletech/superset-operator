@@ -36,6 +36,25 @@ pub enum SupersetConfigOptions {
     StatsLogger,
     RowLimit,
     MapboxApiKey,
+    AuthType,
+    AuthUserRegistration,
+    AuthUserRegistrationRole,
+    AuthRolesSyncAtLogin,
+    AuthLdapServer,
+    AuthLdapBindUser,
+    AuthLdapBindPassword,
+    AuthLdapSearch,
+    AuthLdapSearchFilter,
+    AuthLdapUidField,
+    AuthLdapGroupField,
+    AuthLdapFirstnameField,
+    AuthLdapLastnameField,
+    AuthLdapEmailField,
+    AuthLdapAllowSelfSigned,
+    AuthLdapTlsDemand,
+    AuthLdapTlsCertfile,
+    AuthLdapTlsKeyfile,
+    AuthLdapTlsCacertfile,
 }
 
 impl SupersetConfigOptions {
@@ -53,11 +72,30 @@ impl SupersetConfigOptions {
 impl FlaskAppConfigOptions for SupersetConfigOptions {
     fn python_type(&self) -> PythonType {
         match self {
-            SupersetConfigOptions::RowLimit => PythonType::IntLiteral,
             SupersetConfigOptions::SecretKey => PythonType::Expression,
             SupersetConfigOptions::SqlalchemyDatabaseUri => PythonType::Expression,
             SupersetConfigOptions::StatsLogger => PythonType::Expression,
+            SupersetConfigOptions::RowLimit => PythonType::IntLiteral,
             SupersetConfigOptions::MapboxApiKey => PythonType::Expression,
+            SupersetConfigOptions::AuthType => PythonType::Expression,
+            SupersetConfigOptions::AuthUserRegistration => PythonType::BoolLiteral,
+            SupersetConfigOptions::AuthUserRegistrationRole => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthRolesSyncAtLogin => PythonType::BoolLiteral,
+            SupersetConfigOptions::AuthLdapServer => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapBindUser => PythonType::Expression,
+            SupersetConfigOptions::AuthLdapBindPassword => PythonType::Expression,
+            SupersetConfigOptions::AuthLdapSearch => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapSearchFilter => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapUidField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapGroupField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapFirstnameField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapLastnameField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapEmailField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapAllowSelfSigned => PythonType::BoolLiteral,
+            SupersetConfigOptions::AuthLdapTlsDemand => PythonType::BoolLiteral,
+            SupersetConfigOptions::AuthLdapTlsCertfile => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapTlsKeyfile => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapTlsCacertfile => PythonType::StringLiteral,
         }
     }
 }
@@ -94,7 +132,52 @@ pub struct SupersetClusterSpec {
     #[serde(default)]
     pub load_examples_on_init: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authentication_config: Option<SupersetClusterAuthenticationConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nodes: Option<Role<SupersetConfig>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetClusterAuthenticationConfig {
+    /// Name of the AuthenticationClass used to authenticate the users.
+    /// At the moment only LDAP is supported.
+    /// If not specified the default authentication (AUTH_DB) will be used.
+    pub authentication_class: Option<String>,
+
+    /// Allow users who are not already in the FAB DB.
+    /// Gets mapped to `AUTH_USER_REGISTRATION`
+    #[serde(default = "default_user_registration")]
+    pub user_registration: bool,
+
+    /// This role will be given in addition to any AUTH_ROLES_MAPPING.
+    /// Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
+    #[serde(default = "default_user_registration_role")]
+    pub user_registration_role: String,
+
+    /// If we should replace ALL the user's roles each login, or only on registration.
+    /// Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
+    #[serde(default = "default_sync_roles_at")]
+    pub sync_roles_at: LdapRolesSyncMoment,
+}
+
+pub fn default_user_registration() -> bool {
+    true
+}
+
+pub fn default_user_registration_role() -> String {
+    "Public".to_string()
+}
+
+/// Matches Flask's default mode of syncing at registration
+pub fn default_sync_roles_at() -> LdapRolesSyncMoment {
+    LdapRolesSyncMoment::Registration
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+pub enum LdapRolesSyncMoment {
+    Registration,
+    Login,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -162,7 +245,7 @@ impl Configuration for SupersetConfig {
 
     fn compute_cli(
         &self,
-        _resource: &Self::Configurable,
+        _cluster: &Self::Configurable,
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         Ok(BTreeMap::new())
@@ -170,7 +253,7 @@ impl Configuration for SupersetConfig {
 
     fn compute_files(
         &self,
-        _resource: &Self::Configurable,
+        _cluster: &Self::Configurable,
         _role_name: &str,
         file: &str,
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
@@ -212,7 +295,7 @@ impl SupersetCluster {
 }
 
 /// A reference to a [`SupersetCluster`]
-#[derive(Clone, Default, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClusterRef {
     #[serde(default, skip_serializing_if = "Option::is_none")]
