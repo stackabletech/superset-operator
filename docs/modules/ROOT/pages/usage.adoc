@@ -109,9 +109,44 @@ If the examples were loaded then some dashboards are already available:
 
 image::superset-dashboard.png[Superset dashboard showing birth names]
 
-== Authenticate users using LDAP
+== Authentication
+Every user has to authenticate themselves before using Superset.
+There are multiple options to set up the authentication of users.
+
+=== Webinterface
+The default setting is to manually set up users via the Webinterface.
+
+=== LDAP
 Superset supports authentication of users against an LDAP server.
-Have a look at https://github.com/stackabletech/superset-operator/blob/main/examples/superset-with-ldap.yaml[the LDAP example] and the general xref:commons-operator::authenticationclass.adoc[Stackable Authentication] documentation.
+Have a look at https://github.com/stackabletech/superset-operator/blob/main/examples/superset-with-ldap.yaml[the LDAP example] and the general xref:commons-operator::authenticationclass.adoc[Stackable Authentication] documentation on how to set it up.
+In general it requires you to specify a xref:commons-operator::authenticationclass.adoc which is used to authenticate the users. In this example we assign all the users the `Admin` role once they log into Superset.
+
+[source,yaml]
+----
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: superset-with-ldap-server-veri-tls
+spec:
+  version: 1.4.1
+  [...]
+  authenticationConfig:
+    authenticationClass: superset-with-ldap-server-veri-tls-ldap
+    userRegistrationRole: Admin
+----
+
+== Authorization
+Superset has a concept called `Roles` which allows you to grant user permissions based on roles.
+Have a look at the https://superset.apache.org/docs/security[Superset documentation on Security].
+
+=== Webinterface
+You can see all the available roles in the Webinterface of Superset.
+You can view all the available roles in the Webinterface of Superset and can also assign users to these roles.
+
+=== LDAP
+Superset supports assigning roles to users based on their LDAP group membership.
+This is not supported yet.
+Currently all the users logging in via LDAP get assigned the same role which you can configure via the attribute `authenticationConfig.userRegistrationRole` on the `SupersetCluster` object.
 
 == Connecting Apache Druid Clusters
 
