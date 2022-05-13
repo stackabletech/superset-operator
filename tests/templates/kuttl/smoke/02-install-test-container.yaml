@@ -22,7 +22,7 @@ spec:
         app: python
     spec:
       containers:
-      - name: python
-        image: python:3.10-slim
-        stdin: true
-        tty: true
+        - name: python
+          image: python:3.10-slim
+          stdin: true
+          tty: true
