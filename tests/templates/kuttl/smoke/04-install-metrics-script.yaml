@@ -1,0 +1,7 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-metrics
+commands:
+  - script: kubectl cp -n $NAMESPACE ./metrics.py python-0:/tmp
