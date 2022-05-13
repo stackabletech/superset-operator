@@ -1,0 +1,14 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: mock-druid-discovery-cm
+timeout: 300
+---
+# Now that the druid discovery ConfigMap is there, the connection should become Ready
+apiVersion: superset.stackable.tech/v1alpha1
+kind: DruidConnection
+metadata:
+  name: superset-druid-connection
+status:
+  condition: Ready

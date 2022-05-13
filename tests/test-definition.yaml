@@ -1,0 +1,13 @@
+---
+dimensions:
+  - name: superset
+    values:
+      - 1.3.2-python38
+      - 1.4.1-python39
+tests:
+  - name: smoke
+    dimensions:
+      - superset
+  - name: druid-connection
+    dimensions:
+      - superset
