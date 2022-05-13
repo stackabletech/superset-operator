@@ -146,7 +146,7 @@ You can view all the available roles in the Webinterface of Superset and can als
 === LDAP
 Superset supports assigning roles to users based on their LDAP group membership.
 This is not supported yet.
-Currently all the users logging in via LDAP all get assigned the same role which you can configure via the attribute `authenticationConfig.userRegistrationRole` on the `SupersetCluster` object.
+Currently all the users logging in via LDAP get assigned the same role which you can configure via the attribute `authenticationConfig.userRegistrationRole` on the `SupersetCluster` object.
 
 == Connecting Apache Druid Clusters
 
