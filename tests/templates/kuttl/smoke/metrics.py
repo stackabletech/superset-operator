@@ -3,7 +3,7 @@ import time
 
 # Create and increase the superset_welcome counter
 web_ui_response = requests.get("http://superset-node-default:8088/")
-assert web_ui_response.status_code == 200, "Web UI could not be opened."
+assert web_ui_response.status_code == 200, "Web UI could not be reached successfully."
 
 # Wait for the counter to be consumed by the statsd-exporter
 time.sleep(2)
