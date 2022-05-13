@@ -136,7 +136,7 @@ spec:
 ----
 
 == Authorization
-Superset has a concept called `Roles` which allows you to grant user permission based on roles.
+Superset has a concept called `Roles` which allows you to grant user permissions based on roles.
 Have a look at the https://superset.apache.org/docs/security[Superset documentation on Security].
 
 === Webinterface
