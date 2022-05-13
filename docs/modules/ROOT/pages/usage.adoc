@@ -110,7 +110,7 @@ If the examples were loaded then some dashboards are already available:
 image::superset-dashboard.png[Superset dashboard showing birth names]
 
 == Authentication
-Every user has to authenticate itself before using Superset.
+Every user has to authenticate themselves before using Superset.
 There are multiple options to set up the authentication of users.
 
 === Webinterface
