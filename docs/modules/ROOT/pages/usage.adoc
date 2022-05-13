@@ -141,7 +141,7 @@ Have a look at the https://superset.apache.org/docs/security[Superset documentat
 
 === Webinterface
 You can see all the available roles in the Webinterface of Superset.
-There you can also assign users to roles.
+You can view all the available roles in the Webinterface of Superset and can also assign users to these roles.
 
 === LDAP
 Superset supports assigning roles to users based on their LDAP group membership.
