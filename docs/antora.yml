@@ -1,5 +1,5 @@
 name: superset
-version: master
+version: '0.5'
 title: Stackable Operator for Apache Superset
 nav:
   - modules/ROOT/nav.adoc
