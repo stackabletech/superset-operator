@@ -19,7 +19,7 @@ helm install superset bitnami/postgresql \
 
 == Secret with Superset credentials
 
-A secret with the necessary credentials must be created, this entails database connection credentials as well as an admin account for superset itself:
+A secret with the necessary credentials must be created, this entails database connection credentials as well as an admin account for Superset itself:
 
 [source,yaml]
 ----
@@ -77,7 +77,7 @@ The label of the Docker image provided by Stackable must be set in `spec.version
 
 The previously created secret must be referenced in `spec.credentialsSecret`.
 
-The `spec.loadExamplesOnInit` key is optional and defaults to `false`, it can be set to `true` to load example data into superset when the database is initialized.
+The `spec.loadExamplesOnInit` key is optional and defaults to `false`, it can be set to `true` to load example data into Superset when the database is initialized.
 
 The `rowLimit` configuration option defines the row limit when requesting chart data.
 
@@ -119,7 +119,7 @@ The default setting is to manually set up users via the Webinterface.
 === LDAP
 Superset supports authentication of users against an LDAP server.
 Have a look at https://github.com/stackabletech/superset-operator/blob/main/examples/superset-with-ldap.yaml[the LDAP example] and the general xref:commons-operator::authenticationclass.adoc[Stackable Authentication] documentation on how to set it up.
-In general it requires you to specify a xref:commons-operator::authenticationclass.adoc which is used to authenticate the users. In this example we assign all the users the `Admin` role once they log into Superset.
+In general, it requires you to specify a xref:commons-operator::authenticationclass.adoc[`AuthenticationClass`] which is used to authenticate the users. In this example we assign all the users the `Admin` role once they log into Superset.
 
 [source,yaml]
 ----
@@ -150,7 +150,7 @@ Currently all the users logging in via LDAP get assigned the same role which you
 
 == Connecting Apache Druid Clusters
 
-The operator can automatically connect superset clusters to Apache Druid clusters managed by the https://docs.stackable.tech/druid/index.html[Stackable Druid Cluster].
+The operator can automatically connect Superset to Apache Druid clusters managed by the https://docs.stackable.tech/druid/index.html[Stackable Druid Cluster].
 
 To do so, create a `DruidConnection` resource:
 

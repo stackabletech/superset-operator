@@ -71,6 +71,6 @@ the time of writing).
 
 [source]
 ----
-stackable-superset-operator crd | kubectl apply -f -
-stackable-superset-operator run
+cargo run crd | kubectl apply -f -
+cargo run run
 ----
