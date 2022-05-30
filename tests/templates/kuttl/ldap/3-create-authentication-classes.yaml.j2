@@ -1,0 +1,69 @@
+{% if test_scenario['values']['ldap-authentication'] == 'no-tls' %}
+---
+apiVersion: authentication.stackable.tech/v1alpha1
+kind: AuthenticationClass
+metadata:
+  name: superset-with-ldap-no-tls-ldap
+spec:
+  provider:
+    ldap:
+      hostname: openldap.default.svc.cluster.local
+      port: 1389
+      searchBase: ou=users,dc=example,dc=org
+      bindCredentials:
+        secretClass: superset-with-ldap-bind
+{% elif test_scenario['values']['ldap-authentication'] == 'insecure-tls' %}
+---
+apiVersion: authentication.stackable.tech/v1alpha1
+kind: AuthenticationClass
+metadata:
+  name: superset-with-ldap-insecure-tls-ldap
+spec:
+  provider:
+    ldap:
+      hostname: openldap.default.svc.cluster.local
+      port: 1636
+      searchBase: ou=users,dc=example,dc=org
+      ldapFieldNames:
+        uid: uid
+        group: memberof
+        givenName: givenName
+        surname: sn
+        email: mail
+      bindCredentials:
+        secretClass: superset-with-ldap-bind
+      tls:
+        verification:
+          none: {}
+{% elif test_scenario['values']['ldap-authentication'] == 'server-verification-tls' %}
+---
+apiVersion: authentication.stackable.tech/v1alpha1
+kind: AuthenticationClass
+metadata:
+  name: superset-with-ldap-server-veri-tls-ldap
+spec:
+  provider:
+    ldap:
+      hostname: openldap.default.svc.cluster.local
+      port: 1636
+      searchBase: ou=users,dc=example,dc=org
+      ldapFieldNames:
+        uid: uid
+      bindCredentials:
+        secretClass: superset-with-ldap-bind
+      tls:
+        verification:
+          server:
+            caCert:
+              secretClass: openldap-tls
+{% endif %}
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: superset-with-ldap-bind
+spec:
+  backend:
+    k8sSearch:
+      searchNamespace:
+        pod: {}

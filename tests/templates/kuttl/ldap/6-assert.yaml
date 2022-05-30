@@ -1,0 +1,8 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: login
+timeout: 300
+commands:
+  - script: kubectl -n $NAMESPACE exec python-0 -- python /tmp/login.py

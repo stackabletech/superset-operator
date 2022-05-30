@@ -1,0 +1,47 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-with-ldap-credentials
+type: Opaque
+stringData:
+  adminUser.username: admin
+  adminUser.firstname: Superset
+  adminUser.lastname: Admin
+  adminUser.email: admin@superset.com
+  adminUser.password: admin
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql/superset
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-with-ldap-bind
+  labels:
+    secrets.stackable.tech/class: superset-with-ldap-bind
+stringData:
+  user: cn=admin,dc=example,dc=org
+  password: admin
+---
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: superset-with-ldap
+spec:
+  version: {{ test_scenario['values']['superset'] }}
+  statsdExporterVersion: v0.22.4
+  credentialsSecret: superset-with-ldap-credentials
+  nodes:
+    roleGroups:
+      default:
+        config:
+  authenticationConfig:
+    authenticationClass: {% if test_scenario['values']['ldap-authentication'] == 'no-tls' -%}
+        superset-with-ldap-no-tls-ldap
+      {%- elif test_scenario['values']['ldap-authentication'] == 'insecure-tls' -%}
+        superset-with-ldap-insecure-tls-ldap
+      {%- elif test_scenario['values']['ldap-authentication'] == 'server-verification-tls' -%}
+        superset-with-ldap-server-veri-tls-ldap
+      {%- endif %}
+
+    userRegistrationRole: Admin
