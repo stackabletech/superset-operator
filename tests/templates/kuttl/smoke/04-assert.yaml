@@ -3,5 +3,6 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
   name: test-metrics
+timeout: 300
 commands:
   - script: kubectl exec -n $NAMESPACE python-0 -- python /tmp/metrics.py
