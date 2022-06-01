@@ -462,7 +462,7 @@ fn build_server_rolegroup_statefulset(
 
     let superset_version = superset_version(superset).context(NoSupersetVersionSnafu)?;
 
-    let image = format!("docker.stackable.tech/stackable/superset:{superset_version}-stackable2");
+    let image = format!("docker.stackable.tech/stackable/superset:{superset_version}");
 
     let statsd_exporter_version =
         statsd_exporter_version(superset).context(NoStatsdExporterVersionSnafu)?;

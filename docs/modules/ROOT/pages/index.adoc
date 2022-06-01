@@ -16,5 +16,5 @@ include::partial$supported-versions.adoc[]
 ￼
 [source]
 ----
-docker pull docker.stackable.tech/stackable/superset:<version>
+docker pull docker.stackable.tech/stackable/superset:<version>-stackable<stackable-version>
 ----

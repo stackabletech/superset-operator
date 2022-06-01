@@ -275,7 +275,7 @@ async fn build_import_job(
 
     let container = ContainerBuilder::new("superset-import-druid-connection")
         .image(format!(
-            "docker.stackable.tech/stackable/superset:{}-stackable2",
+            "docker.stackable.tech/stackable/superset:{}",
             superset_db.spec.superset_version
         ))
         .command(vec!["/bin/sh".to_string()])
