@@ -9,6 +9,11 @@
 - Ability to add MAPBOX_API_KEY from secret added ([#178]).
 - Update SupersetConfigOptions to include explicit config for MapboxApiKey ([#179])
 - Add support for LDAP authentication ([#180])
+- [BREAKING] Specifying the product version has been changed to adhere to
+  [ADR018](https://docs.stackable.tech/home/contributor/adr/ADR018-product_image_versioning.html)
+  instead of just specifying the product version you will now have to add the
+  Stackable image version as well, so `version: 1.4.1` becomes (for example)
+  `version: 1.4.1-stackable2.1.0` ([#207])
 
 ### Changed
 
@@ -29,6 +34,7 @@
 [#182]: https://github.com/stackabletech/superset-operator/pull/182
 [#187]: https://github.com/stackabletech/superset-operator/pull/187
 [#190]: https://github.com/stackabletech/superset-operator/pull/190
+[#207]: https://github.com/stackabletech/superset-operator/pull/207
 
 ## [0.4.0] - 2022-04-05
 

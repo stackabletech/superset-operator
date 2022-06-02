@@ -58,7 +58,7 @@ kind: SupersetCluster
 metadata:
   name: superset
 spec:
-  version: 1.4.1
+  version: 1.4.1-stackable2.1.0
   statsdExporterVersion: v0.22.4
   credentialsSecret: simple-superset-credentials
   loadExamplesOnInit: true
@@ -72,6 +72,13 @@ spec:
 `metadata.name` contains the name of the Superset cluster.
 
 The label of the Docker image provided by Stackable must be set in `spec.version`.
+
+Please note that the version you need to specify is not only the version of Apache Superset which
+you want to roll out, but has to be amended with a Stackable version as shown. This Stackable
+version is the version of the underlying container image which is used to execute the processes. For
+a list of available versions please check our
+https://repo.stackable.tech/#browse/browse:docker:v2%2Fstackable%2Fsuperset%2Ftags[image registry].
+It should generally be safe to simply use the latest image version that is available.
 
 `spec.statsdExporterVersion` must contain the tag of a statsd-exporter Docker image in the Stackable repository.
 
@@ -128,7 +135,7 @@ kind: SupersetCluster
 metadata:
   name: superset-with-ldap-server-veri-tls
 spec:
-  version: 1.4.1
+  version: 1.4.1-stackable2.1.0
   [...]
   authenticationConfig:
     authenticationClass: superset-with-ldap-server-veri-tls-ldap
