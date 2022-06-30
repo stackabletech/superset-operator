@@ -1,6 +1,6 @@
 name: superset
-version: "0.5"
+version: "nightly"
 title: Stackable Operator for Apache Superset
 nav:
   - modules/ROOT/nav.adoc
-prerelease: false
+prerelease: true
