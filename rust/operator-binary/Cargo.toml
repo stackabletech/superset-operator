@@ -3,7 +3,7 @@ name = "stackable-superset-operator"
 authors = ["Stackable GmbH <info@stackable.de>"]
 description = "Stackable Operator for Apache Superset"
 license = "OSL-3.0"
-version = "0.5.0-nightly"
+version = "0.5.0"
 edition = "2021"
 repository = "https://github.com/stackabletech/superset-operator"
 

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2022-06-30
+
 ### Added
 
 - Configuration option `rowLimit` added ([#173]).
