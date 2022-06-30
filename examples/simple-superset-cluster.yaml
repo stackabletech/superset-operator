@@ -18,7 +18,7 @@ kind: SupersetCluster
 metadata:
   name: simple-superset
 spec:
-  version: 1.4.1-stackable2.1.0
+  version: 1.5.1-stackable0.1.0
   statsdExporterVersion: v0.22.4
   credentialsSecret: simple-superset-credentials
   loadExamplesOnInit: true

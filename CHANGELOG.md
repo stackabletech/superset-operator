@@ -14,6 +14,7 @@
   instead of just specifying the product version you will now have to add the
   Stackable image version as well, so `version: 1.4.1` becomes (for example)
   `version: 1.4.1-stackable2.1.0` ([#207])
+- Add support for Superset 1.5.1 ([#222]).
 
 ### Changed
 
@@ -35,6 +36,7 @@
 [#187]: https://github.com/stackabletech/superset-operator/pull/187
 [#190]: https://github.com/stackabletech/superset-operator/pull/190
 [#207]: https://github.com/stackabletech/superset-operator/pull/207
+[#222]: https://github.com/stackabletech/superset-operator/pull/222
 
 ## [0.4.0] - 2022-04-05
 
