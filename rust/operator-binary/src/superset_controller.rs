@@ -34,10 +34,7 @@ use stackable_operator::{
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
     kube::{
-        runtime::{
-            controller::{Action, Context},
-            reflector::ObjectRef,
-        },
+        runtime::{controller::Action, reflector::ObjectRef},
         ResourceExt,
     },
     labels::{role_group_selector_labels, role_selector_labels},
@@ -158,13 +155,10 @@ impl ReconcilerError for Error {
     }
 }
 
-pub async fn reconcile_superset(
-    superset: Arc<SupersetCluster>,
-    ctx: Context<Ctx>,
-) -> Result<Action> {
+pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -> Result<Action> {
     tracing::info!("Starting reconcile");
 
-    let client = &ctx.get_ref().client;
+    let client = &ctx.client;
 
     // Ensure DB Schema exists
     let superset_db = SupersetDB::for_superset(&superset).context(CreateSupersetObjectSnafu)?;
@@ -216,7 +210,7 @@ pub async fn reconcile_superset(
             .into(),
         )
         .context(GenerateProductConfigSnafu)?,
-        &ctx.get_ref().product_config,
+        &ctx.product_config,
         false,
         false,
     )
@@ -654,10 +648,10 @@ fn build_secret_operator_volume(
     }
 
     VolumeBuilder::new(volume_name)
-        .csi(secret_operator_volume_source_builder.build())
+        .ephemeral(secret_operator_volume_source_builder.build())
         .build()
 }
 
-pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> Action {
+pub fn error_policy(_error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
 }

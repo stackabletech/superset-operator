@@ -10,10 +10,7 @@ use stackable_operator::{
     },
     kube::{
         core::DynamicObject,
-        runtime::{
-            controller::{Action, Context},
-            reflector::ObjectRef,
-        },
+        runtime::{controller::Action, reflector::ObjectRef},
         ResourceExt,
     },
     logging::controller::ReconcilerError,
@@ -103,11 +100,11 @@ impl ReconcilerError for Error {
 
 pub async fn reconcile_druid_connection(
     druid_connection: Arc<DruidConnection>,
-    ctx: Context<Ctx>,
+    ctx: Arc<Ctx>,
 ) -> Result<Action> {
     tracing::info!("Starting reconciling DruidConnections");
 
-    let client = &ctx.get_ref().client;
+    let client = &ctx.client;
 
     if let Some(ref s) = druid_connection.status {
         match s.condition {
@@ -313,6 +310,6 @@ async fn build_import_job(
     Ok(job)
 }
 
-pub fn error_policy(_error: &Error, _ctx: Context<Ctx>) -> Action {
+pub fn error_policy(_error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
 }
