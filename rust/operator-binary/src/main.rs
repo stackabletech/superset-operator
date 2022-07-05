@@ -4,6 +4,8 @@ mod superset_controller;
 mod superset_db_controller;
 mod util;
 
+use std::sync::Arc;
+
 use clap::Parser;
 use futures::StreamExt;
 use stackable_operator::{
@@ -16,7 +18,7 @@ use stackable_operator::{
     },
     kube::{
         api::ListParams,
-        runtime::{controller::Context, reflector::ObjectRef, Controller},
+        runtime::{reflector::ObjectRef, Controller},
         CustomResourceExt, ResourceExt,
     },
     logging::controller::report_controller_reconciled,
@@ -25,7 +27,6 @@ use stackable_superset_crd::{
     druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
     SupersetClusterAuthenticationConfig,
 };
-use std::sync::Arc;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -129,7 +130,7 @@ async fn main() -> anyhow::Result<()> {
                 .run(
                     superset_controller::reconcile_superset,
                     superset_controller::error_policy,
-                    Context::new(superset_controller::Ctx {
+                    Arc::new(superset_controller::Ctx {
                         client: client.clone(),
                         product_config,
                     }),
@@ -186,7 +187,7 @@ async fn main() -> anyhow::Result<()> {
                 .run(
                     superset_db_controller::reconcile_superset_db,
                     superset_db_controller::error_policy,
-                    Context::new(superset_db_controller::Ctx {
+                    Arc::new(superset_db_controller::Ctx {
                         client: client.clone(),
                     }),
                 )
@@ -255,7 +256,7 @@ async fn main() -> anyhow::Result<()> {
                 .run(
                     druid_connection_controller::reconcile_druid_connection,
                     druid_connection_controller::error_policy,
-                    Context::new(druid_connection_controller::Ctx {
+                    Arc::new(druid_connection_controller::Ctx {
                         client: client.clone(),
                     }),
                 )
