@@ -5,6 +5,7 @@
 ### Changed
 
 - Include chart name when installing with a custom release name ([#227], [#228]).
+- Orphaned resources are deleted
 
 [#227]: https://github.com/stackabletech/superset-operator/pull/227
 [#228]: https://github.com/stackabletech/superset-operator/pull/228
