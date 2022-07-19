@@ -29,8 +29,8 @@ allow = [
     "ISC",
     "LicenseRef-ring",
     "LicenseRef-webpki",
-    "Unicode-DFS-2016",
     "MIT",
+    "Unicode-DFS-2016",
     "Zlib"
 ]
 
