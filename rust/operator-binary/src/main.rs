@@ -46,12 +46,14 @@ struct Opts {
 async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
-        Command::Crd => println!(
-            "{}{}{}",
-            serde_yaml::to_string(&SupersetCluster::crd())?,
-            serde_yaml::to_string(&SupersetDB::crd())?,
-            serde_yaml::to_string(&DruidConnection::crd())?
-        ),
+        Command::Crd => {
+            let yamls = vec![
+                serde_yaml::to_string(&SupersetCluster::crd())?,
+                serde_yaml::to_string(&SupersetDB::crd())?,
+                serde_yaml::to_string(&DruidConnection::crd())?,
+            ];
+            println!("{}", yamls.join("---\n"));
+        }
         Command::Run(ProductOperatorRun {
             product_config,
             watch_namespace,
