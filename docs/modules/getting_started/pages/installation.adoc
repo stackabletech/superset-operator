@@ -1,6 +1,6 @@
 = Installation
 
-On this page you will install the Stackable Druid Operator and Operators for its dependencies - ZooKeeper and HDFS - as well as the commons and secret operator which are required by all Stackable Operators.
+On this page you will install the Stackable Superset Operator as well as the commons and secret operator which are required by all Stackable Operators.
 
 == Stackable Operators
 
@@ -15,7 +15,7 @@ There are 2 ways to run Stackable Operators
 stackablectl is the command line tool to interact with Stackable operators and our recommended way to install Operators.
 Follow the xref:stackablectl::installation.adoc[installation steps] for your platform.
 
-After you have installed stackablectl run the following command to install all Operators necessary for Druid:
+After you have installed stackablectl run the following command to install all Operators necessary for Superset:
 
 [source,bash]
 ----
@@ -46,8 +46,8 @@ Then install the Stackable Operators:
 include::example$code/getting_started.sh[tag=helm-install-operators]
 ----
 
-Helm will deploy the Operators in a Kubernetes Deployment and apply the CRDs for the Apache Druid service (as well as the CRDs for the required operators). You are now ready to deploy Apache Druid in Kubernetes.
+Helm will deploy the Operators in a Kubernetes Deployment and apply the CRDs for the Superset service (as well as the CRDs for the required operators). You are now ready to deploy Superset in Kubernetes.
 
 == What's next
 
-TODO
+xref:first_steps.adoc[Deploy a Superset instance and connect to it].

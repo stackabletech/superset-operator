@@ -1,3 +1,18 @@
 = Getting started
 
-# TODO
+This guide will get you started with Superset using the Stackable Operator. It will guide you through the installation of the Operator and its dependencies, setting up your first Superset instance and connecting to it and looking at some sample data.
+
+== Prerequisites
+
+You will need:
+
+* a Kubernetes cluster
+* kubectl
+* Helm
+
+== What's next
+
+The Guide is divided into two steps:
+
+* xref:installation.adoc[Installing the Operators].
+* xref:first_steps.adoc[Setting up the Superset instance and connecting to it].
