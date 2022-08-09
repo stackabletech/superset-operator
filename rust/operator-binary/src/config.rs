@@ -1,4 +1,4 @@
-use crate::superset_controller::{CERTS_DIR, SECRETS_DIR};
+use crate::superset_controller::{CERTS_DIR, SECRETS_DIR, SUPERSET_TIMEOUT_SECONDS};
 use stackable_operator::commons::{
     authentication::{AuthenticationClass, AuthenticationClassProvider},
     ldap::LdapAuthenticationProvider,
@@ -35,6 +35,10 @@ pub fn add_superset_config(
     config.insert(
         SupersetConfigOptions::MapboxApiKey.to_string(),
         "os.environ.get('MAPBOX_API_KEY', '')".into(),
+    );
+    config.insert(
+        SupersetConfigOptions::SupersetWebserverTimeout.to_string(),
+        SUPERSET_TIMEOUT_SECONDS.to_string(),
     );
 
     if let Some(authentication_config) = authentication_config {

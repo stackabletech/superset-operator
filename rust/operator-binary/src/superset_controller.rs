@@ -5,14 +5,7 @@ use crate::{
     util::{statsd_exporter_version, superset_version},
     APP_NAME, APP_PORT,
 };
-
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-    time::Duration,
-};
-
+use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
@@ -52,6 +45,12 @@ use stackable_superset_crd::{
     SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole, PYTHONPATH,
     SUPERSET_CONFIG_FILENAME,
 };
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+    time::Duration,
+};
 use strum::{EnumDiscriminants, IntoStaticStr};
 use tracing::log::debug;
 
@@ -61,6 +60,10 @@ const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
 pub const SECRETS_DIR: &str = "/stackable/secrets/";
 pub const CERTS_DIR: &str = "/stackable/certificates/";
+
+/// The default timeout of Superset is 60s which is way to low when querying "big data" systems.
+/// see [the Superset docs](https://superset.apache.org/docs/frequently-asked-questions#why-are-my-queries-timing-out).
+pub const SUPERSET_TIMEOUT_SECONDS: u32 = 6 * 60 * 60; // 6 hours
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -497,16 +500,17 @@ fn build_server_rolegroup_statefulset(
         .command(vec![
             "/bin/sh".to_string(),
             "-c".to_string(),
-            "superset init && \
-            gunicorn \
-            --bind 0.0.0.0:${SUPERSET_PORT} \
-            --worker-class gthread \
-            --threads 20 \
-            --timeout 60 \
-            --limit-request-line 0 \
-            --limit-request-field_size 0 \
-            'superset.app:create_app()'"
-                .to_string(),
+            formatdoc! {"
+                superset init && \
+                gunicorn \
+                --bind 0.0.0.0:${{SUPERSET_PORT}} \
+                --worker-class gthread \
+                --threads 20 \
+                --timeout {SUPERSET_TIMEOUT_SECONDS} \
+                --limit-request-line 0 \
+                --limit-request-field_size 0 \
+                'superset.app:create_app()'
+            "},
         ])
         .build();
     let metrics_container = ContainerBuilder::new("metrics")

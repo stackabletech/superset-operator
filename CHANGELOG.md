@@ -5,9 +5,11 @@
 ### Changed
 
 - Include chart name when installing with a custom release name ([#227], [#228]).
+- Increase query timeout from the default value of 60s to 6h [#247].
 
 [#227]: https://github.com/stackabletech/superset-operator/pull/227
 [#228]: https://github.com/stackabletech/superset-operator/pull/228
+[#247]: https://github.com/stackabletech/superset-operator/pull/247
 
 ## [0.5.0] - 2022-06-30
 
