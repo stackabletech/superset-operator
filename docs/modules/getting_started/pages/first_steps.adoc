@@ -15,12 +15,15 @@ include::example$code/getting_started.sh[tag=install-bitnami-psql]
 
 == Secret with Superset credentials
 
-A secret with the necessary credentials must be created, this entails database connection credentials as well as an admin account for Superset itself:
+A secret with the necessary credentials must be created, this entails database connection credentials as well as an admin account for Superset itself. Create a file called `superset-credentials.yaml`:
 
 [source,yaml]
 include::example$code/superset-credentials.yaml[]
 
+And apply it:
 
+[source,bash]
+include::example$code/getting_started.sh[tag=apply-superset-credentials]
 
 The `connections.secretKey` will be used for securely signing the session cookies and can be used
 for any other security related needs by extensions. It should be a long random string of bytes.
@@ -33,10 +36,15 @@ Please note that the admin user will be disabled if you use a non-default authen
 
 == Creation of a Superset node
 
-A Superset node must be created as a custom resource:
+A Superset node must be created as a custom resource, create file called `superset.yaml`:
 
 [source,yaml]
 include::example$code/superset.yaml[]
+
+And apply it:
+
+[source,bash]
+include::example$code/getting_started.sh[tag=apply-superset-cluster]
 
 
 `metadata.name` contains the name of the Superset cluster.
