@@ -1,9 +1,10 @@
 = First steps
 
+After you went through the xref:installation.adoc[] of the Operator and its dependencies, you will now go through the steps to set up a Superset instance and connect to the instance afterwards.
+
 == Database for the Superset metadata
 
-The metadata of Superset (slices, connections, tables, dashboards, ...) is stored in an SQL
-database.
+The metadata of Superset (slices, connections, tables, dashboards, ...) is stored in an SQL database.
 
 For testing purposes, you can spin up a PostgreSQL database with the following commands:
 
@@ -97,3 +98,9 @@ image::superset-login.png[Login screen of Superset]
 If the examples were loaded then some dashboards are already available:
 
 image::superset-dashboard.png[Superset dashboard showing birth names]
+
+Great! You have set up a Superset instance and connected to it!
+
+== What's next
+
+Look at the xref:ROOT:usage.adoc[Usage page] to find out more about configuring your Superset instance or have a look at the Superset documentation to link:https://superset.apache.org/docs/creating-charts-dashboards/creating-your-first-dashboard[create your first dashboard].

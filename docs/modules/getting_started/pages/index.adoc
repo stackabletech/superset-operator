@@ -1,6 +1,6 @@
 = Getting started
 
-This guide will get you started with Superset using the Stackable Operator. It will guide you through the installation of the Operator and its dependencies, setting up your first Superset instance and connecting to it and looking at some sample data.
+This guide will get you started with Superset using the Stackable Operator. It will guide you through the installation of the Operator and its dependencies, setting up your first Superset instance, connecting to it and looking at some sample data.
 
 == Prerequisites
 
