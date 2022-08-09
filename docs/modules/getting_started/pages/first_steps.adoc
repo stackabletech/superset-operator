@@ -73,6 +73,11 @@ The first time the cluster is created, the operator creates a `SupersetDB` resou
 
 A Kubernetes job is created which starts a pod to initialize the database. This can take a while.
 
+You can use kubectl to wait on the resource:
+
+[source,bash]
+include::example$code/getting_started.sh[tag=wait-supersetdb]
+
 == Using Superset
 
 When the Superset node is created and the database is initialized, Superset can be opened in the
@@ -81,9 +86,7 @@ browser.
 The Superset port which defaults to `8088` can be forwarded to the local host:
 
 [source,bash]
-----
-kubectl port-forward service/simple-superset-external 8088
-----
+include::example$code/getting_started.sh[tag=port-forwarding]
 
 Then it can be opened in the browser with `http://localhost:8088`.
 
