@@ -70,7 +70,7 @@ The `rowLimit` configuration option defines the row limit when requesting chart 
 
 === Initialization of the Superset database
 
-The first time the cluster is created, the operator creates a `SupersetDB` resource with the same name as the cluster.  It ensures that the database is initialized (schema created, admin user created).
+The first time the cluster is created, the operator creates a `SupersetDB` resource with the same name as the cluster.  It ensures that the database is initialized (with the creation of a schema and admin user).
 
 A Kubernetes job is created which starts a pod to initialize the database. This can take a while.
 
