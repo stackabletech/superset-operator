@@ -4,7 +4,7 @@ Once you have followed the steps in  xref:installation.adoc[] for the Operator a
 
 == Database for the Superset metadata
 
-The metadata of Superset (slices, connections, tables, dashboards, ...) is stored in an SQL database.
+Superset metadata (slices, connections, tables, dashboards etc.) is stored in an SQL database.
 
 For testing purposes, you can spin up a PostgreSQL database with the following commands:
 
