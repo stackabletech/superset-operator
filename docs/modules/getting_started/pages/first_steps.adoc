@@ -1,6 +1,6 @@
 = First steps
 
-After you went through the xref:installation.adoc[] of the Operator and its dependencies, you will now go through the steps to set up a Superset instance and connect to the instance afterwards.
+Once you have followed the steps in  xref:installation.adoc[] for the Operator and its dependencies, you will now go through the steps to set up and connect to a Superset instance.
 
 == Database for the Superset metadata
 
