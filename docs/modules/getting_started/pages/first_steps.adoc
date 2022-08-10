@@ -16,7 +16,7 @@ include::example$code/getting_started.sh[tag=install-bitnami-psql]
 
 == Secret with Superset credentials
 
-A secret with the necessary credentials must be created, this entails database connection credentials as well as an admin account for Superset itself. Create a file called `superset-credentials.yaml`:
+A secret with the necessary credentials must be created: this contains database connection credentials as well as an admin account for Superset itself. Create a file called `superset-credentials.yaml`:
 
 [source,yaml]
 include::example$code/superset-credentials.yaml[]
