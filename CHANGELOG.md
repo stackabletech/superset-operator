@@ -5,7 +5,7 @@
 ### Changed
 
 - Include chart name when installing with a custom release name ([#227], [#228]).
-- Increase query timeout from the default value of 60s to 6h [#247].
+- Make webserver timeout configurable. Increase default to 5m ([#247]).
 
 [#227]: https://github.com/stackabletech/superset-operator/pull/227
 [#228]: https://github.com/stackabletech/superset-operator/pull/228
