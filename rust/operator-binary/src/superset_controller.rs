@@ -490,10 +490,10 @@ fn build_server_rolegroup_statefulset(
     }
 
     let webserver_timeout = node_config
-        .get(&PropertyNameKind::File("superset_config.py".to_string()))
-        .unwrap()
+        .get(&PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.to_string()))
+        .expect("Failed to get the superset config file from node config. It should be set by product config machinery")
         .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
-        .unwrap();
+        .expect("Failed to get webserver timeout from superset config file. It should be set by product config machinery");
 
     let container = cb
         .image(image)
