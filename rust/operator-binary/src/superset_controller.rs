@@ -61,10 +61,6 @@ const METRICS_PORT: i32 = 9102;
 pub const SECRETS_DIR: &str = "/stackable/secrets/";
 pub const CERTS_DIR: &str = "/stackable/certificates/";
 
-/// The default timeout of Superset is 60s which is way to low when querying "big data" systems.
-/// see [the Superset docs](https://superset.apache.org/docs/frequently-asked-questions#why-are-my-queries-timing-out).
-pub const SUPERSET_TIMEOUT_SECONDS: u32 = 6 * 60 * 60; // 6 hours
-
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub product_config: ProductConfigManager,
@@ -493,6 +489,12 @@ fn build_server_rolegroup_statefulset(
         add_authentication_volumes_and_volume_mounts(authentication_class, &mut cb, &mut pb)?;
     }
 
+    let webserver_timeout = node_config
+        .get(&PropertyNameKind::File("superset_config.py".to_string()))
+        .unwrap()
+        .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
+        .unwrap();
+
     let container = cb
         .image(image)
         .add_container_port("http", APP_PORT.into())
@@ -506,7 +508,7 @@ fn build_server_rolegroup_statefulset(
                 --bind 0.0.0.0:${{SUPERSET_PORT}} \
                 --worker-class gthread \
                 --threads 20 \
-                --timeout {SUPERSET_TIMEOUT_SECONDS} \
+                --timeout {webserver_timeout} \
                 --limit-request-line 0 \
                 --limit-request-field_size 0 \
                 'superset.app:create_app()'
