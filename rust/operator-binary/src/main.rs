@@ -19,9 +19,10 @@ use stackable_operator::{
     kube::{
         api::ListParams,
         runtime::{reflector::ObjectRef, Controller},
-        CustomResourceExt, ResourceExt,
+        ResourceExt,
     },
     logging::controller::report_controller_reconciled,
+    CustomResourceExt,
 };
 use stackable_superset_crd::{
     druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
@@ -46,12 +47,11 @@ struct Opts {
 async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
-        Command::Crd => println!(
-            "{}{}{}",
-            serde_yaml::to_string(&SupersetCluster::crd())?,
-            serde_yaml::to_string(&SupersetDB::crd())?,
-            serde_yaml::to_string(&DruidConnection::crd())?
-        ),
+        Command::Crd => {
+            SupersetCluster::print_yaml_schema()?;
+            SupersetDB::print_yaml_schema()?;
+            DruidConnection::print_yaml_schema()?;
+        }
         Command::Run(ProductOperatorRun {
             product_config,
             watch_namespace,
@@ -121,7 +121,7 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |superset| {
-                                superset_db.name() == superset.name()
+                                superset_db.name_unchecked() == superset.name_unchecked()
                                     && superset_db.namespace() == superset.namespace()
                             })
                             .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
@@ -178,7 +178,7 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |superset_db| {
-                                job.name() == superset_db.name()
+                                job.name_unchecked() == superset_db.name_unchecked()
                                     && job.namespace() == superset_db.namespace()
                             })
                             .map(|superset_db| ObjectRef::from_obj(&*superset_db))
@@ -216,7 +216,7 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                druid_connection.superset_name() == superset_db.name()
+                                druid_connection.superset_name() == superset_db.name_unchecked()
                                     && druid_connection.superset_namespace().ok()
                                         == superset_db.namespace()
                             })

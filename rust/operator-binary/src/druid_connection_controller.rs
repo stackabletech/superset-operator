@@ -128,7 +128,7 @@ pub async fn reconcile_druid_connection(
                 }
                 // Is the referenced druid discovery configmap there?
                 let druid_discovery_cm_exists = client
-                    .exists::<ConfigMap>(
+                    .get_opt::<ConfigMap>(
                         &druid_connection.druid_name(),
                         Some(&druid_connection.druid_namespace().context(
                             DruidConnectionNoNamespaceSnafu {
@@ -137,7 +137,8 @@ pub async fn reconcile_druid_connection(
                         )?),
                     )
                     .await
-                    .context(DruidDiscoveryCheckSnafu)?;
+                    .context(DruidDiscoveryCheckSnafu)?
+                    .is_some();
 
                 if superset_db_ready && druid_discovery_cm_exists {
                     let superset_db = client
@@ -271,6 +272,7 @@ async fn build_import_job(
     let secret = &superset_db.spec.credentials_secret;
 
     let container = ContainerBuilder::new("superset-import-druid-connection")
+        .expect("ContainerBuilder not created")
         .image(format!(
             "docker.stackable.tech/stackable/superset:{}",
             superset_db.spec.superset_version

@@ -72,7 +72,7 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
         match s.condition {
             SupersetDBStatusCondition::Pending => {
                 let secret_exists = client
-                    .exists::<Secret>(
+                    .get_opt::<Secret>(
                         &superset_db.spec.credentials_secret,
                         superset_db.namespace().as_deref(),
                     )
@@ -84,7 +84,8 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
                             secret_ref = secret_ref.within(&ns);
                         }
                         SecretCheckSnafu { secret: secret_ref }
-                    })?;
+                    })?
+                    .is_some();
                 if secret_exists {
                     let job = build_init_job(&superset_db)?;
                     client
@@ -170,6 +171,7 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
     let secret = &superset_db.spec.credentials_secret;
 
     let container = ContainerBuilder::new("superset-init-db")
+        .expect("ContainerBuilder not created")
         .image(format!(
             "docker.stackable.tech/stackable/superset:{}",
             superset_db.spec.superset_version
@@ -193,7 +195,7 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
     let pod = PodTemplateSpec {
         metadata: Some(
             ObjectMetaBuilder::new()
-                .name(format!("{}-init", superset_db.name()))
+                .name(format!("{}-init", superset_db.name_unchecked()))
                 .build(),
         ),
         spec: Some(PodSpec {
@@ -205,7 +207,7 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
 
     let job = Job {
         metadata: ObjectMetaBuilder::new()
-            .name(superset_db.name())
+            .name(superset_db.name_unchecked())
             .namespace_opt(superset_db.namespace())
             .ownerreference_from_resource(superset_db, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?

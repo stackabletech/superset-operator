@@ -55,7 +55,7 @@ impl SupersetDB {
             // when the cluster is created again.
             metadata: ObjectMetaBuilder::new()
                 .name_and_namespace(superset)
-                .with_recommended_labels(superset, APP_NAME, version, "", "") // TODO fill in missing fields
+                .with_recommended_labels(superset, APP_NAME, version, "", "", "") // TODO fill in missing fields
                 .build(),
             spec: SupersetDBSpec {
                 superset_version: version.to_string(),
@@ -67,7 +67,7 @@ impl SupersetDB {
     }
 
     pub fn job_name(&self) -> String {
-        self.name()
+        self.name_unchecked()
     }
 }
 
