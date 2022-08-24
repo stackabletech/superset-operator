@@ -43,7 +43,7 @@ pub struct DruidConnectionSpec {
 
 impl DruidConnection {
     pub fn job_name(&self) -> String {
-        format!("{}-import", self.name())
+        format!("{}-import", self.name_unchecked())
     }
 
     pub fn superset_name(&self) -> String {
@@ -57,7 +57,7 @@ impl DruidConnection {
             Ok(ns)
         } else {
             NoNamespaceSnafu {
-                druid_connection: self.name(),
+                druid_connection: self.name_unchecked(),
             }
             .fail()
         }
@@ -74,7 +74,7 @@ impl DruidConnection {
             Ok(ns)
         } else {
             NoNamespaceSnafu {
-                druid_connection: self.name(),
+                druid_connection: self.name_unchecked(),
             }
             .fail()
         }
