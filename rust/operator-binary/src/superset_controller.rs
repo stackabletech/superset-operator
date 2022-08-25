@@ -154,6 +154,10 @@ pub enum Error {
         source: stackable_operator::error::Error,
         authentication_class: ObjectRef<AuthenticationClass>,
     },
+    #[snafu(display("failed to get the superset config file from node config. It should be set by product config machinery"))]
+    MissingSupersetConfigInNodeConfig,
+    #[snafu(display("failed to get webserver timeout from superset config file. It should be set by product config machinery"))]
+    MissingWebServerTimeoutInSupersetConfig,
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -512,10 +516,12 @@ fn build_server_rolegroup_statefulset(
     }
 
     let webserver_timeout = node_config
-        .get(&PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.to_string()))
-        .expect("Failed to get the superset config file from node config. It should be set by product config machinery")
+        .get(&PropertyNameKind::File(
+            SUPERSET_CONFIG_FILENAME.to_string(),
+        ))
+        .context(MissingSupersetConfigInNodeConfigSnafu)?
         .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
-        .expect("Failed to get webserver timeout from superset config file. It should be set by product config machinery");
+        .context(MissingWebServerTimeoutInSupersetConfigSnafu)?;
 
     let container = cb
         .image(image)
