@@ -21,7 +21,7 @@ spec:
       name: v1alpha1
       schema:
         openAPIV3Schema:
-          description: "Auto-generated derived type for SupersetClusterSpec via `CustomResource`"
+          description: Auto-generated derived type for SupersetClusterSpec via `CustomResource`
           properties:
             spec:
               properties:
@@ -34,18 +34,18 @@ spec:
                       type: string
                     syncRolesAt:
                       default: Registration
-                      description: "If we should replace ALL the user's roles each login, or only on registration. Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`"
+                      description: If we should replace ALL the user's roles each login, or only on registration. Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
                       enum:
                         - Registration
                         - Login
                       type: string
                     userRegistration:
                       default: true
-                      description: "Allow users who are not already in the FAB DB. Gets mapped to `AUTH_USER_REGISTRATION`"
+                      description: Allow users who are not already in the FAB DB. Gets mapped to `AUTH_USER_REGISTRATION`
                       type: boolean
                     userRegistrationRole:
                       default: Public
-                      description: "This role will be given in addition to any AUTH_ROLES_MAPPING. Gets mapped to `AUTH_USER_REGISTRATION_ROLE`"
+                      description: This role will be given in addition to any AUTH_ROLES_MAPPING. Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
                       type: string
                   type: object
                 credentialsSecret:
@@ -138,16 +138,16 @@ spec:
                               matchExpressions:
                                 description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                 items:
-                                  description: "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values."
+                                  description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
                                   properties:
                                     key:
                                       description: key is the label key that the selector applies to.
                                       type: string
                                     operator:
-                                      description: "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist."
+                                      description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
                                       type: string
                                     values:
-                                      description: "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch."
+                                      description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                       items:
                                         type: string
                                       type: array
@@ -159,7 +159,7 @@ spec:
                               matchLabels:
                                 additionalProperties:
                                   type: string
-                                description: "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed."
+                                description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
                                 type: object
                             type: object
                         type: object
@@ -171,7 +171,7 @@ spec:
                   nullable: true
                   type: string
                 stopped:
-                  description: "Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)"
+                  description: Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
                   nullable: true
                   type: boolean
                 version:
@@ -213,7 +213,7 @@ spec:
       name: v1alpha1
       schema:
         openAPIV3Schema:
-          description: "Auto-generated derived type for SupersetDBSpec via `CustomResource`"
+          description: Auto-generated derived type for SupersetDBSpec via `CustomResource`
           properties:
             spec:
               properties:
@@ -275,7 +275,7 @@ spec:
       name: v1alpha1
       schema:
         openAPIV3Schema:
-          description: "Auto-generated derived type for DruidConnectionSpec via `CustomResource`"
+          description: Auto-generated derived type for DruidConnectionSpec via `CustomResource`
           properties:
             spec:
               properties:

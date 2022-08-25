@@ -12,6 +12,7 @@ use stackable_operator::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
         PodSecurityContextBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
     },
+    cluster_resources::ClusterResources,
     commons::{
         authentication::{AuthenticationClass, AuthenticationClassProvider},
         secret_class::SecretClassVolumeScope,
@@ -28,7 +29,7 @@ use stackable_operator::{
     },
     kube::{
         runtime::{controller::Action, reflector::ObjectRef},
-        ResourceExt,
+        Resource, ResourceExt,
     },
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
@@ -54,6 +55,7 @@ use std::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 use tracing::log::debug;
 
+const CONTROLLER_NAME: &str = "superset-operator";
 const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
 
 const METRICS_PORT_NAME: &str = "metrics";
@@ -78,6 +80,14 @@ pub enum Error {
     NoNodeRole,
     #[snafu(display("failed to calculate global service name"))]
     GlobalServiceNameNotFound,
+    #[snafu(display("failed to create cluster resources"))]
+    CreateClusterResources {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to delete orphaned resources"))]
+    DeleteOrphanedResources {
+        source: stackable_operator::error::Error,
+    },
     #[snafu(display("failed to apply global Service"))]
     ApplyRoleService {
         source: stackable_operator::error::Error,
@@ -167,7 +177,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         .context(ApplySupersetDBSnafu)?;
 
     let superset_db = client
-        .get::<SupersetDB>(&superset.name(), superset.namespace().as_deref())
+        .get::<SupersetDB>(&superset.name_unchecked(), superset.namespace().as_deref())
         .await
         .context(SupersetDBRetrievalSnafu)?;
 
@@ -219,9 +229,13 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         .map(Cow::Borrowed)
         .unwrap_or_default();
 
+    let mut cluster_resources =
+        ClusterResources::new(APP_NAME, CONTROLLER_NAME, &superset.object_ref(&()))
+            .context(CreateClusterResourcesSnafu)?;
+
     let node_role_service = build_node_role_service(&superset)?;
-    client
-        .apply_patch(FIELD_MANAGER_SCOPE, &node_role_service, &node_role_service)
+    cluster_resources
+        .add(client, &node_role_service)
         .await
         .context(ApplyRoleServiceSnafu)?;
 
@@ -262,25 +276,30 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             rolegroup_config,
             authentication_class.as_ref(),
         )?;
-        client
-            .apply_patch(FIELD_MANAGER_SCOPE, &rg_service, &rg_service)
+        cluster_resources
+            .add(client, &rg_service)
             .await
             .with_context(|_| ApplyRoleGroupServiceSnafu {
                 rolegroup: rolegroup.clone(),
             })?;
-        client
-            .apply_patch(FIELD_MANAGER_SCOPE, &rg_configmap, &rg_configmap)
+        cluster_resources
+            .add(client, &rg_configmap)
             .await
             .with_context(|_| ApplyRoleGroupConfigSnafu {
                 rolegroup: rolegroup.clone(),
             })?;
-        client
-            .apply_patch(FIELD_MANAGER_SCOPE, &rg_statefulset, &rg_statefulset)
+        cluster_resources
+            .add(client, &rg_statefulset)
             .await
             .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
                 rolegroup: rolegroup.clone(),
             })?;
     }
+
+    cluster_resources
+        .delete_orphaned_resources(client)
+        .await
+        .context(DeleteOrphanedResourcesSnafu)?;
 
     Ok(Action::await_change())
 }
@@ -302,6 +321,7 @@ fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
                 superset,
                 APP_NAME,
                 superset_version(superset).context(NoSupersetVersionSnafu)?,
+                CONTROLLER_NAME,
                 &role_name,
                 "global",
             )
@@ -366,6 +386,7 @@ fn build_rolegroup_config_map(
                     superset,
                     APP_NAME,
                     superset_version(superset).context(NoSupersetVersionSnafu)?,
+                    CONTROLLER_NAME,
                     &rolegroup.role,
                     &rolegroup.role_group,
                 )
@@ -398,6 +419,7 @@ fn build_node_rolegroup_service(
                 superset,
                 APP_NAME,
                 superset_version(superset).context(NoSupersetVersionSnafu)?,
+                CONTROLLER_NAME,
                 &rolegroup.role,
                 &rolegroup.role_group,
             )
@@ -463,7 +485,7 @@ fn build_server_rolegroup_statefulset(
     let statsd_exporter_image =
         format!("docker.stackable.tech/prom/statsd-exporter:{statsd_exporter_version}");
 
-    let mut cb = ContainerBuilder::new("superset");
+    let mut cb = ContainerBuilder::new("superset").expect("ContainerBuilder not created");
     let mut pb = PodBuilder::new();
 
     for (name, value) in node_config
@@ -516,6 +538,7 @@ fn build_server_rolegroup_statefulset(
         ])
         .build();
     let metrics_container = ContainerBuilder::new("metrics")
+        .expect("ContainerBuilder not created")
         .image(statsd_exporter_image)
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
         .build();
@@ -529,6 +552,7 @@ fn build_server_rolegroup_statefulset(
                 superset,
                 APP_NAME,
                 superset_version,
+                CONTROLLER_NAME,
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
             )
@@ -558,6 +582,7 @@ fn build_server_rolegroup_statefulset(
                         superset,
                         APP_NAME,
                         superset_version,
+                        CONTROLLER_NAME,
                         &rolegroup_ref.role,
                         &rolegroup_ref.role_group,
                     )

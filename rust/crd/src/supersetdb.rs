@@ -6,6 +6,7 @@ use stackable_operator::k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use stackable_operator::k8s_openapi::chrono::Utc;
 use stackable_operator::kube::CustomResource;
 use stackable_operator::kube::ResourceExt;
+use stackable_operator::labels::{self, APP_VERSION_LABEL};
 use stackable_operator::schemars::{self, JsonSchema};
 
 #[derive(Snafu, Debug)]
@@ -49,13 +50,18 @@ impl SupersetDB {
             .version
             .as_deref()
             .context(NoSupersetVersionSnafu)?;
+
         Ok(Self {
             // The db is deliberately not owned by the cluster so it doesn't get deleted when the
             // cluster gets deleted.  The schema etc. still exists in the postgres db and can be reused
             // when the cluster is created again.
             metadata: ObjectMetaBuilder::new()
                 .name_and_namespace(superset)
-                .with_recommended_labels(superset, APP_NAME, version, "", "") // TODO fill in missing fields
+                .with_labels(labels::build_common_labels_for_all_managed_resources(
+                    &superset.name_any(),
+                    APP_NAME,
+                ))
+                .with_label(APP_VERSION_LABEL, version)
                 .build(),
             spec: SupersetDBSpec {
                 superset_version: version.to_string(),
@@ -67,7 +73,7 @@ impl SupersetDB {
     }
 
     pub fn job_name(&self) -> String {
-        self.name()
+        self.name_unchecked()
     }
 }
 

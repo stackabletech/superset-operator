@@ -5,11 +5,14 @@
 ### Changed
 
 - Include chart name when installing with a custom release name ([#227], [#228]).
+- Orphaned resources are deleted ([#255]).
+- `operator-rs` `0.22.0` -> `0.25.0` ([#255]).
 - Make webserver timeout configurable. Increase default to 5m ([#247]).
 
 [#227]: https://github.com/stackabletech/superset-operator/pull/227
 [#228]: https://github.com/stackabletech/superset-operator/pull/228
 [#247]: https://github.com/stackabletech/superset-operator/pull/247
+[#255]: https://github.com/stackabletech/superset-operator/pull/255
 
 ## [0.5.0] - 2022-06-30
 

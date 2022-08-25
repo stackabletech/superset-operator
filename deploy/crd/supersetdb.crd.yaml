@@ -13,48 +13,50 @@ spec:
     singular: supersetdb
   scope: Namespaced
   versions:
-    - additionalPrinterColumns: []
-      name: v1alpha1
-      schema:
-        openAPIV3Schema:
-          description: "Auto-generated derived type for SupersetDBSpec via `CustomResource`"
-          properties:
-            spec:
-              properties:
-                credentialsSecret:
-                  type: string
-                loadExamples:
-                  type: boolean
-                supersetVersion:
-                  type: string
-              required:
-                - credentialsSecret
-                - loadExamples
-                - supersetVersion
-              type: object
-            status:
-              nullable: true
-              properties:
-                condition:
-                  enum:
-                    - Pending
-                    - Initializing
-                    - Ready
-                    - Failed
-                  type: string
-                startedAt:
-                  description: Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.
-                  format: date-time
-                  nullable: true
-                  type: string
-              required:
-                - condition
-              type: object
-          required:
-            - spec
-          title: SupersetDB
-          type: object
-      served: true
-      storage: true
-      subresources:
-        status: {}
+  - additionalPrinterColumns: []
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Auto-generated derived type for SupersetDBSpec via `CustomResource`
+        properties:
+          spec:
+            properties:
+              credentialsSecret:
+                type: string
+              loadExamples:
+                type: boolean
+              supersetVersion:
+                type: string
+            required:
+            - credentialsSecret
+            - loadExamples
+            - supersetVersion
+            type: object
+          status:
+            nullable: true
+            properties:
+              condition:
+                enum:
+                - Pending
+                - Initializing
+                - Ready
+                - Failed
+                type: string
+              startedAt:
+                description: Time is a wrapper around time.Time which supports correct
+                  marshaling to YAML and JSON.  Wrappers are provided for many of
+                  the factory methods that the time package offers.
+                format: date-time
+                nullable: true
+                type: string
+            required:
+            - condition
+            type: object
+        required:
+        - spec
+        title: SupersetDB
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
