@@ -70,7 +70,19 @@ spec:
                     default: {}
                     properties:
                       rowLimit:
+                        description: Row limit when requesting chart data. Corresponds
+                          to ROW_LIMIT
                         format: int32
+                        nullable: true
+                        type: integer
+                      webserverTimeout:
+                        description: Maximum number of seconds a Superset request
+                          can take before timing out. This settings effect the maximum
+                          duration a query to an underlying datasource can take. If
+                          you get timeout errors before your query returns the result
+                          you can need to increase this timeout. Corresponds to SUPERSET_WEBSERVER_TIMEOUT
+                        format: uint32
+                        minimum: 0.0
                         nullable: true
                         type: integer
                     type: object
@@ -89,52 +101,36 @@ spec:
                   roleGroups:
                     additionalProperties:
                       properties:
-                        rowLimit:
-                          description: Row limit when requesting chart data. Corresponds to ROW_LIMIT
-                          format: int32
-                          nullable: true
-                          type: integer
-                        webserverTimeout:
-                          description: Maximum number of seconds a Superset request can take before timing out. This settings effect the maximum duration a query to an underlying datasource can take. If you get timeout errors before your query returns the result you can need to increase this timeout. Corresponds to SUPERSET_WEBSERVER_TIMEOUT
-                          format: uint32
-                          minimum: 0.0
-                          nullable: true
-                          type: integer
-                      type: object
-                    configOverrides:
-                      additionalProperties:
-                        additionalProperties:
-                          type: string
-                        type: object
-                      default: {}
-                      type: object
-                    envOverrides:
-                      additionalProperties:
-                        type: string
-                      default: {}
-                      type: object
-                    roleGroups:
-                      additionalProperties:
-                        properties:
-                          cliOverrides:
+                        cliOverrides:
+                          additionalProperties:
+                            type: string
+                          default: {}
+                          type: object
+                        config:
+                          default: {}
+                          properties:
+                            rowLimit:
+                              description: Row limit when requesting chart data. Corresponds
+                                to ROW_LIMIT
+                              format: int32
+                              nullable: true
+                              type: integer
+                            webserverTimeout:
+                              description: Maximum number of seconds a Superset request
+                                can take before timing out. This settings effect the
+                                maximum duration a query to an underlying datasource
+                                can take. If you get timeout errors before your query
+                                returns the result you can need to increase this timeout.
+                                Corresponds to SUPERSET_WEBSERVER_TIMEOUT
+                              format: uint32
+                              minimum: 0.0
+                              nullable: true
+                              type: integer
+                          type: object
+                        configOverrides:
+                          additionalProperties:
                             additionalProperties:
                               type: string
-                            default: {}
-                            type: object
-                          config:
-                            default: {}
-                            properties:
-                              rowLimit:
-                                description: Row limit when requesting chart data. Corresponds to ROW_LIMIT
-                                format: int32
-                                nullable: true
-                                type: integer
-                              webserverTimeout:
-                                description: Maximum number of seconds a Superset request can take before timing out. This settings effect the maximum duration a query to an underlying datasource can take. If you get timeout errors before your query returns the result you can need to increase this timeout. Corresponds to SUPERSET_WEBSERVER_TIMEOUT
-                                format: uint32
-                                minimum: 0.0
-                                nullable: true
-                                type: integer
                             type: object
                           default: {}
                           type: object
