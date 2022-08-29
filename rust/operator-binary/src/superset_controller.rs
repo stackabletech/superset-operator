@@ -154,9 +154,11 @@ pub enum Error {
         source: stackable_operator::error::Error,
         authentication_class: ObjectRef<AuthenticationClass>,
     },
-    #[snafu(display("failed to get the superset config file from node config. It should be set by product config machinery"))]
+    #[snafu(display(
+        "failed to get the {SUPERSET_CONFIG_FILENAME} file from node or product config"
+    ))]
     MissingSupersetConfigInNodeConfig,
-    #[snafu(display("failed to get webserver timeout from superset config file. It should be set by product config machinery"))]
+    #[snafu(display("failed to get {timeout} from {SUPERSET_CONFIG_FILENAME} file. It should be set in the product config or by user input", timeout = SupersetConfigOptions::SupersetWebserverTimeout))]
     MissingWebServerTimeoutInSupersetConfig,
 }
 
