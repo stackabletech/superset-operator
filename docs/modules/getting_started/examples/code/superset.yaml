@@ -13,3 +13,4 @@ spec:
       default:
         config:
           rowLimit: 10000
+          webserverTimeout: 300

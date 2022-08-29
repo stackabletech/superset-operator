@@ -225,7 +225,7 @@ pub struct SupersetConfig {
     pub row_limit: Option<i32>,
     /// Maximum number of seconds a Superset request can take before timing out.
     /// This settings effect the maximum duration a query to an underlying datasource can take.
-    /// If you get timeout errors before your query returns the result you can need to increase this timeout.
+    /// If you get timeout errors before your query returns the result you may need to increase this timeout.
     /// Corresponds to SUPERSET_WEBSERVER_TIMEOUT
     pub webserver_timeout: Option<u32>,
 }
