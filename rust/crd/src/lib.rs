@@ -36,6 +36,7 @@ pub enum SupersetConfigOptions {
     StatsLogger,
     RowLimit,
     MapboxApiKey,
+    SupersetWebserverTimeout,
     AuthType,
     AuthUserRegistration,
     AuthUserRegistrationRole,
@@ -64,6 +65,9 @@ impl SupersetConfigOptions {
     fn config_type_to_string(&self, superset_config: &SupersetConfig) -> Option<String> {
         match self {
             SupersetConfigOptions::RowLimit => superset_config.row_limit.map(|v| v.to_string()),
+            SupersetConfigOptions::SupersetWebserverTimeout => {
+                superset_config.webserver_timeout.map(|v| v.to_string())
+            }
             _ => None,
         }
     }
@@ -77,6 +81,7 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::StatsLogger => PythonType::Expression,
             SupersetConfigOptions::RowLimit => PythonType::IntLiteral,
             SupersetConfigOptions::MapboxApiKey => PythonType::Expression,
+            SupersetConfigOptions::SupersetWebserverTimeout => PythonType::IntLiteral,
             SupersetConfigOptions::AuthType => PythonType::Expression,
             SupersetConfigOptions::AuthUserRegistration => PythonType::BoolLiteral,
             SupersetConfigOptions::AuthUserRegistrationRole => PythonType::StringLiteral,
@@ -215,7 +220,14 @@ pub enum SupersetRole {
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetConfig {
+    /// Row limit when requesting chart data.
+    /// Corresponds to ROW_LIMIT
     pub row_limit: Option<i32>,
+    /// Maximum number of seconds a Superset request can take before timing out.
+    /// This settings effect the maximum duration a query to an underlying datasource can take.
+    /// If you get timeout errors before your query returns the result you may need to increase this timeout.
+    /// Corresponds to SUPERSET_WEBSERVER_TIMEOUT
+    pub webserver_timeout: Option<u32>,
 }
 
 impl SupersetConfig {

@@ -5,14 +5,7 @@ use crate::{
     util::{statsd_exporter_version, superset_version},
     APP_NAME, APP_PORT,
 };
-
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-    time::Duration,
-};
-
+use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
@@ -52,6 +45,12 @@ use stackable_superset_crd::{
     supersetdb::{SupersetDB, SupersetDBStatusCondition},
     SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole, PYTHONPATH,
     SUPERSET_CONFIG_FILENAME,
+};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+    time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 use tracing::log::debug;
@@ -155,6 +154,12 @@ pub enum Error {
         source: stackable_operator::error::Error,
         authentication_class: ObjectRef<AuthenticationClass>,
     },
+    #[snafu(display(
+        "failed to get the {SUPERSET_CONFIG_FILENAME} file from node or product config"
+    ))]
+    MissingSupersetConfigInNodeConfig,
+    #[snafu(display("failed to get {timeout} from {SUPERSET_CONFIG_FILENAME} file. It should be set in the product config or by user input", timeout = SupersetConfigOptions::SupersetWebserverTimeout))]
+    MissingWebServerTimeoutInSupersetConfig,
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -512,6 +517,14 @@ fn build_server_rolegroup_statefulset(
         add_authentication_volumes_and_volume_mounts(authentication_class, &mut cb, &mut pb)?;
     }
 
+    let webserver_timeout = node_config
+        .get(&PropertyNameKind::File(
+            SUPERSET_CONFIG_FILENAME.to_string(),
+        ))
+        .context(MissingSupersetConfigInNodeConfigSnafu)?
+        .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
+        .context(MissingWebServerTimeoutInSupersetConfigSnafu)?;
+
     let container = cb
         .image(image)
         .add_container_port("http", APP_PORT.into())
@@ -519,16 +532,17 @@ fn build_server_rolegroup_statefulset(
         .command(vec![
             "/bin/sh".to_string(),
             "-c".to_string(),
-            "superset init && \
-            gunicorn \
-            --bind 0.0.0.0:${SUPERSET_PORT} \
-            --worker-class gthread \
-            --threads 20 \
-            --timeout 60 \
-            --limit-request-line 0 \
-            --limit-request-field_size 0 \
-            'superset.app:create_app()'"
-                .to_string(),
+            formatdoc! {"
+                superset init && \
+                gunicorn \
+                --bind 0.0.0.0:${{SUPERSET_PORT}} \
+                --worker-class gthread \
+                --threads 20 \
+                --timeout {webserver_timeout} \
+                --limit-request-line 0 \
+                --limit-request-field_size 0 \
+                'superset.app:create_app()'
+            "},
         ])
         .build();
     let metrics_container = ContainerBuilder::new("metrics")
