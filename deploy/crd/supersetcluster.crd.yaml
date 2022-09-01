@@ -77,7 +77,7 @@ spec:
                         type: integer
                       webserverTimeout:
                         description: Maximum number of seconds a Superset request
-                          can take before timing out. This settings effect the maximum
+                          can take before timing out. This setting affects the maximum
                           duration a query to an underlying datasource can take. If
                           you get timeout errors before your query returns the result
                           you may need to increase this timeout. Corresponds to SUPERSET_WEBSERVER_TIMEOUT
@@ -117,7 +117,7 @@ spec:
                               type: integer
                             webserverTimeout:
                               description: Maximum number of seconds a Superset request
-                                can take before timing out. This settings effect the
+                                can take before timing out. This setting affects the
                                 maximum duration a query to an underlying datasource
                                 can take. If you get timeout errors before your query
                                 returns the result you may need to increase this timeout.
