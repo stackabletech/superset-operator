@@ -140,6 +140,25 @@ pub struct SupersetClusterSpec {
     pub authentication_config: Option<SupersetClusterAuthenticationConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nodes: Option<Role<SupersetConfig>>,
+    /// Specify the type of the created kubernetes service.
+    /// This attribute will be removed in a future release when listener-operator is finished.
+    /// Use with caution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_type: Option<ServiceType>,
+}
+
+// TODO: Temporary solution until listener-operator is finished
+#[derive(Clone, Debug, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum ServiceType {
+    NodePort,
+    ClusterIP,
+}
+
+impl Default for ServiceType {
+    fn default() -> Self {
+        Self::NodePort
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
