@@ -344,7 +344,14 @@ fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
                 ..ServicePort::default()
             }]),
             selector: Some(role_selector_labels(superset, APP_NAME, &role_name)),
-            type_: Some("NodePort".to_string()),
+            type_: Some(
+                superset
+                    .spec
+                    .service_type
+                    .clone()
+                    .unwrap_or_default()
+                    .to_string(),
+            ),
             ..ServiceSpec::default()
         }),
         status: None,

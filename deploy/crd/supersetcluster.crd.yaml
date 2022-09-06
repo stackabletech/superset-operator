@@ -198,6 +198,15 @@ spec:
                 required:
                 - roleGroups
                 type: object
+              serviceType:
+                description: Specify the type of the created kubernetes service. This
+                  attribute will be removed in a future release when listener-operator
+                  is finished. Use with caution.
+                enum:
+                - NodePort
+                - ClusterIP
+                nullable: true
+                type: string
               statsdExporterVersion:
                 nullable: true
                 type: string

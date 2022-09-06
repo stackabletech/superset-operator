@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add temporary attribute to support using ClusterIP instead of NodePort service type ([#266]).
+
 ### Changed
 
 - Include chart name when installing with a custom release name ([#227], [#228]).
@@ -13,6 +17,7 @@
 [#228]: https://github.com/stackabletech/superset-operator/pull/228
 [#247]: https://github.com/stackabletech/superset-operator/pull/247
 [#255]: https://github.com/stackabletech/superset-operator/pull/255
+[#266]: https://github.com/stackabletech/superset-operator/pull/266
 
 ## [0.5.0] - 2022-06-30
 
