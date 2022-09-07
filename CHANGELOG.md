@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2022-09-07
+
 ### Added
 
 - Add temporary attribute to support using ClusterIP instead of NodePort service type ([#266]).

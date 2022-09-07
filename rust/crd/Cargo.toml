@@ -5,7 +5,7 @@ edition = "2021"
 license = "OSL-3.0"
 name = "stackable-superset-crd"
 repository = "https://github.com/stackabletech/superset-operator"
-version = "0.6.0-nightly"
+version = "0.6.0"
 
 [dependencies]
 serde = "1.0"
