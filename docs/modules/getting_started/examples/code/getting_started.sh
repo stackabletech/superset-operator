@@ -18,22 +18,22 @@ case "$1" in
 "helm")
 echo "Adding 'stackable-dev' Helm Chart repository"
 # tag::helm-add-repo[]
-helm repo add stackable-stable https://repo.stackable.tech/repository/helm-stable/
+helm repo add stackable-dev https://repo.stackable.tech/repository/helm-dev/
 # end::helm-add-repo[]
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
-helm install --wait commons-operator stackable-stable/commons-operator --version 0.3.0
-helm install --wait secret-operator stackable-stable/secret-operator --version 0.5.0
-helm install --wait superset-operator stackable-stable/superset-operator --version 0.6.0
+helm install --wait commons-operator stackable-dev/commons-operator --version 0.4.0-nightly
+helm install --wait secret-operator stackable-dev/secret-operator --version 0.6.0-nightly
+helm install --wait superset-operator stackable-dev/superset-operator --version 0.7.0-nightly
 # end::helm-install-operators[]
 ;;
 "stackablectl")
 echo "installing Operators with stackablectl"
 # tag::stackablectl-install-operators[]
 stackablectl operator install \
-  commons=0.3.0 \
-  secret=0.5.0 \
-  superset=0.6.0
+  commons=0.4.0-nightly \
+  secret=0.6.0-nightly \
+  superset=0.7.0-nightly
 # end::stackablectl-install-operators[]
 ;;
 *)
