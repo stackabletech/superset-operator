@@ -26,28 +26,23 @@ spec:
                 nullable: true
                 properties:
                   authenticationClass:
-                    description: Name of the AuthenticationClass used to authenticate
-                      the users. At the moment only LDAP is supported. If not specified
-                      the default authentication (AUTH_DB) will be used.
+                    description: Name of the AuthenticationClass used to authenticate the users. At the moment only LDAP is supported. If not specified the default authentication (AUTH_DB) will be used.
                     nullable: true
                     type: string
                   syncRolesAt:
                     default: Registration
-                    description: If we should replace ALL the user's roles each login,
-                      or only on registration. Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
+                    description: If we should replace ALL the user's roles each login, or only on registration. Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
                     enum:
                     - Registration
                     - Login
                     type: string
                   userRegistration:
                     default: true
-                    description: Allow users who are not already in the FAB DB. Gets
-                      mapped to `AUTH_USER_REGISTRATION`
+                    description: Allow users who are not already in the FAB DB. Gets mapped to `AUTH_USER_REGISTRATION`
                     type: boolean
                   userRegistrationRole:
                     default: Public
-                    description: This role will be given in addition to any AUTH_ROLES_MAPPING.
-                      Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
+                    description: This role will be given in addition to any AUTH_ROLES_MAPPING. Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
                     type: string
                 type: object
               credentialsSecret:
@@ -70,17 +65,12 @@ spec:
                     default: {}
                     properties:
                       rowLimit:
-                        description: Row limit when requesting chart data. Corresponds
-                          to ROW_LIMIT
+                        description: Row limit when requesting chart data. Corresponds to ROW_LIMIT
                         format: int32
                         nullable: true
                         type: integer
                       webserverTimeout:
-                        description: Maximum number of seconds a Superset request
-                          can take before timing out. This setting affects the maximum
-                          duration a query to an underlying datasource can take. If
-                          you get timeout errors before your query returns the result
-                          you may need to increase this timeout. Corresponds to SUPERSET_WEBSERVER_TIMEOUT
+                        description: Maximum number of seconds a Superset request can take before timing out. This setting affects the maximum duration a query to an underlying datasource can take. If you get timeout errors before your query returns the result you may need to increase this timeout. Corresponds to SUPERSET_WEBSERVER_TIMEOUT
                         format: uint32
                         minimum: 0.0
                         nullable: true
@@ -110,18 +100,12 @@ spec:
                           default: {}
                           properties:
                             rowLimit:
-                              description: Row limit when requesting chart data. Corresponds
-                                to ROW_LIMIT
+                              description: Row limit when requesting chart data. Corresponds to ROW_LIMIT
                               format: int32
                               nullable: true
                               type: integer
                             webserverTimeout:
-                              description: Maximum number of seconds a Superset request
-                                can take before timing out. This setting affects the
-                                maximum duration a query to an underlying datasource
-                                can take. If you get timeout errors before your query
-                                returns the result you may need to increase this timeout.
-                                Corresponds to SUPERSET_WEBSERVER_TIMEOUT
+                              description: Maximum number of seconds a Superset request can take before timing out. This setting affects the maximum duration a query to an underlying datasource can take. If you get timeout errors before your query returns the result you may need to increase this timeout. Corresponds to SUPERSET_WEBSERVER_TIMEOUT
                               format: uint32
                               minimum: 0.0
                               nullable: true
@@ -145,36 +129,22 @@ spec:
                           nullable: true
                           type: integer
                         selector:
-                          description: A label selector is a label query over a set
-                            of resources. The result of matchLabels and matchExpressions
-                            are ANDed. An empty label selector matches all objects.
-                            A null label selector matches no objects.
+                          description: A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.
                           nullable: true
                           properties:
                             matchExpressions:
-                              description: matchExpressions is a list of label selector
-                                requirements. The requirements are ANDed.
+                              description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                               items:
-                                description: A label selector requirement is a selector
-                                  that contains values, a key, and an operator that
-                                  relates the key and values.
+                                description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
                                 properties:
                                   key:
-                                    description: key is the label key that the selector
-                                      applies to.
+                                    description: key is the label key that the selector applies to.
                                     type: string
                                   operator:
-                                    description: operator represents a key's relationship
-                                      to a set of values. Valid operators are In,
-                                      NotIn, Exists and DoesNotExist.
+                                    description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
                                     type: string
                                   values:
-                                    description: values is an array of string values.
-                                      If the operator is In or NotIn, the values array
-                                      must be non-empty. If the operator is Exists
-                                      or DoesNotExist, the values array must be empty.
-                                      This array is replaced during a strategic merge
-                                      patch.
+                                    description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                     items:
                                       type: string
                                     type: array
@@ -186,11 +156,7 @@ spec:
                             matchLabels:
                               additionalProperties:
                                 type: string
-                              description: matchLabels is a map of {key,value} pairs.
-                                A single {key,value} in the matchLabels map is equivalent
-                                to an element of matchExpressions, whose key field
-                                is "key", the operator is "In", and the values array
-                                contains only "value". The requirements are ANDed.
+                              description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
                               type: object
                           type: object
                       type: object
@@ -199,9 +165,7 @@ spec:
                 - roleGroups
                 type: object
               serviceType:
-                description: Specify the type of the created kubernetes service. This
-                  attribute will be removed in a future release when listener-operator
-                  is finished. Use with caution.
+                description: Specify the type of the created kubernetes service. This attribute will be removed in a future release when listener-operator is finished. Use with caution.
                 enum:
                 - NodePort
                 - ClusterIP
@@ -211,8 +175,7 @@ spec:
                 nullable: true
                 type: string
               stopped:
-                description: Emergency stop button, if `true` then all pods are stopped
-                  without affecting configuration (as setting `replicas` to `0` would)
+                description: Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
                 nullable: true
                 type: boolean
               version:
