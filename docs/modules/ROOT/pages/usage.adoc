@@ -166,3 +166,64 @@ nodes:
 ----
 
 // cliOverrides don't make sense for this operator, so the feature is omitted for now
+
+=== Storage for data volumes
+
+The Superset Operator currently does not support using https://kubernetes.io/docs/concepts/storage/persistent-volumes[PersistentVolumeClaims] for internal storage.
+
+=== Memory requests
+
+You can request a certain amount of memory for each individual role group as shown below:
+
+[source,yaml]
+----
+nodes:
+  roleGroups:
+    default:
+      config:
+        resources:
+          memory:
+            limit: '2Gi'
+----
+
+In this example, each Superset container in the `default` role group will have a maximum of 2 gigabytes of memory. To be more precise, these memory limits apply to the container running Superset but not to any sidecar containers (e.g. the metrics container) that are part of the pod.
+
+For more details regarding Kubernetes memory requests and limits see: https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/[Assign Memory Resources to Containers and Pods].
+
+=== CPU requests
+
+Similarly to memory resources, you can also configure CPU limits, as shown below:
+
+[source,yaml]
+----
+nodes:
+  roleGroups:
+    default:
+      config:
+        resources:
+          cpu:
+            max: '500m'
+            min: '250m'
+----
+
+=== Defaults
+
+If nothing is specified, the operator will automatically set the following default values for resources:
+
+[source,yaml]
+----
+nodes:
+  roleGroups:
+    default:
+      config:
+        resources:
+          cpu:
+            min: '200m'
+            max: "4"
+          memory:
+            limit: '2Gi'
+----
+
+WARNING: The default values are _most likely_ not sufficient to run a proper cluster in production. Please adapt according to your requirements.
+
+For more details regarding Kubernetes CPU limits see: https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/[Assign CPU Resources to Containers and Pods].
