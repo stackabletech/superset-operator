@@ -1,19 +1,19 @@
 pub mod druidconnection;
 pub mod supersetdb;
 
-use std::collections::BTreeMap;
-use std::num::ParseIntError;
-
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use stackable_operator::kube::runtime::reflector::ObjectRef;
-use stackable_operator::kube::CustomResource;
-use stackable_operator::product_config::flask_app_config_writer::{
-    FlaskAppConfigOptions, PythonType,
+use stackable_operator::{
+    commons::resources::{CpuLimits, MemoryLimits, NoRuntimeLimits, Resources},
+    config::merge::Merge,
+    k8s_openapi::apimachinery::pkg::api::resource::Quantity,
+    kube::{runtime::reflector::ObjectRef, CustomResource},
+    product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
+    product_config_utils::{ConfigError, Configuration},
+    role_utils::{Role, RoleGroupRef},
+    schemars::{self, JsonSchema},
 };
-use stackable_operator::product_config_utils::{ConfigError, Configuration};
-use stackable_operator::role_utils::{Role, RoleGroupRef};
-use stackable_operator::schemars::{self, JsonSchema};
+use std::{collections::BTreeMap, num::ParseIntError};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub const APP_NAME: &str = "superset";
@@ -236,7 +236,11 @@ pub enum SupersetRole {
     Node,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Merge, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetStorageConfig {}
+
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetConfig {
     /// Row limit when requesting chart data.
@@ -247,11 +251,27 @@ pub struct SupersetConfig {
     /// If you get timeout errors before your query returns the result you may need to increase this timeout.
     /// Corresponds to SUPERSET_WEBSERVER_TIMEOUT
     pub webserver_timeout: Option<u32>,
+    /// CPU and memory limits for Superset pods
+    pub resources: Option<Resources<SupersetStorageConfig, NoRuntimeLimits>>,
 }
 
 impl SupersetConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
     pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
+
+    fn default_resources() -> Resources<SupersetStorageConfig, NoRuntimeLimits> {
+        Resources {
+            cpu: CpuLimits {
+                min: Some(Quantity("200m".to_owned())),
+                max: Some(Quantity("4".to_owned())),
+            },
+            memory: MemoryLimits {
+                limit: Some(Quantity("2Gi".to_owned())),
+                runtime_limits: NoRuntimeLimits {},
+            },
+            storage: SupersetStorageConfig {},
+        }
+    }
 }
 
 impl Configuration for SupersetConfig {
@@ -322,6 +342,42 @@ impl SupersetCluster {
             role: SupersetRole::Node.to_string(),
             role_group: group_name.into(),
         }
+    }
+
+    /// Retrieve and merge resource configs for role and role groups
+    pub fn resolve_resource_config_for_role_and_rolegroup(
+        &self,
+        role: &SupersetRole,
+        rolegroup_ref: &RoleGroupRef<SupersetCluster>,
+    ) -> Option<Resources<SupersetStorageConfig, NoRuntimeLimits>> {
+        // Initialize the result with all default values as baseline
+        let conf_defaults = SupersetConfig::default_resources();
+
+        let role = match role {
+            SupersetRole::Node => self.spec.nodes.as_ref()?,
+        };
+
+        // Retrieve role resource config
+        let mut conf_role: Resources<SupersetStorageConfig, NoRuntimeLimits> =
+            role.config.config.resources.clone().unwrap_or_default();
+
+        // Retrieve rolegroup specific resource config
+        let mut conf_rolegroup: Resources<SupersetStorageConfig, NoRuntimeLimits> = role
+            .role_groups
+            .get(&rolegroup_ref.role_group)
+            .and_then(|rg| rg.config.config.resources.clone())
+            .unwrap_or_default();
+
+        // Merge more specific configs into default config
+        // Hierarchy is:
+        // 1. RoleGroup
+        // 2. Role
+        // 3. Default
+        conf_role.merge(&conf_defaults);
+        conf_rolegroup.merge(&conf_role);
+
+        tracing::debug!("Merged resource config: {:?}", conf_rolegroup);
+        Some(conf_rolegroup)
     }
 }
 
