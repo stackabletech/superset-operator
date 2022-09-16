@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- CPU and memory limits are now configurable ([#273]).
+
+[#273]: https://github.com/stackabletech/superset-operator/pull/273
+
 ## [0.6.0] - 2022-09-07
 
 ### Added
