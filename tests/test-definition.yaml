@@ -5,6 +5,9 @@ dimensions:
       - 1.3.2-stackable2.1.0
       - 1.4.1-stackable2.1.0
       - 1.5.1-stackable0.1.0
+  - name: superset-latest
+    values:
+      - 1.5.1-stackable0.1.0
   - name: ldap-authentication
     values:
       - no-tls
@@ -21,3 +24,6 @@ tests:
     dimensions:
       - superset
       - ldap-authentication
+  - name: resources
+    dimensions:
+      - superset-latest

@@ -15,6 +15,7 @@ use stackable_operator::{
     cluster_resources::ClusterResources,
     commons::{
         authentication::{AuthenticationClass, AuthenticationClassProvider},
+        resources::{NoRuntimeLimits, Resources},
         secret_class::SecretClassVolumeScope,
         tls::{CaCert, TlsServerVerification, TlsVerification},
     },
@@ -43,8 +44,8 @@ use stackable_operator::{
 };
 use stackable_superset_crd::{
     supersetdb::{SupersetDB, SupersetDBStatusCondition},
-    SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole, PYTHONPATH,
-    SUPERSET_CONFIG_FILENAME,
+    SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole, SupersetStorageConfig,
+    PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
 use std::{
     borrow::Cow,
@@ -160,6 +161,8 @@ pub enum Error {
     MissingSupersetConfigInNodeConfig,
     #[snafu(display("failed to get {timeout} from {SUPERSET_CONFIG_FILENAME} file. It should be set in the product config or by user input", timeout = SupersetConfigOptions::SupersetWebserverTimeout))]
     MissingWebServerTimeoutInSupersetConfig,
+    #[snafu(display("failed to resolve and merge resource config for role and role group"))]
+    FailedToResolveResourceConfig,
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -269,6 +272,10 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     for (rolegroup_name, rolegroup_config) in role_node_config.iter() {
         let rolegroup = superset.node_rolegroup_ref(rolegroup_name);
 
+        let resources = superset
+            .resolve_resource_config_for_role_and_rolegroup(&SupersetRole::Node, &rolegroup)
+            .context(FailedToResolveResourceConfigSnafu)?;
+
         let rg_service = build_node_rolegroup_service(&rolegroup, &superset)?;
         let rg_configmap = build_rolegroup_config_map(
             &superset,
@@ -281,6 +288,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             &superset,
             rolegroup_config,
             authentication_class.as_ref(),
+            &resources,
         )?;
         cluster_resources
             .add(client, &rg_service)
@@ -479,6 +487,7 @@ fn build_server_rolegroup_statefulset(
     superset: &SupersetCluster,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
+    resources: &Resources<SupersetStorageConfig, NoRuntimeLimits>,
 ) -> Result<StatefulSet> {
     let rolegroup = superset
         .spec
@@ -551,6 +560,7 @@ fn build_server_rolegroup_statefulset(
                 'superset.app:create_app()'
             "},
         ])
+        .resources(resources.clone().into())
         .build();
     let metrics_container = ContainerBuilder::new("metrics")
         .expect("ContainerBuilder not created")
