@@ -169,7 +169,7 @@ nodes:
 
 === Storage for data volumes
 
-The Superset Operator currently does not support using https://kubernetes.io/docs/concepts/storage/persistent-volumes[PersistentVolumeClaims] for internal storage.
+The Superset operator currently does not support using https://kubernetes.io/docs/concepts/storage/persistent-volumes[PersistentVolumeClaims] for internal storage.
 
 === Memory requests
 
