@@ -1,0 +1,48 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: install-superset
+timeout: 300
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: superset-node-resources-from-role
+spec:
+  template:
+    spec:
+      containers:
+        - name: superset
+          resources:
+            requests:
+              cpu: 100m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+        - name: metrics
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: superset-node-resources-from-role-group
+spec:
+  template:
+    spec:
+      containers:
+        - name: superset
+          resources:
+            requests:
+              cpu: 300m
+              memory: 3Gi
+            limits:
+              cpu: "3"
+              memory: 3Gi
+        - name: metrics
+status:
+  readyReplicas: 1
+  replicas: 1
