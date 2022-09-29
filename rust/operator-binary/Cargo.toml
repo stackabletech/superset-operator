@@ -9,7 +9,7 @@ repository = "https://github.com/stackabletech/superset-operator"
 
 [dependencies]
 anyhow = "1.0"
-clap = "3.2"
+clap = "4.0"
 fnv = "1.0"
 futures = { version = "0.3", features = ["compat"] }
 indoc = "1.0"
