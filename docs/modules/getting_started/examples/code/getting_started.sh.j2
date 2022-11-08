@@ -16,7 +16,7 @@ fi
 
 case "$1" in
 "helm")
-echo "Adding 'stackable-dev' Helm Chart repository"
+echo "Adding '{{ helm.repo_name }}' Helm Chart repository"
 # tag::helm-add-repo[]
 helm repo add {{ helm.repo_name }} {{ helm.repo_url }}
 # end::helm-add-repo[]
