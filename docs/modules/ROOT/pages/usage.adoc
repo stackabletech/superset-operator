@@ -19,7 +19,7 @@ kind: SupersetCluster
 metadata:
   name: superset-with-ldap-server-veri-tls
 spec:
-  version: 1.5.1-stackable0.1.0
+  version: 1.5.1-stackable0.3.0
   [...]
   authenticationConfig:
     authenticationClass: superset-with-ldap-server-veri-tls-ldap
