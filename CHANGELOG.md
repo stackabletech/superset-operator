@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Updated stackable image versions ([#295]).
+
+[#295]: https://github.com/stackabletech/superset-operator/pull/295
+
 ## [0.7.0] - 2022-11-07
 
 ### Added
