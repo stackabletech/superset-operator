@@ -4,7 +4,9 @@ mod superset_controller;
 mod superset_db_controller;
 mod util;
 
-use std::sync::Arc;
+use crate::druid_connection_controller::DRUID_CONNECTION_CONTROLLER_NAME;
+use crate::superset_controller::SUPERSET_CONTROLLER_NAME;
+use crate::superset_db_controller::SUPERSET_DB_CONTROLLER_NAME;
 
 use clap::Parser;
 use futures::StreamExt;
@@ -26,15 +28,16 @@ use stackable_operator::{
 };
 use stackable_superset_crd::{
     druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
-    SupersetClusterAuthenticationConfig,
+    SupersetClusterAuthenticationConfig, APP_NAME,
 };
+use std::sync::Arc;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
-pub const APP_NAME: &str = "superset";
 pub const APP_PORT: u16 = 8088;
+pub const OPERATOR_NAME: &str = "superset.stackable.tech";
 
 #[derive(Parser)]
 #[clap(about = built_info::PKG_DESCRIPTION, author = stackable_operator::cli::AUTHOR)]
@@ -76,10 +79,8 @@ async fn main() -> anyhow::Result<()> {
                 "/etc/stackable/superset-operator/config-spec/properties.yaml",
             ])?;
 
-            let client = stackable_operator::client::create_client(Some(
-                "superset.stackable.tech".to_string(),
-            ))
-            .await?;
+            let client =
+                stackable_operator::client::create_client(Some(OPERATOR_NAME.to_string())).await?;
 
             let superset_controller_builder = Controller::new(
                 watch_namespace.get_api::<SupersetCluster>(&client),
@@ -138,7 +139,7 @@ async fn main() -> anyhow::Result<()> {
                 .map(|res| {
                     report_controller_reconciled(
                         &client,
-                        "supersetclusters.superset.stackable.tech",
+                        &format!("{SUPERSET_CONTROLLER_NAME}.{OPERATOR_NAME}"),
                         &res,
                     )
                 });
@@ -194,7 +195,7 @@ async fn main() -> anyhow::Result<()> {
                 .map(|res| {
                     report_controller_reconciled(
                         &client,
-                        "supersetdbclusters.superset.stackable.tech",
+                        &format!("{SUPERSET_DB_CONTROLLER_NAME}.{OPERATOR_NAME}"),
                         &res,
                     )
                 });
@@ -263,7 +264,7 @@ async fn main() -> anyhow::Result<()> {
                 .map(|res| {
                     report_controller_reconciled(
                         &client,
-                        "druidconnection.superset.stackable.tech",
+                        &format!("{DRUID_CONNECTION_CONTROLLER_NAME}.{OPERATOR_NAME}"),
                         &res,
                     )
                 });

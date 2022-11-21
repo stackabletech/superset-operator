@@ -23,7 +23,7 @@ use stackable_superset_crd::{
 use std::{sync::Arc, time::Duration};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
+pub const DRUID_CONNECTION_CONTROLLER_NAME: &str = "druid-connection";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -114,11 +114,11 @@ pub async fn reconcile_druid_connection(
                 if let Some(status) = client
                     .get::<SupersetDB>(
                         &druid_connection.superset_name(),
-                        Some(&druid_connection.superset_namespace().context(
+                        &druid_connection.superset_namespace().context(
                             DruidConnectionNoNamespaceSnafu {
                                 druid_connection: ObjectRef::from_obj(&*druid_connection),
                             },
-                        )?),
+                        )?,
                     )
                     .await
                     .context(SupersetDBRetrievalSnafu)?
@@ -130,11 +130,11 @@ pub async fn reconcile_druid_connection(
                 let druid_discovery_cm_exists = client
                     .get_opt::<ConfigMap>(
                         &druid_connection.druid_name(),
-                        Some(&druid_connection.druid_namespace().context(
+                        &druid_connection.druid_namespace().context(
                             DruidConnectionNoNamespaceSnafu {
                                 druid_connection: ObjectRef::from_obj(&*druid_connection),
                             },
-                        )?),
+                        )?,
                     )
                     .await
                     .context(DruidDiscoveryCheckSnafu)?
@@ -144,34 +144,38 @@ pub async fn reconcile_druid_connection(
                     let superset_db = client
                         .get::<SupersetDB>(
                             &druid_connection.superset_name(),
-                            Some(&druid_connection.superset_namespace().context(
+                            &druid_connection.superset_namespace().context(
                                 DruidConnectionNoNamespaceSnafu {
                                     druid_connection: ObjectRef::from_obj(&*druid_connection),
                                 },
-                            )?),
+                            )?,
                         )
                         .await
                         .context(SupersetDBRetrievalSnafu)?;
                     // Everything is there, retrieve all necessary info and start the job
                     let sqlalchemy_str = get_sqlalchemy_uri_for_druid_cluster(
                         &druid_connection.druid_name(),
-                        Some(&druid_connection.druid_namespace().context(
+                        &druid_connection.druid_namespace().context(
                             DruidConnectionNoNamespaceSnafu {
                                 druid_connection: ObjectRef::from_obj(&*druid_connection),
                             },
-                        )?),
+                        )?,
                         client,
                     )
                     .await?;
                     let job =
                         build_import_job(&druid_connection, &superset_db, &sqlalchemy_str).await?;
                     client
-                        .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
+                        .apply_patch(DRUID_CONNECTION_CONTROLLER_NAME, &job, &job)
                         .await
                         .context(ApplyJobSnafu)?;
                     // The job is started, update status to reflect new state
                     client
-                        .apply_patch_status(FIELD_MANAGER_SCOPE, &*druid_connection, &s.importing())
+                        .apply_patch_status(
+                            DRUID_CONNECTION_CONTROLLER_NAME,
+                            &*druid_connection,
+                            &s.importing(),
+                        )
                         .await
                         .context(ApplyStatusSnafu)?;
                 }
@@ -181,13 +185,12 @@ pub async fn reconcile_druid_connection(
                     .namespace()
                     .unwrap_or_else(|| "default".to_string());
                 let job_name = druid_connection.job_name();
-                let job =
-                    client
-                        .get::<Job>(&job_name, Some(&ns))
-                        .await
-                        .context(GetImportJobSnafu {
-                            import_job: ObjectRef::<Job>::new(&job_name).within(&ns),
-                        })?;
+                let job = client
+                    .get::<Job>(&job_name, &ns)
+                    .await
+                    .context(GetImportJobSnafu {
+                        import_job: ObjectRef::<Job>::new(&job_name).within(&ns),
+                    })?;
 
                 let new_status = match get_job_state(&job) {
                     JobState::Failed => Some(s.failed()),
@@ -197,7 +200,11 @@ pub async fn reconcile_druid_connection(
 
                 if let Some(ns) = new_status {
                     client
-                        .apply_patch_status(FIELD_MANAGER_SCOPE, &*druid_connection, &ns)
+                        .apply_patch_status(
+                            DRUID_CONNECTION_CONTROLLER_NAME,
+                            &*druid_connection,
+                            &ns,
+                        )
                         .await
                         .context(ApplyStatusSnafu)?;
                 }
@@ -209,7 +216,7 @@ pub async fn reconcile_druid_connection(
         // Status not set yet, initialize
         client
             .apply_patch_status(
-                FIELD_MANAGER_SCOPE,
+                DRUID_CONNECTION_CONTROLLER_NAME,
                 &*druid_connection,
                 &DruidConnectionStatus::new(),
             )
@@ -223,18 +230,14 @@ pub async fn reconcile_druid_connection(
 /// Takes a druid cluster name and namespace and returns the SQLAlchemy connect string
 async fn get_sqlalchemy_uri_for_druid_cluster(
     cluster_name: &str,
-    namespace: Option<&str>,
+    namespace: &str,
     client: &Client,
 ) -> Result<String> {
     client
         .get::<ConfigMap>(cluster_name, namespace)
         .await
         .context(GetDruidConnStringConfigMapSnafu {
-            config_map: if let Some(ns) = namespace {
-                ObjectRef::<ConfigMap>::new(cluster_name).within(ns)
-            } else {
-                ObjectRef::<ConfigMap>::new(cluster_name)
-            },
+            config_map: ObjectRef::<ConfigMap>::new(cluster_name).within(namespace),
         })?
         .data
         .and_then(|mut data| data.remove("DRUID_SQLALCHEMY"))
@@ -312,6 +315,6 @@ async fn build_import_job(
     Ok(job)
 }
 
-pub fn error_policy(_error: &Error, _ctx: Arc<Ctx>) -> Action {
+pub fn error_policy(_obj: Arc<DruidConnection>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
 }

@@ -1,10 +1,12 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 
+use crate::util::build_recommended_labels;
 use crate::{
     config::{self, PYTHON_IMPORTS},
     util::{statsd_exporter_version, superset_version},
-    APP_NAME, APP_PORT,
+    APP_PORT, OPERATOR_NAME,
 };
+
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -45,7 +47,7 @@ use stackable_operator::{
 use stackable_superset_crd::{
     supersetdb::{SupersetDB, SupersetDBStatusCondition},
     SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole, SupersetStorageConfig,
-    PYTHONPATH, SUPERSET_CONFIG_FILENAME,
+    APP_NAME, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
 use std::{
     borrow::Cow,
@@ -56,13 +58,12 @@ use std::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 use tracing::log::debug;
 
-const CONTROLLER_NAME: &str = "superset-operator";
-const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
+pub const SUPERSET_CONTROLLER_NAME: &str = "supersetcluster";
+pub const SECRETS_DIR: &str = "/stackable/secrets/";
+pub const CERTS_DIR: &str = "/stackable/certificates/";
 
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
-pub const SECRETS_DIR: &str = "/stackable/secrets/";
-pub const CERTS_DIR: &str = "/stackable/certificates/";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -73,6 +74,8 @@ pub struct Ctx {
 #[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
+    #[snafu(display("object has no namespace"))]
+    ObjectHasNoNamespace,
     #[snafu(display("failed to retrieve superset version"))]
     NoSupersetVersion { source: crate::util::Error },
     #[snafu(display("failed to retrieve statsd exporter version"))]
@@ -162,7 +165,9 @@ pub enum Error {
     #[snafu(display("failed to get {timeout} from {SUPERSET_CONFIG_FILENAME} file. It should be set in the product config or by user input", timeout = SupersetConfigOptions::SupersetWebserverTimeout))]
     MissingWebServerTimeoutInSupersetConfig,
     #[snafu(display("failed to resolve and merge resource config for role and role group"))]
-    FailedToResolveResourceConfig,
+    FailedToResolveResourceConfig {
+        source: stackable_superset_crd::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -181,12 +186,18 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     // Ensure DB Schema exists
     let superset_db = SupersetDB::for_superset(&superset).context(CreateSupersetObjectSnafu)?;
     client
-        .apply_patch(FIELD_MANAGER_SCOPE, &superset_db, &superset_db)
+        .apply_patch(SUPERSET_CONTROLLER_NAME, &superset_db, &superset_db)
         .await
         .context(ApplySupersetDBSnafu)?;
 
     let superset_db = client
-        .get::<SupersetDB>(&superset.name_unchecked(), superset.namespace().as_deref())
+        .get::<SupersetDB>(
+            &superset.name_unchecked(),
+            superset
+                .namespace()
+                .as_deref()
+                .context(ObjectHasNoNamespaceSnafu)?,
+        )
         .await
         .context(SupersetDBRetrievalSnafu)?;
 
@@ -238,9 +249,13 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         .map(Cow::Borrowed)
         .unwrap_or_default();
 
-    let mut cluster_resources =
-        ClusterResources::new(APP_NAME, CONTROLLER_NAME, &superset.object_ref(&()))
-            .context(CreateClusterResourcesSnafu)?;
+    let mut cluster_resources = ClusterResources::new(
+        APP_NAME,
+        OPERATOR_NAME,
+        SUPERSET_CONTROLLER_NAME,
+        &superset.object_ref(&()),
+    )
+    .context(CreateClusterResourcesSnafu)?;
 
     let node_role_service = build_node_role_service(&superset)?;
     cluster_resources
@@ -254,7 +269,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
                 Some(authentication_class) => {
                     Some(
                         client
-                            .get::<AuthenticationClass>(authentication_class, None) // AuthenticationClass has ClusterScope
+                            .get::<AuthenticationClass>(authentication_class, &()) // AuthenticationClass has ClusterScope
                             .await
                             .context(AuthenticationClassRetrievalSnafu {
                                 authentication_class: ObjectRef::<AuthenticationClass>::new(
@@ -331,14 +346,13 @@ fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
             .name(format!("{}-external", &role_svc_name))
             .ownerreference_from_resource(superset, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(
+            .with_recommended_labels(build_recommended_labels(
                 superset,
-                APP_NAME,
+                SUPERSET_CONTROLLER_NAME,
                 superset_version(superset).context(NoSupersetVersionSnafu)?,
-                CONTROLLER_NAME,
                 &role_name,
                 "global",
-            )
+            ))
             .with_label(
                 "statsd-exporter",
                 statsd_exporter_version(superset).context(NoStatsdExporterVersionSnafu)?,
@@ -403,14 +417,13 @@ fn build_rolegroup_config_map(
                 .name(rolegroup.object_name())
                 .ownerreference_from_resource(superset, None, Some(true))
                 .context(ObjectMissingMetadataForOwnerRefSnafu)?
-                .with_recommended_labels(
+                .with_recommended_labels(build_recommended_labels(
                     superset,
-                    APP_NAME,
+                    SUPERSET_CONTROLLER_NAME,
                     superset_version(superset).context(NoSupersetVersionSnafu)?,
-                    CONTROLLER_NAME,
                     &rolegroup.role,
                     &rolegroup.role_group,
-                )
+                ))
                 .build(),
         )
         .add_data(
@@ -436,14 +449,13 @@ fn build_node_rolegroup_service(
             .name(&rolegroup.object_name())
             .ownerreference_from_resource(superset, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(
+            .with_recommended_labels(build_recommended_labels(
                 superset,
-                APP_NAME,
+                SUPERSET_CONTROLLER_NAME,
                 superset_version(superset).context(NoSupersetVersionSnafu)?,
-                CONTROLLER_NAME,
                 &rolegroup.role,
                 &rolegroup.role_group,
-            )
+            ))
             .with_label(
                 "statsd-exporter",
                 statsd_exporter_version(superset).context(NoStatsdExporterVersionSnafu)?,
@@ -573,14 +585,13 @@ fn build_server_rolegroup_statefulset(
             .name(&rolegroup_ref.object_name())
             .ownerreference_from_resource(superset, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(
+            .with_recommended_labels(build_recommended_labels(
                 superset,
-                APP_NAME,
+                SUPERSET_CONTROLLER_NAME,
                 superset_version,
-                CONTROLLER_NAME,
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
-            )
+            ))
             .with_label("statsd-exporter", statsd_exporter_version)
             .with_label("restarter.stackable.tech/enabled", "true")
             .build(),
@@ -603,14 +614,13 @@ fn build_server_rolegroup_statefulset(
             service_name: rolegroup_ref.object_name(),
             template: pb
                 .metadata_builder(|m| {
-                    m.with_recommended_labels(
+                    m.with_recommended_labels(build_recommended_labels(
                         superset,
-                        APP_NAME,
+                        SUPERSET_CONTROLLER_NAME,
                         superset_version,
-                        CONTROLLER_NAME,
                         &rolegroup_ref.role,
                         &rolegroup_ref.role_group,
-                    )
+                    ))
                     .with_label("statsd-exporter", statsd_exporter_version)
                 })
                 .add_container(container)
@@ -708,6 +718,6 @@ fn build_secret_operator_volume(
         .build()
 }
 
-pub fn error_policy(_error: &Error, _ctx: Arc<Ctx>) -> Action {
+pub fn error_policy(_obj: Arc<SupersetCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
 }
