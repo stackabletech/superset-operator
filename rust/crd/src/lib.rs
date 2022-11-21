@@ -242,8 +242,10 @@ pub enum SupersetRole {
     Node,
 }
 
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
 #[fragment_attrs(
+    allow(clippy::derive_partial_eq_without_eq),
     derive(
         Clone,
         Debug,
