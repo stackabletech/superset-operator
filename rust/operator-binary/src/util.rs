@@ -1,10 +1,11 @@
+use crate::OPERATOR_NAME;
 use snafu::{OptionExt, Snafu};
 use stackable_operator::k8s_openapi::api::batch::v1::Job;
-use stackable_superset_crd::SupersetCluster;
+use stackable_operator::labels::ObjectLabels;
+use stackable_superset_crd::{SupersetCluster, APP_NAME};
 
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
-#[snafu(context(suffix(false)))]
 pub enum Error {
     #[snafu(display("object defines no version"))]
     ObjectHasNoVersion,
@@ -41,7 +42,11 @@ pub fn get_job_state(job: &Job) -> JobState {
 }
 
 pub fn superset_version(superset: &SupersetCluster) -> Result<&str, Error> {
-    superset.spec.version.as_deref().context(ObjectHasNoVersion)
+    superset
+        .spec
+        .version
+        .as_deref()
+        .context(ObjectHasNoVersionSnafu)
 }
 
 pub fn statsd_exporter_version(superset: &SupersetCluster) -> Result<&str, Error> {
@@ -49,5 +54,24 @@ pub fn statsd_exporter_version(superset: &SupersetCluster) -> Result<&str, Error
         .spec
         .statsd_exporter_version
         .as_deref()
-        .context(ObjectHasNoStatsdExporterVersion)
+        .context(ObjectHasNoStatsdExporterVersionSnafu)
+}
+
+/// Creates recommended `ObjectLabels` to be used in deployed resources
+pub fn build_recommended_labels<'a, T>(
+    owner: &'a T,
+    controller_name: &'a str,
+    app_version: &'a str,
+    role: &'a str,
+    role_group: &'a str,
+) -> ObjectLabels<'a, T> {
+    ObjectLabels {
+        owner,
+        app_name: APP_NAME,
+        app_version,
+        operator_name: OPERATOR_NAME,
+        controller_name,
+        role,
+        role_group,
+    }
 }

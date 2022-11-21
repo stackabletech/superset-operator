@@ -1,6 +1,6 @@
 use crate::util::{get_job_state, JobState};
 
-use snafu::{ResultExt, Snafu};
+use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder},
     k8s_openapi::api::{
@@ -20,7 +20,7 @@ use stackable_superset_crd::{
 use std::{sync::Arc, time::Duration};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-const FIELD_MANAGER_SCOPE: &str = "supersetcluster";
+pub const SUPERSET_DB_CONTROLLER_NAME: &str = "superset-db";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -30,6 +30,8 @@ pub struct Ctx {
 #[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
+    #[snafu(display("object has no namespace"))]
+    ObjectHasNoNamespace,
     #[snafu(display("failed to apply Job for {}", superset_db))]
     ApplyJob {
         source: stackable_operator::error::Error,
@@ -74,7 +76,10 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
                 let secret_exists = client
                     .get_opt::<Secret>(
                         &superset_db.spec.credentials_secret,
-                        superset_db.namespace().as_deref(),
+                        superset_db
+                            .namespace()
+                            .as_deref()
+                            .context(ObjectHasNoNamespaceSnafu)?,
                     )
                     .await
                     .with_context(|_| {
@@ -89,14 +94,18 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
                 if secret_exists {
                     let job = build_init_job(&superset_db)?;
                     client
-                        .apply_patch(FIELD_MANAGER_SCOPE, &job, &job)
+                        .apply_patch(SUPERSET_DB_CONTROLLER_NAME, &job, &job)
                         .await
                         .context(ApplyJobSnafu {
                             superset_db: ObjectRef::from_obj(&*superset_db),
                         })?;
                     // The job is started, update status to reflect new state
                     client
-                        .apply_patch_status(FIELD_MANAGER_SCOPE, &*superset_db, &s.initializing())
+                        .apply_patch_status(
+                            SUPERSET_DB_CONTROLLER_NAME,
+                            &*superset_db,
+                            &s.initializing(),
+                        )
                         .await
                         .context(ApplyStatusSnafu)?;
                 }
@@ -108,11 +117,13 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
                     .namespace()
                     .unwrap_or_else(|| "default".to_string());
                 let job_name = superset_db.job_name();
-                let job = client.get::<Job>(&job_name, Some(&ns)).await.context(
-                    GetInitializationJobSnafu {
-                        init_job: ObjectRef::<Job>::new(&job_name).within(&ns),
-                    },
-                )?;
+                let job =
+                    client
+                        .get::<Job>(&job_name, &ns)
+                        .await
+                        .context(GetInitializationJobSnafu {
+                            init_job: ObjectRef::<Job>::new(&job_name).within(&ns),
+                        })?;
 
                 let new_status = match get_job_state(&job) {
                     JobState::Complete => Some(s.ready()),
@@ -122,7 +133,7 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
 
                 if let Some(ns) = new_status {
                     client
-                        .apply_patch_status(FIELD_MANAGER_SCOPE, &*superset_db, &ns)
+                        .apply_patch_status(SUPERSET_DB_CONTROLLER_NAME, &*superset_db, &ns)
                         .await
                         .context(ApplyStatusSnafu)?;
                 }
@@ -134,7 +145,7 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
         // Status is none => initialize the status object as "Provisioned"
         let new_status = SupersetDBStatus::new();
         client
-            .apply_patch_status(FIELD_MANAGER_SCOPE, &*superset_db, &new_status)
+            .apply_patch_status(SUPERSET_DB_CONTROLLER_NAME, &*superset_db, &new_status)
             .await
             .context(ApplyStatusSnafu)?;
     }
@@ -222,6 +233,6 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
     Ok(job)
 }
 
-pub fn error_policy(_error: &Error, _ctx: Arc<Ctx>) -> Action {
+pub fn error_policy(_obj: Arc<SupersetDB>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
 }

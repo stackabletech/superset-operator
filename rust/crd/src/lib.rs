@@ -2,10 +2,13 @@ pub mod druidconnection;
 pub mod supersetdb;
 
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
+use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    commons::resources::{CpuLimits, MemoryLimits, NoRuntimeLimits, Resources},
-    config::merge::Merge,
+    commons::resources::{
+        CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
+        Resources, ResourcesFragment,
+    },
+    config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{runtime::reflector::ObjectRef, CustomResource},
     product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
@@ -17,7 +20,6 @@ use std::{collections::BTreeMap, num::ParseIntError};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub const APP_NAME: &str = "superset";
-pub const MANAGED_BY: &str = "superset-operator";
 
 pub const PYTHONPATH: &str = "/stackable/app/pythonpath";
 pub const SUPERSET_CONFIG_FILENAME: &str = "superset_config.py";
@@ -26,6 +28,10 @@ pub const SUPERSET_CONFIG_FILENAME: &str = "superset_config.py";
 pub enum Error {
     #[snafu(display("invalid int config value"))]
     InvalidIntConfigValue { source: ParseIntError },
+    #[snafu(display("unknown Superset role found {role}. Should be one of {roles:?}"))]
+    UnknownSupersetRole { role: String, roles: Vec<String> },
+    #[snafu(display("fragment validation failure"))]
+    FragmentValidationFailure { source: ValidationError },
 }
 
 #[derive(Display, EnumIter, EnumString)]
@@ -236,8 +242,22 @@ pub enum SupersetRole {
     Node,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, Merge, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
+#[fragment_attrs(
+    allow(clippy::derive_partial_eq_without_eq),
+    derive(
+        Clone,
+        Debug,
+        Default,
+        Deserialize,
+        Merge,
+        JsonSchema,
+        PartialEq,
+        Serialize
+    ),
+    serde(rename_all = "camelCase")
+)]
 pub struct SupersetStorageConfig {}
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -252,24 +272,24 @@ pub struct SupersetConfig {
     /// Corresponds to SUPERSET_WEBSERVER_TIMEOUT
     pub webserver_timeout: Option<u32>,
     /// CPU and memory limits for Superset pods
-    pub resources: Option<Resources<SupersetStorageConfig, NoRuntimeLimits>>,
+    pub resources: Option<ResourcesFragment<SupersetStorageConfig, NoRuntimeLimits>>,
 }
 
 impl SupersetConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
     pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
 
-    fn default_resources() -> Resources<SupersetStorageConfig, NoRuntimeLimits> {
-        Resources {
-            cpu: CpuLimits {
+    fn default_resources() -> ResourcesFragment<SupersetStorageConfig, NoRuntimeLimits> {
+        ResourcesFragment {
+            cpu: CpuLimitsFragment {
                 min: Some(Quantity("200m".to_owned())),
                 max: Some(Quantity("4".to_owned())),
             },
-            memory: MemoryLimits {
+            memory: MemoryLimitsFragment {
                 limit: Some(Quantity("2Gi".to_owned())),
-                runtime_limits: NoRuntimeLimits {},
+                runtime_limits: NoRuntimeLimitsFragment {},
             },
-            storage: SupersetStorageConfig {},
+            storage: SupersetStorageConfigFragment {},
         }
     }
 }
@@ -349,20 +369,23 @@ impl SupersetCluster {
         &self,
         role: &SupersetRole,
         rolegroup_ref: &RoleGroupRef<SupersetCluster>,
-    ) -> Option<Resources<SupersetStorageConfig, NoRuntimeLimits>> {
+    ) -> Result<Resources<SupersetStorageConfig, NoRuntimeLimits>, Error> {
         // Initialize the result with all default values as baseline
         let conf_defaults = SupersetConfig::default_resources();
 
         let role = match role {
-            SupersetRole::Node => self.spec.nodes.as_ref()?,
+            SupersetRole::Node => self.spec.nodes.as_ref().context(UnknownSupersetRoleSnafu {
+                role: role.to_string(),
+                roles: vec![role.to_string()],
+            })?,
         };
 
         // Retrieve role resource config
-        let mut conf_role: Resources<SupersetStorageConfig, NoRuntimeLimits> =
+        let mut conf_role: ResourcesFragment<SupersetStorageConfig, NoRuntimeLimits> =
             role.config.config.resources.clone().unwrap_or_default();
 
         // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup: Resources<SupersetStorageConfig, NoRuntimeLimits> = role
+        let mut conf_rolegroup: ResourcesFragment<SupersetStorageConfig, NoRuntimeLimits> = role
             .role_groups
             .get(&rolegroup_ref.role_group)
             .and_then(|rg| rg.config.config.resources.clone())
@@ -377,7 +400,7 @@ impl SupersetCluster {
         conf_rolegroup.merge(&conf_role);
 
         tracing::debug!("Merged resource config: {:?}", conf_rolegroup);
-        Some(conf_rolegroup)
+        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 }
 
