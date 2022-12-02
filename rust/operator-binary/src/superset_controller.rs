@@ -10,7 +10,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
-        PodSecurityContextBuilder, SecretOperatorVolumeSourceBuilder, VolumeBuilder,
+        SecretOperatorVolumeSourceBuilder, VolumeBuilder,
     },
     cluster_resources::ClusterResources,
     commons::{
@@ -23,7 +23,8 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, ConfigMapVolumeSource, Service, ServicePort, ServiceSpec, Volume,
+                ConfigMap, ConfigMapVolumeSource, PodSecurityContext, Service, ServicePort,
+                ServiceSpec, Volume,
             },
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
@@ -623,7 +624,12 @@ fn build_server_rolegroup_statefulset(
                     }),
                     ..Default::default()
                 })
-                .security_context(PodSecurityContextBuilder::new().fs_group(1000).build()) // Needed for secret-operator
+                .security_context(PodSecurityContext {
+                    run_as_user: Some(1000),
+                    run_as_group: Some(1000),
+                    fs_group: Some(1000),
+                    ..PodSecurityContext::default()
+                })
                 .build_template(),
             ..StatefulSetSpec::default()
         }),
