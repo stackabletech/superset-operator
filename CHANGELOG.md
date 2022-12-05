@@ -16,7 +16,12 @@
 
 - CPU and memory limits are now configurable ([#273]).
 
+### Changed
+
+- Don't run init container as root and avoid chmod and chowning ([#300]).
+
 [#273]: https://github.com/stackabletech/superset-operator/pull/273
+[#300]: https://github.com/stackabletech/superset-operator/pull/300
 
 ## [0.6.0] - 2022-09-07
 
