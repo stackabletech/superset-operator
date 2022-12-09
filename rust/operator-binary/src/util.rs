@@ -1,8 +1,8 @@
 use crate::OPERATOR_NAME;
-use snafu::{OptionExt, Snafu};
+use snafu::Snafu;
 use stackable_operator::k8s_openapi::api::batch::v1::Job;
 use stackable_operator::labels::ObjectLabels;
-use stackable_superset_crd::{SupersetCluster, APP_NAME};
+use stackable_superset_crd::APP_NAME;
 
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
@@ -39,22 +39,6 @@ pub fn get_job_state(job: &Job) -> JobState {
     } else {
         JobState::InProgress
     }
-}
-
-pub fn superset_version(superset: &SupersetCluster) -> Result<&str, Error> {
-    superset
-        .spec
-        .version
-        .as_deref()
-        .context(ObjectHasNoVersionSnafu)
-}
-
-pub fn statsd_exporter_version(superset: &SupersetCluster) -> Result<&str, Error> {
-    superset
-        .spec
-        .statsd_exporter_version
-        .as_deref()
-        .context(ObjectHasNoStatsdExporterVersionSnafu)
 }
 
 /// Creates recommended `ObjectLabels` to be used in deployed resources

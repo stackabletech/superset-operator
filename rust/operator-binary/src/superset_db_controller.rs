@@ -1,6 +1,8 @@
 use crate::util::{get_job_state, JobState};
 
+use crate::superset_controller::DOCKER_IMAGE_BASE_NAME;
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder},
     k8s_openapi::api::{
@@ -69,6 +71,8 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
     tracing::info!("Starting reconcile");
 
     let client = &ctx.client;
+    let resolved_product_image: ResolvedProductImage =
+        superset_db.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
 
     if let Some(ref s) = superset_db.status {
         match s.condition {
@@ -92,7 +96,7 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
                     })?
                     .is_some();
                 if secret_exists {
-                    let job = build_init_job(&superset_db)?;
+                    let job = build_init_job(&superset_db, &resolved_product_image)?;
                     client
                         .apply_patch(SUPERSET_DB_CONTROLLER_NAME, &job, &job)
                         .await
@@ -153,7 +157,10 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
     Ok(Action::await_change())
 }
 
-fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
+fn build_init_job(
+    superset_db: &SupersetDB,
+    resolved_product_image: &ResolvedProductImage,
+) -> Result<Job> {
     let config = [
         "import os",
         "SECRET_KEY = os.environ.get('SECRET_KEY')",
@@ -183,10 +190,7 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
 
     let container = ContainerBuilder::new("superset-init-db")
         .expect("ContainerBuilder not created")
-        .image(format!(
-            "docker.stackable.tech/stackable/superset:{}",
-            superset_db.spec.superset_version
-        ))
+        .image_from_product_image(resolved_product_image)
         .command(vec!["/bin/bash".to_string()])
         .args(vec![
             String::from("-euo"),
@@ -211,6 +215,7 @@ fn build_init_job(superset_db: &SupersetDB) -> Result<Job> {
         ),
         spec: Some(PodSpec {
             containers: vec![container],
+            image_pull_secrets: resolved_product_image.pull_secrets.clone(),
             restart_policy: Some("Never".to_string()),
             ..Default::default()
         }),
