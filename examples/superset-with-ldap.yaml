@@ -148,8 +148,9 @@ kind: SupersetCluster
 metadata:
   name: superset-with-ldap-server-veri-tls
 spec:
-  version: 1.5.1-stackable0.3.0
-  statsdExporterVersion: v0.22.4
+  image:
+    productVersion: 1.5.1
+    stackableVersion: 0.4.0
   credentialsSecret: superset-with-ldap-server-veri-tls-credentials
   nodes:
     roleGroups:
