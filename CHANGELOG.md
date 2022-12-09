@@ -6,9 +6,11 @@
 
 - Updated stackable image versions ([#295]).
 - `operator-rs` `0.25.0` -> `0.27.1` ([#297]).
+- [BREAKING] Use Product image selection instead of version. `spec.version` has been replaced by `spec.image` ([#304]).
 
 [#295]: https://github.com/stackabletech/superset-operator/pull/295
 [#297]: https://github.com/stackabletech/superset-operator/pull/297
+[#304]: https://github.com/stackabletech/superset-operator/pull/304
 
 ## [0.7.0] - 2022-11-07
 
