@@ -78,10 +78,6 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object has no namespace"))]
     ObjectHasNoNamespace,
-    #[snafu(display("failed to retrieve superset version"))]
-    NoSupersetVersion { source: crate::util::Error },
-    #[snafu(display("failed to retrieve statsd exporter version"))]
-    NoStatsdExporterVersion { source: crate::util::Error },
     #[snafu(display("object defines no node role"))]
     NoNodeRole,
     #[snafu(display("failed to calculate global service name"))]

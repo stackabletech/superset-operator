@@ -1,17 +1,7 @@
 use crate::OPERATOR_NAME;
-use snafu::Snafu;
 use stackable_operator::k8s_openapi::api::batch::v1::Job;
 use stackable_operator::labels::ObjectLabels;
 use stackable_superset_crd::APP_NAME;
-
-#[derive(Snafu, Debug)]
-#[allow(clippy::enum_variant_names)]
-pub enum Error {
-    #[snafu(display("object defines no version"))]
-    ObjectHasNoVersion,
-    #[snafu(display("object defines no stats exporter version"))]
-    ObjectHasNoStatsdExporterVersion,
-}
 
 pub enum JobState {
     InProgress,
