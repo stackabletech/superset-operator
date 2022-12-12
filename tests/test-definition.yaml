@@ -2,12 +2,12 @@
 dimensions:
   - name: superset
     values:
-      - 1.3.2-stackable0.3.0
-      - 1.4.1-stackable0.3.0
-      - 1.5.1-stackable0.4.0
+      - 1.3.2-stackable3.0.0
+      - 1.4.1-stackable3.0.0
+      - 1.5.1-stackable3.0.0
   - name: superset-latest
     values:
-      - 1.5.1-stackable0.4.0
+      - 1.5.1-stackable3.0.0
   - name: ldap-authentication
     values:
       - no-tls
