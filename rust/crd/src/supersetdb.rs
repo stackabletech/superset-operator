@@ -1,7 +1,8 @@
 use crate::{SupersetCluster, APP_NAME};
 use serde::{Deserialize, Serialize};
-use snafu::{OptionExt, Snafu};
+use snafu::Snafu;
 use stackable_operator::builder::ObjectMetaBuilder;
+use stackable_operator::commons::product_image_selection::{ProductImage, ResolvedProductImage};
 use stackable_operator::k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use stackable_operator::k8s_openapi::chrono::Utc;
 use stackable_operator::kube::CustomResource;
@@ -21,7 +22,7 @@ pub enum Error {
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "superset.stackable.tech",
     version = "v1alpha1",
@@ -37,20 +38,18 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 )]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetDBSpec {
-    pub superset_version: String,
+    /// The Superset image to use<
+    pub image: ProductImage,
     pub credentials_secret: String,
     pub load_examples: bool,
 }
 
 impl SupersetDB {
     /// Returns a SupersetDB resource with the same name, namespace and Superset version as the cluster.
-    pub fn for_superset(superset: &SupersetCluster) -> Result<Self> {
-        let version = superset
-            .spec
-            .version
-            .as_deref()
-            .context(NoSupersetVersionSnafu)?;
-
+    pub fn for_superset(
+        superset: &SupersetCluster,
+        resolved_product_image: &ResolvedProductImage,
+    ) -> Result<Self> {
         Ok(Self {
             // The db is deliberately not owned by the cluster so it doesn't get deleted when the
             // cluster gets deleted.  The schema etc. still exists in the postgres db and can be reused
@@ -61,10 +60,10 @@ impl SupersetDB {
                     &superset.name_any(),
                     APP_NAME,
                 ))
-                .with_label(APP_VERSION_LABEL, version)
+                .with_label(APP_VERSION_LABEL, &resolved_product_image.app_version_label)
                 .build(),
             spec: SupersetDBSpec {
-                superset_version: version.to_string(),
+                image: superset.spec.image.clone(),
                 credentials_secret: superset.spec.credentials_secret.clone(),
                 load_examples: superset.spec.load_examples_on_init.unwrap_or_default(),
             },

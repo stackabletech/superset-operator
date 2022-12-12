@@ -24,8 +24,9 @@ kind: SupersetCluster
 metadata:
   name: superset
 spec:
-  version: {{ test_scenario['values']['superset'] }}
-  statsdExporterVersion: v0.22.4
+  image:
+    productVersion: "{{ test_scenario['values']['superset'].split('-stackable')[0] }}"
+    stackableVersion: "{{ test_scenario['values']['superset'].split('-stackable')[1] }}"
   credentialsSecret: superset-credentials
   loadExamplesOnInit: false
   nodes:

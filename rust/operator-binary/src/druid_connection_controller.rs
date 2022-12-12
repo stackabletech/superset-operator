@@ -1,6 +1,8 @@
 use crate::util::{get_job_state, JobState};
 
+use crate::superset_controller::DOCKER_IMAGE_BASE_NAME;
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder},
     client::Client,
@@ -163,8 +165,15 @@ pub async fn reconcile_druid_connection(
                         client,
                     )
                     .await?;
-                    let job =
-                        build_import_job(&druid_connection, &superset_db, &sqlalchemy_str).await?;
+                    let resolved_product_image: ResolvedProductImage =
+                        superset_db.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
+                    let job = build_import_job(
+                        &superset_db,
+                        &druid_connection,
+                        &resolved_product_image,
+                        &sqlalchemy_str,
+                    )
+                    .await?;
                     client
                         .apply_patch(DRUID_CONNECTION_CONTROLLER_NAME, &job, &job)
                         .await
@@ -254,8 +263,9 @@ fn build_druid_db_yaml(druid_cluster_name: &str, sqlalchemy_str: &str) -> Result
 
 /// Builds the import job.  When run it will import the druid connection into the database.
 async fn build_import_job(
-    druid_connection: &DruidConnection,
     superset_db: &SupersetDB,
+    druid_connection: &DruidConnection,
+    resolved_product_image: &ResolvedProductImage,
     sqlalchemy_str: &str,
 ) -> Result<Job> {
     let mut commands = vec![];
@@ -276,10 +286,7 @@ async fn build_import_job(
 
     let container = ContainerBuilder::new("superset-import-druid-connection")
         .expect("ContainerBuilder not created")
-        .image(format!(
-            "docker.stackable.tech/stackable/superset:{}",
-            superset_db.spec.superset_version
-        ))
+        .image_from_product_image(resolved_product_image)
         .command(vec!["/bin/sh".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
         .add_env_var_from_secret("DATABASE_URI", secret, "connections.sqlalchemyDatabaseUri")
@@ -293,6 +300,7 @@ async fn build_import_job(
         ),
         spec: Some(PodSpec {
             containers: vec![container],
+            image_pull_secrets: resolved_product_image.pull_secrets.clone(),
             restart_policy: Some("Never".to_string()),
             ..Default::default()
         }),

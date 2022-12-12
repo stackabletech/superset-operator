@@ -3,6 +3,7 @@ pub mod supersetdb;
 
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::commons::product_image_selection::ProductImage;
 use stackable_operator::{
     commons::resources::{
         CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
@@ -113,7 +114,7 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
 
 pub const HTTP_PORT: &str = "http";
 
-#[derive(Clone, CustomResource, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "superset.stackable.tech",
     version = "v1alpha1",
@@ -133,11 +134,8 @@ pub struct SupersetClusterSpec {
     /// Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stopped: Option<bool>,
-    /// Desired Superset version
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub version: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub statsd_exporter_version: Option<String>,
+    /// The Superset image to use
+    pub image: ProductImage,
     pub credentials_secret: String,
     pub mapbox_secret: Option<String>,
     #[serde(default)]

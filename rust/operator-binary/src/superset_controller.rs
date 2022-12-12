@@ -3,12 +3,12 @@
 use crate::util::build_recommended_labels;
 use crate::{
     config::{self, PYTHON_IMPORTS},
-    util::{statsd_exporter_version, superset_version},
     APP_PORT, OPERATOR_NAME,
 };
 
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
     builder::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
@@ -62,6 +62,7 @@ use tracing::log::debug;
 pub const SUPERSET_CONTROLLER_NAME: &str = "supersetcluster";
 pub const SECRETS_DIR: &str = "/stackable/secrets/";
 pub const CERTS_DIR: &str = "/stackable/certificates/";
+pub const DOCKER_IMAGE_BASE_NAME: &str = "superset";
 
 const METRICS_PORT_NAME: &str = "metrics";
 const METRICS_PORT: i32 = 9102;
@@ -77,10 +78,6 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object has no namespace"))]
     ObjectHasNoNamespace,
-    #[snafu(display("failed to retrieve superset version"))]
-    NoSupersetVersion { source: crate::util::Error },
-    #[snafu(display("failed to retrieve statsd exporter version"))]
-    NoStatsdExporterVersion { source: crate::util::Error },
     #[snafu(display("object defines no node role"))]
     NoNodeRole,
     #[snafu(display("failed to calculate global service name"))]
@@ -183,9 +180,12 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     tracing::info!("Starting reconcile");
 
     let client = &ctx.client;
+    let resolved_product_image: ResolvedProductImage =
+        superset.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
 
     // Ensure DB Schema exists
-    let superset_db = SupersetDB::for_superset(&superset).context(CreateSupersetObjectSnafu)?;
+    let superset_db = SupersetDB::for_superset(&superset, &resolved_product_image)
+        .context(CreateSupersetObjectSnafu)?;
     client
         .apply_patch(SUPERSET_CONTROLLER_NAME, &superset_db, &superset_db)
         .await
@@ -224,7 +224,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     }
 
     let validated_config = validate_all_roles_and_groups_config(
-        superset_version(&superset).context(NoSupersetVersionSnafu)?,
+        &resolved_product_image.product_version,
         &transform_all_roles_to_config(
             &*superset,
             [(
@@ -258,7 +258,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     )
     .context(CreateClusterResourcesSnafu)?;
 
-    let node_role_service = build_node_role_service(&superset)?;
+    let node_role_service = build_node_role_service(&superset, &resolved_product_image)?;
     cluster_resources
         .add(client, &node_role_service)
         .await
@@ -292,16 +292,19 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             .resolve_resource_config_for_role_and_rolegroup(&SupersetRole::Node, &rolegroup)
             .context(FailedToResolveResourceConfigSnafu)?;
 
-        let rg_service = build_node_rolegroup_service(&rolegroup, &superset)?;
+        let rg_service =
+            build_node_rolegroup_service(&superset, &resolved_product_image, &rolegroup)?;
         let rg_configmap = build_rolegroup_config_map(
             &superset,
+            &resolved_product_image,
             &rolegroup,
             rolegroup_config,
             authentication_class.as_ref(),
         )?;
         let rg_statefulset = build_server_rolegroup_statefulset(
-            &rolegroup,
             &superset,
+            &resolved_product_image,
+            &rolegroup,
             rolegroup_config,
             authentication_class.as_ref(),
             &resources,
@@ -336,7 +339,10 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
 
 /// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
 /// including targets outside of the cluster.
-fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
+fn build_node_role_service(
+    superset: &SupersetCluster,
+    resolved_product_image: &ResolvedProductImage,
+) -> Result<Service> {
     let role_name = SupersetRole::Node.to_string();
     let role_svc_name = superset
         .node_role_service_name()
@@ -350,14 +356,10 @@ fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
             .with_recommended_labels(build_recommended_labels(
                 superset,
                 SUPERSET_CONTROLLER_NAME,
-                superset_version(superset).context(NoSupersetVersionSnafu)?,
+                &resolved_product_image.app_version_label,
                 &role_name,
                 "global",
             ))
-            .with_label(
-                "statsd-exporter",
-                statsd_exporter_version(superset).context(NoStatsdExporterVersionSnafu)?,
-            )
             .build(),
         spec: Some(ServiceSpec {
             ports: Some(vec![ServicePort {
@@ -384,6 +386,7 @@ fn build_node_role_service(superset: &SupersetCluster) -> Result<Service> {
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
 fn build_rolegroup_config_map(
     superset: &SupersetCluster,
+    resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<SupersetCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
@@ -421,7 +424,7 @@ fn build_rolegroup_config_map(
                 .with_recommended_labels(build_recommended_labels(
                     superset,
                     SUPERSET_CONTROLLER_NAME,
-                    superset_version(superset).context(NoSupersetVersionSnafu)?,
+                    &resolved_product_image.app_version_label,
                     &rolegroup.role,
                     &rolegroup.role_group,
                 ))
@@ -441,8 +444,9 @@ fn build_rolegroup_config_map(
 ///
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
 fn build_node_rolegroup_service(
-    rolegroup: &RoleGroupRef<SupersetCluster>,
     superset: &SupersetCluster,
+    resolved_product_image: &ResolvedProductImage,
+    rolegroup: &RoleGroupRef<SupersetCluster>,
 ) -> Result<Service> {
     Ok(Service {
         metadata: ObjectMetaBuilder::new()
@@ -453,14 +457,10 @@ fn build_node_rolegroup_service(
             .with_recommended_labels(build_recommended_labels(
                 superset,
                 SUPERSET_CONTROLLER_NAME,
-                superset_version(superset).context(NoSupersetVersionSnafu)?,
+                &resolved_product_image.app_version_label,
                 &rolegroup.role,
                 &rolegroup.role_group,
             ))
-            .with_label(
-                "statsd-exporter",
-                statsd_exporter_version(superset).context(NoStatsdExporterVersionSnafu)?,
-            )
             .with_label("prometheus.io/scrape", "true")
             .build(),
         spec: Some(ServiceSpec {
@@ -496,8 +496,9 @@ fn build_node_rolegroup_service(
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_node_rolegroup_service`]).
 fn build_server_rolegroup_statefulset(
-    rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     superset: &SupersetCluster,
+    resolved_product_image: &ResolvedProductImage,
+    rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
     resources: &Resources<SupersetStorageConfig, NoRuntimeLimits>,
@@ -509,16 +510,6 @@ fn build_server_rolegroup_statefulset(
         .context(NoNodeRoleSnafu)?
         .role_groups
         .get(&rolegroup_ref.role_group);
-
-    let superset_version = superset_version(superset).context(NoSupersetVersionSnafu)?;
-
-    let image = format!("docker.stackable.tech/stackable/superset:{superset_version}");
-
-    let statsd_exporter_version =
-        statsd_exporter_version(superset).context(NoStatsdExporterVersionSnafu)?;
-
-    let statsd_exporter_image =
-        format!("docker.stackable.tech/prom/statsd-exporter:{statsd_exporter_version}");
 
     let mut cb = ContainerBuilder::new("superset").expect("ContainerBuilder not created");
     let mut pb = PodBuilder::new();
@@ -555,7 +546,7 @@ fn build_server_rolegroup_statefulset(
         .context(MissingWebServerTimeoutInSupersetConfigSnafu)?;
 
     let container = cb
-        .image(image)
+        .image_from_product_image(resolved_product_image)
         .add_container_port("http", APP_PORT.into())
         .add_volume_mount("config", PYTHONPATH)
         .command(vec![
@@ -577,7 +568,9 @@ fn build_server_rolegroup_statefulset(
         .build();
     let metrics_container = ContainerBuilder::new("metrics")
         .expect("ContainerBuilder not created")
-        .image(statsd_exporter_image)
+        .image_from_product_image(resolved_product_image)
+        .command(vec!["/bin/bash".to_string(), "-c".to_string()])
+        .args(vec!["/stackable/statsd_exporter".to_string()])
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
         .build();
     Ok(StatefulSet {
@@ -589,11 +582,10 @@ fn build_server_rolegroup_statefulset(
             .with_recommended_labels(build_recommended_labels(
                 superset,
                 SUPERSET_CONTROLLER_NAME,
-                superset_version,
+                &resolved_product_image.app_version_label,
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
             ))
-            .with_label("statsd-exporter", statsd_exporter_version)
             .with_label("restarter.stackable.tech/enabled", "true")
             .build(),
         spec: Some(StatefulSetSpec {
@@ -618,12 +610,12 @@ fn build_server_rolegroup_statefulset(
                     m.with_recommended_labels(build_recommended_labels(
                         superset,
                         SUPERSET_CONTROLLER_NAME,
-                        superset_version,
+                        &resolved_product_image.app_version_label,
                         &rolegroup_ref.role,
                         &rolegroup_ref.role_group,
                     ))
-                    .with_label("statsd-exporter", statsd_exporter_version)
                 })
+                .image_pull_secrets_from_product_image(resolved_product_image)
                 .add_container(container)
                 .add_container(metrics_container)
                 .add_volume(Volume {
