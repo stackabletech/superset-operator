@@ -38,6 +38,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 )]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetDBSpec {
+    /// The Superset image to use<
     pub image: ProductImage,
     pub credentials_secret: String,
     pub load_examples: bool,

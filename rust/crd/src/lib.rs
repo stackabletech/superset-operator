@@ -134,7 +134,7 @@ pub struct SupersetClusterSpec {
     /// Emergency stop button, if `true` then all pods are stopped without affecting configuration (as setting `replicas` to `0` would)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stopped: Option<bool>,
-    /// The Superset image version to use
+    /// The Superset image to use
     pub image: ProductImage,
     pub credentials_secret: String,
     pub mapbox_secret: Option<String>,

@@ -55,7 +55,7 @@ spec:
                 - required:
                   - productVersion
                   - stackableVersion
-                description: The Superset image version to use
+                description: The Superset image to use
                 properties:
                   custom:
                     description: Overwrite the docker image. Specify the full docker image name, e.g. `docker.stackable.tech/stackable/superset:1.4.1-stackable2.1.0`
