@@ -4,10 +4,13 @@
 
 ### Changed
 
+- Fixed the RoleGroup `selector`. It was not used before. ([#306])
+- `operator-rs` `0.27.1` -> `0.30.1` ([#306])
 - Updated stackable image versions ([#295]).
 - `operator-rs` `0.25.0` -> `0.27.1` ([#297]).
 - [BREAKING] Use Product image selection instead of version. `spec.version` has been replaced by `spec.image` ([#304]).
 
+[#306]: https://github.com/stackabletech/superset-operator/pull/306
 [#295]: https://github.com/stackabletech/superset-operator/pull/295
 [#297]: https://github.com/stackabletech/superset-operator/pull/297
 [#304]: https://github.com/stackabletech/superset-operator/pull/304
