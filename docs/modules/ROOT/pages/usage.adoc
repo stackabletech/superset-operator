@@ -9,8 +9,8 @@ The default setting is to manually set up users via the Webinterface.
 
 === LDAP
 
-Superset supports xref:home:concepts:authentication.adoc[authentication] of users against an LDAP server. This requires setting up an xref:home:concepts:authentication.adoc#authenticationclass[AuthenticationClass] for the LDAP server.
-The AuthenticationClass is then referenced in the SupersetCluster resource like so:
+Superset supports xref:home:concepts:authentication.adoc[authentication] of users against an LDAP server. This requires setting up an xref:nightly@home:concepts:authentication.adoc#authenticationclass[AuthenticationClass] for the LDAP server.
+The AuthenticationClass is then referenced in the SupersetCluster resource as follows:
 
 [source,yaml]
 ----
@@ -29,11 +29,11 @@ spec:
 ----
 
 <1> The reference to an AuthenticationClass called `ldap`
-<2> The default role that all users are assigned to upon logging in
+<2> The default role that all users are assigned to
 
-Users that log in with LDAP are assigned a default https://superset.apache.org/docs/security/#roles[Role] upon logging in which is specified with the `userRegistrationRole` property.
+Users that log in with LDAP are assigned a default https://superset.apache.org/docs/security/#roles[Role] which is specified with the `userRegistrationRole` property.
 
-You can follow the xref:home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:home:reference:authenticationclass.adoc[] reference.
+You can follow the xref:nightly@home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:nightly@home:reference:authenticationclass.adoc[] reference.
 
 == Authorization
 Superset has a concept called `Roles` which allows you to grant user permissions based on roles.
@@ -45,7 +45,7 @@ You can view all the available roles in the Webinterface of Superset and can als
 
 === LDAP
 Superset supports assigning https://superset.apache.org/docs/security/#roles[Roles] to users based on their LDAP group membership, though this is not yet supported by the Stackable operator.
-All the users logging in via LDAP get assigned the same role which you can configure via the attribute `authenticationConfig.userRegistrationRole` on the `SupersetCluster` object:
+All the users logging in via LDAP get assigned to the same role which you can configure via the attribute `authenticationConfig.userRegistrationRole` on the `SupersetCluster` object:
 
 [source,yaml]
 ----
@@ -114,7 +114,7 @@ can interfere with the operator and can lead to problems.
 
 For a role or role group, at the same level of `config`, you can specify `configOverrides` for the
 `superset_config.py`. For example, if you want to set the CSV export encoding and the preferred
-databases adapt the `nodes` section of the cluster resource like so:
+databases adapt the `nodes` section of the cluster resource as follows:
 
 [source,yaml]
 ----
