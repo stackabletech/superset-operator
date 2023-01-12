@@ -44,7 +44,7 @@ You can see all the available roles in the Webinterface of Superset.
 You can view all the available roles in the Webinterface of Superset and can also assign users to these roles.
 
 === LDAP
-Superset supports assigning https://superset.apache.org/docs/security/#roles[Roles] to users based on their LDAP group membership, but the Stackable Operator does not support this yet.
+Superset supports assigning https://superset.apache.org/docs/security/#roles[Roles] to users based on their LDAP group membership, though this is not yet supported by the Stackable operator.
 All the users logging in via LDAP get assigned the same role which you can configure via the attribute `authenticationConfig.userRegistrationRole` on the `SupersetCluster` object:
 
 [source,yaml]
