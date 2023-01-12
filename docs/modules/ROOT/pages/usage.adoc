@@ -8,25 +8,32 @@ There are multiple options to set up the authentication of users.
 The default setting is to manually set up users via the Webinterface.
 
 === LDAP
-Superset supports authentication of users against an LDAP server.
-Have a look at https://github.com/stackabletech/superset-operator/blob/main/examples/superset-with-ldap.yaml[the LDAP example] and the general xref:commons-operator::authenticationclass.adoc[Stackable Authentication] documentation on how to set it up.
-In general, it requires you to specify a xref:commons-operator::authenticationclass.adoc[`AuthenticationClass`] which is used to authenticate the users. In this example we assign all the users the `Admin` role once they log into Superset.
+
+Superset supports xref:home:concepts:authentication.adoc[authentication] of users against an LDAP server. This requires setting up an xref:home:concepts:authentication.adoc#authenticationclass[AuthenticationClass] for the LDAP server.
+The AuthenticationClass is then referenced in the SupersetCluster resource like so:
 
 [source,yaml]
 ----
 apiVersion: superset.stackable.tech/v1alpha1
 kind: SupersetCluster
 metadata:
-  name: superset-with-ldap-server-veri-tls
+  name: superset-with-ldap-server
 spec:
   image:
     productVersion: 1.5.1
     stackableVersion: 3.0.0
   [...]
   authenticationConfig:
-    authenticationClass: superset-with-ldap-server-veri-tls-ldap
-    userRegistrationRole: Admin
+    authenticationClass: ldap    # <1>
+    userRegistrationRole: Admin  # <2>
 ----
+
+<1> The reference to an AuthenticationClass called `ldap`
+<2> The default role that all users are assigned to upon logging in
+
+Users that log in with LDAP are assigned a default https://superset.apache.org/docs/security/#roles[Role] upon logging in which is specified with the `userRegistrationRole` property.
+
+You can follow the xref:home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:home:reference:authenticationclass.adoc[] reference.
 
 == Authorization
 Superset has a concept called `Roles` which allows you to grant user permissions based on roles.
@@ -37,9 +44,23 @@ You can see all the available roles in the Webinterface of Superset.
 You can view all the available roles in the Webinterface of Superset and can also assign users to these roles.
 
 === LDAP
-Superset supports assigning roles to users based on their LDAP group membership.
-This is not supported yet.
-Currently all the users logging in via LDAP get assigned the same role which you can configure via the attribute `authenticationConfig.userRegistrationRole` on the `SupersetCluster` object.
+Superset supports assigning https://superset.apache.org/docs/security/#roles[Roles] to users based on their LDAP group membership, but the Stackable Operator does not support this yet.
+All the users logging in via LDAP get assigned the same role which you can configure via the attribute `authenticationConfig.userRegistrationRole` on the `SupersetCluster` object:
+
+[source,yaml]
+----
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: superset-with-ldap-server
+spec:
+  [...]
+  authenticationConfig:
+    authenticationClass: ldap
+    userRegistrationRole: Admin  # <1>
+----
+
+<1> All users are assigned to the `Admin` role
 
 == Connecting Apache Druid Clusters
 
