@@ -9,7 +9,7 @@ The default setting is to manually set up users via the Webinterface.
 
 === LDAP
 
-Superset supports xref:home:concepts:authentication.adoc[authentication] of users against an LDAP server. This requires setting up an xref:nightly@home:concepts:authentication.adoc#authenticationclass[AuthenticationClass] for the LDAP server.
+Superset supports xref:nightly@home:concepts:authentication.adoc[authentication] of users against an LDAP server. This requires setting up an xref:nightly@home:concepts:authentication.adoc#authenticationclass[AuthenticationClass] for the LDAP server.
 The AuthenticationClass is then referenced in the SupersetCluster resource as follows:
 
 [source,yaml]
