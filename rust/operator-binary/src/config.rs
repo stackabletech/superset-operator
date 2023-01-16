@@ -1,8 +1,7 @@
-use crate::superset_controller::{CERTS_DIR, SECRETS_DIR};
 use stackable_operator::commons::{
     authentication::{AuthenticationClass, AuthenticationClassProvider},
     ldap::LdapAuthenticationProvider,
-    tls::{CaCert, TlsVerification},
+    tls::TlsVerification,
 };
 use stackable_superset_crd::{
     LdapRolesSyncMoment, SupersetClusterAuthenticationConfig, SupersetConfigOptions,
@@ -49,9 +48,8 @@ fn append_authentication_config(
     authentication_config: &SupersetClusterAuthenticationConfig,
     authentication_class: &AuthenticationClass,
 ) {
-    let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
     if let AuthenticationClassProvider::Ldap(ldap) = &authentication_class.spec.provider {
-        append_ldap_config(config, ldap, authentication_class_name);
+        append_ldap_config(config, ldap);
     }
 
     config.insert(
@@ -68,11 +66,7 @@ fn append_authentication_config(
     );
 }
 
-fn append_ldap_config(
-    config: &mut BTreeMap<String, String>,
-    ldap: &LdapAuthenticationProvider,
-    authentication_class_name: &str,
-) {
+fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenticationProvider) {
     config.insert(
         SupersetConfigOptions::AuthType.to_string(),
         "AUTH_LDAP".into(),
@@ -114,71 +108,38 @@ fn append_ldap_config(
         ldap.ldap_field_names.surname.clone(),
     );
 
-    // Possible TLS options, see https://github.com/dpgaspar/Flask-AppBuilder/blob/f6f66fc1bcc0163a213e4a2e6f960e91082d201f/flask_appbuilder/security/manager.py#L243-L250
-    match &ldap.tls {
-        None => {
-            config.insert(
-                SupersetConfigOptions::AuthLdapTlsDemand.to_string(),
-                false.to_string(),
-            );
-        }
-        Some(tls) => match &tls.verification {
+    config.insert(
+        SupersetConfigOptions::AuthLdapTlsDemand.to_string(),
+        ldap.use_tls().to_string(),
+    );
+
+    if let Some(tls) = &ldap.tls {
+        match &tls.verification {
             TlsVerification::None {} => {
-                config.insert(
-                    SupersetConfigOptions::AuthLdapTlsDemand.to_string(),
-                    true.to_string(),
-                );
                 config.insert(
                     SupersetConfigOptions::AuthLdapAllowSelfSigned.to_string(),
                     true.to_string(),
                 );
             }
-            TlsVerification::Server(server_verification) => {
-                append_server_ca_cert(
-                    config,
-                    authentication_class_name,
-                    &server_verification.ca_cert,
-                );
+            TlsVerification::Server(_) => {
+                if let Some(ca_cert_path) = ldap.tls_ca_cert_mount_path() {
+                    config.insert(
+                        SupersetConfigOptions::AuthLdapTlsCacertfile.to_string(),
+                        ca_cert_path,
+                    );
+                }
             }
-        },
+        }
     }
 
-    if ldap.bind_credentials.is_some() {
+    if let Some((user_path, password_path)) = ldap.bind_credentials_mount_paths() {
         config.insert(
             SupersetConfigOptions::AuthLdapBindUser.to_string(),
-            format!(
-                "open('{SECRETS_DIR}{authentication_class_name}-bind-credentials/user').read()"
-            ),
+            format!("open('{user_path}').read()"),
         );
         config.insert(
             SupersetConfigOptions::AuthLdapBindPassword.to_string(),
-            format!(
-                "open('{SECRETS_DIR}{authentication_class_name}-bind-credentials/password').read()"
-            ),
+            format!("open('{password_path}').read()"),
         );
-    }
-}
-
-fn append_server_ca_cert(
-    config: &mut BTreeMap<String, String>,
-    authentication_class_name: &str,
-    server_ca_cert: &CaCert,
-) {
-    config.insert(
-        SupersetConfigOptions::AuthLdapTlsDemand.to_string(),
-        true.to_string(),
-    );
-    config.insert(
-        SupersetConfigOptions::AuthLdapAllowSelfSigned.to_string(),
-        false.to_string(),
-    );
-    match server_ca_cert {
-        CaCert::SecretClass(..) => {
-            config.insert(
-                SupersetConfigOptions::AuthLdapTlsCacertfile.to_string(),
-                format!("{CERTS_DIR}{authentication_class_name}-tls-certificate/ca.crt"),
-            );
-        }
-        CaCert::WebPki {} => {}
     }
 }
