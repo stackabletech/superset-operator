@@ -219,6 +219,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     let validated_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
         &transform_all_roles_to_config(
+            #[allow(clippy::explicit_auto_deref)]
             &*superset,
             [(
                 SupersetRole::Node.to_string(),
