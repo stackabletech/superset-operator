@@ -36,10 +36,10 @@ pub fn add_superset_config(
         "os.environ.get('MAPBOX_API_KEY', '')".into(),
     );
 
-    if let Some(authentication_config) = authentication_config {
-        if let Some(authentication_class) = authentication_class {
-            append_authentication_config(config, authentication_config, authentication_class);
-        }
+    if let (Some(authentication_config), Some(authentication_class)) =
+        (authentication_config, authentication_class)
+    {
+        append_authentication_config(config, authentication_config, authentication_class);
     }
 }
 
