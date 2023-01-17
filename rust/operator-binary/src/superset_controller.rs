@@ -216,12 +216,10 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         return Ok(Action::await_change());
     }
 
-    // Since rust 1.64 the '&*' became a clippy warning. It is needed though to dereference the Arc here
-    #[allow(clippy::explicit_auto_deref)]
     let validated_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
         &transform_all_roles_to_config(
-            &*superset,
+            superset.as_ref(),
             [(
                 SupersetRole::Node.to_string(),
                 (
