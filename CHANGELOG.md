@@ -4,16 +4,17 @@
 
 ### Changed
 
+- `operator-rs` `0.27.1` -> `0.31.0` ([#306], [#297], [#311])
 - Fixed the RoleGroup `selector`. It was not used before. ([#306])
-- `operator-rs` `0.27.1` -> `0.30.1` ([#306])
 - Updated stackable image versions ([#295]).
-- `operator-rs` `0.25.0` -> `0.27.1` ([#297]).
 - [BREAKING] Use Product image selection instead of version. `spec.version` has been replaced by `spec.image` ([#304]).
+- Refactored LDAP authentication handling to use functionality from the `LdapAuthenticationProvider` ([#311])
 
 [#306]: https://github.com/stackabletech/superset-operator/pull/306
 [#295]: https://github.com/stackabletech/superset-operator/pull/295
 [#297]: https://github.com/stackabletech/superset-operator/pull/297
 [#304]: https://github.com/stackabletech/superset-operator/pull/304
+[#311]: https://github.com/stackabletech/superset-operator/pull/311
 
 ## [0.7.0] - 2022-11-07
 
