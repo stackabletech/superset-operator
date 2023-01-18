@@ -10,16 +10,11 @@ use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
-    builder::{
-        ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
-        SecretOperatorVolumeSourceBuilder, VolumeBuilder,
-    },
+    builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     cluster_resources::ClusterResources,
     commons::{
         authentication::{AuthenticationClass, AuthenticationClassProvider},
         resources::{NoRuntimeLimits, Resources},
-        secret_class::SecretClassVolumeScope,
-        tls::{CaCert, TlsServerVerification, TlsVerification},
     },
     k8s_openapi::{
         api::{
@@ -60,8 +55,6 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use tracing::log::debug;
 
 pub const SUPERSET_CONTROLLER_NAME: &str = "supersetcluster";
-pub const SECRETS_DIR: &str = "/stackable/secrets/";
-pub const CERTS_DIR: &str = "/stackable/certificates/";
 pub const DOCKER_IMAGE_BASE_NAME: &str = "superset";
 
 const METRICS_PORT_NAME: &str = "metrics";
@@ -226,7 +219,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     let validated_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
         &transform_all_roles_to_config(
-            &*superset,
+            superset.as_ref(),
             [(
                 SupersetRole::Node.to_string(),
                 (
@@ -649,39 +642,7 @@ fn add_authentication_volumes_and_volume_mounts(
 
     match &authentication_class.spec.provider {
         AuthenticationClassProvider::Ldap(ldap) => {
-            if let Some(bind_credentials) = &ldap.bind_credentials {
-                let volume_name = format!("{authentication_class_name}-bind-credentials");
-
-                pb.add_volume(build_secret_operator_volume(
-                    &volume_name,
-                    &bind_credentials.secret_class,
-                    bind_credentials.scope.as_ref(),
-                ));
-                cb.add_volume_mount(&volume_name, format!("{SECRETS_DIR}{volume_name}"));
-            }
-
-            if let Some(tls) = &ldap.tls {
-                match &tls.verification {
-                    TlsVerification::Server(TlsServerVerification {
-                        ca_cert: CaCert::SecretClass(cert_secret_class),
-                    }) => {
-                        let volume_name = format!("{authentication_class_name}-tls-certificate");
-
-                        pb.add_volume(build_secret_operator_volume(
-                            &volume_name,
-                            cert_secret_class,
-                            None,
-                        ));
-                        cb.add_volume_mount(&volume_name, format!("{CERTS_DIR}{volume_name}"));
-                    }
-                    // Explicitly listing other possibilities to not oversee new enum variants in the future
-                    TlsVerification::None {}
-                    | TlsVerification::Server(TlsServerVerification {
-                        ca_cert: CaCert::WebPki {},
-                    }) => {}
-                }
-            }
-
+            ldap.add_volumes_and_mounts(pb, vec![cb]);
             Ok(())
         }
         _ => AuthenticationClassProviderNotSupportedSnafu {
@@ -690,31 +651,6 @@ fn add_authentication_volumes_and_volume_mounts(
         }
         .fail(),
     }
-}
-
-fn build_secret_operator_volume(
-    volume_name: &str,
-    secret_class_name: &str,
-    scope: Option<&SecretClassVolumeScope>,
-) -> Volume {
-    let mut secret_operator_volume_source_builder =
-        SecretOperatorVolumeSourceBuilder::new(secret_class_name);
-
-    if let Some(scope) = scope {
-        if scope.pod {
-            secret_operator_volume_source_builder.with_pod_scope();
-        }
-        if scope.node {
-            secret_operator_volume_source_builder.with_node_scope();
-        }
-        for service in &scope.services {
-            secret_operator_volume_source_builder.with_service_scope(service);
-        }
-    }
-
-    VolumeBuilder::new(volume_name)
-        .ephemeral(secret_operator_volume_source_builder.build())
-        .build()
 }
 
 pub fn error_policy(_obj: Arc<SupersetCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
