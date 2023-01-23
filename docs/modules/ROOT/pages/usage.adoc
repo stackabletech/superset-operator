@@ -9,7 +9,7 @@ The default setting is to manually set up users via the Webinterface.
 
 === LDAP
 
-Superset supports xref:nightly@home:concepts:authentication.adoc[authentication] of users against an LDAP server. This requires setting up an xref:nightly@home:concepts:authentication.adoc#authenticationclass[AuthenticationClass] for the LDAP server.
+Superset supports xref:home:concepts:authentication.adoc[authentication] of users against an LDAP server. This requires setting up an xref:home:concepts:authentication.adoc#authenticationclass[AuthenticationClass] for the LDAP server.
 The AuthenticationClass is then referenced in the SupersetCluster resource as follows:
 
 [source,yaml]
@@ -33,7 +33,7 @@ spec:
 
 Users that log in with LDAP are assigned to a default https://superset.apache.org/docs/security/#roles[Role] which is specified with the `userRegistrationRole` property.
 
-You can follow the xref:nightly@home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:nightly@home:reference:authenticationclass.adoc[] reference.
+You can follow the xref:home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:home:reference:authenticationclass.adoc[] reference.
 
 == Authorization
 Superset has a concept called `Roles` which allows you to grant user permissions based on roles.
@@ -199,7 +199,7 @@ The Superset operator currently does not support using https://kubernetes.io/doc
 // The "nightly" version is needed because the "include" directive searches for
 // files in the "stable" version by default.
 // TODO: remove the "nightly" version after the next platform release (current: 22.09)
-include::nightly@home:concepts:stackable_resource_requests.adoc[]
+include::home:concepts:stackable_resource_requests.adoc[]
 
 If no resource requests are configured explicitly, the Superset operator uses the following defaults:
 

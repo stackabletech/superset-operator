@@ -6,7 +6,7 @@ metadata:
 spec:
   image:
     productVersion: 1.5.1
-    stackableVersion: 3.0.0
+    stackableVersion: 23.1.0
   credentialsSecret: simple-superset-credentials
   loadExamplesOnInit: true
   nodes:
