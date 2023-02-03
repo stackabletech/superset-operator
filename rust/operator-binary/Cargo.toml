@@ -13,7 +13,7 @@ anyhow = "1.0"
 clap = "4.0"
 fnv = "1.0"
 futures = { version = "0.3", features = ["compat"] }
-indoc = "1.0"
+indoc = "2.0"
 serde = "1.0"
 snafu = "0.7"
 stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.31.0" }
