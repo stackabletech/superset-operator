@@ -9,10 +9,10 @@ Superset metadata (slices, connections, tables, dashboards etc.) is stored in an
 For testing purposes, you can spin up a PostgreSQL database with the following commands:
 
 [source,bash]
-include::example$code/getting_started.sh[tag=add-bitnami-repo]
+include::example$getting_started/getting_started.sh[tag=add-bitnami-repo]
 
 [source,bash]
-include::example$code/getting_started.sh[tag=install-bitnami-psql]
+include::example$getting_started/getting_started.sh[tag=install-bitnami-psql]
 
 == Secret with Superset credentials
 
