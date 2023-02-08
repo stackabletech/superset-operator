@@ -69,9 +69,9 @@ kubectl apply -f superset.yaml
 
 echo "Waiting on SupersetDB ..."
 # tag::wait-supersetdb[]
-kubectl wait supersetdb/simple-superset \
+time kubectl wait supersetdb/simple-superset \
   --for jsonpath='{.status.condition}'=Ready \
-  --timeout 300s
+  --timeout 600s
 # end::wait-supersetdb[]
 
 sleep 5
