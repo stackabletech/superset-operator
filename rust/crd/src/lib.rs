@@ -282,6 +282,7 @@ pub struct SupersetConfig {
     /// Corresponds to SUPERSET_WEBSERVER_TIMEOUT
     pub webserver_timeout: Option<u32>,
     /// CPU and memory limits for Superset pods
+    #[fragment_attrs(serde(default))]
     pub resources: Resources<SupersetStorageConfig, NoRuntimeLimits>,
 }
 

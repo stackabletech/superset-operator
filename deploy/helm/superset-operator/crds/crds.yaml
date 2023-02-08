@@ -110,6 +110,14 @@ spec:
                       default: {}
                       properties:
                         resources:
+                          default:
+                            memory:
+                              limit: null
+                              runtimeLimits: {}
+                            cpu:
+                              min: null
+                              max: null
+                            storage: {}
                           properties:
                             cpu:
                               default:
@@ -146,8 +154,6 @@ spec:
                           minimum: 0.0
                           nullable: true
                           type: integer
-                      required:
-                        - resources
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -173,6 +179,14 @@ spec:
                             default: {}
                             properties:
                               resources:
+                                default:
+                                  memory:
+                                    limit: null
+                                    runtimeLimits: {}
+                                  cpu:
+                                    min: null
+                                    max: null
+                                  storage: {}
                                 properties:
                                   cpu:
                                     default:
@@ -209,8 +223,6 @@ spec:
                                 minimum: 0.0
                                 nullable: true
                                 type: integer
-                            required:
-                              - resources
                             type: object
                           configOverrides:
                             additionalProperties:
