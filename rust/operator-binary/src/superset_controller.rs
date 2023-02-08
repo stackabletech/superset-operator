@@ -155,8 +155,8 @@ pub enum Error {
     MissingSupersetConfigInNodeConfig,
     #[snafu(display("failed to get {timeout} from {SUPERSET_CONFIG_FILENAME} file. It should be set in the product config or by user input", timeout = SupersetConfigOptions::SupersetWebserverTimeout))]
     MissingWebServerTimeoutInSupersetConfig,
-    #[snafu(display("failed to resolve and merge resource config for role and role group"))]
-    FailedToResolveResourceConfig {
+    #[snafu(display("failed to resolve and merge config for role and role group"))]
+    FailedToResolveConfig {
         source: stackable_superset_crd::Error,
     },
 }
@@ -281,9 +281,9 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     for (rolegroup_name, rolegroup_config) in role_node_config.iter() {
         let rolegroup = superset.node_rolegroup_ref(rolegroup_name);
 
-        let resources = superset
-            .resolve_resource_config_for_role_and_rolegroup(&SupersetRole::Node, &rolegroup)
-            .context(FailedToResolveResourceConfigSnafu)?;
+        let config = superset
+            .merged_config(&SupersetRole::Node, &rolegroup)
+            .context(FailedToResolveConfigSnafu)?;
 
         let rg_service =
             build_node_rolegroup_service(&superset, &resolved_product_image, &rolegroup)?;
@@ -300,7 +300,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             &rolegroup,
             rolegroup_config,
             authentication_class.as_ref(),
-            &resources,
+            &config.resources,
         )?;
         cluster_resources
             .add(client, &rg_service)
