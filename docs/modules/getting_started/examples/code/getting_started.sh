@@ -79,6 +79,9 @@ sleep 5
 echo "Wainting on superset StatefulSet ..."
 kubectl rollout status --watch statefulset/simple-superset-node-default
 
+# wait a bit for the port to open
+sleep 10
+
 echo "Starting port-forwarding of port 8088"
 # tag::port-forwarding[]
 kubectl port-forward service/simple-superset-external 8088 2>&1 >/dev/null &
