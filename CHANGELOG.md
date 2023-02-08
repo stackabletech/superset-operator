@@ -4,6 +4,15 @@
 
 ### Changed
 
+- `operator-rs` `0.31.0` -> `0.34.0` ([#322]).
+- Bumped stackable image versions to "23.4.0-rc1" ([#322]).
+
+[#322]: https://github.com/stackabletech/superset-operator/pull/322
+
+## [23.1.0] - 2023-01-23
+
+### Changed
+
 - `operator-rs` `0.27.1` -> `0.31.0` ([#306], [#297], [#311])
 - Fixed the RoleGroup `selector`. It was not used before. ([#306])
 - Updated stackable image versions ([#295]).
