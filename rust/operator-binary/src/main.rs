@@ -1,5 +1,7 @@
 mod config;
+mod controller_commons;
 mod druid_connection_controller;
+mod product_logging;
 mod superset_controller;
 mod superset_db_controller;
 mod util;

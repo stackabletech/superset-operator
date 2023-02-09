@@ -14,6 +14,7 @@ use stackable_operator::{
     kube::{runtime::reflector::ObjectRef, CustomResource},
     product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
     product_config_utils::{ConfigError, Configuration},
+    product_logging::{self, spec::Logging},
     role_utils::{Role, RoleGroupRef},
     schemars::{self, JsonSchema},
 };
@@ -21,9 +22,12 @@ use std::{collections::BTreeMap, num::ParseIntError};
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub const APP_NAME: &str = "superset";
-
+pub const CONFIG_DIR: &str = "/stackable/config";
+pub const LOG_CONFIG_DIR: &str = "/stackable/log_config";
+pub const LOG_DIR: &str = "/stackable/log";
 pub const PYTHONPATH: &str = "/stackable/app/pythonpath";
 pub const SUPERSET_CONFIG_FILENAME: &str = "superset_config.py";
+pub const LOG_VOLUME_SIZE_IN_MIB: u32 = 10;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -44,6 +48,7 @@ pub enum SupersetConfigOptions {
     RowLimit,
     MapboxApiKey,
     SupersetWebserverTimeout,
+    LoggingConfigurator,
     AuthType,
     AuthUserRegistration,
     AuthUserRegistrationRole,
@@ -89,6 +94,7 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::RowLimit => PythonType::IntLiteral,
             SupersetConfigOptions::MapboxApiKey => PythonType::Expression,
             SupersetConfigOptions::SupersetWebserverTimeout => PythonType::IntLiteral,
+            SupersetConfigOptions::LoggingConfigurator => PythonType::Expression,
             SupersetConfigOptions::AuthType => PythonType::Expression,
             SupersetConfigOptions::AuthUserRegistration => PythonType::BoolLiteral,
             SupersetConfigOptions::AuthUserRegistrationRole => PythonType::StringLiteral,
@@ -136,6 +142,10 @@ pub struct SupersetClusterSpec {
     pub stopped: Option<bool>,
     /// The Superset image to use
     pub image: ProductImage,
+    /// Name of the Vector aggregator discovery ConfigMap.
+    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vector_aggregator_config_map_name: Option<String>,
     pub credentials_secret: String,
     pub mapbox_secret: Option<String>,
     #[serde(default)]
@@ -258,6 +268,26 @@ pub enum SupersetRole {
 )]
 pub struct SupersetStorageConfig {}
 
+#[derive(
+    Clone,
+    Debug,
+    Deserialize,
+    Display,
+    Eq,
+    EnumIter,
+    JsonSchema,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+)]
+#[serde(rename_all = "kebab-case")]
+#[strum(serialize_all = "kebab-case")]
+pub enum Container {
+    Superset,
+    Vector,
+}
+
 #[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
 #[fragment_attrs(
     derive(
@@ -284,6 +314,8 @@ pub struct SupersetConfig {
     /// CPU and memory limits for Superset pods
     #[fragment_attrs(serde(default))]
     pub resources: Resources<SupersetStorageConfig, NoRuntimeLimits>,
+    #[fragment_attrs(serde(default))]
+    pub logging: Logging<Container>,
 }
 
 impl SupersetConfig {
@@ -303,6 +335,7 @@ impl SupersetConfig {
                 },
                 storage: SupersetStorageConfigFragment {},
             },
+            logging: product_logging::spec::default_logging(),
             ..Default::default()
         }
     }
