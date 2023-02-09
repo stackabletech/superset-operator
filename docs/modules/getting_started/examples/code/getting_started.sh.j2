@@ -84,7 +84,7 @@ sleep 10
 
 echo "Starting port-forwarding of port 8088"
 # tag::port-forwarding[]
-kubectl port-forward service/simple-superset-external 8088 2>&1 >/dev/null &
+kubectl port-forward service/simple-superset-external 8088 > /dev/null 2>&1 &
 # end::port-forwarding[]
 PORT_FORWARD_PID=$!
 trap "kill $PORT_FORWARD_PID" EXIT
