@@ -154,6 +154,8 @@ pub struct SupersetClusterSpec {
     pub authentication_config: Option<SupersetClusterAuthenticationConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nodes: Option<Role<SupersetConfigFragment>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub database_initialization: Option<supersetdb::SupersetDbConfigFragment>,
     /// Specify the type of the created kubernetes service.
     /// This attribute will be removed in a future release when listener-operator is finished.
     /// Use with caution.

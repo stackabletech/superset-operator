@@ -1,24 +1,38 @@
-use crate::util::{get_job_state, JobState};
+use crate::{
+    config::{self, PYTHON_IMPORTS},
+    controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
+    product_logging::{
+        extend_config_map_with_log_config, resolve_vector_aggregator_address, LOG_CONFIG_FILE,
+    },
+    superset_controller::DOCKER_IMAGE_BASE_NAME,
+    util::{get_job_state, JobState},
+};
 
-use crate::superset_controller::DOCKER_IMAGE_BASE_NAME;
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
-    builder::{ContainerBuilder, ObjectMetaBuilder},
+    builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder},
+    commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
-        core::v1::{PodSpec, PodTemplateSpec, Secret},
+        core::v1::{ConfigMap, PodSpec, PodTemplateSpec, Secret},
     },
     kube::{
         runtime::{controller::Action, reflector::ObjectRef},
         ResourceExt,
     },
     logging::controller::ReconcilerError,
+    product_config::flask_app_config_writer::{self, FlaskAppConfigWriterError},
+    product_logging::{self, spec::Logging},
+    role_utils::RoleGroupRef,
 };
 use stackable_superset_crd::{
-    supersetdb::{SupersetDB, SupersetDBStatus, SupersetDBStatusCondition},
-    PYTHONPATH, SUPERSET_CONFIG_FILENAME,
+    supersetdb::{
+        Container, SupersetDB, SupersetDBStatus, SupersetDBStatusCondition, SupersetDbConfig,
+    },
+    SupersetConfigOptions, CONFIG_DIR, LOG_CONFIG_DIR, LOG_DIR, PYTHONPATH,
+    SUPERSET_CONFIG_FILENAME,
 };
+use std::collections::BTreeMap;
 use std::{sync::Arc, time::Duration};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -56,6 +70,35 @@ pub enum Error {
     SecretCheck {
         source: stackable_operator::error::Error,
         secret: ObjectRef<Secret>,
+    },
+    #[snafu(display("failed to build Superset config"))]
+    BuildSupersetConfig { source: FlaskAppConfigWriterError },
+    #[snafu(display("failed to build ConfigMap [{name}]"))]
+    BuildConfigMap {
+        name: String,
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to patch ConfigMap [{name}]"))]
+    ApplyConfigMap {
+        name: String,
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to resolve and merge config"))]
+    FailedToResolveConfig {
+        source: stackable_superset_crd::supersetdb::Error,
+    },
+    #[snafu(display("invalid container name"))]
+    InvalidContainerName {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to resolve the Vector aggregator address"))]
+    ResolveVectorAggregatorAddress {
+        source: crate::product_logging::Error,
+    },
+    #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
+    InvalidLoggingConfig {
+        source: crate::product_logging::Error,
+        cm_name: String,
     },
 }
 
@@ -96,7 +139,39 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
                     })?
                     .is_some();
                 if secret_exists {
-                    let job = build_init_job(&superset_db, &resolved_product_image)?;
+                    let vector_aggregator_address = resolve_vector_aggregator_address(
+                        client,
+                        superset_db.as_ref(),
+                        superset_db
+                            .spec
+                            .vector_aggregator_config_map_name
+                            .as_deref(),
+                    )
+                    .await
+                    .context(ResolveVectorAggregatorAddressSnafu)?;
+
+                    let config = superset_db
+                        .merged_config()
+                        .context(FailedToResolveConfigSnafu)?;
+
+                    let config_map = build_config_map(
+                        &superset_db,
+                        &config.logging,
+                        vector_aggregator_address.as_deref(),
+                    )?;
+                    client
+                        .apply_patch(SUPERSET_DB_CONTROLLER_NAME, &config_map, &config_map)
+                        .await
+                        .context(ApplyConfigMapSnafu {
+                            name: config_map.name_any(),
+                        })?;
+
+                    let job = build_init_job(
+                        &superset_db,
+                        &resolved_product_image,
+                        &config,
+                        &config_map.name_unchecked(),
+                    )?;
                     client
                         .apply_patch(SUPERSET_DB_CONTROLLER_NAME, &job, &job)
                         .await
@@ -160,17 +235,13 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
 fn build_init_job(
     superset_db: &SupersetDB,
     resolved_product_image: &ResolvedProductImage,
+    config: &SupersetDbConfig,
+    config_map_name: &str,
 ) -> Result<Job> {
-    let config = [
-        "import os",
-        "SECRET_KEY = os.environ.get('SECRET_KEY')",
-        "SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI')",
-    ]
-    .join("; ");
-
     let mut commands = vec![
         format!("mkdir -p {PYTHONPATH}"),
-        format!("echo \"{config}\" > {PYTHONPATH}/{SUPERSET_CONFIG_FILENAME}"),
+        format!("cp {CONFIG_DIR}/* {PYTHONPATH}"),
+        format!("cp {LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH}"),
         String::from(
             "superset fab create-admin \
                     --username \"$ADMIN_USERNAME\" \
@@ -185,12 +256,16 @@ fn build_init_job(
     if superset_db.spec.load_examples {
         commands.push(String::from("superset load_examples"));
     }
+    commands.push(product_logging::framework::shutdown_vector_command(LOG_DIR));
 
     let secret = &superset_db.spec.credentials_secret;
 
-    let container = ContainerBuilder::new("superset-init-db")
-        .expect("ContainerBuilder not created")
-        .image_from_product_image(resolved_product_image)
+    let mut containers = Vec::new();
+
+    let mut cb = ContainerBuilder::new(&Container::SupersetInitDb.to_string())
+        .context(InvalidContainerNameSnafu)?;
+
+    cb.image_from_product_image(resolved_product_image)
         .command(vec!["/bin/bash".to_string()])
         .args(vec![
             String::from("-euo"),
@@ -199,13 +274,35 @@ fn build_init_job(
             commands.join("; "),
         ])
         .add_env_var_from_secret("SECRET_KEY", secret, "connections.secretKey")
-        .add_env_var_from_secret("DATABASE_URI", secret, "connections.sqlalchemyDatabaseUri")
+        .add_env_var_from_secret(
+            "SQLALCHEMY_DATABASE_URI",
+            secret,
+            "connections.sqlalchemyDatabaseUri",
+        )
         .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
         .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
         .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
         .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
         .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
-        .build();
+        .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_DIR)
+        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
+        .add_volume_mount(LOG_VOLUME_NAME, LOG_DIR);
+
+    containers.push(cb.build());
+
+    if config.logging.enable_vector_agent {
+        containers.push(product_logging::framework::vector_container(
+            resolved_product_image,
+            CONFIG_VOLUME_NAME,
+            LOG_VOLUME_NAME,
+            config.logging.containers.get(&Container::Vector),
+        ));
+    }
+
+    let volumes = controller_commons::create_volumes(
+        config_map_name,
+        config.logging.containers.get(&Container::SupersetInitDb),
+    );
 
     let pod = PodTemplateSpec {
         metadata: Some(
@@ -214,9 +311,10 @@ fn build_init_job(
                 .build(),
         ),
         spec: Some(PodSpec {
-            containers: vec![container],
+            containers,
             image_pull_secrets: resolved_product_image.pull_secrets.clone(),
             restart_policy: Some("Never".to_string()),
+            volumes: Some(volumes),
             ..Default::default()
         }),
     };
@@ -236,6 +334,61 @@ fn build_init_job(
     };
 
     Ok(job)
+}
+
+fn build_config_map(
+    superset_db: &SupersetDB,
+    logging: &Logging<Container>,
+    vector_aggregator_address: Option<&str>,
+) -> Result<ConfigMap> {
+    let mut config = BTreeMap::new();
+    config::add_superset_config(&mut config, None, None);
+
+    let mut config_file = Vec::new();
+    flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
+        &mut config_file,
+        config.iter(),
+        PYTHON_IMPORTS,
+    )
+    .context(BuildSupersetConfigSnafu)?;
+
+    let mut cm_builder = ConfigMapBuilder::new();
+
+    let cm_name = format!("{cluster}-init-db", cluster = superset_db.name_unchecked());
+
+    cm_builder
+        .metadata(
+            ObjectMetaBuilder::new()
+                .name(&cm_name)
+                .namespace_opt(superset_db.namespace())
+                .ownerreference_from_resource(superset_db, None, Some(true))
+                .context(ObjectMissingMetadataForOwnerRefSnafu)?
+                .build(),
+        )
+        .add_data(
+            SUPERSET_CONFIG_FILENAME,
+            String::from_utf8(config_file).unwrap(),
+        );
+
+    extend_config_map_with_log_config(
+        &RoleGroupRef {
+            cluster: ObjectRef::from_obj(superset_db),
+            role: String::new(),
+            role_group: String::new(),
+        },
+        vector_aggregator_address,
+        logging,
+        &Container::SupersetInitDb,
+        &Container::Vector,
+        &mut cm_builder,
+    )
+    .context(InvalidLoggingConfigSnafu {
+        cm_name: cm_name.to_owned(),
+    })?;
+
+    cm_builder
+        .build()
+        .context(BuildConfigMapSnafu { name: cm_name })
 }
 
 pub fn error_policy(_obj: Arc<SupersetDB>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
