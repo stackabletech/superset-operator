@@ -66,10 +66,10 @@ pub enum SupersetConfigOptions {
 }
 
 impl SupersetConfigOptions {
-    /// Mapping from `SupersetConfigOptions` to the values set in `SupersetConfig`.
+    /// Mapping from `SupersetConfigOptions` to the values set in `SupersetConfigFragment`.
     /// `None` is returned if either the according option is not set or is not exposed in the
     /// `SupersetConfig`.
-    fn config_type_to_string(&self, superset_config: &SupersetConfig) -> Option<String> {
+    fn config_type_to_string(&self, superset_config: &SupersetConfigFragment) -> Option<String> {
         match self {
             SupersetConfigOptions::RowLimit => superset_config.row_limit.map(|v| v.to_string()),
             SupersetConfigOptions::SupersetWebserverTimeout => {
@@ -143,7 +143,7 @@ pub struct SupersetClusterSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authentication_config: Option<SupersetClusterAuthenticationConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub nodes: Option<Role<SupersetConfig>>,
+    pub nodes: Option<Role<SupersetConfigFragment>>,
     /// Specify the type of the created kubernetes service.
     /// This attribute will be removed in a future release when listener-operator is finished.
     /// Use with caution.
@@ -258,8 +258,20 @@ pub enum SupersetRole {
 )]
 pub struct SupersetStorageConfig {}
 
-#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+#[fragment_attrs(
+    derive(
+        Clone,
+        Debug,
+        Default,
+        Deserialize,
+        Merge,
+        JsonSchema,
+        PartialEq,
+        Serialize
+    ),
+    serde(rename_all = "camelCase")
+)]
 pub struct SupersetConfig {
     /// Row limit when requesting chart data.
     /// Corresponds to ROW_LIMIT
@@ -270,29 +282,33 @@ pub struct SupersetConfig {
     /// Corresponds to SUPERSET_WEBSERVER_TIMEOUT
     pub webserver_timeout: Option<u32>,
     /// CPU and memory limits for Superset pods
-    pub resources: Option<ResourcesFragment<SupersetStorageConfig, NoRuntimeLimits>>,
+    #[fragment_attrs(serde(default))]
+    pub resources: Resources<SupersetStorageConfig, NoRuntimeLimits>,
 }
 
 impl SupersetConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
     pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
 
-    fn default_resources() -> ResourcesFragment<SupersetStorageConfig, NoRuntimeLimits> {
-        ResourcesFragment {
-            cpu: CpuLimitsFragment {
-                min: Some(Quantity("200m".to_owned())),
-                max: Some(Quantity("4".to_owned())),
+    fn default_config() -> SupersetConfigFragment {
+        SupersetConfigFragment {
+            resources: ResourcesFragment {
+                cpu: CpuLimitsFragment {
+                    min: Some(Quantity("200m".to_owned())),
+                    max: Some(Quantity("4".to_owned())),
+                },
+                memory: MemoryLimitsFragment {
+                    limit: Some(Quantity("2Gi".to_owned())),
+                    runtime_limits: NoRuntimeLimitsFragment {},
+                },
+                storage: SupersetStorageConfigFragment {},
             },
-            memory: MemoryLimitsFragment {
-                limit: Some(Quantity("2Gi".to_owned())),
-                runtime_limits: NoRuntimeLimitsFragment {},
-            },
-            storage: SupersetStorageConfigFragment {},
+            ..Default::default()
         }
     }
 }
 
-impl Configuration for SupersetConfig {
+impl Configuration for SupersetConfigFragment {
     type Configurable = SupersetCluster;
 
     fn compute_env(
@@ -302,11 +318,14 @@ impl Configuration for SupersetConfig {
     ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
         let mut result = BTreeMap::new();
         result.insert(
-            Self::CREDENTIALS_SECRET_PROPERTY.to_string(),
+            SupersetConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
             Some(cluster.spec.credentials_secret.clone()),
         );
         if let Some(msec) = &cluster.spec.mapbox_secret {
-            result.insert(Self::MAPBOX_SECRET_PROPERTY.to_string(), Some(msec.clone()));
+            result.insert(
+                SupersetConfig::MAPBOX_SECRET_PROPERTY.to_string(),
+                Some(msec.clone()),
+            );
         }
 
         Ok(result)
@@ -363,13 +382,13 @@ impl SupersetCluster {
     }
 
     /// Retrieve and merge resource configs for role and role groups
-    pub fn resolve_resource_config_for_role_and_rolegroup(
+    pub fn merged_config(
         &self,
         role: &SupersetRole,
         rolegroup_ref: &RoleGroupRef<SupersetCluster>,
-    ) -> Result<Resources<SupersetStorageConfig, NoRuntimeLimits>, Error> {
+    ) -> Result<SupersetConfig, Error> {
         // Initialize the result with all default values as baseline
-        let conf_defaults = SupersetConfig::default_resources();
+        let conf_defaults = SupersetConfig::default_config();
 
         let role = match role {
             SupersetRole::Node => self.spec.nodes.as_ref().context(UnknownSupersetRoleSnafu {
@@ -379,14 +398,13 @@ impl SupersetCluster {
         };
 
         // Retrieve role resource config
-        let mut conf_role: ResourcesFragment<SupersetStorageConfig, NoRuntimeLimits> =
-            role.config.config.resources.clone().unwrap_or_default();
+        let mut conf_role = role.config.config.to_owned();
 
         // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup: ResourcesFragment<SupersetStorageConfig, NoRuntimeLimits> = role
+        let mut conf_rolegroup = role
             .role_groups
             .get(&rolegroup_ref.role_group)
-            .and_then(|rg| rg.config.config.resources.clone())
+            .map(|rg| rg.config.config.clone())
             .unwrap_or_default();
 
         // Merge more specific configs into default config
@@ -397,7 +415,7 @@ impl SupersetCluster {
         conf_role.merge(&conf_defaults);
         conf_rolegroup.merge(&conf_role);
 
-        tracing::debug!("Merged resource config: {:?}", conf_rolegroup);
+        tracing::debug!("Merged config: {:?}", conf_rolegroup);
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 }
