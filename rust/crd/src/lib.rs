@@ -18,7 +18,7 @@ use stackable_operator::{
     role_utils::{Role, RoleGroupRef},
     schemars::{self, JsonSchema},
 };
-use std::{collections::BTreeMap, num::ParseIntError};
+use std::collections::BTreeMap;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub const APP_NAME: &str = "superset";
@@ -31,8 +31,6 @@ pub const LOG_VOLUME_SIZE_IN_MIB: u32 = 10;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
-    #[snafu(display("invalid int config value"))]
-    InvalidIntConfigValue { source: ParseIntError },
     #[snafu(display("unknown Superset role found {role}. Should be one of {roles:?}"))]
     UnknownSupersetRole { role: String, roles: Vec<String> },
     #[snafu(display("fragment validation failure"))]
