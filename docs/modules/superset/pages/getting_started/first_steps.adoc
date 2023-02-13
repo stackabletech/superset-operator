@@ -1,6 +1,6 @@
 = First steps
 
-Once you have followed the steps in  xref:installation.adoc[] for the Operator and its dependencies, you will now go through the steps to set up and connect to a Superset instance.
+Once you have followed the steps in  xref:getting_started/installation.adoc[] for the Operator and its dependencies, you will now go through the steps to set up and connect to a Superset instance.
 
 == Database for the Superset metadata
 
@@ -9,22 +9,22 @@ Superset metadata (slices, connections, tables, dashboards etc.) is stored in an
 For testing purposes, you can spin up a PostgreSQL database with the following commands:
 
 [source,bash]
-include::example$code/getting_started.sh[tag=add-bitnami-repo]
+include::example$getting_started/getting_started.sh[tag=add-bitnami-repo]
 
 [source,bash]
-include::example$code/getting_started.sh[tag=install-bitnami-psql]
+include::example$getting_started/getting_started.sh[tag=install-bitnami-psql]
 
 == Secret with Superset credentials
 
 A secret with the necessary credentials must be created: this contains database connection credentials as well as an admin account for Superset itself. Create a file called `superset-credentials.yaml`:
 
 [source,yaml]
-include::example$code/superset-credentials.yaml[]
+include::example$getting_started/superset-credentials.yaml[]
 
 And apply it:
 
 [source,bash]
-include::example$code/getting_started.sh[tag=apply-superset-credentials]
+include::example$getting_started/getting_started.sh[tag=apply-superset-credentials]
 
 The `connections.secretKey` will be used for securely signing the session cookies and can be used
 for any other security related needs by extensions. It should be a long random string of bytes.
@@ -40,12 +40,12 @@ Please note that the admin user will be disabled if you use a non-default authen
 A Superset node must be created as a custom resource, create file called `superset.yaml`:
 
 [source,yaml]
-include::example$code/superset.yaml[]
+include::example$getting_started/superset.yaml[]
 
 And apply it:
 
 [source,bash]
-include::example$code/getting_started.sh[tag=apply-superset-cluster]
+include::example$getting_started/getting_started.sh[tag=apply-superset-cluster]
 
 
 `metadata.name` contains the name of the Superset cluster.
@@ -80,7 +80,7 @@ A Kubernetes job is created which starts a pod to initialize the database. This 
 You can use kubectl to wait on the resource:
 
 [source,bash]
-include::example$code/getting_started.sh[tag=wait-supersetdb]
+include::example$getting_started/getting_started.sh[tag=wait-supersetdb]
 
 == Using Superset
 
@@ -90,20 +90,20 @@ browser.
 The Superset port which defaults to `8088` can be forwarded to the local host:
 
 [source,bash]
-include::example$code/getting_started.sh[tag=port-forwarding]
+include::example$getting_started/getting_started.sh[tag=port-forwarding]
 
 Then it can be opened in the browser with `http://localhost:8088`.
 
 Enter the admin credentials from the Kubernetes secret:
 
-image::superset-login.png[Login screen of Superset]
+image::getting_started/superset-login.png[Login screen of Superset]
 
 If the examples were loaded then some dashboards are already available:
 
-image::superset-dashboard.png[Superset dashboard showing birth names]
+image::getting_started/superset-dashboard.png[Superset dashboard showing birth names]
 
 Great! You have set up a Superset instance and connected to it!
 
 == What's next
 
-Look at the xref:ROOT:usage.adoc[Usage page] to find out more about configuring your Superset instance or have a look at the Superset documentation to link:https://superset.apache.org/docs/creating-charts-dashboards/creating-your-first-dashboard[create your first dashboard].
+Look at the xref:usage.adoc[Usage page] to find out more about configuring your Superset instance or have a look at the Superset documentation to link:https://superset.apache.org/docs/creating-charts-dashboards/creating-your-first-dashboard[create your first dashboard].
