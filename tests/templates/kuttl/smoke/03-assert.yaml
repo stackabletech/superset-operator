@@ -2,7 +2,13 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
-  name: login
+  name: install-test-container
 timeout: 300
-commands:
-  - script: kubectl exec -n $NAMESPACE python-0 -- python /tmp/login.py
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: python
+status:
+  readyReplicas: 1
+  replicas: 1

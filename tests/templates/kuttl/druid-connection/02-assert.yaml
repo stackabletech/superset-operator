@@ -2,12 +2,13 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
-  name: install-druid-connection
+  name: install-superset
 timeout: 300
 ---
-apiVersion: superset.stackable.tech/v1alpha1
-kind: DruidConnection
+apiVersion: apps/v1
+kind: StatefulSet
 metadata:
-  name: superset-druid-connection
+  name: superset-node-default
 status:
-  condition: Pending
+  readyReplicas: 1
+  replicas: 1
