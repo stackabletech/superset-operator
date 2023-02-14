@@ -1,7 +1,3 @@
-name: superset
+---
+name: home
 version: "nightly"
-title: Stackable Operator for Apache Superset
-nav:
-  - modules/getting_started/nav.adoc
-  - modules/ROOT/nav.adoc
-prerelease: true
