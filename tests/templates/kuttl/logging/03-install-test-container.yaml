@@ -1,0 +1,28 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-test-container
+timeout: 300
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-superset-python
+  labels:
+    app: test-superset-python
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-superset-python
+  template:
+    metadata:
+      labels:
+        app: test-superset-python
+    spec:
+      containers:
+        - name: test-superset-python
+          image: docker.stackable.tech/stackable/testing-tools:0.1.0-stackable0.1.0
+          stdin: true
+          tty: true

@@ -12,6 +12,7 @@ pub const PYTHON_IMPORTS: &[&str] = &[
     "import os",
     "from superset.stats_logger import StatsdStatsLogger",
     "from flask_appbuilder.security.manager import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_OID, AUTH_REMOTE_USER)",
+    "from log_config import StackableLoggingConfigurator",
     ];
 
 pub fn add_superset_config(
@@ -34,6 +35,10 @@ pub fn add_superset_config(
     config.insert(
         SupersetConfigOptions::MapboxApiKey.to_string(),
         "os.environ.get('MAPBOX_API_KEY', '')".into(),
+    );
+    config.insert(
+        SupersetConfigOptions::LoggingConfigurator.to_string(),
+        "StackableLoggingConfigurator()".into(),
     );
 
     if let (Some(authentication_config), Some(authentication_class)) =

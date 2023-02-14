@@ -2,14 +2,13 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
-  name: install-openldap
-timeout: 300
+  name: test-superset-postgresql
+timeout: 480
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: openldap
-  namespace: default
+  name: superset-postgresql
 status:
   readyReplicas: 1
   replicas: 1

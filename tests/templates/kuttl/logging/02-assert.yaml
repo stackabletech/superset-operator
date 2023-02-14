@@ -8,7 +8,15 @@ timeout: 300
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: superset-node-default
+  name: superset-node-automatic-log-config
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: superset-node-custom-log-config
 status:
   readyReplicas: 1
   replicas: 1

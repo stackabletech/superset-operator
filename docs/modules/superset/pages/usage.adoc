@@ -21,7 +21,7 @@ metadata:
 spec:
   image:
     productVersion: 1.5.1
-    stackableVersion: 23.4.0-rc1
+    stackableVersion: 23.4.0-rc2
   [...]
   authenticationConfig:
     authenticationClass: ldap    # <1>
@@ -100,6 +100,27 @@ image::superset-databases.png[Superset databases showing the connected Druid clu
 
 The managed Superset instances are automatically configured to export Prometheus metrics. See
 xref:home:operators:monitoring.adoc[] for more details.
+
+== Log aggregation
+
+The logs can be forwarded to a Vector log aggregator by providing a discovery
+ConfigMap for the aggregator and by enabling the log agent:
+
+[source,yaml]
+----
+spec:
+  vectorAggregatorConfigMapName: vector-aggregator-discovery
+  nodes:
+    config:
+      logging:
+        enableVectorAgent: true
+  databaseInitialization:
+    logging:
+      enableVectorAgent: true
+----
+
+Further information on how to configure logging, can be found in
+xref:home:concepts:logging.adoc[].
 
 == Configuration & Environment Overrides
 

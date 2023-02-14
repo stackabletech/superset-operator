@@ -2,12 +2,12 @@
 dimensions:
   - name: superset
     values:
-      - 1.3.2-stackable23.4.0-rc1
-      - 1.4.1-stackable23.4.0-rc1
-      - 1.5.1-stackable23.4.0-rc1
+      - 1.3.2-stackable23.4.0-rc2
+      - 1.4.1-stackable23.4.0-rc2
+      - 1.5.1-stackable23.4.0-rc2
   - name: superset-latest
     values:
-      - 1.5.1-stackable23.4.0-rc1
+      - 1.5.1-stackable23.4.0-rc2
   - name: ldap-authentication
     values:
       - no-tls
@@ -27,3 +27,6 @@ tests:
   - name: resources
     dimensions:
       - superset-latest
+  - name: logging
+    dimensions:
+      - superset

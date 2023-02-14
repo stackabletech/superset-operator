@@ -1,0 +1,112 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-superset
+timeout: 300
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-credentials
+type: Opaque
+stringData:
+  adminUser.username: admin
+  adminUser.firstname: Superset
+  adminUser.lastname: Admin
+  adminUser.email: admin@superset.com
+  adminUser.password: admin
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql/superset
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: superset-log-config
+data:
+  log_config.py: |
+    import flask.config
+    import logging
+    import os
+    from superset.utils.logging_configurator import LoggingConfigurator
+    from pythonjsonlogger import jsonlogger
+
+    os.makedirs('/stackable/log/superset', exist_ok=True)
+
+    class StackableLoggingConfigurator(LoggingConfigurator):
+        def configure_logging(self, app_config: flask.config.Config, debug_mode: bool):
+            logFormat = '%(asctime)s %(levelname)s %(name)s %(message)s'
+
+            jsonFormatter = jsonlogger.JsonFormatter(logFormat)
+
+            fileHandler = logging.FileHandler('/stackable/log/superset/superset.py.json')
+            fileHandler.setLevel(logging.INFO)
+            fileHandler.setFormatter(jsonFormatter)
+
+            rootLogger = logging.getLogger()
+            rootLogger.setLevel(logging.INFO)
+            rootLogger.addHandler(fileHandler)
+---
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: superset
+spec:
+  image:
+    productVersion: "{{ test_scenario['values']['superset'].split('-stackable')[0] }}"
+    stackableVersion: "{{ test_scenario['values']['superset'].split('-stackable')[1] }}"
+  vectorAggregatorConfigMapName: superset-vector-aggregator-discovery
+  credentialsSecret: superset-credentials
+  nodes:
+    roleGroups:
+      automatic-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              superset:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+              vector:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+      custom-log-config:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
+            containers:
+              superset:
+                custom:
+                  configMap: superset-log-config
+  databaseInitialization:
+    logging:
+      enableVectorAgent: true
+      containers:
+        superset-init-db:
+          console:
+            level: INFO
+          file:
+            level: INFO
+          loggers:
+            ROOT:
+              level: INFO
+        vector:
+          console:
+            level: INFO
+          file:
+            level: INFO
+          loggers:
+            ROOT:
+              level: INFO

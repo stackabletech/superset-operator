@@ -256,8 +256,7 @@ async fn get_sqlalchemy_uri_for_druid_cluster(
 /// Returns a yaml document read to be imported with "superset import-datasources"
 fn build_druid_db_yaml(druid_cluster_name: &str, sqlalchemy_str: &str) -> Result<String> {
     Ok(format!(
-        "databases:\n- database_name: {}\n  sqlalchemy_uri: {}\n  tables: []\n",
-        druid_cluster_name, sqlalchemy_str
+        "databases:\n- database_name: {druid_cluster_name}\n  sqlalchemy_uri: {sqlalchemy_str}\n  tables: []\n"
     ))
 }
 
@@ -277,7 +276,7 @@ async fn build_import_job(
     ));
 
     let druid_info = build_druid_db_yaml(&druid_connection.spec.druid.name, sqlalchemy_str)?;
-    commands.push(format!("echo \"{}\" > /tmp/druids.yaml", druid_info));
+    commands.push(format!("echo \"{druid_info}\" > /tmp/druids.yaml"));
     commands.push(String::from(
         "superset import_datasources -p /tmp/druids.yaml",
     ));

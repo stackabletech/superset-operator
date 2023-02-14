@@ -3,6 +3,10 @@
 use crate::util::build_recommended_labels;
 use crate::{
     config::{self, PYTHON_IMPORTS},
+    controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
+    product_logging::{
+        extend_config_map_with_log_config, resolve_vector_aggregator_address, LOG_CONFIG_FILE,
+    },
     APP_PORT, OPERATOR_NAME,
 };
 
@@ -12,17 +16,11 @@ use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     cluster_resources::ClusterResources,
-    commons::{
-        authentication::{AuthenticationClass, AuthenticationClassProvider},
-        resources::{NoRuntimeLimits, Resources},
-    },
+    commons::authentication::{AuthenticationClass, AuthenticationClassProvider},
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{
-                ConfigMap, ConfigMapVolumeSource, PodSecurityContext, Service, ServicePort,
-                ServiceSpec, Volume,
-            },
+            core::v1::{ConfigMap, PodSecurityContext, Service, ServicePort, ServiceSpec},
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
@@ -38,12 +36,13 @@ use stackable_operator::{
         ProductConfigManager,
     },
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
+    product_logging::{self, spec::Logging},
     role_utils::RoleGroupRef,
 };
 use stackable_superset_crd::{
     supersetdb::{SupersetDB, SupersetDBStatusCondition},
-    SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole, SupersetStorageConfig,
-    APP_NAME, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
+    Container, SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole, APP_NAME,
+    CONFIG_DIR, LOG_CONFIG_DIR, LOG_DIR, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
 use std::{
     borrow::Cow,
@@ -75,6 +74,10 @@ pub enum Error {
     NoNodeRole,
     #[snafu(display("failed to calculate global service name"))]
     GlobalServiceNameNotFound,
+    #[snafu(display("invalid container name"))]
+    InvalidContainerName {
+        source: stackable_operator::error::Error,
+    },
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
         source: stackable_operator::error::Error,
@@ -159,6 +162,15 @@ pub enum Error {
     FailedToResolveConfig {
         source: stackable_superset_crd::Error,
     },
+    #[snafu(display("failed to resolve the Vector aggregator address"))]
+    ResolveVectorAggregatorAddress {
+        source: crate::product_logging::Error,
+    },
+    #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
+    InvalidLoggingConfig {
+        source: crate::product_logging::Error,
+        cm_name: String,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -215,6 +227,14 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         debug!("Waiting for SupersetDBStatus to be reported, not starting Superset yet");
         return Ok(Action::await_change());
     }
+
+    let vector_aggregator_address = resolve_vector_aggregator_address(
+        client,
+        superset.as_ref(),
+        superset.spec.vector_aggregator_config_map_name.as_deref(),
+    )
+    .await
+    .context(ResolveVectorAggregatorAddressSnafu)?;
 
     let validated_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
@@ -293,6 +313,8 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             &rolegroup,
             rolegroup_config,
             authentication_class.as_ref(),
+            &config.logging,
+            vector_aggregator_address.as_deref(),
         )?;
         let rg_statefulset = build_server_rolegroup_statefulset(
             &superset,
@@ -300,7 +322,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             &rolegroup,
             rolegroup_config,
             authentication_class.as_ref(),
-            &config.resources,
+            &config,
         )?;
         cluster_resources
             .add(client, &rg_service)
@@ -383,6 +405,8 @@ fn build_rolegroup_config_map(
     rolegroup: &RoleGroupRef<SupersetCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
+    logging: &Logging<Container>,
+    vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
     let mut config = rolegroup_config
         .get(&PropertyNameKind::File(
@@ -407,7 +431,9 @@ fn build_rolegroup_config_map(
         rolegroup: rolegroup.clone(),
     })?;
 
-    ConfigMapBuilder::new()
+    let mut cm_builder = ConfigMapBuilder::new();
+
+    cm_builder
         .metadata(
             ObjectMetaBuilder::new()
                 .name_and_namespace(superset)
@@ -426,7 +452,21 @@ fn build_rolegroup_config_map(
         .add_data(
             SUPERSET_CONFIG_FILENAME,
             String::from_utf8(config_file).unwrap(),
-        )
+        );
+
+    extend_config_map_with_log_config(
+        rolegroup,
+        vector_aggregator_address,
+        logging,
+        &Container::Superset,
+        &Container::Vector,
+        &mut cm_builder,
+    )
+    .context(InvalidLoggingConfigSnafu {
+        cm_name: rolegroup.object_name(),
+    })?;
+
+    cm_builder
         .build()
         .with_context(|_| BuildRoleGroupConfigSnafu {
             rolegroup: rolegroup.clone(),
@@ -494,7 +534,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
-    resources: &Resources<SupersetStorageConfig, NoRuntimeLimits>,
+    config: &SupersetConfig,
 ) -> Result<StatefulSet> {
     let rolegroup = superset
         .spec
@@ -504,7 +544,8 @@ fn build_server_rolegroup_statefulset(
         .role_groups
         .get(&rolegroup_ref.role_group);
 
-    let mut cb = ContainerBuilder::new("superset").expect("ContainerBuilder not created");
+    let mut cb = ContainerBuilder::new(&Container::Superset.to_string())
+        .context(InvalidContainerNameSnafu)?;
     let mut pb = PodBuilder::new();
 
     for (name, value) in node_config
@@ -541,11 +582,16 @@ fn build_server_rolegroup_statefulset(
     let container = cb
         .image_from_product_image(resolved_product_image)
         .add_container_port("http", APP_PORT.into())
-        .add_volume_mount("config", PYTHONPATH)
+        .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_DIR)
+        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
+        .add_volume_mount(LOG_VOLUME_NAME, LOG_DIR)
         .command(vec![
             "/bin/sh".to_string(),
             "-c".to_string(),
             formatdoc! {"
+                mkdir --parents {PYTHONPATH} && \
+                cp {CONFIG_DIR}/* {PYTHONPATH} && \
+                cp {LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH} && \
                 superset init && \
                 gunicorn \
                 --bind 0.0.0.0:${{SUPERSET_PORT}} \
@@ -557,15 +603,33 @@ fn build_server_rolegroup_statefulset(
                 'superset.app:create_app()'
             "},
         ])
-        .resources(resources.clone().into())
+        .resources(config.resources.clone().into())
         .build();
     let metrics_container = ContainerBuilder::new("metrics")
-        .expect("ContainerBuilder not created")
+        .context(InvalidContainerNameSnafu)?
         .image_from_product_image(resolved_product_image)
         .command(vec!["/bin/bash".to_string(), "-c".to_string()])
         .args(vec!["/stackable/statsd_exporter".to_string()])
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
         .build();
+
+    let volumes = controller_commons::create_volumes(
+        &rolegroup_ref.object_name(),
+        config.logging.containers.get(&Container::Superset),
+    );
+
+    pb.add_container(container);
+    pb.add_container(metrics_container);
+
+    if config.logging.enable_vector_agent {
+        pb.add_container(product_logging::framework::vector_container(
+            resolved_product_image,
+            CONFIG_VOLUME_NAME,
+            LOG_VOLUME_NAME,
+            config.logging.containers.get(&Container::Vector),
+        ));
+    }
+
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(superset)
@@ -609,17 +673,8 @@ fn build_server_rolegroup_statefulset(
                     ))
                 })
                 .image_pull_secrets_from_product_image(resolved_product_image)
-                .add_container(container)
-                .add_container(metrics_container)
                 .node_selector_opt(rolegroup.and_then(|rg| rg.selector.clone()))
-                .add_volume(Volume {
-                    name: "config".to_string(),
-                    config_map: Some(ConfigMapVolumeSource {
-                        name: Some(rolegroup_ref.object_name()),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                })
+                .add_volumes(volumes)
                 .security_context(PodSecurityContext {
                     run_as_user: Some(1000),
                     run_as_group: Some(1000),

@@ -22,6 +22,9 @@ spec:
               cpu: "1"
               memory: 1Gi
         - name: metrics
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+        - name: vector
+{% endif %}
 status:
   readyReplicas: 1
   replicas: 1
@@ -43,6 +46,9 @@ spec:
               cpu: "3"
               memory: 3Gi
         - name: metrics
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+        - name: vector
+{% endif %}
 status:
   readyReplicas: 1
   replicas: 1
