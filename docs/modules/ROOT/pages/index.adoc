@@ -1,0 +1,3 @@
+= Stackable Operator for Apache Superset
+
+The docs can now be found at: xref:home:superset:index.adoc[]
