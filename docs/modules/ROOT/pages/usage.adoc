@@ -9,8 +9,8 @@ The default setting is to manually set up users via the Webinterface.
 
 === LDAP
 Superset supports authentication of users against an LDAP server.
-Have a look at https://github.com/stackabletech/superset-operator/blob/main/examples/superset-with-ldap.yaml[the LDAP example] and the general xref:commons-operator::authenticationclass.adoc[Stackable Authentication] documentation on how to set it up.
-In general, it requires you to specify a xref:commons-operator::authenticationclass.adoc[`AuthenticationClass`] which is used to authenticate the users. In this example we assign all the users the `Admin` role once they log into Superset.
+Have a look at https://github.com/stackabletech/superset-operator/blob/main/examples/superset-with-ldap.yaml[the LDAP example] and the general xref:0.4@commons-operator::authenticationclass.adoc[Stackable Authentication] documentation on how to set it up.
+In general, it requires you to specify a xref:0.4@commons-operator::authenticationclass.adoc[`AuthenticationClass`] which is used to authenticate the users. In this example we assign all the users the `Admin` role once they log into Superset.
 
 [source,yaml]
 ----
