@@ -8,7 +8,7 @@ There are 2 ways to run Stackable Operators
 
 1. Using xref:stackablectl::index.adoc[]
 
-1. Using Helm
+2. Using Helm
 
 === stackablectl
 
