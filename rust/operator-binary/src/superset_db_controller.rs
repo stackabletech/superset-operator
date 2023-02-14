@@ -27,7 +27,7 @@ use stackable_operator::{
 };
 use stackable_superset_crd::{
     supersetdb::{
-        Container, SupersetDB, SupersetDBStatus, SupersetDBStatusCondition, SupersetDbConfig,
+        InitDbContainer, SupersetDB, SupersetDBStatus, SupersetDBStatusCondition, SupersetDbConfig,
     },
     SupersetConfigOptions, CONFIG_DIR, LOG_CONFIG_DIR, LOG_DIR, PYTHONPATH,
     SUPERSET_CONFIG_FILENAME,
@@ -262,7 +262,7 @@ fn build_init_job(
 
     let mut containers = Vec::new();
 
-    let mut cb = ContainerBuilder::new(&Container::SupersetInitDb.to_string())
+    let mut cb = ContainerBuilder::new(&InitDbContainer::SupersetInitDb.to_string())
         .context(InvalidContainerNameSnafu)?;
 
     cb.image_from_product_image(resolved_product_image)
@@ -295,13 +295,16 @@ fn build_init_job(
             resolved_product_image,
             CONFIG_VOLUME_NAME,
             LOG_VOLUME_NAME,
-            config.logging.containers.get(&Container::Vector),
+            config.logging.containers.get(&InitDbContainer::Vector),
         ));
     }
 
     let volumes = controller_commons::create_volumes(
         config_map_name,
-        config.logging.containers.get(&Container::SupersetInitDb),
+        config
+            .logging
+            .containers
+            .get(&InitDbContainer::SupersetInitDb),
     );
 
     let pod = PodTemplateSpec {
@@ -338,7 +341,7 @@ fn build_init_job(
 
 fn build_config_map(
     superset_db: &SupersetDB,
-    logging: &Logging<Container>,
+    logging: &Logging<InitDbContainer>,
     vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap> {
     let mut config = BTreeMap::new();
@@ -378,8 +381,8 @@ fn build_config_map(
         },
         vector_aggregator_address,
         logging,
-        &Container::SupersetInitDb,
-        &Container::Vector,
+        &InitDbContainer::SupersetInitDb,
+        &InitDbContainer::Vector,
         &mut cm_builder,
     )
     .context(InvalidLoggingConfigSnafu {

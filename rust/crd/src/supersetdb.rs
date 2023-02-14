@@ -40,7 +40,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 )]
 #[serde(rename_all = "kebab-case")]
 #[strum(serialize_all = "kebab-case")]
-pub enum Container {
+pub enum InitDbContainer {
     SupersetInitDb,
     Vector,
 }
@@ -61,7 +61,7 @@ pub enum Container {
 )]
 pub struct SupersetDbConfig {
     #[fragment_attrs(serde(default))]
-    pub logging: Logging<Container>,
+    pub logging: Logging<InitDbContainer>,
 }
 
 impl SupersetDbConfig {
