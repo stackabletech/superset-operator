@@ -5,6 +5,7 @@
 ### Added
 
 - Log aggregation added ([#326]).
+- Deploy default and support custom affinities ([#337]).
 
 ### Changed
 
@@ -15,6 +16,7 @@
 [#322]: https://github.com/stackabletech/superset-operator/pull/322
 [#323]: https://github.com/stackabletech/superset-operator/pull/323
 [#326]: https://github.com/stackabletech/superset-operator/pull/326
+[#337]: https://github.com/stackabletech/superset-operator/pull/337
 
 ## [23.1.0] - 2023-01-23
 

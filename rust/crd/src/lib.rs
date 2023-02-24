@@ -1,9 +1,14 @@
+pub mod affinity;
 pub mod druidconnection;
 pub mod supersetdb;
 
+use affinity::get_affinity;
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::commons::affinity::StackableAffinity;
 use stackable_operator::commons::product_image_selection::ProductImage;
+use stackable_operator::kube::ResourceExt;
+use stackable_operator::role_utils::RoleGroup;
 use stackable_operator::{
     commons::resources::{
         CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
@@ -316,13 +321,15 @@ pub struct SupersetConfig {
     pub resources: Resources<SupersetStorageConfig, NoRuntimeLimits>,
     #[fragment_attrs(serde(default))]
     pub logging: Logging<Container>,
+    #[fragment_attrs(serde(default))]
+    pub affinity: StackableAffinity,
 }
 
 impl SupersetConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
     pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
 
-    fn default_config() -> SupersetConfigFragment {
+    fn default_config(cluster_name: &str, role: &SupersetRole) -> SupersetConfigFragment {
         SupersetConfigFragment {
             resources: ResourcesFragment {
                 cpu: CpuLimitsFragment {
@@ -336,6 +343,7 @@ impl SupersetConfig {
                 storage: SupersetStorageConfigFragment {},
             },
             logging: product_logging::spec::default_logging(),
+            affinity: get_affinity(cluster_name, role),
             ..Default::default()
         }
     }
@@ -421,7 +429,7 @@ impl SupersetCluster {
         rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     ) -> Result<SupersetConfig, Error> {
         // Initialize the result with all default values as baseline
-        let conf_defaults = SupersetConfig::default_config();
+        let conf_defaults = SupersetConfig::default_config(&self.name_any(), role);
 
         let role = match role {
             SupersetRole::Node => self.spec.nodes.as_ref().context(UnknownSupersetRoleSnafu {
@@ -439,6 +447,17 @@ impl SupersetCluster {
             .get(&rolegroup_ref.role_group)
             .map(|rg| rg.config.config.clone())
             .unwrap_or_default();
+
+        if let Some(RoleGroup {
+            selector: Some(selector),
+            ..
+        }) = role.role_groups.get(&rolegroup_ref.role_group)
+        {
+            // Migrate old `selector` attribute, see ADR 26 affinities.
+            // TODO Can be removed after support for the old `selector` field is dropped.
+            #[allow(deprecated)]
+            conf_rolegroup.affinity.add_legacy_selector(selector);
+        }
 
         // Merge more specific configs into default config
         // Hierarchy is:
