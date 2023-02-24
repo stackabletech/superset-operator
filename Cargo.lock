@@ -1772,8 +1772,8 @@ dependencies = [
 
 [[package]]
 name = "stackable-operator"
-version = "0.35.0"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=0.35.0#707b043fceef300416cec2172be18a3e7a45a0e2"
+version = "0.36.0"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=0.36.0#e7796ee75dcba3904646e2b7a3ed2029b88651d6"
 dependencies = [
  "chrono",
  "clap",
@@ -1806,8 +1806,8 @@ dependencies = [
 
 [[package]]
 name = "stackable-operator-derive"
-version = "0.35.0"
-source = "git+https://github.com/stackabletech/operator-rs.git?tag=0.35.0#707b043fceef300416cec2172be18a3e7a45a0e2"
+version = "0.36.0"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=0.36.0#e7796ee75dcba3904646e2b7a3ed2029b88651d6"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1821,6 +1821,7 @@ version = "0.0.0-dev"
 dependencies = [
  "serde",
  "serde_json",
+ "serde_yaml 0.9.17",
  "snafu",
  "stackable-operator",
  "strum",

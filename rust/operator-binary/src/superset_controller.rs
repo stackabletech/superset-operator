@@ -534,7 +534,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
-    config: &SupersetConfig,
+    merged_config: &SupersetConfig,
 ) -> Result<StatefulSet> {
     let rolegroup = superset
         .spec
@@ -603,7 +603,7 @@ fn build_server_rolegroup_statefulset(
                 'superset.app:create_app()'
             "},
         ])
-        .resources(config.resources.clone().into())
+        .resources(merged_config.resources.clone().into())
         .build();
     let metrics_container = ContainerBuilder::new("metrics")
         .context(InvalidContainerNameSnafu)?
@@ -615,18 +615,18 @@ fn build_server_rolegroup_statefulset(
 
     let volumes = controller_commons::create_volumes(
         &rolegroup_ref.object_name(),
-        config.logging.containers.get(&Container::Superset),
+        merged_config.logging.containers.get(&Container::Superset),
     );
 
     pb.add_container(container);
     pb.add_container(metrics_container);
 
-    if config.logging.enable_vector_agent {
+    if merged_config.logging.enable_vector_agent {
         pb.add_container(product_logging::framework::vector_container(
             resolved_product_image,
             CONFIG_VOLUME_NAME,
             LOG_VOLUME_NAME,
-            config.logging.containers.get(&Container::Vector),
+            merged_config.logging.containers.get(&Container::Vector),
         ));
     }
 
@@ -673,7 +673,6 @@ fn build_server_rolegroup_statefulset(
                     ))
                 })
                 .image_pull_secrets_from_product_image(resolved_product_image)
-                .node_selector_opt(rolegroup.and_then(|rg| rg.selector.clone()))
                 .add_volumes(volumes)
                 .security_context(PodSecurityContext {
                     run_as_user: Some(1000),
@@ -681,6 +680,7 @@ fn build_server_rolegroup_statefulset(
                     fs_group: Some(1000),
                     ..PodSecurityContext::default()
                 })
+                .affinity(&merged_config.affinity)
                 .build_template(),
             ..StatefulSetSpec::default()
         }),
