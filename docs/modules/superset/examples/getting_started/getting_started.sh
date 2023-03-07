@@ -24,18 +24,18 @@ helm repo add stackable-dev https://repo.stackable.tech/repository/helm-dev/
 # end::helm-add-repo[]
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
-helm install --wait commons-operator stackable-dev/commons-operator --version 0.5.0-nightly
-helm install --wait secret-operator stackable-dev/secret-operator --version 0.7.0-nightly
-helm install --wait superset-operator stackable-dev/superset-operator --version 0.8.0-nightly
+helm install --wait commons-operator stackable-dev/commons-operator --version 0.0.0-dev
+helm install --wait secret-operator stackable-dev/secret-operator --version 0.0.0-dev
+helm install --wait superset-operator stackable-dev/superset-operator --version 0.0.0-dev
 # end::helm-install-operators[]
 ;;
 "stackablectl")
 echo "installing Operators with stackablectl"
 # tag::stackablectl-install-operators[]
 stackablectl operator install \
-  commons=0.5.0-nightly \
-  secret=0.7.0-nightly \
-  superset=0.8.0-nightly
+  commons=0.0.0-dev \
+  secret=0.0.0-dev \
+  superset=0.0.0-dev
 # end::stackablectl-install-operators[]
 ;;
 *)
@@ -67,6 +67,8 @@ echo "Creating Superset cluster"
 kubectl apply -f superset.yaml
 # end::apply-superset-cluster[]
 
+sleep 5
+
 echo "Waiting on SupersetDB ..."
 # tag::wait-supersetdb[]
 time kubectl wait supersetdb/simple-superset \
@@ -74,10 +76,18 @@ time kubectl wait supersetdb/simple-superset \
   --timeout 600s
 # end::wait-supersetdb[]
 
-sleep 5
+for (( i=1; i<=15; i++ ))
+do
+  echo "Waiting for DruidCluster to appear ..."
+  if eval kubectl get statefulset simple-superset-node-default; then
+    break
+  fi
+
+  sleep 1
+done
 
 echo "Wainting on superset StatefulSet ..."
-kubectl rollout status --watch statefulset/simple-superset-node-default
+kubectl rollout status --watch statefulset/simple-superset-node-default --timeout 300s
 
 # wait a bit for the port to open
 sleep 10
