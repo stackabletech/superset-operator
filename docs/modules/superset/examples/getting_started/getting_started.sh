@@ -80,7 +80,7 @@ time kubectl wait supersetdb/simple-superset \
 
 for (( i=1; i<=15; i++ ))
 do
-  echo "Waiting for DruidCluster to appear ..."
+  echo "Waiting for SupersetCluster to appear ..."
   if eval kubectl get statefulset simple-superset-node-default; then
     break
   fi
