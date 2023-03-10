@@ -22,6 +22,8 @@ echo "Adding '{{ helm.repo_name }}' Helm Chart repository"
 # tag::helm-add-repo[]
 helm repo add {{ helm.repo_name }} {{ helm.repo_url }}
 # end::helm-add-repo[]
+echo "Updating Helm repo"
+helm repo update
 echo "Installing Operators with Helm"
 # tag::helm-install-operators[]
 helm install --wait commons-operator {{ helm.repo_name }}/commons-operator --version {{ versions.commons }}
@@ -67,6 +69,8 @@ echo "Creating Superset cluster"
 kubectl apply -f superset.yaml
 # end::apply-superset-cluster[]
 
+sleep 5
+
 echo "Waiting on SupersetDB ..."
 # tag::wait-supersetdb[]
 time kubectl wait supersetdb/simple-superset \
@@ -74,10 +78,18 @@ time kubectl wait supersetdb/simple-superset \
   --timeout 600s
 # end::wait-supersetdb[]
 
-sleep 5
+for (( i=1; i<=15; i++ ))
+do
+  echo "Waiting for SupersetCluster to appear ..."
+  if eval kubectl get statefulset simple-superset-node-default; then
+    break
+  fi
+
+  sleep 1
+done
 
 echo "Wainting on superset StatefulSet ..."
-kubectl rollout status --watch statefulset/simple-superset-node-default
+kubectl rollout status --watch statefulset/simple-superset-node-default --timeout 300s
 
 # wait a bit for the port to open
 sleep 10
