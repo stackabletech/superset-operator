@@ -1,9 +1,5 @@
 = Storage and resource configuration
 
-== Storage for data volumes
-
-The Superset operator currently does not support using https://kubernetes.io/docs/concepts/storage/persistent-volumes[PersistentVolumeClaims] for internal storage.
-
 == Resource Requests
 
 include::concepts:stackable_resource_requests.adoc[]

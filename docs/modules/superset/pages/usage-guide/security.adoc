@@ -1,6 +1,6 @@
 = Security
 
-== Authentication
+== [[authentication]]Authentication
 Every user has to authenticate themselves before using Superset.
 There are multiple options to set up the authentication of users.
 
@@ -35,7 +35,7 @@ Users that log in with LDAP are assigned to a default https://superset.apache.or
 
 You can follow the xref:nightly@home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:nightly@home:reference:authenticationclass.adoc[] reference.
 
-== Authorization
+== [[authorization]]Authorization
 Superset has a concept called `Roles` which allows you to grant user permissions based on roles.
 Have a look at the https://superset.apache.org/docs/security[Superset documentation on Security].
 
