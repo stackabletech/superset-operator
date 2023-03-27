@@ -1,0 +1,33 @@
+= Connecting Apache Druid clusters
+
+The operator can automatically connect Superset to Apache Druid clusters managed by the https://docs.stackable.tech/druid/index.html[Stackable Druid Cluster].
+
+To do so, create a _DruidConnection_ resource:
+
+[source,yaml]
+----
+apiVersion: superset.stackable.tech/v1alpha1
+kind: DruidConnection
+metadata:
+  name: superset-druid-connection
+spec:
+  superset:
+    name: superset
+    namespace: default
+  druid:
+    name: my-druid-cluster
+    namespace: default
+
+----
+
+The `name` and `namespace` in `spec.superset` refer to the Superset cluster that you want to connect. Following our example above, the name is `superset`.
+
+In `spec.druid` you specify the `name` and `namespace` of your Druid cluster.
+
+The `namespace` part is optional; if it is omitted it will default to the namespace of the DruidConnection.
+
+The namespace for the Superset and Druid cluster can be omitted, in that case the Operator will assume that they are in the same namespace as the DruidConnection.
+
+Once the database is initialized, the connection will be added to the cluster by the operator. You can see it in the user interface under Data > Databases:
+
+image::superset-databases.png[Superset databases showing the connected Druid cluster]
