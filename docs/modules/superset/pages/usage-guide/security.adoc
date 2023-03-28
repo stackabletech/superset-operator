@@ -39,7 +39,6 @@ Superset has a concept called `Roles` which allows you to grant user permissions
 Have a look at the https://superset.apache.org/docs/security[Superset documentation on Security].
 
 === Webinterface
-You can see all the available roles in the Webinterface of Superset.
 You can view all the available roles in the Webinterface of Superset and can also assign users to these roles.
 
 === LDAP
