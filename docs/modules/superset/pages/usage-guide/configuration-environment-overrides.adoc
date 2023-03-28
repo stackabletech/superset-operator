@@ -54,7 +54,7 @@ nodes:
 ----
 
 All override property values must be strings. They are treated as Python expressions. So care must
-be taken to not produce an invalid configuration.
+be taken to produce a valid configuration.
 
 For a full list of configuration options we refer to the
 https://github.com/apache/superset/blob/master/superset/config.py[main config file for Superset].
