@@ -28,7 +28,7 @@ spec:
 ----
 
 <1> The reference to an AuthenticationClass called `ldap`
-<2> The default role that all users are assigned to
+<2> The default role to which all users are assigned
 
 Users that log in with LDAP are assigned to a default https://superset.apache.org/docs/security/#roles[Role] which is specified with the `userRegistrationRole` property.
 
