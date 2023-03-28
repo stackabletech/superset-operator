@@ -12,11 +12,13 @@
 - `operator-rs` `0.31.0` -> `0.35.0` ([#322], [#326]).
 - Bumped stackable image versions to "23.4.0-rc2" ([#322], [#326]).
 - Fragmented `SupersetConfig` ([#323]).
+- Restructured documentation ([#344]).
 
 [#322]: https://github.com/stackabletech/superset-operator/pull/322
 [#323]: https://github.com/stackabletech/superset-operator/pull/323
 [#326]: https://github.com/stackabletech/superset-operator/pull/326
 [#337]: https://github.com/stackabletech/superset-operator/pull/337
+[#344]: https://github.com/stackabletech/superset-operator/pull/344
 
 ## [23.1.0] - 2023-01-23
 
