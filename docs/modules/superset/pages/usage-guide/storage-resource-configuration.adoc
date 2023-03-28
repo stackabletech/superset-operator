@@ -1,0 +1,23 @@
+= Storage and resource configuration
+
+== Resource Requests
+
+include::concepts:stackable_resource_requests.adoc[]
+
+If no resource requests are configured explicitly, the Superset operator uses the following defaults:
+
+[source,yaml]
+----
+nodes:
+  roleGroups:
+    default:
+      config:
+        resources:
+          cpu:
+            min: '200m'
+            max: "4"
+          memory:
+            limit: '2Gi'
+----
+
+WARNING: The default values are _most likely_ not sufficient to run a production cluster. Please adapt according to your requirements.

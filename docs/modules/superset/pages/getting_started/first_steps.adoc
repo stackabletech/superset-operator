@@ -106,4 +106,4 @@ Great! You have set up a Superset instance and connected to it!
 
 == What's next
 
-Look at the xref:usage.adoc[Usage page] to find out more about configuring your Superset instance or have a look at the Superset documentation to link:https://superset.apache.org/docs/creating-charts-dashboards/creating-your-first-dashboard[create your first dashboard].
+Look at the xref:usage-guide/index.adoc[] to find out more about configuring your Superset instance or have a look at the Superset documentation to https://superset.apache.org/docs/creating-charts-dashboards/creating-your-first-dashboard[create your first dashboard].
