@@ -6,7 +6,7 @@ The Stackable Operator for Apache Superset is an operator that can deploy and ma
 
 == Getting started
 
-Get started using Superset with with Stackable Operator by following the xref:getting_started/index.adoc[]. It guides you through installing the Operator alongside a PostgreSQL database, connecting to your Superset instance and analyzing some preloaded example data.
+Get started using Superset with Stackable Operator by following the xref:getting_started/index.adoc[]. It guides you through installing the Operator alongside a PostgreSQL database, connecting to your Superset instance and analyzing some preloaded example data.
 
 == Resources
 
