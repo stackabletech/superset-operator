@@ -2,7 +2,6 @@
 
 == [[authentication]]Authentication
 Every user has to be authenticated before using Superset: there are several ways in which this can be set up.
-There are multiple options to set up the authentication of users.
 
 === Webinterface
 The default setting is to manually set up users via the Webinterface.
