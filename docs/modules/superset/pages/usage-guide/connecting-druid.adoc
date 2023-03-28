@@ -26,7 +26,7 @@ In `spec.druid` you specify the `name` and `namespace` of your Druid cluster.
 
 The `namespace` part is optional; if it is omitted it will default to the namespace of the DruidConnection.
 
-The namespace for the Superset and Druid cluster can be omitted, in that case the Operator will assume that they are in the same namespace as the DruidConnection.
+The namespace for both the Superset and Druid clusters can be omitted, in which case the Operator will assume that they are in the same namespace as the DruidConnection.
 
 Once the database is initialized, the connection will be added to the cluster by the operator. You can see it in the user interface under Data > Databases:
 
