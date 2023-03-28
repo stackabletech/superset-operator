@@ -18,7 +18,7 @@ The SupersetCluster is the main resource for the configuration of the Superset i
 
 When a SupersetCluster is first deployed, a SupersetDB resource is created. The SupersetDB resource is a wrapper resource for the SQL database that is used by Superset for its metadata. The resource contains some configuration but also keeps track of whether the database has been initialized or not. It is not deleted automatically if a SupersetCluster is deleted, and so can be reused.
 
-DruidConnection resources link a Superset and Druid instance. It is a way for you to define this connection in the familiar way of deploying a resource (instead of configuring the connection via the Superset UI or API). The operator takes care of configuring the connection between the Druid in the Superset instance.
+DruidConnection resources link a Superset and Druid instance. It lets you define this connection in the familiar way of deploying a resource (instead of configuring the connection via the Superset UI or API). The operator configures the connection between Druid and the Superset instance.
 
 === Kubernetes resources
 
