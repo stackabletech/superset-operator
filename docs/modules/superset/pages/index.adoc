@@ -34,7 +34,7 @@ ConfigMaps are created, one per RoleGroup and also one for the SupersetDB. Both 
 
 == Dependencies
 
-Superset requires and SQL database to store its metadata, dashboards and users in. The Stackable platform does not have its own Operator for an SQL database but the xref:getting_started/index.adoc[] guides you through installing an example database with a Superset instance that you can use to get started.
+Superset requires an SQL database in which to store its metadata, dashboards and users. The Stackable platform does not have its own Operator for an SQL database but the xref:getting_started/index.adoc[] guides you through installing an example database with a Superset instance that you can use to get started.
 
 == Connecting to data sources
 
