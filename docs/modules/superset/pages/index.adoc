@@ -16,7 +16,7 @@ The Operator manages three https://kubernetes.io/docs/concepts/extend-kubernetes
 
 The SupersetCluster is the main resource for the configuration of the Superset instance. The resource defines only one xref:concepts:roles-and-role-groups.adoc[role], the `node`. The various configuration options are explained in the xref:usage-guide/index.adoc[]. It helps you tune your cluster to your needs by configuring xref:usage-guide/storage-resource-configuration.adoc[resource usage], xref:usage-guide/security.adoc[security], xref:usage-guide/logging.adoc[logging] and more.
 
-When a SupersetCluster is first deployed, a SupersetDB resource is created. The SupersetDB resource is a wrapper resource for the SQL database that is used by Superset for its metadata. The resource contains some configuration but also keeps track of whether the database has been initialized or not. It is not deleted automatically if a SupersetCluster is deleted, and so it can be reused.
+When a SupersetCluster is first deployed, a SupersetDB resource is created. The SupersetDB resource is a wrapper resource for the SQL database that is used by Superset for its metadata. The resource contains some configuration but also keeps track of whether the database has been initialized or not. It is not deleted automatically if a SupersetCluster is deleted, and so can be reused.
 
 DruidConnection resources link a Superset and Druid instance. It is a way for you to define this connection in the familiar way of deploying a resource (instead of configuring the connection via the Superset UI or API). The operator takes care of configuring the connection between the Druid in the Superset instance.
 
