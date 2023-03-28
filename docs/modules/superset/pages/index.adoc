@@ -50,7 +50,7 @@ The xref:stackablectl::demos/nifi-kafka-druid-earthquake-data.adoc[] and xref:st
 
 === With Trino
 
-The xref:stackablectl::demos/spark-k8s-anomaly-detection-taxi-data.adoc[], xref:stackablectl::demos/trino-taxi-data.adoc[], xref:stackablectl::demos/trino-iceberg.adoc[] and xref:stackablectl::demos/data-lakehouse-iceberg-trino-spark.adoc[] demos all uses a xref:trino:index.adoc[Trino] instance on top of S3 storage that hold data to analyze. Superset is connected to Trino to analyze a variety of different data.
+The xref:stackablectl::demos/spark-k8s-anomaly-detection-taxi-data.adoc[], xref:stackablectl::demos/trino-taxi-data.adoc[], xref:stackablectl::demos/trino-iceberg.adoc[] and xref:stackablectl::demos/data-lakehouse-iceberg-trino-spark.adoc[] demos all use a xref:trino:index.adoc[Trino] instance on top of S3 storage that hold data to analyze. Superset is connected to Trino to analyze a variety of different datasets.
 
 == Supported Versions
 
