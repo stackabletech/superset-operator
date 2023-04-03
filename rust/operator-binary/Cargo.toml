@@ -16,7 +16,7 @@ futures = { version = "0.3", features = ["compat"] }
 indoc = "1.0"
 serde = "1.0"
 snafu = "0.7"
-stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.36.0" }
+stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.39.0" }
 stackable-superset-crd = { path = "../crd" }
 strum = { version = "0.24", features = ["derive"] }
 tokio = { version = "1.25", features = ["macros", "rt-multi-thread"] }
@@ -24,5 +24,5 @@ tracing = "0.1"
 
 [build-dependencies]
 built = { version =  "0.5", features = ["chrono", "git2"] }
-stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.36.0" }
+stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "0.39.0" }
 stackable-superset-crd = { path = "../crd" }
