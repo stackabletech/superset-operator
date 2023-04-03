@@ -269,7 +269,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         OPERATOR_NAME,
         SUPERSET_CONTROLLER_NAME,
         &superset.object_ref(&()),
-        ClusterResourceApplyStrategy::Default,
+        ClusterResourceApplyStrategy::from(&superset.spec.cluster_operation),
     )
     .context(CreateClusterResourcesSnafu)?;
 
