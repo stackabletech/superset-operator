@@ -12,6 +12,7 @@ use crate::{
 
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::cluster_resources::ClusterResourceApplyStrategy;
 use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
@@ -268,12 +269,13 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         OPERATOR_NAME,
         SUPERSET_CONTROLLER_NAME,
         &superset.object_ref(&()),
+        ClusterResourceApplyStrategy::from(&superset.spec.cluster_operation),
     )
     .context(CreateClusterResourcesSnafu)?;
 
     let node_role_service = build_node_role_service(&superset, &resolved_product_image)?;
     cluster_resources
-        .add(client, &node_role_service)
+        .add(client, node_role_service)
         .await
         .context(ApplyRoleServiceSnafu)?;
 
@@ -325,19 +327,19 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             &config,
         )?;
         cluster_resources
-            .add(client, &rg_service)
+            .add(client, rg_service)
             .await
             .with_context(|_| ApplyRoleGroupServiceSnafu {
                 rolegroup: rolegroup.clone(),
             })?;
         cluster_resources
-            .add(client, &rg_configmap)
+            .add(client, rg_configmap)
             .await
             .with_context(|_| ApplyRoleGroupConfigSnafu {
                 rolegroup: rolegroup.clone(),
             })?;
         cluster_resources
-            .add(client, &rg_statefulset)
+            .add(client, rg_statefulset)
             .await
             .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
                 rolegroup: rolegroup.clone(),
