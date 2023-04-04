@@ -6,6 +6,7 @@
 
 - Log aggregation added ([#326]).
 - Deploy default and support custom affinities ([#337]).
+- Add cluster operation integration test ([#348])
 
 ### Changed
 
@@ -19,6 +20,7 @@
 [#326]: https://github.com/stackabletech/superset-operator/pull/326
 [#337]: https://github.com/stackabletech/superset-operator/pull/337
 [#344]: https://github.com/stackabletech/superset-operator/pull/344
+[#348]: https://github.com/stackabletech/superset-operator/pull/348
 
 ## [23.1.0] - 2023-01-23
 
