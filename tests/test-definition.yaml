@@ -17,6 +17,9 @@ tests:
   - name: smoke
     dimensions:
       - superset
+  - name: cluster-operation
+    dimensions:
+      - superset-latest
   - name: druid-connection
     dimensions:
       - superset
