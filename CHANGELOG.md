@@ -6,7 +6,7 @@
 
 - Log aggregation added ([#326]).
 - Deploy default and support custom affinities ([#337]).
-- Add cluster operation integration test ([#348])
+- Extend cluster resources for status and cluster operation (paused, stopped) ([#348])
 
 ### Changed
 
