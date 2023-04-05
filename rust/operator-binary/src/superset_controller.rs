@@ -15,7 +15,6 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::cluster_resources::ClusterResourceApplyStrategy;
 use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
-    status::condition::{compute_conditions, statefulset::StatefulSetConditionBuilder},
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     cluster_resources::ClusterResources,
     commons::authentication::{AuthenticationClass, AuthenticationClassProvider},
@@ -40,6 +39,10 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{self, spec::Logging},
     role_utils::RoleGroupRef,
+    status::condition::{
+        compute_conditions, operations::ClusterOperationsConditionBuilder,
+        statefulset::StatefulSetConditionBuilder,
+    },
 };
 use stackable_superset_crd::SupersetClusterStatus;
 use stackable_superset_crd::{
@@ -178,7 +181,7 @@ pub enum Error {
     ApplyStatus {
         source: stackable_operator::error::Error,
     },
- }
+}
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -360,14 +363,19 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         .await
         .context(DeleteOrphanedResourcesSnafu)?;
 
+    let cluster_operation_cond_builder =
+        ClusterOperationsConditionBuilder::new(&superset.spec.cluster_operation);
+
     let status = SupersetClusterStatus {
-        conditions: compute_conditions(superset.as_ref(), &[&ss_cond_builder])
+        conditions: compute_conditions(
+            superset.as_ref(),
+            &[&ss_cond_builder, &cluster_operation_cond_builder],
+        ),
     };
     client
         .apply_patch_status(OPERATOR_NAME, &*superset, &status)
         .await
         .context(ApplyStatusSnafu)?;
-
 
     Ok(Action::await_change())
 }

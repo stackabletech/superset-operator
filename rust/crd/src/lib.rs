@@ -10,7 +10,7 @@ use stackable_operator::commons::cluster_operation::ClusterOperation;
 use stackable_operator::commons::product_image_selection::ProductImage;
 use stackable_operator::kube::ResourceExt;
 use stackable_operator::role_utils::RoleGroup;
-use stackable_operator::status::condition::{HasStatusCondition, ClusterCondition};
+use stackable_operator::status::condition::{ClusterCondition, HasStatusCondition};
 use stackable_operator::{
     commons::resources::{
         CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
@@ -419,7 +419,6 @@ impl HasStatusCondition for SupersetCluster {
         }
     }
 }
-
 
 impl SupersetCluster {
     /// The name of the role-level load-balanced Kubernetes `Service`

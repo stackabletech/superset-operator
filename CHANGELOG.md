@@ -7,6 +7,7 @@
 - Log aggregation added ([#326]).
 - Deploy default and support custom affinities ([#337]).
 - Extend cluster resources for status and cluster operation (paused, stopped) ([#348])
+- Cluster status conditions ([#349])
 
 ### Changed
 
@@ -21,6 +22,7 @@
 [#337]: https://github.com/stackabletech/superset-operator/pull/337
 [#344]: https://github.com/stackabletech/superset-operator/pull/344
 [#348]: https://github.com/stackabletech/superset-operator/pull/348
+[#349]: https://github.com/stackabletech/superset-operator/pull/349
 
 ## [23.1.0] - 2023-01-23
 
