@@ -15,6 +15,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::cluster_resources::ClusterResourceApplyStrategy;
 use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
+    status::condition::{compute_conditions, statefulset::StatefulSetConditionBuilder},
     builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
     cluster_resources::ClusterResources,
     commons::authentication::{AuthenticationClass, AuthenticationClassProvider},
@@ -40,6 +41,7 @@ use stackable_operator::{
     product_logging::{self, spec::Logging},
     role_utils::RoleGroupRef,
 };
+use stackable_superset_crd::SupersetClusterStatus;
 use stackable_superset_crd::{
     supersetdb::{SupersetDB, SupersetDBStatusCondition},
     Container, SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole, APP_NAME,
@@ -172,7 +174,11 @@ pub enum Error {
         source: crate::product_logging::Error,
         cm_name: String,
     },
-}
+    #[snafu(display("failed to update status"))]
+    ApplyStatus {
+        source: stackable_operator::error::Error,
+    },
+ }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -300,6 +306,8 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         None => None,
     };
 
+    let mut ss_cond_builder = StatefulSetConditionBuilder::default();
+
     for (rolegroup_name, rolegroup_config) in role_node_config.iter() {
         let rolegroup = superset.node_rolegroup_ref(rolegroup_name);
 
@@ -339,17 +347,27 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
                 rolegroup: rolegroup.clone(),
             })?;
         cluster_resources
-            .add(client, rg_statefulset)
+            .add(client, rg_statefulset.clone())
             .await
             .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
                 rolegroup: rolegroup.clone(),
             })?;
+        ss_cond_builder.add(rg_statefulset);
     }
 
     cluster_resources
         .delete_orphaned_resources(client)
         .await
         .context(DeleteOrphanedResourcesSnafu)?;
+
+    let status = SupersetClusterStatus {
+        conditions: compute_conditions(superset.as_ref(), &[&ss_cond_builder])
+    };
+    client
+        .apply_patch_status(OPERATOR_NAME, &*superset, &status)
+        .await
+        .context(ApplyStatusSnafu)?;
+
 
     Ok(Action::await_change())
 }
