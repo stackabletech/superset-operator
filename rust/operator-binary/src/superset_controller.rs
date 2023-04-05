@@ -349,13 +349,14 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             .with_context(|_| ApplyRoleGroupConfigSnafu {
                 rolegroup: rolegroup.clone(),
             })?;
-        cluster_resources
-            .add(client, rg_statefulset.clone())
-            .await
-            .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
-                rolegroup: rolegroup.clone(),
-            })?;
-        ss_cond_builder.add(rg_statefulset);
+        ss_cond_builder.add(
+            cluster_resources
+                .add(client, rg_statefulset.clone())
+                .await
+                .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?,
+        );
     }
 
     cluster_resources
