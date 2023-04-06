@@ -48,6 +48,8 @@ spec:
                       type: string
                   type: object
                 clusterConfig:
+                  default:
+                    listenerClass: cluster-internal
                   description: Superset cluster configuration options.
                   properties:
                     listenerClass:
@@ -1510,7 +1512,6 @@ spec:
                   nullable: true
                   type: string
               required:
-                - clusterConfig
                 - credentialsSecret
                 - image
               type: object
