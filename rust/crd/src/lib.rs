@@ -146,6 +146,9 @@ pub struct SupersetClusterSpec {
     pub stopped: Option<bool>,
     /// The Superset image to use
     pub image: ProductImage,
+    /// Superset cluster configuration options.
+    #[serde(default)]
+    pub cluster_config: SupersetClusterConfig,
     /// Name of the Vector aggregator discovery ConfigMap.
     /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -160,27 +163,49 @@ pub struct SupersetClusterSpec {
     pub nodes: Option<Role<SupersetConfigFragment>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub database_initialization: Option<supersetdb::SupersetDbConfigFragment>,
-    /// Specify the type of the created kubernetes service.
-    /// This attribute will be removed in a future release when listener-operator is finished.
-    /// Use with caution.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub service_type: Option<ServiceType>,
     /// Cluster operations like pause reconciliation or cluster stop.
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
 }
 
-// TODO: Temporary solution until listener-operator is finished
-#[derive(Clone, Debug, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "PascalCase")]
-pub enum ServiceType {
-    NodePort,
-    ClusterIP,
+#[derive(Clone, Debug, Default, Eq, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetClusterConfig {
+    /// In the future this setting will control, which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html>
+    /// will be used to expose the service.
+    /// Currently only a subset of the ListenerClasses are supported by choosing the type of the created Services
+    /// by looking at the ListenerClass name specified,
+    /// In a future release support for custom ListenerClasses will be introduced without a breaking change:
+    ///
+    /// * cluster-internal: Use a ClusterIP service
+    ///
+    /// * external-unstable: Use a NodePort service
+    ///
+    /// * external-stable: Use a LoadBalancer service
+    #[serde(default)]
+    pub listener_class: CurrentlySupportedListenerClasses,
 }
 
-impl Default for ServiceType {
-    fn default() -> Self {
-        Self::NodePort
+// TODO: Temporary solution until listener-operator is finished
+#[derive(Clone, Debug, Default, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum CurrentlySupportedListenerClasses {
+    #[default]
+    #[serde(rename = "cluster-internal")]
+    ClusterInternal,
+    #[serde(rename = "external-unstable")]
+    ExternalUnstable,
+    #[serde(rename = "external-stable")]
+    ExternalStable,
+}
+
+impl CurrentlySupportedListenerClasses {
+    pub fn k8s_service_type(&self) -> String {
+        match self {
+            CurrentlySupportedListenerClasses::ClusterInternal => "ClusterIP".to_string(),
+            CurrentlySupportedListenerClasses::ExternalUnstable => "NodePort".to_string(),
+            CurrentlySupportedListenerClasses::ExternalStable => "LoadBalancer".to_string(),
+        }
     }
 }
 
