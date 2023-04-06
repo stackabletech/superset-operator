@@ -147,6 +147,7 @@ pub struct SupersetClusterSpec {
     /// The Superset image to use
     pub image: ProductImage,
     /// Superset cluster configuration options.
+    #[serde(default)]
     pub cluster_config: SupersetClusterConfig,
     /// Name of the Vector aggregator discovery ConfigMap.
     /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
@@ -167,7 +168,7 @@ pub struct SupersetClusterSpec {
     pub cluster_operation: ClusterOperation,
 }
 
-#[derive(Clone, Debug, Eq, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClusterConfig {
     /// In the future this setting will control, which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html>
