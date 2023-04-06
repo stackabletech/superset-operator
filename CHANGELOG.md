@@ -11,6 +11,11 @@
 
 ### Changed
 
+- [BREAKING]: Support specifying Service type by moving `serviceType` (which was an experimental feature) to `clusterConfig.listenerClass`.
+  This enables us to later switch non-breaking to using `ListenerClasses` for the exposure of Services.
+  This change is breaking, because - for security reasons - we default to the `cluster-internal` `ListenerClass`.
+  If you need your cluster to be accessible from outside of Kubernetes you need to set `clusterConfig.listenerClass`
+  to `external-unstable` or `external-stable` ([#350]).
 - `operator-rs` `0.31.0` -> `0.35.0` ([#322], [#326]).
 - Bumped stackable image versions to "23.4.0-rc2" ([#322], [#326]).
 - Fragmented `SupersetConfig` ([#323]).
@@ -23,6 +28,7 @@
 [#344]: https://github.com/stackabletech/superset-operator/pull/344
 [#348]: https://github.com/stackabletech/superset-operator/pull/348
 [#349]: https://github.com/stackabletech/superset-operator/pull/349
+[#350]: https://github.com/stackabletech/superset-operator/pull/350
 
 ## [23.1.0] - 2023-01-23
 
