@@ -751,21 +751,25 @@ async fn wait_for_db_and_update_status(
 
     tracing::debug!("{}", format!("Checking status: {:#?}", superset_db.status));
 
-    // Update the Superset cluster status.
+    // Update the Superset cluster status, only if the controller needs to wait.
+    // This avoids updating the status twice per reconcile call. when the DB
+    // has a ready condition.
     let db_cond_builder = DbConditionBuilder(superset_db.status);
-    let status = SupersetClusterStatus {
-        conditions: compute_conditions(
-            superset,
-            &[&db_cond_builder, cluster_operation_condition_builder],
-        ),
-    };
+    if bool::from(&db_cond_builder) {
+        let status = SupersetClusterStatus {
+            conditions: compute_conditions(
+                superset,
+                &[&db_cond_builder, cluster_operation_condition_builder],
+            ),
+        };
 
-    client
-        .apply_patch_status(OPERATOR_NAME, superset, &status)
-        .await
-        .context(ApplyStatusSnafu)?;
+        client
+            .apply_patch_status(OPERATOR_NAME, superset, &status)
+            .await
+            .context(ApplyStatusSnafu)?;
+    }
 
-    Ok(db_cond_builder.into())
+    Ok(bool::from(&db_cond_builder))
 }
 
 struct DbConditionBuilder(Option<SupersetDBStatus>);
@@ -808,8 +812,8 @@ impl ConditionBuilder for DbConditionBuilder {
 
 /// Evaluates to true if the DB is not ready yet (the controller needs to wait).
 /// Otherwise false.
-impl From<DbConditionBuilder> for bool {
-    fn from(cond_builder: DbConditionBuilder) -> Self {
+impl From<&DbConditionBuilder> for bool {
+    fn from(cond_builder: &DbConditionBuilder) -> bool {
         if let Some(ref status) = cond_builder.0 {
             match status.condition {
                 SupersetDBStatusCondition::Pending | SupersetDBStatusCondition::Initializing => {
