@@ -39,7 +39,14 @@ use stackable_operator::{
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{self, spec::Logging},
     role_utils::RoleGroupRef,
+    status::condition::{
+        compute_conditions, operations::ClusterOperationsConditionBuilder,
+        statefulset::StatefulSetConditionBuilder, ClusterCondition, ClusterConditionSet,
+        ClusterConditionStatus, ClusterConditionType, ConditionBuilder,
+    },
 };
+use stackable_superset_crd::supersetdb::SupersetDBStatus;
+use stackable_superset_crd::SupersetClusterStatus;
 use stackable_superset_crd::{
     supersetdb::{SupersetDB, SupersetDBStatusCondition},
     Container, SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole, APP_NAME,
@@ -52,7 +59,6 @@ use std::{
     time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
-use tracing::log::debug;
 
 pub const SUPERSET_CONTROLLER_NAME: &str = "supersetcluster";
 pub const DOCKER_IMAGE_BASE_NAME: &str = "superset";
@@ -172,6 +178,10 @@ pub enum Error {
         source: crate::product_logging::Error,
         cm_name: String,
     },
+    #[snafu(display("failed to update status"))]
+    ApplyStatus {
+        source: stackable_operator::error::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -189,43 +199,17 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     let resolved_product_image: ResolvedProductImage =
         superset.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
 
-    // Ensure DB Schema exists
-    let superset_db = SupersetDB::for_superset(&superset, &resolved_product_image)
-        .context(CreateSupersetObjectSnafu)?;
-    client
-        .apply_patch(SUPERSET_CONTROLLER_NAME, &superset_db, &superset_db)
-        .await
-        .context(ApplySupersetDBSnafu)?;
+    let cluster_operation_cond_builder =
+        ClusterOperationsConditionBuilder::new(&superset.spec.cluster_operation);
 
-    let superset_db = client
-        .get::<SupersetDB>(
-            &superset.name_unchecked(),
-            superset
-                .namespace()
-                .as_deref()
-                .context(ObjectHasNoNamespaceSnafu)?,
-        )
-        .await
-        .context(SupersetDBRetrievalSnafu)?;
-
-    if let Some(ref status) = superset_db.status {
-        match status.condition {
-            SupersetDBStatusCondition::Pending | SupersetDBStatusCondition::Initializing => {
-                debug!(
-                    "Waiting for SupersetDB initialization to complete, not starting Superset yet"
-                );
-                return Ok(Action::await_change());
-            }
-            SupersetDBStatusCondition::Failed => {
-                return SupersetDBFailedSnafu {
-                    superset_db: ObjectRef::from_obj(&superset_db),
-                }
-                .fail();
-            }
-            SupersetDBStatusCondition::Ready => (), // Continue starting Superset
-        }
-    } else {
-        debug!("Waiting for SupersetDBStatus to be reported, not starting Superset yet");
+    if wait_for_db_and_update_status(
+        client,
+        &superset,
+        &resolved_product_image,
+        &cluster_operation_cond_builder,
+    )
+    .await?
+    {
         return Ok(Action::await_change());
     }
 
@@ -300,6 +284,8 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         None => None,
     };
 
+    let mut ss_cond_builder = StatefulSetConditionBuilder::default();
+
     for (rolegroup_name, rolegroup_config) in role_node_config.iter() {
         let rolegroup = superset.node_rolegroup_ref(rolegroup_name);
 
@@ -338,18 +324,31 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             .with_context(|_| ApplyRoleGroupConfigSnafu {
                 rolegroup: rolegroup.clone(),
             })?;
-        cluster_resources
-            .add(client, rg_statefulset)
-            .await
-            .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
-                rolegroup: rolegroup.clone(),
-            })?;
+        ss_cond_builder.add(
+            cluster_resources
+                .add(client, rg_statefulset.clone())
+                .await
+                .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?,
+        );
     }
 
     cluster_resources
         .delete_orphaned_resources(client)
         .await
         .context(DeleteOrphanedResourcesSnafu)?;
+
+    let status = SupersetClusterStatus {
+        conditions: compute_conditions(
+            superset.as_ref(),
+            &[&ss_cond_builder, &cluster_operation_cond_builder],
+        ),
+    };
+    client
+        .apply_patch_status(OPERATOR_NAME, &*superset, &status)
+        .await
+        .context(ApplyStatusSnafu)?;
 
     Ok(Action::await_change())
 }
@@ -713,4 +712,118 @@ fn add_authentication_volumes_and_volume_mounts(
 
 pub fn error_policy(_obj: Arc<SupersetCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
+}
+
+/// Return true if the controller should wait for the DB to be set up.
+///
+/// As a side-effect, the Superset cluster status is updated as long as the controller waits
+/// for the DB to come up.
+///
+/// Having the DB set up by a Job managed by a different controller has it's own
+/// set of problems as described here: <https://github.com/stackabletech/superset-operator/issues/351>.
+/// The Airflow operator uses the same pattern as implemented here for setting up the DB.
+///
+/// When the ticket above is implemented, this function will most likely be removed completely.
+async fn wait_for_db_and_update_status(
+    client: &stackable_operator::client::Client,
+    superset: &SupersetCluster,
+    resolved_product_image: &ResolvedProductImage,
+    cluster_operation_condition_builder: &ClusterOperationsConditionBuilder<'_>,
+) -> Result<bool> {
+    // Ensure DB Schema exists
+    let superset_db = SupersetDB::for_superset(superset, resolved_product_image)
+        .context(CreateSupersetObjectSnafu)?;
+    client
+        .apply_patch(SUPERSET_CONTROLLER_NAME, &superset_db, &superset_db)
+        .await
+        .context(ApplySupersetDBSnafu)?;
+
+    let superset_db = client
+        .get::<SupersetDB>(
+            &superset.name_unchecked(),
+            superset
+                .namespace()
+                .as_deref()
+                .context(ObjectHasNoNamespaceSnafu)?,
+        )
+        .await
+        .context(SupersetDBRetrievalSnafu)?;
+
+    tracing::debug!("{}", format!("Checking status: {:#?}", superset_db.status));
+
+    // Update the Superset cluster status, only if the controller needs to wait.
+    // This avoids updating the status twice per reconcile call. when the DB
+    // has a ready condition.
+    let db_cond_builder = DbConditionBuilder(superset_db.status);
+    if bool::from(&db_cond_builder) {
+        let status = SupersetClusterStatus {
+            conditions: compute_conditions(
+                superset,
+                &[&db_cond_builder, cluster_operation_condition_builder],
+            ),
+        };
+
+        client
+            .apply_patch_status(OPERATOR_NAME, superset, &status)
+            .await
+            .context(ApplyStatusSnafu)?;
+    }
+
+    Ok(bool::from(&db_cond_builder))
+}
+
+struct DbConditionBuilder(Option<SupersetDBStatus>);
+impl ConditionBuilder for DbConditionBuilder {
+    fn build_conditions(&self) -> ClusterConditionSet {
+        let (status, message) = if let Some(ref status) = self.0 {
+            match status.condition {
+                SupersetDBStatusCondition::Pending | SupersetDBStatusCondition::Initializing => (
+                    ClusterConditionStatus::False,
+                    "Waiting for SupersetDB initialization to complete",
+                ),
+                SupersetDBStatusCondition::Failed => (
+                    ClusterConditionStatus::False,
+                    "Superset database initialization failed.",
+                ),
+                SupersetDBStatusCondition::Ready => (
+                    ClusterConditionStatus::True,
+                    "Superset database initialization ready.",
+                ),
+            }
+        } else {
+            (
+                ClusterConditionStatus::Unknown,
+                "Waiting for Superset database initialization to start.",
+            )
+        };
+
+        let cond = ClusterCondition {
+            reason: None,
+            message: Some(String::from(message)),
+            status,
+            type_: ClusterConditionType::Available,
+            last_transition_time: None,
+            last_update_time: None,
+        };
+
+        vec![cond].into()
+    }
+}
+
+/// Evaluates to true if the DB is not ready yet (the controller needs to wait).
+/// Otherwise false.
+impl From<&DbConditionBuilder> for bool {
+    fn from(cond_builder: &DbConditionBuilder) -> bool {
+        if let Some(ref status) = cond_builder.0 {
+            match status.condition {
+                SupersetDBStatusCondition::Pending | SupersetDBStatusCondition::Initializing => {
+                    true
+                }
+                SupersetDBStatusCondition::Failed => true,
+                SupersetDBStatusCondition::Ready => false,
+            }
+        } else {
+            true
+        }
+    }
 }

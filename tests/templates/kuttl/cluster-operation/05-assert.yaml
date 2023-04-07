@@ -4,6 +4,8 @@ kind: TestAssert
 metadata:
   name: install-superset
 timeout: 300
+commands:
+  - script: kubectl -n $NAMESPACE wait --for=condition=available=true supersetclusters.superset.stackable.tech/superset --timeout 301s
 ---
 apiVersion: apps/v1
 kind: StatefulSet

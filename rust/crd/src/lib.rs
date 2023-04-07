@@ -10,6 +10,7 @@ use stackable_operator::commons::cluster_operation::ClusterOperation;
 use stackable_operator::commons::product_image_selection::ProductImage;
 use stackable_operator::kube::ResourceExt;
 use stackable_operator::role_utils::RoleGroup;
+use stackable_operator::status::condition::{ClusterCondition, HasStatusCondition};
 use stackable_operator::{
     commons::resources::{
         CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
@@ -431,7 +432,18 @@ impl Configuration for SupersetConfigFragment {
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SupersetClusterStatus {}
+pub struct SupersetClusterStatus {
+    pub conditions: Vec<ClusterCondition>,
+}
+
+impl HasStatusCondition for SupersetCluster {
+    fn conditions(&self) -> Vec<ClusterCondition> {
+        match &self.status {
+            Some(status) => status.conditions.clone(),
+            None => vec![],
+        }
+    }
+}
 
 impl SupersetCluster {
     /// The name of the role-level load-balanced Kubernetes `Service`
