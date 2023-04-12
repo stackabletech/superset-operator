@@ -16,10 +16,11 @@
   This change is breaking, because - for security reasons - we default to the `cluster-internal` `ListenerClass`.
   If you need your cluster to be accessible from outside of Kubernetes you need to set `clusterConfig.listenerClass`
   to `external-unstable` or `external-stable` ([#350]).
-- `operator-rs` `0.31.0` -> `0.35.0` ([#322], [#326]).
+- `operator-rs` `0.31.0` -> `0.35.0` -> `0.40.2`  ([#322], [#326]). ([#xxx]).
 - Bumped stackable image versions to "23.4.0-rc2" ([#322], [#326]).
 - Fragmented `SupersetConfig` ([#323]).
 - Restructured documentation ([#344]).
+- Use build_rbac_resources from operator-rs ([#xxx])
 
 [#322]: https://github.com/stackabletech/superset-operator/pull/322
 [#323]: https://github.com/stackabletech/superset-operator/pull/323
@@ -29,6 +30,7 @@
 [#348]: https://github.com/stackabletech/superset-operator/pull/348
 [#349]: https://github.com/stackabletech/superset-operator/pull/349
 [#350]: https://github.com/stackabletech/superset-operator/pull/350
+[#xxx]: https://github.com/stackabletech/superset-operator/pull/xxx
 
 ## [23.1.0] - 2023-01-23
 
