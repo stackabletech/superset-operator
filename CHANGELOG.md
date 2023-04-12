@@ -20,7 +20,7 @@
 - Bumped stackable image versions to "23.4.0-rc2" ([#322], [#326]).
 - Fragmented `SupersetConfig` ([#323]).
 - Restructured documentation ([#344]).
-- Use build_rbac_resources from operator-rs ([#xxx])
+- Create `ServiceAccount` for Superset clusters. Use `build_rbac_resources()` from operator-rs ([#352])
 
 [#322]: https://github.com/stackabletech/superset-operator/pull/322
 [#323]: https://github.com/stackabletech/superset-operator/pull/323
@@ -30,7 +30,7 @@
 [#348]: https://github.com/stackabletech/superset-operator/pull/348
 [#349]: https://github.com/stackabletech/superset-operator/pull/349
 [#350]: https://github.com/stackabletech/superset-operator/pull/350
-[#xxx]: https://github.com/stackabletech/superset-operator/pull/xxx
+[#352]: https://github.com/stackabletech/superset-operator/pull/352
 
 ## [23.1.0] - 2023-01-23
 
