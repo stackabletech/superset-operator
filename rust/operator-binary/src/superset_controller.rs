@@ -15,7 +15,10 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::cluster_resources::ClusterResourceApplyStrategy;
 use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
-    builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
+    builder::{
+        ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
+        PodSecurityContextBuilder,
+    },
     cluster_resources::ClusterResources,
     commons::{
         authentication::{AuthenticationClass, AuthenticationClassProvider},
@@ -24,7 +27,7 @@ use stackable_operator::{
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{ConfigMap, PodSecurityContext, Service, ServicePort, ServiceSpec},
+            core::v1::{ConfigMap, Service, ServicePort, ServiceSpec},
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
@@ -709,12 +712,13 @@ fn build_server_rolegroup_statefulset(
                 })
                 .image_pull_secrets_from_product_image(resolved_product_image)
                 .add_volumes(volumes)
-                .security_context(PodSecurityContext {
-                    run_as_user: Some(1000),
-                    run_as_group: Some(1000),
-                    fs_group: Some(1000),
-                    ..PodSecurityContext::default()
-                })
+                .security_context(
+                    PodSecurityContextBuilder::new()
+                        .run_as_user(1000)
+                        .run_as_group(0)
+                        .fs_group(1000) // Needed for secret-operator
+                        .build(),
+                )
                 .affinity(&merged_config.affinity)
                 .service_account_name(sa_name)
                 .build_template(),

@@ -11,7 +11,7 @@ use crate::{
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder},
+    builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
     commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
@@ -344,6 +344,12 @@ fn build_init_job(
             restart_policy: Some("Never".to_string()),
             volumes: Some(volumes),
             service_account: Some(sa_name.to_string()),
+            security_context: Some(
+                PodSecurityContextBuilder::new()
+                    .run_as_user(1000)
+                    .run_as_group(0)
+                    .build(),
+            ),
             ..Default::default()
         }),
     };
