@@ -130,7 +130,7 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
     client
         .apply_patch(SUPERSET_DB_CONTROLLER_NAME, &rbac_sa, &rbac_sa)
         .await
-        .with_context(|_| ApplyServiceAccountSnafu)?;
+        .context(ApplyServiceAccountSnafu)?;
     client
         .apply_patch(
             SUPERSET_DB_CONTROLLER_NAME,
