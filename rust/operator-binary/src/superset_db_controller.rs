@@ -192,7 +192,7 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
                     let job = build_init_job(
                         &superset_db,
                         &resolved_product_image,
-                        &rbac_sa.name_unchecked(),
+                        &rbac_sa.name_any(),
                         &config,
                         &config_map.name_unchecked(),
                     )?;
