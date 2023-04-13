@@ -138,7 +138,7 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
             &rbac_rolebinding,
         )
         .await
-        .with_context(|_| ApplyRoleBindingSnafu)?;
+        .context(ApplyRoleBindingSnafu)?;
 
     if let Some(ref s) = superset_db.status {
         match s.condition {
