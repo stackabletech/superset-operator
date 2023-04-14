@@ -4,13 +4,14 @@ use crate::{
     product_logging::{
         extend_config_map_with_log_config, resolve_vector_aggregator_address, LOG_CONFIG_FILE,
     },
+    rbac,
     superset_controller::DOCKER_IMAGE_BASE_NAME,
     util::{get_job_state, JobState},
 };
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder},
+    builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
     commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
@@ -29,7 +30,7 @@ use stackable_superset_crd::{
     supersetdb::{
         InitDbContainer, SupersetDB, SupersetDBStatus, SupersetDBStatusCondition, SupersetDbConfig,
     },
-    SupersetConfigOptions, CONFIG_DIR, LOG_CONFIG_DIR, LOG_DIR, PYTHONPATH,
+    SupersetConfigOptions, APP_NAME, CONFIG_DIR, LOG_CONFIG_DIR, LOG_DIR, PYTHONPATH,
     SUPERSET_CONFIG_FILENAME,
 };
 use std::collections::BTreeMap;
@@ -100,6 +101,14 @@ pub enum Error {
         source: crate::product_logging::Error,
         cm_name: String,
     },
+    #[snafu(display("failed to patch service account"))]
+    ApplyServiceAccount {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to patch role binding"))]
+    ApplyRoleBinding {
+        source: stackable_operator::error::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -116,6 +125,20 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
     let client = &ctx.client;
     let resolved_product_image: ResolvedProductImage =
         superset_db.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
+
+    let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(superset_db.as_ref(), APP_NAME);
+    client
+        .apply_patch(SUPERSET_DB_CONTROLLER_NAME, &rbac_sa, &rbac_sa)
+        .await
+        .context(ApplyServiceAccountSnafu)?;
+    client
+        .apply_patch(
+            SUPERSET_DB_CONTROLLER_NAME,
+            &rbac_rolebinding,
+            &rbac_rolebinding,
+        )
+        .await
+        .context(ApplyRoleBindingSnafu)?;
 
     if let Some(ref s) = superset_db.status {
         match s.condition {
@@ -169,6 +192,7 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
                     let job = build_init_job(
                         &superset_db,
                         &resolved_product_image,
+                        &rbac_sa.name_any(),
                         &config,
                         &config_map.name_unchecked(),
                     )?;
@@ -235,6 +259,7 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
 fn build_init_job(
     superset_db: &SupersetDB,
     resolved_product_image: &ResolvedProductImage,
+    sa_name: &str,
     config: &SupersetDbConfig,
     config_map_name: &str,
 ) -> Result<Job> {
@@ -318,6 +343,13 @@ fn build_init_job(
             image_pull_secrets: resolved_product_image.pull_secrets.clone(),
             restart_policy: Some("Never".to_string()),
             volumes: Some(volumes),
+            service_account: Some(sa_name.to_string()),
+            security_context: Some(
+                PodSecurityContextBuilder::new()
+                    .run_as_user(1000)
+                    .run_as_group(0)
+                    .build(),
+            ),
             ..Default::default()
         }),
     };

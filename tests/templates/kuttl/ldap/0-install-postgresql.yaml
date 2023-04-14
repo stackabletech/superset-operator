@@ -6,8 +6,6 @@ commands:
       helm install superset-postgresql
       --namespace $NAMESPACE
       --version 12.1.5
-      --set auth.username=superset
-      --set auth.password=superset
-      --set auth.database=superset
+      -f helm-bitnami-postgresql-values.yaml
       --repo https://charts.bitnami.com/bitnami postgresql
-    timeout: 300
+    timeout: 600

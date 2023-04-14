@@ -13,23 +13,32 @@ dimensions:
       - no-tls
       - insecure-tls
       - server-verification-tls
+  - name: openshift
+    values:
+      - "false"
 tests:
   - name: smoke
     dimensions:
       - superset
+      - openshift
   - name: cluster-operation
     dimensions:
       - superset-latest
+      - openshift
   - name: druid-connection
     dimensions:
       - superset
+      - openshift
   - name: ldap
     dimensions:
       - superset
       - ldap-authentication
+      - openshift
   - name: resources
     dimensions:
       - superset-latest
+      - openshift
   - name: logging
     dimensions:
       - superset
+      - openshift

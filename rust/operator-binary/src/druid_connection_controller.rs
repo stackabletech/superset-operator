@@ -1,10 +1,10 @@
 use crate::util::{get_job_state, JobState};
 
-use crate::superset_controller::DOCKER_IMAGE_BASE_NAME;
+use crate::{rbac, superset_controller::DOCKER_IMAGE_BASE_NAME, APP_NAME};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
-    builder::{ContainerBuilder, ObjectMetaBuilder},
+    builder::{ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
     client::Client,
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
@@ -72,6 +72,14 @@ pub enum Error {
         source: stackable_superset_crd::druidconnection::Error,
         druid_connection: ObjectRef<DruidConnection>,
     },
+    #[snafu(display("failed to patch service account"))]
+    ApplyServiceAccount {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to patch role binding"))]
+    ApplyRoleBinding {
+        source: stackable_operator::error::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -96,6 +104,8 @@ impl ReconcilerError for Error {
             Error::DruidConnectionNoNamespace {
                 druid_connection, ..
             } => Some(druid_connection.clone().erase()),
+            Error::ApplyServiceAccount { .. } => None,
+            Error::ApplyRoleBinding { .. } => None,
         }
     }
 }
@@ -107,6 +117,21 @@ pub async fn reconcile_druid_connection(
     tracing::info!("Starting reconciling DruidConnections");
 
     let client = &ctx.client;
+
+    let (rbac_sa, rbac_rolebinding) =
+        rbac::build_rbac_resources(druid_connection.as_ref(), APP_NAME);
+    client
+        .apply_patch(DRUID_CONNECTION_CONTROLLER_NAME, &rbac_sa, &rbac_sa)
+        .await
+        .context(ApplyServiceAccountSnafu)?;
+    client
+        .apply_patch(
+            DRUID_CONNECTION_CONTROLLER_NAME,
+            &rbac_rolebinding,
+            &rbac_rolebinding,
+        )
+        .await
+        .context(ApplyRoleBindingSnafu)?;
 
     if let Some(ref s) = druid_connection.status {
         match s.condition {
@@ -172,6 +197,7 @@ pub async fn reconcile_druid_connection(
                         &druid_connection,
                         &resolved_product_image,
                         &sqlalchemy_str,
+                        &rbac_sa.name_any(),
                     )
                     .await?;
                     client
@@ -266,6 +292,7 @@ async fn build_import_job(
     druid_connection: &DruidConnection,
     resolved_product_image: &ResolvedProductImage,
     sqlalchemy_str: &str,
+    sa_name: &str,
 ) -> Result<Job> {
     let mut commands = vec![];
 
@@ -301,6 +328,13 @@ async fn build_import_job(
             containers: vec![container],
             image_pull_secrets: resolved_product_image.pull_secrets.clone(),
             restart_policy: Some("Never".to_string()),
+            service_account: Some(sa_name.to_string()),
+            security_context: Some(
+                PodSecurityContextBuilder::new()
+                    .run_as_user(1000)
+                    .run_as_group(0)
+                    .build(),
+            ),
             ..Default::default()
         }),
     };

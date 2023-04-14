@@ -15,13 +15,19 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::cluster_resources::ClusterResourceApplyStrategy;
 use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
-    builder::{ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder},
+    builder::{
+        ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
+        PodSecurityContextBuilder,
+    },
     cluster_resources::ClusterResources,
-    commons::authentication::{AuthenticationClass, AuthenticationClassProvider},
+    commons::{
+        authentication::{AuthenticationClass, AuthenticationClassProvider},
+        rbac::build_rbac_resources,
+    },
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{ConfigMap, PodSecurityContext, Service, ServicePort, ServiceSpec},
+            core::v1::{ConfigMap, Service, ServicePort, ServiceSpec},
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
@@ -182,6 +188,18 @@ pub enum Error {
     ApplyStatus {
         source: stackable_operator::error::Error,
     },
+    #[snafu(display("failed to patch service account"))]
+    ApplyServiceAccount {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to patch role binding"))]
+    ApplyRoleBinding {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to build RBAC objects"))]
+    BuildRBACObjects {
+        source: stackable_operator::error::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -257,6 +275,22 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     )
     .context(CreateClusterResourcesSnafu)?;
 
+    let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
+        superset.as_ref(),
+        APP_NAME,
+        cluster_resources.get_required_labels(),
+    )
+    .context(BuildRBACObjectsSnafu)?;
+
+    let rbac_sa = cluster_resources
+        .add(client, rbac_sa)
+        .await
+        .context(ApplyServiceAccountSnafu)?;
+    cluster_resources
+        .add(client, rbac_rolebinding)
+        .await
+        .context(ApplyRoleBindingSnafu)?;
+
     let node_role_service = build_node_role_service(&superset, &resolved_product_image)?;
     cluster_resources
         .add(client, node_role_service)
@@ -310,6 +344,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             &rolegroup,
             rolegroup_config,
             authentication_class.as_ref(),
+            &rbac_sa.name_any(),
             &config,
         )?;
         cluster_resources
@@ -536,6 +571,7 @@ fn build_server_rolegroup_statefulset(
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_class: Option<&AuthenticationClass>,
+    sa_name: &str,
     merged_config: &SupersetConfig,
 ) -> Result<StatefulSet> {
     let rolegroup = superset
@@ -676,13 +712,15 @@ fn build_server_rolegroup_statefulset(
                 })
                 .image_pull_secrets_from_product_image(resolved_product_image)
                 .add_volumes(volumes)
-                .security_context(PodSecurityContext {
-                    run_as_user: Some(1000),
-                    run_as_group: Some(1000),
-                    fs_group: Some(1000),
-                    ..PodSecurityContext::default()
-                })
+                .security_context(
+                    PodSecurityContextBuilder::new()
+                        .run_as_user(1000)
+                        .run_as_group(0)
+                        .fs_group(1000) // Needed for secret-operator
+                        .build(),
+                )
                 .affinity(&merged_config.affinity)
+                .service_account_name(sa_name)
                 .build_template(),
             ..StatefulSetSpec::default()
         }),
