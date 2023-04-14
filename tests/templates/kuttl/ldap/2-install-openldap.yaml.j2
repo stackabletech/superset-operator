@@ -37,6 +37,7 @@ commands:
             labels:
               app.kubernetes.io/name: openldap
           spec:
+            serviceAccountName: "druid-ldap-sa"
             containers:
               - name: openldap
                 image: docker.io/bitnami/openldap:2.5
@@ -92,60 +93,36 @@ commands:
             targetPort: tls-ldap
         selector:
           app.kubernetes.io/name: openldap
+      ---
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: druid-ldap-sa
+        namespace: $NAMESPACE
 {% if test_scenario['values']['openshift'] == 'true' %}
       ---
+      kind: Role
       apiVersion: rbac.authorization.k8s.io/v1
-      kind: ClusterRole
       metadata:
-        name: openldap-clusterrole
+        name: druid-ldap-tests-role
+        namespace: $NAMESPACE
       rules:
-      - apiGroups:
-          - security.openshift.io
-        resources:
-          - securitycontextconstraints
-        resourceNames:
-          - stackable-openldap-scc
-        verbs:
-          - use
+      - apiGroups: ["security.openshift.io"]
+        resources: ["securitycontextconstraints"]
+        resourceNames: ["privileged"]
+        verbs: ["use"]
       ---
-      apiVersion: security.openshift.io/v1
-      kind: SecurityContextConstraints
+      kind: RoleBinding
+      apiVersion: rbac.authorization.k8s.io/v1
       metadata:
-        name: stackable-openldap-scc
-        annotations:
-          kubernetes.io/description: custom SCC for tests with OpenLDAP
-      allowHostDirVolumePlugin: true
-      allowHostIPC: false
-      allowHostNetwork: false
-      allowHostPID: false
-      allowHostPorts: false
-      allowPrivilegeEscalation: true
-      allowPrivilegedContainer: true
-      allowedCapabilities: null
-      defaultAddCapabilities: null
-      fsGroup:
-        type: RunAsAny
-      groups: []
-      priority: null
-      readOnlyRootFilesystem: false
-      requiredDropCapabilities:
-        - MKNOD
-      runAsUser:
-        type: RunAsAny
-      seLinuxContext:
-        type: MustRunAs
-      supplementalGroups:
-        type: RunAsAny
-      users: []
-      volumes:
-        - configMap
-        - downwardAPI
-        - emptyDir
-        - ephemeral
-        - hostPath
-        - nfs
-        - persistentVolumeClaim
-        - projected
-        - secret
-        - csi
+        name: druid-ldap-tests-rolebinding
+        namespace: $NAMESPACE
+      subjects:
+        - kind: ServiceAccount
+          name: druid-ldap-sa
+      roleRef:
+        kind: Role
+        name: druid-ldap-tests-role
+        apiGroup: rbac.authorization.k8s.io
 {% endif %}
+      EOF

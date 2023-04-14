@@ -7,7 +7,7 @@ metadata:
 spec:
   provider:
     ldap:
-      hostname: openldap.default.svc.cluster.local
+      hostname: openldap.$NAMESPACE.svc.cluster.local
       port: 1389
       searchBase: ou=users,dc=example,dc=org
       bindCredentials:
@@ -21,7 +21,7 @@ metadata:
 spec:
   provider:
     ldap:
-      hostname: openldap.default.svc.cluster.local
+      hostname: openldap.$NAMESPACE.svc.cluster.local
       port: 1636
       searchBase: ou=users,dc=example,dc=org
       ldapFieldNames:
@@ -44,7 +44,7 @@ metadata:
 spec:
   provider:
     ldap:
-      hostname: openldap.default.svc.cluster.local
+      hostname: openldap.$NAMESPACE.svc.cluster.local
       port: 1636
       searchBase: ou=users,dc=example,dc=org
       ldapFieldNames:
