@@ -15,7 +15,7 @@ dimensions:
       - server-verification-tls
   - name: openshift
     values:
-      - "true"
+      - "false"
 tests:
   - name: smoke
     dimensions:
