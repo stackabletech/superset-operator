@@ -123,7 +123,7 @@ pub async fn reconcile_druid_connection(
     client
         .apply_patch(DRUID_CONNECTION_CONTROLLER_NAME, &rbac_sa, &rbac_sa)
         .await
-        .with_context(|_| ApplyServiceAccountSnafu)?;
+        .context(ApplyServiceAccountSnafu)?;
     client
         .apply_patch(
             DRUID_CONNECTION_CONTROLLER_NAME,
@@ -131,7 +131,7 @@ pub async fn reconcile_druid_connection(
             &rbac_rolebinding,
         )
         .await
-        .with_context(|_| ApplyRoleBindingSnafu)?;
+        .context(ApplyRoleBindingSnafu)?;
 
     if let Some(ref s) = druid_connection.status {
         match s.condition {
