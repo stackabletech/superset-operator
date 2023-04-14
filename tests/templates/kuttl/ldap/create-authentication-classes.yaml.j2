@@ -55,7 +55,7 @@ spec:
         verification:
           server:
             caCert:
-              secretClass: openldap-tls
+              secretClass: openldap-tls-$NAMESPACE
 {% endif %}
 ---
 apiVersion: secrets.stackable.tech/v1alpha1
