@@ -76,7 +76,7 @@ pub enum Error {
     ApplyServiceAccount {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to patch role binding: {source}"))]
+    #[snafu(display("failed to patch role binding"))]
     ApplyRoleBinding {
         source: stackable_operator::error::Error,
     },
