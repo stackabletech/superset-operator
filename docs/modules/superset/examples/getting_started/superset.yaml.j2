@@ -7,6 +7,8 @@ spec:
   image:
     productVersion: 1.5.1
     stackableVersion: {{ versions.superset }}
+  clusterConfig:
+    listenerClass: external-unstable
   credentialsSecret: simple-superset-credentials
   loadExamplesOnInit: true
   nodes:
