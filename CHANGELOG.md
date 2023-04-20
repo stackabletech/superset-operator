@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `operator-rs` `0.40.2` -> `0.41.0` ([#360]).
+
+[#360]: https://github.com/stackabletech/superset-operator/pull/360
+
 ## [23.4.0] - 2023-04-17
 
 ### Added
