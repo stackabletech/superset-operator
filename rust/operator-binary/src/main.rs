@@ -22,8 +22,7 @@ use stackable_operator::{
         core::v1::{ConfigMap, Secret, Service},
     },
     kube::{
-        api::ListParams,
-        runtime::{reflector::ObjectRef, Controller},
+        runtime::{reflector::ObjectRef, watcher, Controller},
         ResourceExt,
     },
     logging::controller::report_controller_reconciled,
@@ -88,23 +87,23 @@ async fn main() -> anyhow::Result<()> {
 
             let superset_controller_builder = Controller::new(
                 watch_namespace.get_api::<SupersetCluster>(&client),
-                ListParams::default(),
+                watcher::Config::default(),
             );
             let superset_store_1 = superset_controller_builder.store();
             let superset_store_2 = superset_controller_builder.store();
             let superset_controller = superset_controller_builder
                 .owns(
                     watch_namespace.get_api::<Service>(&client),
-                    ListParams::default(),
+                    watcher::Config::default(),
                 )
                 .owns(
                     watch_namespace.get_api::<StatefulSet>(&client),
-                    ListParams::default(),
+                    watcher::Config::default(),
                 )
                 .shutdown_on_signal()
                 .watches(
                     client.get_api::<AuthenticationClass>(&()),
-                    ListParams::default(),
+                    watcher::Config::default(),
                     move |authentication_class| {
                         superset_store_1
                             .state()
@@ -120,7 +119,7 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .watches(
                     watch_namespace.get_api::<SupersetDB>(&client),
-                    ListParams::default(),
+                    watcher::Config::default(),
                     move |superset_db| {
                         superset_store_2
                             .state()
@@ -150,7 +149,7 @@ async fn main() -> anyhow::Result<()> {
 
             let superset_db_controller_builder = Controller::new(
                 watch_namespace.get_api::<SupersetDB>(&client),
-                ListParams::default(),
+                watcher::Config::default(),
             );
             let superset_db_store1 = superset_db_controller_builder.store();
             let superset_db_store2 = superset_db_controller_builder.store();
@@ -158,7 +157,7 @@ async fn main() -> anyhow::Result<()> {
                 .shutdown_on_signal()
                 .watches(
                     watch_namespace.get_api::<Secret>(&client),
-                    ListParams::default(),
+                    watcher::Config::default(),
                     move |secret| {
                         superset_db_store1
                             .state()
@@ -177,7 +176,7 @@ async fn main() -> anyhow::Result<()> {
                 // and update our status accordingly
                 .watches(
                     watch_namespace.get_api::<Job>(&client),
-                    ListParams::default(),
+                    watcher::Config::default(),
                     move |job| {
                         superset_db_store2
                             .state()
@@ -206,7 +205,7 @@ async fn main() -> anyhow::Result<()> {
 
             let druid_connection_controller_builder = Controller::new(
                 watch_namespace.get_api::<DruidConnection>(&client),
-                ListParams::default(),
+                watcher::Config::default(),
             );
             let druid_connection_store_1 = druid_connection_controller_builder.store();
             let druid_connection_store_2 = druid_connection_controller_builder.store();
@@ -215,7 +214,7 @@ async fn main() -> anyhow::Result<()> {
                 .shutdown_on_signal()
                 .watches(
                     watch_namespace.get_api::<SupersetDB>(&client),
-                    ListParams::default(),
+                    watcher::Config::default(),
                     move |superset_db| {
                         druid_connection_store_1
                             .state()
@@ -230,7 +229,7 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .watches(
                     watch_namespace.get_api::<Job>(&client),
-                    ListParams::default(),
+                    watcher::Config::default(),
                     move |job| {
                         druid_connection_store_2
                             .state()
@@ -244,7 +243,7 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .watches(
                     watch_namespace.get_api::<ConfigMap>(&client),
-                    ListParams::default(),
+                    watcher::Config::default(),
                     move |config_map| {
                         druid_connection_store_3
                             .state()
