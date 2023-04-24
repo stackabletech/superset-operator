@@ -5,8 +5,11 @@
 ### Changed
 
 - `operator-rs` `0.40.2` -> `0.41.0` ([#360]).
+- Use 0.0.0-dev product images for testing ([#xxx)
+- Use testing-tools 0.2.0 ([#xxx])
 
 [#360]: https://github.com/stackabletech/superset-operator/pull/360
+[#xxx]: https://github.com/stackabletech/superset-operator/pull/xxx
 
 ## [23.4.0] - 2023-04-17
 
