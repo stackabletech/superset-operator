@@ -46,8 +46,8 @@ mod tests {
           name: simple-superset
         spec:
           image:
-            productVersion: 1.5.1
-            stackableVersion: "23.1"
+            productVersion: 2.1.0
+            stackableVersion: "0.0.0-dev"
           credentialsSecret: simple-superset-credentials
           nodes:
             roleGroups:
@@ -108,8 +108,8 @@ mod tests {
           name: simple-superset
         spec:
           image:
-            productVersion: 1.5.1
-            stackableVersion: "23.1"
+            productVersion: 2.1.0
+            stackableVersion: "0.0.0-dev"
           credentialsSecret: simple-superset-credentials
           nodes:
             roleGroups:
