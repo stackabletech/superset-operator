@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added support for Superset versions `1.4.2`, `1.5.3`, `2.0.1` and `2.1.0` ([#362]).
+
 ### Changed
 
 - `operator-rs` `0.40.2` -> `0.41.0` ([#360]).
@@ -10,6 +14,7 @@
 
 [#360]: https://github.com/stackabletech/superset-operator/pull/360
 [#361]: https://github.com/stackabletech/superset-operator/pull/361
+[#362]: https://github.com/stackabletech/superset-operator/pull/362
 
 ## [23.4.0] - 2023-04-17
 
