@@ -150,7 +150,7 @@ metadata:
 spec:
   image:
     productVersion: 1.5.1
-    stackableVersion: 23.4.0-rc2
+    stackableVersion: 0.0.0-dev
   credentialsSecret: superset-with-ldap-server-veri-tls-credentials
   nodes:
     roleGroups:
