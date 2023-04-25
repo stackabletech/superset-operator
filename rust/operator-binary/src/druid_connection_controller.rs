@@ -316,6 +316,8 @@ async fn build_import_job(
         .command(vec!["/bin/sh".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
         .add_env_var_from_secret("DATABASE_URI", secret, "connections.sqlalchemyDatabaseUri")
+        // From 2.1.0 superset barfs if the SECRET_KEY is not set properly. This causes the import job to fail.
+        .add_env_var_from_secret("SUPERSET_SECRET_KEY", secret, "connections.secretKey")
         .build();
 
     let pod = PodTemplateSpec {
