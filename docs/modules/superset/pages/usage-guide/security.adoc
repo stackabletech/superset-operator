@@ -19,7 +19,7 @@ metadata:
   name: superset-with-ldap-server
 spec:
   image:
-    productVersion: 1.5.1
+    productVersion: 2.1.0
     stackableVersion: 0.0.0-dev
   [...]
   authenticationConfig:
