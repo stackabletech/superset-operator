@@ -1,0 +1,7 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-auth-class
+commands:
+  - script: eval "echo \"$(cat create-authentication-classes.yaml)\"" | kubectl apply -f -

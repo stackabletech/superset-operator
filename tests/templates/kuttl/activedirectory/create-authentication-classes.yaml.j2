@@ -1,0 +1,25 @@
+---
+apiVersion: authentication.stackable.tech/v1alpha1
+kind: AuthenticationClass
+metadata:
+  name: superset-with-ldap-no-tls-ldap
+spec:
+  provider:
+    ldap:
+      hostname: WIN-VAAJN07KEU8.example.com
+      port: 389
+      searchBase: CN=Users,DC=example,DC=com
+      ldapFieldNames:
+        uid: userPrincipalName
+      bindCredentials:
+        secretClass: superset-with-ldap-bind
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: superset-with-ldap-bind
+spec:
+  backend:
+    k8sSearch:
+      searchNamespace:
+        pod: {}
