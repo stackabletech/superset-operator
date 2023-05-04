@@ -1,3 +1,7 @@
+#
+# To run these tests on OpenShift you have to ensure that:
+# 1. The "openshift" dimension below is set to "true"
+#
 ---
 dimensions:
   - name: superset
