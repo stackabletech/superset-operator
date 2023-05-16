@@ -1817,7 +1817,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-superset-crd"
-version = "23.4.0"
+version = "23.4.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -1830,7 +1830,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-superset-operator"
-version = "23.4.0"
+version = "23.4.1"
 dependencies = [
  "anyhow",
  "built",
