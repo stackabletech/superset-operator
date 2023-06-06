@@ -5,7 +5,8 @@ commands:
   - script: >-
       helm install superset-postgresql
       --namespace $NAMESPACE
-      --version 12.1.5
+      --version 12.5.6
       -f helm-bitnami-postgresql-values.yaml
       --repo https://charts.bitnami.com/bitnami postgresql
+      --wait
     timeout: 600
