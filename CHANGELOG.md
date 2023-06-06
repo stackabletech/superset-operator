@@ -7,7 +7,7 @@
 - Added support for Superset versions `1.4.2`, `1.5.3`, `2.0.1` and `2.1.0` ([#362]).
 - Generate OLM bundle for Release 23.4.0 ([#364]).
 - Missing CRD defaults for `status.conditions` field ([#367]).
-- Add support for resource quota ([#xxx])
+- Add support for resource quota ([#371])
 
 ### Changed
 
@@ -20,7 +20,7 @@
 [#362]: https://github.com/stackabletech/superset-operator/pull/362
 [#364]: https://github.com/stackabletech/superset-operator/pull/364
 [#367]: https://github.com/stackabletech/superset-operator/pull/367
-[#xxx]: https://github.com/stackabletech/superset-operator/pull/xxx
+[#371]: https://github.com/stackabletech/superset-operator/pull/371
 
 ## [23.4.0] - 2023-04-17
 
