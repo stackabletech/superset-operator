@@ -8,7 +8,7 @@ The default setting is to manually set up users via the Webinterface.
 
 === LDAP
 
-Superset supports xref:nightly@home:concepts:authentication.adoc[authentication] of users against an LDAP server. This requires setting up an xref:nightly@home:concepts:authentication.adoc#authenticationclass[AuthenticationClass] for the LDAP server.
+Superset supports xref:home:concepts:authentication.adoc[authentication] of users against an LDAP server. This requires setting up an xref:home:concepts:authentication.adoc#authenticationclass[AuthenticationClass] for the LDAP server.
 The AuthenticationClass is then referenced in the SupersetCluster resource as follows:
 
 [source,yaml]
@@ -33,6 +33,71 @@ spec:
 Users that log in with LDAP are assigned to a default https://superset.apache.org/docs/security/#roles[Role] which is specified with the `userRegistrationRole` property.
 
 You can follow the xref:nightly@home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:nightly@home:reference:authenticationclass.adoc[] reference.
+
+=== OAuth
+
+Superset supports xref:concepts:authentication.adoc[authentication] of users against an OAuth server.
+Since Superset 2.0.x Keycloak is supported as a OAuth provider, which will be used in the following section.
+
+In the future the official way to integrate with OAuth services is to create a xref:home:concepts:authentication.adoc#authenticationclass[AuthenticationClass] and configure your SupersetCluster to use that.
+Until this is officially supported, we have documented a way to configure this using configOverrides.
+
+First of you need to install keycloak, e.g. via
+
+[source,console]
+----
+$ helm repo add codecentric https://codecentric.github.io/helm-charts
+$ helm install keycloak codecentric/keycloak
+----
+
+You can access your instance using
+
+[source,console]
+----
+$ export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=keycloak,app.kubernetes.io/instance=keycloak" -o name)
+$ echo "Visit http://127.0.0.1:8080 to use your application"
+$ kubectl --namespace default port-forward "$POD_NAME" 8080
+----
+
+The last step is to connect you SupersetCluster to Keycloak using configOverrides as follows:
+
+[source,yaml]
+----
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: superset
+spec:
+  image:
+    productVersion: 2.1.0
+    stackableVersion: 0.0.0-dev
+  clusterConfig:
+    listenerClass: external-unstable
+  credentialsSecret: simple-superset-credentials
+  nodes:
+    configOverrides:
+      superset_config.py:
+        AUTH_TYPE: AUTH_OAUTH
+        AUTH_USER_REGISTRATION: "true"
+        AUTH_USER_REGISTRATION_ROLE: Admin
+        OAUTH_PROVIDERS: |-
+          [
+            { 'name': 'keycloak',
+              'icon': 'fa-key',
+              'token_key': 'access_token',
+              'remote_app': {
+                  'client_id': 'superset',
+                  'client_kwargs': {
+                      'scope': 'email profile openid'
+                  },
+                  'server_metadata_url': 'http://keycloak-http.default.svc.cluster.local/realms/superset/.well-known/openid-configuration',
+              },
+            }
+          ]
+    roleGroups:
+      default:
+        replicas: 1
+----
 
 == [[authorization]]Authorization
 Superset has a concept called `Roles` which allows you to grant user permissions based on roles.
