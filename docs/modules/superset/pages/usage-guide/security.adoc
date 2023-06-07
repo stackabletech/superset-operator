@@ -59,6 +59,14 @@ $ echo "Visit http://127.0.0.1:8080 to use your application"
 $ kubectl --namespace default port-forward "$POD_NAME" 8080
 ----
 
+Next up you need to set up your Keycloak instance by following the Screenshots below:
+
+image::oauth/1.png[]
+image::oauth/2.png[]
+image::oauth/3.png[]
+image::oauth/4.png[]
+image::oauth/5.png[]
+
 The last step is to connect you SupersetCluster to Keycloak using configOverrides as follows:
 
 [source,yaml]
