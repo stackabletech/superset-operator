@@ -47,7 +47,7 @@ First of you need to install keycloak, e.g. via
 [source,console]
 ----
 $ helm repo add codecentric https://codecentric.github.io/helm-charts
-$ helm install keycloak codecentric/keycloak
+$ helm install --wait keycloak codecentric/keycloak
 ----
 
 You can access your instance using
