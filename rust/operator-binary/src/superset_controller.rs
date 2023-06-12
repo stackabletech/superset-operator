@@ -1,5 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 
+use stackable_operator::builder::resources::ResourceRequirementsBuilder;
+
 use crate::util::build_recommended_labels;
 use crate::{
     config::{self, PYTHON_IMPORTS},
@@ -198,6 +200,10 @@ pub enum Error {
     },
     #[snafu(display("failed to build RBAC objects"))]
     BuildRBACObjects {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to build pod template"))]
+    BuildTemplate {
         source: stackable_operator::error::Error,
     },
 }
@@ -641,7 +647,7 @@ fn build_server_rolegroup_statefulset(
                 'superset.app:create_app()'
             "},
         ])
-        .resources(merged_config.resources.clone().into())
+        .with_resources(merged_config.resources.clone().into())
         .build();
     let metrics_container = ContainerBuilder::new("metrics")
         .context(InvalidContainerNameSnafu)?
@@ -649,6 +655,14 @@ fn build_server_rolegroup_statefulset(
         .command(vec!["/bin/bash".to_string(), "-c".to_string()])
         .args(vec!["/stackable/statsd_exporter".to_string()])
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
+        .with_resources(
+            ResourceRequirementsBuilder::new()
+                .with_cpu_limit("500m")
+                .with_cpu_request("100m")
+                .with_memory_limit("128Mi")
+                .with_memory_request("128Mi")
+                .build(),
+        )
         .build();
 
     let volumes = controller_commons::create_volumes(
@@ -660,11 +674,19 @@ fn build_server_rolegroup_statefulset(
     pb.add_container(metrics_container);
 
     if merged_config.logging.enable_vector_agent {
+        let resources = ResourceRequirementsBuilder::new()
+            .with_cpu_limit("500m")
+            .with_cpu_request("100m")
+            .with_memory_limit("40Mi")
+            .with_memory_request("8Mi")
+            .build();
+
         pb.add_container(product_logging::framework::vector_container(
             resolved_product_image,
             CONFIG_VOLUME_NAME,
             LOG_VOLUME_NAME,
             merged_config.logging.containers.get(&Container::Vector),
+            resources,
         ));
     }
 
@@ -717,7 +739,8 @@ fn build_server_rolegroup_statefulset(
                 )
                 .affinity(&merged_config.affinity)
                 .service_account_name(sa_name)
-                .build_template(),
+                .build_template()
+                .context(BuildTemplateSnafu)?,
             ..StatefulSetSpec::default()
         }),
         status: None,
