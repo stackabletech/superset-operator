@@ -214,7 +214,7 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
                         .await
                         .context(ApplyStatusSnafu)?;
                 } else {
-                    return SecretNotFoundSnafu.fail(); 
+                    return SecretNotFoundSnafu.fail();
                 }
             }
             SupersetDBStatusCondition::Initializing => {
