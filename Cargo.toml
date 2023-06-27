@@ -3,4 +3,4 @@ members = ["rust/crd", "rust/operator-binary"]
 
 # [patch."https://github.com/stackabletech/operator-rs.git"]
 # stackable-operator = { path = "path/to/operator-rs" }
-# stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", branch = "you/feature/branch" }
+# stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", branch = "your/feature/branch" }
