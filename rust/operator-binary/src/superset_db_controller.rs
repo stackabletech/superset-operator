@@ -146,7 +146,7 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
             SupersetDBStatusCondition::Pending => {
                 // This is easier to use than `get_opt` and having an Error variant for "Secret does not exist"
                 let _secret = client
-                    .get_opt::<Secret>(&superset_db.spec.credentials_secret, &namespace)
+                    .get::<Secret>(&superset_db.spec.credentials_secret, &namespace)
                     .await
                     .context(SecretCheckSnafu {
                         secret: ObjectRef::<Secret>::new(&superset_db.spec.credentials_secret)
