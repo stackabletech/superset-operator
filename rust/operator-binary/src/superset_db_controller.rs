@@ -109,10 +109,6 @@ pub enum Error {
     ApplyRoleBinding {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("unable to find SecretClass [{secret}]. Missing spec.credentialsSecret."))]
-    SecretNotFound{
-        secret: String,
-    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -127,6 +123,7 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
     tracing::info!("Starting reconcile");
 
     let client = &ctx.client;
+    let namespace = superset_db.namespace().context(ObjectHasNoNamespaceSnafu)?;
     let resolved_product_image: ResolvedProductImage =
         superset_db.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
 
@@ -147,94 +144,74 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
     if let Some(ref s) = superset_db.status {
         match s.condition {
             SupersetDBStatusCondition::Pending => {
-                let secret_exists = client
-                    .get_opt::<Secret>(
-                        &superset_db.spec.credentials_secret,
-                        superset_db
-                            .namespace()
-                            .as_deref()
-                            .context(ObjectHasNoNamespaceSnafu)?,
+                // This is easier to use than `get_opt` and having an Error variant for "Secret does not exist"
+                let _secret = client
+                    .get_opt::<Secret>(&superset_db.spec.credentials_secret, &namespace)
+                    .await
+                    .context(SecretCheckSnafu {
+                        secret: ObjectRef::<Secret>::new(&superset_db.spec.credentials_secret)
+                            .within(&namespace),
+                    })?;
+
+                let vector_aggregator_address = resolve_vector_aggregator_address(
+                    client,
+                    superset_db.as_ref(),
+                    superset_db
+                        .spec
+                        .vector_aggregator_config_map_name
+                        .as_deref(),
+                )
+                .await
+                .context(ResolveVectorAggregatorAddressSnafu)?;
+
+                let config = superset_db
+                    .merged_config()
+                    .context(FailedToResolveConfigSnafu)?;
+
+                let config_map = build_config_map(
+                    &superset_db,
+                    &config.logging,
+                    vector_aggregator_address.as_deref(),
+                )?;
+                client
+                    .apply_patch(SUPERSET_DB_CONTROLLER_NAME, &config_map, &config_map)
+                    .await
+                    .context(ApplyConfigMapSnafu {
+                        name: config_map.name_any(),
+                    })?;
+
+                let job = build_init_job(
+                    &superset_db,
+                    &resolved_product_image,
+                    &rbac_sa.name_any(),
+                    &config,
+                    &config_map.name_unchecked(),
+                )?;
+                client
+                    .apply_patch(SUPERSET_DB_CONTROLLER_NAME, &job, &job)
+                    .await
+                    .context(ApplyJobSnafu {
+                        superset_db: ObjectRef::from_obj(&*superset_db),
+                    })?;
+                // The job is started, update status to reflect new state
+                client
+                    .apply_patch_status(
+                        SUPERSET_DB_CONTROLLER_NAME,
+                        &*superset_db,
+                        &s.initializing(),
                     )
                     .await
-                    .with_context(|_| {
-                        let mut secret_ref =
-                            ObjectRef::<Secret>::new(&superset_db.spec.credentials_secret);
-                        if let Some(ns) = superset_db.namespace() {
-                            secret_ref = secret_ref.within(&ns);
-                        }
-                        SecretCheckSnafu { secret: secret_ref }
-                    })?
-                    .is_some();
-                if secret_exists {
-                    let vector_aggregator_address = resolve_vector_aggregator_address(
-                        client,
-                        superset_db.as_ref(),
-                        superset_db
-                            .spec
-                            .vector_aggregator_config_map_name
-                            .as_deref(),
-                    )
-                    .await
-                    .context(ResolveVectorAggregatorAddressSnafu)?;
-
-                    let config = superset_db
-                        .merged_config()
-                        .context(FailedToResolveConfigSnafu)?;
-
-                    let config_map = build_config_map(
-                        &superset_db,
-                        &config.logging,
-                        vector_aggregator_address.as_deref(),
-                    )?;
-                    client
-                        .apply_patch(SUPERSET_DB_CONTROLLER_NAME, &config_map, &config_map)
-                        .await
-                        .context(ApplyConfigMapSnafu {
-                            name: config_map.name_any(),
-                        })?;
-
-                    let job = build_init_job(
-                        &superset_db,
-                        &resolved_product_image,
-                        &rbac_sa.name_any(),
-                        &config,
-                        &config_map.name_unchecked(),
-                    )?;
-                    client
-                        .apply_patch(SUPERSET_DB_CONTROLLER_NAME, &job, &job)
-                        .await
-                        .context(ApplyJobSnafu {
-                            superset_db: ObjectRef::from_obj(&*superset_db),
-                        })?;
-                    // The job is started, update status to reflect new state
-                    client
-                        .apply_patch_status(
-                            SUPERSET_DB_CONTROLLER_NAME,
-                            &*superset_db,
-                            &s.initializing(),
-                        )
-                        .await
-                        .context(ApplyStatusSnafu)?;
-                } else {
-                    return SecretNotFoundSnafu {
-                        secret: &superset_db.spec.credentials_secret
-                    }.fail();
-                }
+                    .context(ApplyStatusSnafu)?;
             }
             SupersetDBStatusCondition::Initializing => {
                 // In here, check the associated job that is running.
                 // If it is still running, do nothing. If it completed, set status to ready, if it failed, set status to failed.
-                let ns = superset_db
-                    .namespace()
-                    .unwrap_or_else(|| "default".to_string());
                 let job_name = superset_db.job_name();
-                let job =
-                    client
-                        .get::<Job>(&job_name, &ns)
-                        .await
-                        .context(GetInitializationJobSnafu {
-                            init_job: ObjectRef::<Job>::new(&job_name).within(&ns),
-                        })?;
+                let job = client.get::<Job>(&job_name, &namespace).await.context(
+                    GetInitializationJobSnafu {
+                        init_job: ObjectRef::<Job>::new(&job_name).within(&namespace),
+                    },
+                )?;
 
                 let new_status = match get_job_state(&job) {
                     JobState::Complete => Some(s.ready()),
