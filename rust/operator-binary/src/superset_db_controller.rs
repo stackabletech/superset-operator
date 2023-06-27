@@ -314,12 +314,12 @@ fn build_init_job(
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_DIR)
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
         .add_volume_mount(LOG_VOLUME_NAME, LOG_DIR)
-        .with_resources(
+        .resources(
             ResourceRequirementsBuilder::new()
-                .with_cpu_limit("500m")
                 .with_cpu_request("100m")
-                .with_memory_limit("512Mi")
+                .with_cpu_limit("500m")
                 .with_memory_request("128Mi")
+                .with_memory_limit("512Mi")
                 .build(),
         );
 
@@ -327,10 +327,10 @@ fn build_init_job(
 
     if config.logging.enable_vector_agent {
         let resources = ResourceRequirementsBuilder::new()
-            .with_cpu_limit("500m")
             .with_cpu_request("100m")
-            .with_memory_limit("40Mi")
+            .with_cpu_limit("500m")
             .with_memory_request("8Mi")
+            .with_memory_limit("40Mi")
             .build();
 
         containers.push(product_logging::framework::vector_container(

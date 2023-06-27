@@ -202,10 +202,6 @@ pub enum Error {
     BuildRBACObjects {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to build pod template"))]
-    BuildTemplate {
-        source: stackable_operator::error::Error,
-    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -647,20 +643,21 @@ fn build_server_rolegroup_statefulset(
                 'superset.app:create_app()'
             "},
         ])
-        .with_resources(merged_config.resources.clone().into())
+        .resources(merged_config.resources.clone().into())
         .build();
+
     let metrics_container = ContainerBuilder::new("metrics")
         .context(InvalidContainerNameSnafu)?
         .image_from_product_image(resolved_product_image)
         .command(vec!["/bin/bash".to_string(), "-c".to_string()])
         .args(vec!["/stackable/statsd_exporter".to_string()])
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
-        .with_resources(
+        .resources(
             ResourceRequirementsBuilder::new()
-                .with_cpu_limit("500m")
                 .with_cpu_request("100m")
-                .with_memory_limit("128Mi")
-                .with_memory_request("128Mi")
+                .with_cpu_limit("200m")
+                .with_memory_request("64Mi")
+                .with_memory_limit("64Mi")
                 .build(),
         )
         .build();
@@ -675,10 +672,10 @@ fn build_server_rolegroup_statefulset(
 
     if merged_config.logging.enable_vector_agent {
         let resources = ResourceRequirementsBuilder::new()
+            .with_cpu_request("250m")
             .with_cpu_limit("500m")
-            .with_cpu_request("100m")
-            .with_memory_limit("40Mi")
-            .with_memory_request("8Mi")
+            .with_memory_request("128Mi")
+            .with_memory_limit("128Mi")
             .build();
 
         pb.add_container(product_logging::framework::vector_container(
@@ -739,8 +736,7 @@ fn build_server_rolegroup_statefulset(
                 )
                 .affinity(&merged_config.affinity)
                 .service_account_name(sa_name)
-                .build_template()
-                .context(BuildTemplateSnafu)?,
+                .build_template(),
             ..StatefulSetSpec::default()
         }),
         status: None,

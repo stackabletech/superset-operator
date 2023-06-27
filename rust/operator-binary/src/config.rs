@@ -1,7 +1,6 @@
-use stackable_operator::commons::{
-    authentication::{AuthenticationClass, AuthenticationClassProvider},
-    ldap::LdapAuthenticationProvider,
-    tls::TlsVerification,
+use stackable_operator::commons::authentication::{
+    ldap::LdapAuthenticationProvider, tls::TlsVerification, AuthenticationClass,
+    AuthenticationClassProvider,
 };
 use stackable_superset_crd::{
     LdapRolesSyncMoment, SupersetClusterAuthenticationConfig, SupersetConfigOptions,
