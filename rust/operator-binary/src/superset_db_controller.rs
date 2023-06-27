@@ -109,8 +109,10 @@ pub enum Error {
     ApplyRoleBinding {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("unable to find SecretClass with airflow credentials"))]
-    SecretNotFound,
+    #[snafu(display("unable to find SecretClass [{secret}]. Missing spec.credentialsSecret."))]
+    SecretNotFound{
+        secret: String,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -214,7 +216,9 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
                         .await
                         .context(ApplyStatusSnafu)?;
                 } else {
-                    return SecretNotFoundSnafu.fail();
+                    return SecretNotFoundSnafu {
+                        secret: &superset_db.spec.credentials_secret
+                    }.fail();
                 }
             }
             SupersetDBStatusCondition::Initializing => {
