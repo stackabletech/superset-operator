@@ -671,19 +671,17 @@ fn build_server_rolegroup_statefulset(
     pb.add_container(metrics_container);
 
     if merged_config.logging.enable_vector_agent {
-        let resources = ResourceRequirementsBuilder::new()
-            .with_cpu_request("250m")
-            .with_cpu_limit("500m")
-            .with_memory_request("128Mi")
-            .with_memory_limit("128Mi")
-            .build();
-
         pb.add_container(product_logging::framework::vector_container(
             resolved_product_image,
             CONFIG_VOLUME_NAME,
             LOG_VOLUME_NAME,
             merged_config.logging.containers.get(&Container::Vector),
-            resources,
+            ResourceRequirementsBuilder::new()
+                .with_cpu_request("250m")
+                .with_cpu_limit("500m")
+                .with_memory_request("128Mi")
+                .with_memory_limit("128Mi")
+                .build(),
         ));
     }
 
