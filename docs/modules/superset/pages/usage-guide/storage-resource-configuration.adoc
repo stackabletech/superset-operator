@@ -27,7 +27,4 @@ nodes:
             limit: '1000Mi'
 ----
 
-WARNING: The default values are _most likely_ not sufficient to run a production cluster. Please adapt according to your
-requirements.
-
-
+WARNING: The default values are _most likely_ not sufficient to run a production cluster. Please adapt according to your requirements.
