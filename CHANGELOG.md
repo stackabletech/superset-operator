@@ -8,6 +8,7 @@
 - Generate OLM bundle for Release 23.4.0 ([#364]).
 - Missing CRD defaults for `status.conditions` field ([#367]).
 - Set explicit resources on all containers ([#371])
+- Operator errors out when credentialsSecret is missing ([#375]).
 
 ### Changed
 
@@ -23,6 +24,7 @@
 [#367]: https://github.com/stackabletech/superset-operator/pull/367
 [#371]: https://github.com/stackabletech/superset-operator/pull/371
 [#373]: https://github.com/stackabletech/superset-operator/pull/373
+[#375]: https://github.com/stackabletech/superset-operator/pull/375
 
 ## [23.4.0] - 2023-04-17
 
