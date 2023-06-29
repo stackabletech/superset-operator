@@ -1,5 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 
+use stackable_operator::builder::resources::ResourceRequirementsBuilder;
+
 use crate::util::build_recommended_labels;
 use crate::{
     config::{self, PYTHON_IMPORTS},
@@ -643,12 +645,21 @@ fn build_server_rolegroup_statefulset(
         ])
         .resources(merged_config.resources.clone().into())
         .build();
+
     let metrics_container = ContainerBuilder::new("metrics")
         .context(InvalidContainerNameSnafu)?
         .image_from_product_image(resolved_product_image)
         .command(vec!["/bin/bash".to_string(), "-c".to_string()])
         .args(vec!["/stackable/statsd_exporter".to_string()])
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
+        .resources(
+            ResourceRequirementsBuilder::new()
+                .with_cpu_request("100m")
+                .with_cpu_limit("200m")
+                .with_memory_request("64Mi")
+                .with_memory_limit("64Mi")
+                .build(),
+        )
         .build();
 
     let volumes = controller_commons::create_volumes(
@@ -665,6 +676,12 @@ fn build_server_rolegroup_statefulset(
             CONFIG_VOLUME_NAME,
             LOG_VOLUME_NAME,
             merged_config.logging.containers.get(&Container::Vector),
+            ResourceRequirementsBuilder::new()
+                .with_cpu_request("250m")
+                .with_cpu_limit("500m")
+                .with_memory_request("128Mi")
+                .with_memory_limit("128Mi")
+                .build(),
         ));
     }
 

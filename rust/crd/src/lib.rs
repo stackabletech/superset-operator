@@ -360,11 +360,11 @@ impl SupersetConfig {
         SupersetConfigFragment {
             resources: ResourcesFragment {
                 cpu: CpuLimitsFragment {
-                    min: Some(Quantity("200m".to_owned())),
-                    max: Some(Quantity("4".to_owned())),
+                    min: Some(Quantity("300m".to_owned())),
+                    max: Some(Quantity("1200m".to_owned())),
                 },
                 memory: MemoryLimitsFragment {
-                    limit: Some(Quantity("2Gi".to_owned())),
+                    limit: Some(Quantity("1000Mi".to_owned())),
                     runtime_limits: NoRuntimeLimitsFragment {},
                 },
                 storage: SupersetStorageConfigFragment {},

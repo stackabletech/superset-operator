@@ -4,7 +4,14 @@
 
 include::concepts:stackable_resource_requests.adoc[]
 
-If no resource requests are configured explicitly, the Superset operator uses the following defaults:
+A minimal HA setup consisting of 2 Superset instances has the following
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/[resource requirements]:
+
+* `1300m` CPU request
+* `3800m` CPU limit
+* `2384Mi` memory request and limit
+
+Corresponding to the values above, the operator uses the following resource defaults:
 
 [source,yaml]
 ----
@@ -14,10 +21,10 @@ nodes:
       config:
         resources:
           cpu:
-            min: '200m'
-            max: "4"
+            min: '300m'
+            max: "1200m"
           memory:
-            limit: '2Gi'
+            limit: '1000Mi'
 ----
 
 WARNING: The default values are _most likely_ not sufficient to run a production cluster. Please adapt according to your requirements.
