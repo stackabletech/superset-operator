@@ -29,8 +29,8 @@ use stackable_operator::{
     CustomResourceExt,
 };
 use stackable_superset_crd::{
-    druidconnection::DruidConnection, supersetdb::SupersetDB, SupersetCluster,
-    SupersetClusterAuthenticationConfig, APP_NAME,
+    authentication::SupersetAuthentication, druidconnection::DruidConnection,
+    supersetdb::SupersetDB, SupersetCluster, APP_NAME,
 };
 use std::sync::Arc;
 
@@ -110,7 +110,7 @@ async fn main() -> anyhow::Result<()> {
                             .into_iter()
                             .filter(move |superset: &Arc<SupersetCluster>| {
                                 references_authentication_class(
-                                    &superset.spec.authentication_config,
+                                    &superset.spec.cluster_config.authentication,
                                     &authentication_class,
                                 )
                             })
@@ -285,13 +285,15 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn references_authentication_class(
-    authentication_config: &Option<SupersetClusterAuthenticationConfig>,
+    authentication_config: &SupersetAuthentication,
     authentication_class: &AuthenticationClass,
 ) -> bool {
     assert!(authentication_class.metadata.name.is_some());
 
     authentication_config
-        .as_ref()
-        .and_then(|c| c.authentication_class.as_ref())
-        == authentication_class.metadata.name.as_ref()
+        .authentication_class_names()
+        .into_iter()
+        .filter(|c| *c == authentication_class.name_any())
+        .count()
+        > 0
 }

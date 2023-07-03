@@ -378,7 +378,7 @@ fn build_config_map(
     vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap> {
     let mut config = BTreeMap::new();
-    config::add_superset_config(&mut config, None, None);
+    config::add_superset_config(&mut config, &vec![]);
 
     let mut config_file = Vec::new();
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(

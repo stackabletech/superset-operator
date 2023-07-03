@@ -14,16 +14,14 @@ use crate::{
 
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::cluster_resources::ClusterResourceApplyStrategy;
-use stackable_operator::commons::product_image_selection::ResolvedProductImage;
 use stackable_operator::{
     builder::{
         ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
         PodSecurityContextBuilder,
     },
-    cluster_resources::ClusterResources,
+    cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
-        authentication::{AuthenticationClass, AuthenticationClassProvider},
+        authentication::AuthenticationClassProvider, product_image_selection::ResolvedProductImage,
         rbac::build_rbac_resources,
     },
     k8s_openapi::{
@@ -53,6 +51,7 @@ use stackable_operator::{
         ClusterConditionStatus, ClusterConditionType, ConditionBuilder,
     },
 };
+use stackable_superset_crd::authentication::SuperSetAuthenticationConfigResolved;
 use stackable_superset_crd::supersetdb::SupersetDBStatus;
 use stackable_superset_crd::SupersetClusterStatus;
 use stackable_superset_crd::{
@@ -157,15 +156,9 @@ pub enum Error {
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("Superset doesn't support the AuthenticationClass provider {authentication_class_provider} from AuthenticationClass {authentication_class}"))]
-    AuthenticationClassProviderNotSupported {
-        authentication_class_provider: String,
-        authentication_class: ObjectRef<AuthenticationClass>,
-    },
-    #[snafu(display("failed to retrieve AuthenticationClass {authentication_class}"))]
-    AuthenticationClassRetrieval {
-        source: stackable_operator::error::Error,
-        authentication_class: ObjectRef<AuthenticationClass>,
+    #[snafu(display("failed to apply authentication configuration"))]
+    InvalidAuthenticationConfig {
+        source: stackable_superset_crd::authentication::Error,
     },
     #[snafu(display(
         "failed to get the {SUPERSET_CONFIG_FILENAME} file from node or product config"
@@ -245,6 +238,14 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     .await
     .context(ResolveVectorAggregatorAddressSnafu)?;
 
+    let authentication_config = superset
+        .spec
+        .cluster_config
+        .authentication
+        .resolve(&client)
+        .await
+        .context(InvalidAuthenticationConfigSnafu)?;
+
     let validated_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
         &transform_all_roles_to_config(
@@ -303,27 +304,6 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         .await
         .context(ApplyRoleServiceSnafu)?;
 
-    let authentication_class = match &superset.spec.authentication_config {
-        Some(authentication_config) => {
-            match &authentication_config.authentication_class {
-                Some(authentication_class) => {
-                    Some(
-                        client
-                            .get::<AuthenticationClass>(authentication_class, &()) // AuthenticationClass has ClusterScope
-                            .await
-                            .context(AuthenticationClassRetrievalSnafu {
-                                authentication_class: ObjectRef::<AuthenticationClass>::new(
-                                    authentication_class,
-                                ),
-                            })?,
-                    )
-                }
-                None => None,
-            }
-        }
-        None => None,
-    };
-
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
     for (rolegroup_name, rolegroup_config) in role_node_config.iter() {
@@ -340,7 +320,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             &resolved_product_image,
             &rolegroup,
             rolegroup_config,
-            authentication_class.as_ref(),
+            &authentication_config,
             &config.logging,
             vector_aggregator_address.as_deref(),
         )?;
@@ -349,7 +329,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             &resolved_product_image,
             &rolegroup,
             rolegroup_config,
-            authentication_class.as_ref(),
+            &authentication_config,
             &rbac_sa.name_any(),
             &config,
         )?;
@@ -445,7 +425,7 @@ fn build_rolegroup_config_map(
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<SupersetCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    authentication_class: Option<&AuthenticationClass>,
+    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
     logging: &Logging<Container>,
     vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
@@ -456,11 +436,7 @@ fn build_rolegroup_config_map(
         .cloned()
         .unwrap_or_default();
 
-    config::add_superset_config(
-        &mut config,
-        superset.spec.authentication_config.as_ref(),
-        authentication_class,
-    );
+    config::add_superset_config(&mut config, authentication_config);
 
     let mut config_file = Vec::new();
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
@@ -576,7 +552,7 @@ fn build_server_rolegroup_statefulset(
     resolved_product_image: &ResolvedProductImage,
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    authentication_class: Option<&AuthenticationClass>,
+    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
     sa_name: &str,
     merged_config: &SupersetConfig,
 ) -> Result<StatefulSet> {
@@ -611,9 +587,7 @@ fn build_server_rolegroup_statefulset(
         };
     }
 
-    if let Some(authentication_class) = authentication_class {
-        add_authentication_volumes_and_volume_mounts(authentication_class, &mut cb, &mut pb)?;
-    }
+    add_authentication_volumes_and_volume_mounts(authentication_config, &mut cb, &mut pb);
 
     let webserver_timeout = node_config
         .get(&PropertyNameKind::File(
@@ -746,22 +720,22 @@ fn build_server_rolegroup_statefulset(
 }
 
 fn add_authentication_volumes_and_volume_mounts(
-    authentication_class: &AuthenticationClass,
+    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
-) -> Result<()> {
-    let authentication_class_name = authentication_class.metadata.name.as_ref().unwrap();
-
-    match &authentication_class.spec.provider {
-        AuthenticationClassProvider::Ldap(ldap) => {
-            ldap.add_volumes_and_mounts(pb, vec![cb]);
-            Ok(())
+) {
+    // TODO: Currently there can be only one AuthenticationClass due to FlaskAppBuilder restrictions.
+    //    Needs adaptation once FAB and superset support multiple auth methods.
+    // The checks for max one AuthenticationClass and the provider are done in crd/src/authentication.rs
+    for config in authentication_config {
+        if let Some(auth_class) = &config.authentication_class {
+            match &auth_class.spec.provider {
+                AuthenticationClassProvider::Ldap(ldap) => {
+                    ldap.add_volumes_and_mounts(pb, vec![cb]);
+                }
+                AuthenticationClassProvider::Tls(_) | AuthenticationClassProvider::Static(_) => {}
+            }
         }
-        _ => AuthenticationClassProviderNotSupportedSnafu {
-            authentication_class_provider: authentication_class.spec.provider.to_string(),
-            authentication_class: ObjectRef::<AuthenticationClass>::new(authentication_class_name),
-        }
-        .fail(),
     }
 }
 
