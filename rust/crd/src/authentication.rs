@@ -42,6 +42,7 @@ pub struct SuperSetAuthenticationConfigResolved {
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetAuthentication {
+    #[serde(default)]
     authentication: Vec<SuperSetAuthenticationConfig>,
 }
 
@@ -107,7 +108,7 @@ impl SupersetAuthentication {
 
         // TODO: adapt if multiple authentication classes are supported by superset.
         //    This is currently not possible due to the Flask App Builder not supporting it.
-        if self.authentication.len() != 1 {
+        if self.authentication.len() > 1 {
             return Err(Error::MultipleAuthenticationClassesProvided);
         }
 
