@@ -220,7 +220,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         superset.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
 
     let cluster_operation_cond_builder =
-        ClusterOperationsConditionBuilder::new(&superset.spec.cluster_operation);
+        ClusterOperationsConditionBuilder::new(&superset.spec.cluster_config.cluster_operation);
 
     if wait_for_db_and_update_status(
         client,
@@ -236,7 +236,11 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     let vector_aggregator_address = resolve_vector_aggregator_address(
         client,
         superset.as_ref(),
-        superset.spec.vector_aggregator_config_map_name.as_deref(),
+        superset
+            .spec
+            .cluster_config
+            .vector_aggregator_config_map_name
+            .as_deref(),
     )
     .await
     .context(ResolveVectorAggregatorAddressSnafu)?;
@@ -273,7 +277,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         OPERATOR_NAME,
         SUPERSET_CONTROLLER_NAME,
         &superset.object_ref(&()),
-        ClusterResourceApplyStrategy::from(&superset.spec.cluster_operation),
+        ClusterResourceApplyStrategy::from(&superset.spec.cluster_config.cluster_operation),
     )
     .context(CreateClusterResourcesSnafu)?;
 

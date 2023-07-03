@@ -147,28 +147,21 @@ pub struct SupersetClusterSpec {
     /// Superset cluster configuration options.
     #[serde(default)]
     pub cluster_config: SupersetClusterConfig,
-    /// Name of the Vector aggregator discovery ConfigMap.
-    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub vector_aggregator_config_map_name: Option<String>,
-    pub credentials_secret: String,
-    pub mapbox_secret: Option<String>,
-    #[serde(default)]
-    pub load_examples_on_init: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authentication_config: Option<SupersetClusterAuthenticationConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nodes: Option<Role<SupersetConfigFragment>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub database_initialization: Option<supersetdb::SupersetDbConfigFragment>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetClusterConfig {
+    pub credentials_secret: String,
     /// Cluster operations like pause reconciliation or cluster stop.
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
-}
-
-#[derive(Clone, Debug, Default, Eq, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetClusterConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub database_initialization: Option<supersetdb::SupersetDbConfigFragment>,
     /// In the future this setting will control, which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html>
     /// will be used to expose the service.
     /// Currently only a subset of the ListenerClasses are supported by choosing the type of the created Services
@@ -182,6 +175,14 @@ pub struct SupersetClusterConfig {
     /// * external-stable: Use a LoadBalancer service
     #[serde(default)]
     pub listener_class: CurrentlySupportedListenerClasses,
+    #[serde(default)]
+    pub load_examples_on_init: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mapbox_secret: Option<String>,
+    /// Name of the Vector aggregator discovery ConfigMap.
+    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vector_aggregator_config_map_name: Option<String>,
 }
 
 // TODO: Temporary solution until listener-operator is finished
@@ -387,9 +388,9 @@ impl Configuration for SupersetConfigFragment {
         let mut result = BTreeMap::new();
         result.insert(
             SupersetConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
-            Some(cluster.spec.credentials_secret.clone()),
+            Some(cluster.spec.cluster_config.credentials_secret.clone()),
         );
-        if let Some(msec) = &cluster.spec.mapbox_secret {
+        if let Some(msec) = &cluster.spec.cluster_config.mapbox_secret {
             result.insert(
                 SupersetConfig::MAPBOX_SECRET_PROPERTY.to_string(),
                 Some(msec.clone()),
