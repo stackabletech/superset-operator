@@ -21,10 +21,10 @@ spec:
   image:
     productVersion: 2.1.0
     stackableVersion: 0.0.0-dev
-  [...]
-  authenticationConfig:
-    authenticationClass: ldap    # <1>
-    userRegistrationRole: Admin  # <2>
+  clusterConfig:
+    authentication:
+    - authenticationClass: ldap    # <1>
+      userRegistrationRole: Admin  # <2>
 ----
 
 <1> The reference to an AuthenticationClass called `ldap`
@@ -43,7 +43,7 @@ You can view all the available roles in the Webinterface of Superset and can als
 
 === LDAP
 Superset supports assigning https://superset.apache.org/docs/security/#roles[Roles] to users based on their LDAP group membership, though this is not yet supported by the Stackable operator.
-All the users logging in via LDAP get assigned to the same role which you can configure via the attribute `authenticationConfig.userRegistrationRole` on the `SupersetCluster` object:
+All the users logging in via LDAP get assigned to the same role which you can configure via the attribute `authentication[*].userRegistrationRole` on the `SupersetCluster` object:
 
 [source,yaml]
 ----
@@ -52,10 +52,10 @@ kind: SupersetCluster
 metadata:
   name: superset-with-ldap-server
 spec:
-  [...]
-  authenticationConfig:
-    authenticationClass: ldap
-    userRegistrationRole: Admin  # <1>
+  clusterConfig:
+    authentication:
+    - authenticationClass: ldap
+      userRegistrationRole: Admin  # <1>
 ----
 
 <1> All users are assigned to the `Admin` role

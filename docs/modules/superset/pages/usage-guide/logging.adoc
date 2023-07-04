@@ -6,14 +6,15 @@ ConfigMap for the aggregator and by enabling the log agent:
 [source,yaml]
 ----
 spec:
-  vectorAggregatorConfigMapName: vector-aggregator-discovery
+  clusterConfig:
+    databaseInitialization:
+      logging:
+        enableVectorAgent: true
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
   nodes:
     config:
       logging:
         enableVectorAgent: true
-  databaseInitialization:
-    logging:
-      enableVectorAgent: true
 ----
 
 Further information on how to configure logging, can be found in
