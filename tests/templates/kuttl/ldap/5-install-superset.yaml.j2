@@ -31,19 +31,9 @@ spec:
   image:
     productVersion: "{{ test_scenario['values']['superset'].split('-stackable')[0] }}"
     stackableVersion: "{{ test_scenario['values']['superset'].split('-stackable')[1] }}"
-{% if lookup('env', 'VECTOR_AGGREGATOR') %}
-  vectorAggregatorConfigMapName: vector-aggregator-discovery
-{% endif %}
-  credentialsSecret: superset-with-ldap-credentials
-  nodes:
-    config:
-      logging:
-        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-    roleGroups:
-      default:
-        config:
-  authenticationConfig:
-    authenticationClass: {% if test_scenario['values']['ldap-authentication'] == 'no-tls' -%}
+  clusterConfig:
+    authentication:
+      - authenticationClass: {% if test_scenario['values']['ldap-authentication'] == 'no-tls' -%}
         superset-with-ldap-no-tls-ldap
       {%- elif test_scenario['values']['ldap-authentication'] == 'insecure-tls' -%}
         superset-with-ldap-insecure-tls-ldap
@@ -51,4 +41,16 @@ spec:
         superset-with-ldap-server-veri-tls-ldap
       {%- endif %}
 
-    userRegistrationRole: Admin
+        # We need the new line above otherwise j2 will mess up the indentation
+        userRegistrationRole: Admin
+    credentialsSecret: superset-with-ldap-credentials
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+  nodes:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1

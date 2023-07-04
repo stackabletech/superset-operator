@@ -55,8 +55,29 @@ spec:
   image:
     productVersion: "{{ test_scenario['values']['superset'].split('-stackable')[0] }}"
     stackableVersion: "{{ test_scenario['values']['superset'].split('-stackable')[1] }}"
-  vectorAggregatorConfigMapName: superset-vector-aggregator-discovery
-  credentialsSecret: superset-credentials
+  clusterConfig:
+    credentialsSecret: superset-credentials
+    vectorAggregatorConfigMapName: superset-vector-aggregator-discovery
+    databaseInitialization:
+      logging:
+        enableVectorAgent: true
+        containers:
+          superset-init-db:
+            console:
+              level: INFO
+            file:
+              level: INFO
+            loggers:
+              ROOT:
+                level: INFO
+          vector:
+            console:
+              level: INFO
+            file:
+              level: INFO
+            loggers:
+              ROOT:
+                level: INFO
   nodes:
     roleGroups:
       automatic-log-config:
@@ -90,23 +111,3 @@ spec:
               superset:
                 custom:
                   configMap: superset-log-config
-  databaseInitialization:
-    logging:
-      enableVectorAgent: true
-      containers:
-        superset-init-db:
-          console:
-            level: INFO
-          file:
-            level: INFO
-          loggers:
-            ROOT:
-              level: INFO
-        vector:
-          console:
-            level: INFO
-          file:
-            level: INFO
-          loggers:
-            ROOT:
-              level: INFO
