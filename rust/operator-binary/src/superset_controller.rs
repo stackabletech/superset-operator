@@ -242,7 +242,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         .spec
         .cluster_config
         .authentication
-        .resolve(&client)
+        .resolve(client)
         .await
         .context(InvalidAuthenticationConfigSnafu)?;
 

@@ -114,7 +114,7 @@ impl SupersetAuthentication {
 
         for config in &self.authentication {
             let auth_class = if let Some(auth_class) = &config.authentication_class {
-                let resolved = AuthenticationClass::resolve(client, &auth_class)
+                let resolved = AuthenticationClass::resolve(client, auth_class)
                     .await
                     .context(AuthenticationClassRetrievalSnafu {
                         authentication_class: ObjectRef::<AuthenticationClass>::new(auth_class),
@@ -138,7 +138,7 @@ impl SupersetAuthentication {
 
             resolved.push(SuperSetAuthenticationConfigResolved {
                 authentication_class: auth_class,
-                user_registration: config.user_registration.clone(),
+                user_registration: config.user_registration,
                 user_registration_role: config.user_registration_role.clone(),
                 sync_roles_at: config.sync_roles_at.clone(),
             })
