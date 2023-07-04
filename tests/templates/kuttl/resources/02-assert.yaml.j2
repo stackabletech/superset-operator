@@ -52,3 +52,27 @@ spec:
 status:
   readyReplicas: 1
   replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: superset-node-resources-from-pod-overrides
+spec:
+  template:
+    spec:
+      containers:
+        - name: superset
+          resources:
+            requests:
+              cpu: 290m
+              memory: 1Gi
+            limits:
+              cpu: 990m
+              memory: 1Gi
+        - name: metrics
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+        - name: vector
+{% endif %}
+status:
+  readyReplicas: 1
+  replicas: 1
