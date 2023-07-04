@@ -121,7 +121,7 @@ impl SupersetAuthentication {
                     })?;
 
                 // Checking for supported AuthenticationClass here is a little out of place, but is does not
-                // make sense to to iterate further after finding an unsupported AuthenticationClass.
+                // make sense to iterate further after finding an unsupported AuthenticationClass.
                 Some(match resolved.spec.provider {
                     AuthenticationClassProvider::Ldap(_) => resolved,
                     AuthenticationClassProvider::Tls(_)
