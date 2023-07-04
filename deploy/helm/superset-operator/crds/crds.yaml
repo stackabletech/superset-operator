@@ -36,6 +36,7 @@ spec:
                   description: Superset cluster configuration options.
                   properties:
                     authentication:
+                      default: []
                       items:
                         properties:
                           authenticationClass:
@@ -182,7 +183,6 @@ spec:
                       nullable: true
                       type: string
                   required:
-                    - authentication
                     - credentialsSecret
                   type: object
                 image:
