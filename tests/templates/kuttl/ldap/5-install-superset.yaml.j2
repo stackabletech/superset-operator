@@ -41,7 +41,6 @@ spec:
         superset-with-ldap-server-veri-tls-ldap
       {%- endif %}
 
-        # We need the new line above otherwise j2 will mess up the indentation
         userRegistrationRole: Admin
     credentialsSecret: superset-with-ldap-credentials
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
