@@ -49,17 +49,21 @@ tests:
       - superset
       - openshift
 suites:
-  - name: latest
+  - name: nightly
+    patch:
+      - dimensions:
+          - name: superset
+            expr: last
+  - name: smoke-latest
+    select:
+      - smoke
     patch:
       - dimensions:
           - expr: last
-  - name: smoke
-    select:
-      - smoke
   - name: openshift
     patch:
       - dimensions:
-          - expr: last
-      - dimensions:
+          - name: superset
+            expr: last
           - name: openshift
             expr: "true"
