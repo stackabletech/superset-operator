@@ -404,6 +404,12 @@ impl HasStatusCondition for SupersetCluster {
 }
 
 impl SupersetCluster {
+    pub fn get_role(&self, role: &SupersetRole) -> Option<&Role<SupersetConfigFragment>> {
+        match role {
+            SupersetRole::Node => self.spec.nodes.as_ref(),
+        }
+    }
+
     /// The name of the role-level load-balanced Kubernetes `Service`
     pub fn node_role_service_name(&self) -> Option<String> {
         self.metadata.name.clone()

@@ -1,6 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 
 use stackable_operator::builder::resources::ResourceRequirementsBuilder;
+use stackable_operator::k8s_openapi::DeepMerge;
 
 use crate::util::build_recommended_labels;
 use crate::{
@@ -211,6 +212,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     let client = &ctx.client;
     let resolved_product_image: ResolvedProductImage =
         superset.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
+    let superset_role = SupersetRole::Node;
 
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&superset.spec.cluster_config.cluster_operation);
@@ -251,7 +253,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         &transform_all_roles_to_config(
             superset.as_ref(),
             [(
-                SupersetRole::Node.to_string(),
+                superset_role.to_string(),
                 (
                     vec![
                         PropertyNameKind::Env,
@@ -268,8 +270,9 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         false,
     )
     .context(InvalidProductConfigSnafu)?;
+
     let role_node_config = validated_config
-        .get(&SupersetRole::Node.to_string())
+        .get(superset_role.to_string().as_str())
         .map(Cow::Borrowed)
         .unwrap_or_default();
 
@@ -327,6 +330,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         let rg_statefulset = build_server_rolegroup_statefulset(
             &superset,
             &resolved_product_image,
+            &superset_role,
             &rolegroup,
             rolegroup_config,
             &authentication_config,
@@ -547,26 +551,47 @@ fn build_node_rolegroup_service(
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_node_rolegroup_service`]).
+#[allow(clippy::too_many_arguments)]
 fn build_server_rolegroup_statefulset(
     superset: &SupersetCluster,
     resolved_product_image: &ResolvedProductImage,
+    superset_role: &SupersetRole,
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
     sa_name: &str,
     merged_config: &SupersetConfig,
 ) -> Result<StatefulSet> {
-    let rolegroup = superset
-        .spec
-        .nodes
-        .as_ref()
-        .context(NoNodeRoleSnafu)?
+    let role = superset.get_role(superset_role).context(NoNodeRoleSnafu)?;
+    let role_group = role
         .role_groups
-        .get(&rolegroup_ref.role_group);
+        .get(&rolegroup_ref.role_group)
+        .context(NoNodeRoleSnafu)?;
 
-    let mut cb = ContainerBuilder::new(&Container::Superset.to_string())
-        .context(InvalidContainerNameSnafu)?;
     let mut pb = PodBuilder::new();
+    pb.metadata_builder(|m| {
+        m.with_recommended_labels(build_recommended_labels(
+            superset,
+            SUPERSET_CONTROLLER_NAME,
+            &resolved_product_image.app_version_label,
+            &rolegroup_ref.role,
+            &rolegroup_ref.role_group,
+        ))
+    })
+    .image_pull_secrets_from_product_image(resolved_product_image)
+    .security_context(
+        PodSecurityContextBuilder::new()
+            .run_as_user(1000)
+            .run_as_group(0)
+            .fs_group(1000) // Needed for secret-operator
+            .build(),
+    )
+    .affinity(&merged_config.affinity)
+    .service_account_name(sa_name)
+    .build_template();
+
+    let mut superset_container = ContainerBuilder::new(&Container::Superset.to_string())
+        .context(InvalidContainerNameSnafu)?;
 
     for (name, value) in node_config
         .get(&PropertyNameKind::Env)
@@ -574,20 +599,32 @@ fn build_server_rolegroup_statefulset(
         .unwrap_or_default()
     {
         if name == SupersetConfig::CREDENTIALS_SECRET_PROPERTY {
-            cb.add_env_var_from_secret("SECRET_KEY", &value, "connections.secretKey");
-            cb.add_env_var_from_secret(
+            superset_container.add_env_var_from_secret(
+                "SECRET_KEY",
+                &value,
+                "connections.secretKey",
+            );
+            superset_container.add_env_var_from_secret(
                 "SQLALCHEMY_DATABASE_URI",
                 &value,
                 "connections.sqlalchemyDatabaseUri",
             );
         } else if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
-            cb.add_env_var_from_secret("MAPBOX_API_KEY", &value, "connections.mapboxApiKey");
+            superset_container.add_env_var_from_secret(
+                "MAPBOX_API_KEY",
+                &value,
+                "connections.mapboxApiKey",
+            );
         } else {
-            cb.add_env_var(name, value);
+            superset_container.add_env_var(name, value);
         };
     }
 
-    add_authentication_volumes_and_volume_mounts(authentication_config, &mut cb, &mut pb);
+    add_authentication_volumes_and_volume_mounts(
+        authentication_config,
+        &mut superset_container,
+        &mut pb,
+    );
 
     let webserver_timeout = node_config
         .get(&PropertyNameKind::File(
@@ -597,7 +634,7 @@ fn build_server_rolegroup_statefulset(
         .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
         .context(MissingWebServerTimeoutInSupersetConfigSnafu)?;
 
-    let container = cb
+    superset_container
         .image_from_product_image(resolved_product_image)
         .add_container_port("http", APP_PORT.into())
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_DIR)
@@ -621,8 +658,9 @@ fn build_server_rolegroup_statefulset(
                 'superset.app:create_app()'
             "},
         ])
-        .resources(merged_config.resources.clone().into())
-        .build();
+        .resources(merged_config.resources.clone().into());
+
+    pb.add_container(superset_container.build());
 
     let metrics_container = ContainerBuilder::new("metrics")
         .context(InvalidContainerNameSnafu)?
@@ -640,12 +678,10 @@ fn build_server_rolegroup_statefulset(
         )
         .build();
 
-    let volumes = controller_commons::create_volumes(
+    pb.add_volumes(controller_commons::create_volumes(
         &rolegroup_ref.object_name(),
         merged_config.logging.containers.get(&Container::Superset),
-    );
-
-    pb.add_container(container);
+    ));
     pb.add_container(metrics_container);
 
     if merged_config.logging.enable_vector_agent {
@@ -662,6 +698,10 @@ fn build_server_rolegroup_statefulset(
                 .build(),
         ));
     }
+
+    let mut pod_template = pb.build_template();
+    pod_template.merge_from(role.config.pod_overrides.clone());
+    pod_template.merge_from(role_group.config.pod_overrides.clone());
 
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
@@ -680,7 +720,7 @@ fn build_server_rolegroup_statefulset(
             .build(),
         spec: Some(StatefulSetSpec {
             pod_management_policy: Some("Parallel".to_string()),
-            replicas: rolegroup.and_then(|rg| rg.replicas).map(i32::from),
+            replicas: role_group.replicas.map(i32::from),
             selector: LabelSelector {
                 match_labels: Some(role_group_selector_labels(
                     superset,
@@ -691,28 +731,7 @@ fn build_server_rolegroup_statefulset(
                 ..LabelSelector::default()
             },
             service_name: rolegroup_ref.object_name(),
-            template: pb
-                .metadata_builder(|m| {
-                    m.with_recommended_labels(build_recommended_labels(
-                        superset,
-                        SUPERSET_CONTROLLER_NAME,
-                        &resolved_product_image.app_version_label,
-                        &rolegroup_ref.role,
-                        &rolegroup_ref.role_group,
-                    ))
-                })
-                .image_pull_secrets_from_product_image(resolved_product_image)
-                .add_volumes(volumes)
-                .security_context(
-                    PodSecurityContextBuilder::new()
-                        .run_as_user(1000)
-                        .run_as_group(0)
-                        .fs_group(1000) // Needed for secret-operator
-                        .build(),
-                )
-                .affinity(&merged_config.affinity)
-                .service_account_name(sa_name)
-                .build_template(),
+            template: pod_template,
             ..StatefulSetSpec::default()
         }),
         status: None,

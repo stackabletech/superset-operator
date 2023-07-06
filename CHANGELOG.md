@@ -7,16 +7,20 @@
 - Added support for Superset versions `1.4.2`, `1.5.3`, `2.0.1` and `2.1.0` ([#362]).
 - Generate OLM bundle for Release 23.4.0 ([#364]).
 - Missing CRD defaults for `status.conditions` field ([#367]).
-- Set explicit resources on all containers ([#371])
-- Operator errors out when credentialsSecret is missing ([#375]).
+- Set explicit resources on all containers ([#371]).
+- Support podOverrides ([#377]).
 
 ### Changed
 
-- `operator-rs` `0.40.2` -> `0.41.0` ([#360]).
+`operator-rs` `0.40.2` -> `0.42.2` ([#360], [#371]).
 - Use 0.0.0-dev product images for testing ([#361]).
 - Use testing-tools 0.2.0 ([#361]).
 - Added kuttl test suites ([#373]).
 - [BREAKING] Moved all top level config options to `clusterConfig`. Authentication is now provided via an array of AuthenticationClasses and additional properties ([#379]).
+
+### Fixed
+
+- Operator now errors out when `credentialsSecret` is missing ([#375]).
 
 [#360]: https://github.com/stackabletech/superset-operator/pull/360
 [#361]: https://github.com/stackabletech/superset-operator/pull/361
@@ -26,6 +30,7 @@
 [#371]: https://github.com/stackabletech/superset-operator/pull/371
 [#373]: https://github.com/stackabletech/superset-operator/pull/373
 [#375]: https://github.com/stackabletech/superset-operator/pull/375
+[#377]: https://github.com/stackabletech/superset-operator/pull/377
 [#379]: https://github.com/stackabletech/superset-operator/pull/379
 
 ## [23.4.0] - 2023-04-17

@@ -53,3 +53,13 @@ spec:
               max: "3"
             memory:
               limit: 3Gi
+      resources-from-pod-overrides:
+        podOverrides:
+          spec:
+            containers:
+              - name: hbase
+                resources:
+                  requests:
+                    cpu: 290m
+                  limits:
+                    cpu: 990m
