@@ -590,7 +590,7 @@ fn build_server_rolegroup_statefulset(
     .service_account_name(sa_name)
     .build_template();
 
-    let mut superset_container = ContainerBuilder::new(&Container::Superset.to_string())
+    let mut superset_cb = ContainerBuilder::new(&Container::Superset.to_string())
         .context(InvalidContainerNameSnafu)?;
 
     for (name, value) in node_config
@@ -599,32 +599,24 @@ fn build_server_rolegroup_statefulset(
         .unwrap_or_default()
     {
         if name == SupersetConfig::CREDENTIALS_SECRET_PROPERTY {
-            superset_container.add_env_var_from_secret(
-                "SECRET_KEY",
-                &value,
-                "connections.secretKey",
-            );
-            superset_container.add_env_var_from_secret(
+            superset_cb.add_env_var_from_secret("SECRET_KEY", &value, "connections.secretKey");
+            superset_cb.add_env_var_from_secret(
                 "SQLALCHEMY_DATABASE_URI",
                 &value,
                 "connections.sqlalchemyDatabaseUri",
             );
         } else if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
-            superset_container.add_env_var_from_secret(
+            superset_cb.add_env_var_from_secret(
                 "MAPBOX_API_KEY",
                 &value,
                 "connections.mapboxApiKey",
             );
         } else {
-            superset_container.add_env_var(name, value);
+            superset_cb.add_env_var(name, value);
         };
     }
 
-    add_authentication_volumes_and_volume_mounts(
-        authentication_config,
-        &mut superset_container,
-        &mut pb,
-    );
+    add_authentication_volumes_and_volume_mounts(authentication_config, &mut superset_cb, &mut pb);
 
     let webserver_timeout = node_config
         .get(&PropertyNameKind::File(
@@ -634,7 +626,7 @@ fn build_server_rolegroup_statefulset(
         .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
         .context(MissingWebServerTimeoutInSupersetConfigSnafu)?;
 
-    superset_container
+    superset_cb
         .image_from_product_image(resolved_product_image)
         .add_container_port("http", APP_PORT.into())
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_DIR)
@@ -660,7 +652,7 @@ fn build_server_rolegroup_statefulset(
         ])
         .resources(merged_config.resources.clone().into());
 
-    pb.add_container(superset_container.build());
+    pb.add_container(superset_cb.build());
 
     let metrics_container = ContainerBuilder::new("metrics")
         .context(InvalidContainerNameSnafu)?
