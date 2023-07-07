@@ -34,6 +34,114 @@ Users that log in with LDAP are assigned to a default https://superset.apache.or
 
 You can follow the xref:nightly@home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:nightly@home:reference:authenticationclass.adoc[] reference.
 
+=== [[oauth]]OAuth
+
+Strictly speaking, OAuth is an authorization protocol but can be used for authentication if the
+security implications are acceptable. In the Superset cluster CRD, authentication via OAuth is not
+directly supported but can be configured by overriding properties in `superset_config.py`. The
+following example uses https://www.keycloak.org/[Keycloak 21.1] as OAuth provider:
+
+[source,yaml]
+----
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: superset-with-oauth
+spec:
+  image:
+    productVersion: 2.1.0
+    stackableVersion: 0.0.0-dev
+  [...]
+  nodes:
+    configOverrides:
+      superset_config.py:
+        AUTH_TYPE: AUTH_OAUTH # <1>
+        AUTH_USER_REGISTRATION: 'true' # <2>
+        AUTH_USER_REGISTRATION_ROLE: 'Gamma' # <3>
+        OAUTH_PROVIDERS: |-
+          [
+            { 'name': 'keycloak', # <4>
+              'icon': 'fa-key', # <5>
+              'token_key': 'access_token', # <6>
+              'remote_app': {
+                'client_id': 'KEYCLOAK_CLIENT_ID',
+                'client_secret': 'KEYCLOAK_CLIENT_SECRET',
+                'api_base_url': 'https://KEYCLOAK_DOMAIN/realms/KEYCLOAK_REALM/protocol/openid-connect', # <7>
+                'client_kwargs': {
+                  'scope': 'email profile openid' # <8>
+                },
+                'access_token_url': 'https://KEYCLOAK_DOMAIN/realms/KEYCLOAK_REALM/protocol/openid-connect/token', # <9>
+                'authorize_url': 'https://KEYCLOAK_DOMAIN/realms/KEYCLOAK_REALM/protocol/openid-connect/auth', # <10>
+                'request_token_url': None,
+              },
+            }
+          ]
+----
+
+<1> The authentication type must be set to `AUTH_OAUTH`.
+<2> Authenticated users are added to the Superset database if they do not exist yet. The user
+    information is fetched from the `/userinfo` endpoint of the OAuth provider which is only
+    available if the `openid` scope is requested. The admin user is already present in the Superset
+    database as defined in the credentials secret, but the authentication is performed with the
+    password stored in Keycloak. The property `clusterConfig.authenticationConfig.userRegistration`
+    cannot be used here because it is only taken into account when an authentication class is set.
+<3> This role will be given in addition to any roles defined in `AUTH_ROLE_MAPPING`. The property
+    `clusterConfig.authenticationConfig.userRegistrationRole` cannot be used here because it is only
+    taken into account when an authentication class is set.
+<4> The name of the OAuth provider; Superset has built-in logic for `keycloak` and some other
+    providers.
+<5> The Font Awesome icon on the sign-in button
+<6> The token key name the provider uses
+<7> The base URL used for well-known endpoints like `/userinfo`. It must be reachable from the
+    Kubernetes cluster/Superset pod.
+<8> The scopes `email` and `profile` return claims which contain the user's name and email address
+    respectively. The `openid` scope is required for the `/userinfo` endpoint.
+<9> The access token URL must be reachable from the Kubernetes client/Superset pod.
+<10> The authorize URL must be reachable from the user's browser.
+
+A minimum client configuration in Keycloak looks like this:
+
+[source,json]
+----
+{
+  "clientId": "KEYCLOAK_CLIENT_ID",
+  "enabled": true,
+  "clientAuthenticatorType": "client-secret", # <1>
+  "secret": "KEYCLOAK_CLIENT_SECRET",
+  "redirectUris": [
+    "*"
+  ],
+  "webOrigins": [
+    "*"
+  ],
+  "standardFlowEnabled": true, # <2>
+  "protocol": "openid-connect" # <3>
+}
+----
+
+<1> Sets the OIDC type to confidential access type.
+<2> Enables the OAuth2 "Authorization Code Flow".
+<3> Enables OpenID Connect and OAuth2 support.
+
+Superset configuration examples for other providers can be found at
+https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-oauth[].
+
+=== [[oidc]]OpenID Connect
+
+OpenID Connect (OIDC) is an authentication protocol based on the OAuth 2.0 framework. Unfortunately,
+it is not supported by Superset out of the box. An adapted `SupersetSecurityManager` and the
+https://github.com/puiterwijk/flask-oidc[`flask-oidc`] library would be required which are both not
+included in the official Stackable product image. But as OpenID Connect is just an authentication
+layer on top of the OAuth 2.0 authorization framework, the configuration described in the
+xref:oauth[OAuth section] usually works for OpenID Connect providers too.
+
+=== OpenID
+
+OpenID Authentication 2.0 is an authentication protocol. It is deprecated in favor of
+xref:oidc[OpenID Connect]. Superset provides the authentication type `AUTH_OID` for it but also
+requires the https://github.com/pallets-eco/flask-openid[Flask-OpenID] library which is not included
+in the official Stackable product image.
+
 == [[authorization]]Authorization
 Superset has a concept called `Roles` which allows you to grant user permissions based on roles.
 Have a look at the https://superset.apache.org/docs/security[Superset documentation on Security].
