@@ -1,29 +1,31 @@
 pub mod affinity;
+pub mod authentication;
 pub mod druidconnection;
 pub mod supersetdb;
 
+use crate::authentication::SupersetAuthentication;
 use affinity::get_affinity;
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::commons::affinity::StackableAffinity;
-use stackable_operator::commons::cluster_operation::ClusterOperation;
-use stackable_operator::commons::product_image_selection::ProductImage;
-use stackable_operator::kube::ResourceExt;
-use stackable_operator::role_utils::RoleGroup;
-use stackable_operator::status::condition::{ClusterCondition, HasStatusCondition};
 use stackable_operator::{
-    commons::resources::{
-        CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
-        Resources, ResourcesFragment,
+    commons::{
+        affinity::StackableAffinity,
+        cluster_operation::ClusterOperation,
+        product_image_selection::ProductImage,
+        resources::{
+            CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
+            Resources, ResourcesFragment,
+        },
     },
     config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
-    kube::{runtime::reflector::ObjectRef, CustomResource},
+    kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
     product_config_utils::{ConfigError, Configuration},
     product_logging::{self, spec::Logging},
-    role_utils::{Role, RoleGroupRef},
+    role_utils::{Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
+    status::condition::{ClusterCondition, HasStatusCondition},
 };
 use std::collections::BTreeMap;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
@@ -147,28 +149,21 @@ pub struct SupersetClusterSpec {
     /// Superset cluster configuration options.
     #[serde(default)]
     pub cluster_config: SupersetClusterConfig,
-    /// Name of the Vector aggregator discovery ConfigMap.
-    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub vector_aggregator_config_map_name: Option<String>,
-    pub credentials_secret: String,
-    pub mapbox_secret: Option<String>,
-    #[serde(default)]
-    pub load_examples_on_init: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub authentication_config: Option<SupersetClusterAuthenticationConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nodes: Option<Role<SupersetConfigFragment>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub database_initialization: Option<supersetdb::SupersetDbConfigFragment>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetClusterConfig {
+    #[serde(flatten)]
+    pub authentication: SupersetAuthentication,
+    pub credentials_secret: String,
     /// Cluster operations like pause reconciliation or cluster stop.
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
-}
-
-#[derive(Clone, Debug, Default, Eq, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetClusterConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub database_initialization: Option<supersetdb::SupersetDbConfigFragment>,
     /// In the future this setting will control, which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html>
     /// will be used to expose the service.
     /// Currently only a subset of the ListenerClasses are supported by choosing the type of the created Services
@@ -182,6 +177,14 @@ pub struct SupersetClusterConfig {
     /// * external-stable: Use a LoadBalancer service
     #[serde(default)]
     pub listener_class: CurrentlySupportedListenerClasses,
+    #[serde(default)]
+    pub load_examples_on_init: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mapbox_secret: Option<String>,
+    /// Name of the Vector aggregator discovery ConfigMap.
+    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vector_aggregator_config_map_name: Option<String>,
 }
 
 // TODO: Temporary solution until listener-operator is finished
@@ -205,49 +208,6 @@ impl CurrentlySupportedListenerClasses {
             CurrentlySupportedListenerClasses::ExternalStable => "LoadBalancer".to_string(),
         }
     }
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetClusterAuthenticationConfig {
-    /// Name of the AuthenticationClass used to authenticate the users.
-    /// At the moment only LDAP is supported.
-    /// If not specified the default authentication (AUTH_DB) will be used.
-    pub authentication_class: Option<String>,
-
-    /// Allow users who are not already in the FAB DB.
-    /// Gets mapped to `AUTH_USER_REGISTRATION`
-    #[serde(default = "default_user_registration")]
-    pub user_registration: bool,
-
-    /// This role will be given in addition to any AUTH_ROLES_MAPPING.
-    /// Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
-    #[serde(default = "default_user_registration_role")]
-    pub user_registration_role: String,
-
-    /// If we should replace ALL the user's roles each login, or only on registration.
-    /// Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
-    #[serde(default = "default_sync_roles_at")]
-    pub sync_roles_at: LdapRolesSyncMoment,
-}
-
-pub fn default_user_registration() -> bool {
-    true
-}
-
-pub fn default_user_registration_role() -> String {
-    "Public".to_string()
-}
-
-/// Matches Flask's default mode of syncing at registration
-pub fn default_sync_roles_at() -> LdapRolesSyncMoment {
-    LdapRolesSyncMoment::Registration
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-pub enum LdapRolesSyncMoment {
-    Registration,
-    Login,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -387,9 +347,9 @@ impl Configuration for SupersetConfigFragment {
         let mut result = BTreeMap::new();
         result.insert(
             SupersetConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
-            Some(cluster.spec.credentials_secret.clone()),
+            Some(cluster.spec.cluster_config.credentials_secret.clone()),
         );
-        if let Some(msec) = &cluster.spec.mapbox_secret {
+        if let Some(msec) = &cluster.spec.cluster_config.mapbox_secret {
             result.insert(
                 SupersetConfig::MAPBOX_SECRET_PROPERTY.to_string(),
                 Some(msec.clone()),

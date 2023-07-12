@@ -117,15 +117,21 @@ impl SupersetDB {
                 .build(),
             spec: SupersetDBSpec {
                 image: superset.spec.image.clone(),
-                credentials_secret: superset.spec.credentials_secret.clone(),
-                load_examples: superset.spec.load_examples_on_init.unwrap_or_default(),
+                credentials_secret: superset.spec.cluster_config.credentials_secret.clone(),
+                load_examples: superset
+                    .spec
+                    .cluster_config
+                    .load_examples_on_init
+                    .unwrap_or_default(),
                 vector_aggregator_config_map_name: superset
                     .spec
+                    .cluster_config
                     .vector_aggregator_config_map_name
                     .clone(),
                 config: SupersetDbConfigFragment {
                     logging: superset
                         .spec
+                        .cluster_config
                         .database_initialization
                         .clone()
                         .unwrap_or_default()

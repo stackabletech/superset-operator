@@ -152,12 +152,12 @@ spec:
     productVersion: 2.1.0
     stackableVersion: 0.0.0-dev
   clusterConfig:
+    authentication:
+      - authenticationClass: superset-with-ldap-server-veri-tls-ldap
+        userRegistrationRole: Admin
+    credentialsSecret: superset-with-ldap-server-veri-tls-credentials
     listenerClass: external-unstable
-  credentialsSecret: superset-with-ldap-server-veri-tls-credentials
   nodes:
     roleGroups:
       default:
-        config:
-  authenticationConfig:
-    authenticationClass: superset-with-ldap-server-veri-tls-ldap
-    userRegistrationRole: Admin
+        replicas: 1

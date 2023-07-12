@@ -24,34 +24,139 @@ spec:
           properties:
             spec:
               properties:
-                authenticationConfig:
-                  nullable: true
-                  properties:
-                    authenticationClass:
-                      description: Name of the AuthenticationClass used to authenticate the users. At the moment only LDAP is supported. If not specified the default authentication (AUTH_DB) will be used.
-                      nullable: true
-                      type: string
-                    syncRolesAt:
-                      default: Registration
-                      description: If we should replace ALL the user's roles each login, or only on registration. Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
-                      enum:
-                        - Registration
-                        - Login
-                      type: string
-                    userRegistration:
-                      default: true
-                      description: Allow users who are not already in the FAB DB. Gets mapped to `AUTH_USER_REGISTRATION`
-                      type: boolean
-                    userRegistrationRole:
-                      default: Public
-                      description: This role will be given in addition to any AUTH_ROLES_MAPPING. Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
-                      type: string
-                  type: object
                 clusterConfig:
                   default:
+                    authentication: []
+                    credentialsSecret: ''
+                    clusterOperation:
+                      stopped: false
+                      reconciliationPaused: false
                     listenerClass: cluster-internal
+                    loadExamplesOnInit: null
                   description: Superset cluster configuration options.
                   properties:
+                    authentication:
+                      default: []
+                      items:
+                        properties:
+                          authenticationClass:
+                            description: Name of the AuthenticationClass used to authenticate the users. At the moment only LDAP is supported. If not specified the default authentication (AUTH_DB) will be used.
+                            nullable: true
+                            type: string
+                          syncRolesAt:
+                            default: Registration
+                            description: If we should replace ALL the user's roles each login, or only on registration. Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
+                            enum:
+                              - Registration
+                              - Login
+                            type: string
+                          userRegistration:
+                            default: true
+                            description: Allow users who are not already in the FAB DB. Gets mapped to `AUTH_USER_REGISTRATION`
+                            type: boolean
+                          userRegistrationRole:
+                            default: Public
+                            description: This role will be given in addition to any AUTH_ROLES_MAPPING. Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
+                            type: string
+                        type: object
+                      type: array
+                    clusterOperation:
+                      default:
+                        stopped: false
+                        reconciliationPaused: false
+                      description: Cluster operations like pause reconciliation or cluster stop.
+                      properties:
+                        reconciliationPaused:
+                          default: false
+                          description: Flag to stop cluster reconciliation by the operator. This means that all changes in the custom resource spec are ignored until this flag is set to false or removed. The operator will however still watch the deployed resources at the time and update the custom resource status field. If applied at the same time with `stopped`, `reconciliationPaused` will take precedence over `stopped` and stop the reconciliation immediately.
+                          type: boolean
+                        stopped:
+                          default: false
+                          description: Flag to stop the cluster. This means all deployed resources (e.g. Services, StatefulSets, ConfigMaps) are kept but all deployed Pods (e.g. replicas from a StatefulSet) are scaled to 0 and therefore stopped and removed. If applied at the same time with `reconciliationPaused`, the latter will pause reconciliation and `stopped` will take no effect until `reconciliationPaused` is set to false or removed.
+                          type: boolean
+                      type: object
+                    credentialsSecret:
+                      type: string
+                    databaseInitialization:
+                      nullable: true
+                      properties:
+                        logging:
+                          default:
+                            enableVectorAgent: null
+                            containers: {}
+                          properties:
+                            containers:
+                              additionalProperties:
+                                anyOf:
+                                  - required:
+                                      - custom
+                                  - {}
+                                description: Fragment derived from `ContainerLogConfigChoice`
+                                properties:
+                                  console:
+                                    nullable: true
+                                    properties:
+                                      level:
+                                        description: Log levels
+                                        enum:
+                                          - TRACE
+                                          - DEBUG
+                                          - INFO
+                                          - WARN
+                                          - ERROR
+                                          - FATAL
+                                          - NONE
+                                        nullable: true
+                                        type: string
+                                    type: object
+                                  custom:
+                                    description: Custom log configuration provided in a ConfigMap
+                                    properties:
+                                      configMap:
+                                        nullable: true
+                                        type: string
+                                    type: object
+                                  file:
+                                    nullable: true
+                                    properties:
+                                      level:
+                                        description: Log levels
+                                        enum:
+                                          - TRACE
+                                          - DEBUG
+                                          - INFO
+                                          - WARN
+                                          - ERROR
+                                          - FATAL
+                                          - NONE
+                                        nullable: true
+                                        type: string
+                                    type: object
+                                  loggers:
+                                    additionalProperties:
+                                      properties:
+                                        level:
+                                          description: Log levels
+                                          enum:
+                                            - TRACE
+                                            - DEBUG
+                                            - INFO
+                                            - WARN
+                                            - ERROR
+                                            - FATAL
+                                            - NONE
+                                          nullable: true
+                                          type: string
+                                      type: object
+                                    default: {}
+                                    type: object
+                                type: object
+                              type: object
+                            enableVectorAgent:
+                              nullable: true
+                              type: boolean
+                          type: object
+                      type: object
                     listenerClass:
                       default: cluster-internal
                       description: |-
@@ -67,103 +172,18 @@ spec:
                         - external-unstable
                         - external-stable
                       type: string
-                  type: object
-                clusterOperation:
-                  default:
-                    stopped: false
-                    reconciliationPaused: false
-                  description: Cluster operations like pause reconciliation or cluster stop.
-                  properties:
-                    reconciliationPaused:
-                      default: false
-                      description: Flag to stop cluster reconciliation by the operator. This means that all changes in the custom resource spec are ignored until this flag is set to false or removed. The operator will however still watch the deployed resources at the time and update the custom resource status field. If applied at the same time with `stopped`, `reconciliationPaused` will take precedence over `stopped` and stop the reconciliation immediately.
+                    loadExamplesOnInit:
+                      nullable: true
                       type: boolean
-                    stopped:
-                      default: false
-                      description: Flag to stop the cluster. This means all deployed resources (e.g. Services, StatefulSets, ConfigMaps) are kept but all deployed Pods (e.g. replicas from a StatefulSet) are scaled to 0 and therefore stopped and removed. If applied at the same time with `reconciliationPaused`, the latter will pause reconciliation and `stopped` will take no effect until `reconciliationPaused` is set to false or removed.
-                      type: boolean
-                  type: object
-                credentialsSecret:
-                  type: string
-                databaseInitialization:
-                  nullable: true
-                  properties:
-                    logging:
-                      default:
-                        enableVectorAgent: null
-                        containers: {}
-                      properties:
-                        containers:
-                          additionalProperties:
-                            anyOf:
-                              - required:
-                                  - custom
-                              - {}
-                            description: Fragment derived from `ContainerLogConfigChoice`
-                            properties:
-                              console:
-                                nullable: true
-                                properties:
-                                  level:
-                                    description: Log levels
-                                    enum:
-                                      - TRACE
-                                      - DEBUG
-                                      - INFO
-                                      - WARN
-                                      - ERROR
-                                      - FATAL
-                                      - NONE
-                                    nullable: true
-                                    type: string
-                                type: object
-                              custom:
-                                description: Custom log configuration provided in a ConfigMap
-                                properties:
-                                  configMap:
-                                    nullable: true
-                                    type: string
-                                type: object
-                              file:
-                                nullable: true
-                                properties:
-                                  level:
-                                    description: Log levels
-                                    enum:
-                                      - TRACE
-                                      - DEBUG
-                                      - INFO
-                                      - WARN
-                                      - ERROR
-                                      - FATAL
-                                      - NONE
-                                    nullable: true
-                                    type: string
-                                type: object
-                              loggers:
-                                additionalProperties:
-                                  properties:
-                                    level:
-                                      description: Log levels
-                                      enum:
-                                        - TRACE
-                                        - DEBUG
-                                        - INFO
-                                        - WARN
-                                        - ERROR
-                                        - FATAL
-                                        - NONE
-                                      nullable: true
-                                      type: string
-                                  type: object
-                                default: {}
-                                type: object
-                            type: object
-                          type: object
-                        enableVectorAgent:
-                          nullable: true
-                          type: boolean
-                      type: object
+                    mapboxSecret:
+                      nullable: true
+                      type: string
+                    vectorAggregatorConfigMapName:
+                      description: Name of the Vector aggregator discovery ConfigMap. It must contain the key `ADDRESS` with the address of the Vector aggregator.
+                      nullable: true
+                      type: string
+                  required:
+                    - credentialsSecret
                   type: object
                 image:
                   anyOf:
@@ -208,12 +228,6 @@ spec:
                       description: Stackable version of the product, e.g. 2.1.0
                       type: string
                   type: object
-                loadExamplesOnInit:
-                  nullable: true
-                  type: boolean
-                mapboxSecret:
-                  nullable: true
-                  type: string
                 nodes:
                   nullable: true
                   properties:
@@ -7033,12 +7047,7 @@ spec:
                   required:
                     - roleGroups
                   type: object
-                vectorAggregatorConfigMapName:
-                  description: Name of the Vector aggregator discovery ConfigMap. It must contain the key `ADDRESS` with the address of the Vector aggregator.
-                  nullable: true
-                  type: string
               required:
-                - credentialsSecret
                 - image
               type: object
             status:

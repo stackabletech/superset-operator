@@ -1,10 +1,8 @@
 use stackable_operator::commons::authentication::{
-    ldap::LdapAuthenticationProvider, tls::TlsVerification, AuthenticationClass,
-    AuthenticationClassProvider,
+    ldap::LdapAuthenticationProvider, tls::TlsVerification, AuthenticationClassProvider,
 };
-use stackable_superset_crd::{
-    LdapRolesSyncMoment, SupersetClusterAuthenticationConfig, SupersetConfigOptions,
-};
+use stackable_superset_crd::authentication::SuperSetAuthenticationConfigResolved;
+use stackable_superset_crd::{authentication::FlaskRolesSyncMoment, SupersetConfigOptions};
 use std::collections::BTreeMap;
 
 pub const PYTHON_IMPORTS: &[&str] = &[
@@ -16,8 +14,7 @@ pub const PYTHON_IMPORTS: &[&str] = &[
 
 pub fn add_superset_config(
     config: &mut BTreeMap<String, String>,
-    authentication_config: Option<&SupersetClusterAuthenticationConfig>,
-    authentication_class: Option<&AuthenticationClass>,
+    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
 ) {
     config.insert(
         SupersetConfigOptions::SecretKey.to_string(),
@@ -40,34 +37,36 @@ pub fn add_superset_config(
         "StackableLoggingConfigurator()".into(),
     );
 
-    if let (Some(authentication_config), Some(authentication_class)) =
-        (authentication_config, authentication_class)
-    {
-        append_authentication_config(config, authentication_config, authentication_class);
-    }
+    append_authentication_config(config, authentication_config);
 }
 
 fn append_authentication_config(
     config: &mut BTreeMap<String, String>,
-    authentication_config: &SupersetClusterAuthenticationConfig,
-    authentication_class: &AuthenticationClass,
+    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
 ) {
-    if let AuthenticationClassProvider::Ldap(ldap) = &authentication_class.spec.provider {
-        append_ldap_config(config, ldap);
-    }
+    // TODO: we make sure in crd/src/authentication.rs that currently there is only one
+    //    AuthenticationClass provided. If the FlaskAppBuilder ever supports this we have
+    //    to adapt the config here accordingly
+    for auth_config in authentication_config {
+        if let Some(auth_class) = &auth_config.authentication_class {
+            if let AuthenticationClassProvider::Ldap(ldap) = &auth_class.spec.provider {
+                append_ldap_config(config, ldap);
+            }
+        }
 
-    config.insert(
-        SupersetConfigOptions::AuthUserRegistration.to_string(),
-        authentication_config.user_registration.to_string(),
-    );
-    config.insert(
-        SupersetConfigOptions::AuthUserRegistrationRole.to_string(),
-        authentication_config.user_registration_role.to_string(),
-    );
-    config.insert(
-        SupersetConfigOptions::AuthRolesSyncAtLogin.to_string(),
-        (authentication_config.sync_roles_at == LdapRolesSyncMoment::Login).to_string(),
-    );
+        config.insert(
+            SupersetConfigOptions::AuthUserRegistration.to_string(),
+            auth_config.user_registration.to_string(),
+        );
+        config.insert(
+            SupersetConfigOptions::AuthUserRegistrationRole.to_string(),
+            auth_config.user_registration_role.to_string(),
+        );
+        config.insert(
+            SupersetConfigOptions::AuthRolesSyncAtLogin.to_string(),
+            (auth_config.sync_roles_at == FlaskRolesSyncMoment::Login).to_string(),
+        );
+    }
 }
 
 fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenticationProvider) {
