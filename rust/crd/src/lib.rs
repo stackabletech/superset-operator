@@ -20,6 +20,7 @@ use stackable_operator::{
     config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
+    memory::{BinaryMultiple, MemoryQuantity},
     product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
     product_config_utils::{ConfigError, Configuration},
     product_logging::{self, spec::Logging},
@@ -36,7 +37,10 @@ pub const LOG_CONFIG_DIR: &str = "/stackable/log_config";
 pub const LOG_DIR: &str = "/stackable/log";
 pub const PYTHONPATH: &str = "/stackable/app/pythonpath";
 pub const SUPERSET_CONFIG_FILENAME: &str = "superset_config.py";
-pub const LOG_VOLUME_SIZE_IN_MIB: u32 = 10;
+pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
+    value: 10.0,
+    unit: BinaryMultiple::Mebi,
+};
 
 #[derive(Debug, Snafu)]
 pub enum Error {

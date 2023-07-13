@@ -12,7 +12,7 @@
 
 ### Changed
 
-`operator-rs` `0.40.2` -> `0.42.2` ([#360], [#371]).
+`operator-rs` `0.40.2` -> `0.44.0` ([#360], [#371], [#383]).
 - Use 0.0.0-dev product images for testing ([#361]).
 - Use testing-tools 0.2.0 ([#361]).
 - Added kuttl test suites ([#373]).
@@ -21,6 +21,7 @@
 ### Fixed
 
 - Operator now errors out when `credentialsSecret` is missing ([#375]).
+- Increase the size limit of the log volume ([#383]).
 
 [#360]: https://github.com/stackabletech/superset-operator/pull/360
 [#361]: https://github.com/stackabletech/superset-operator/pull/361
@@ -32,6 +33,7 @@
 [#375]: https://github.com/stackabletech/superset-operator/pull/375
 [#377]: https://github.com/stackabletech/superset-operator/pull/377
 [#379]: https://github.com/stackabletech/superset-operator/pull/379
+[#383]: https://github.com/stackabletech/superset-operator/pull/383
 
 ## [23.4.0] - 2023-04-17
 
