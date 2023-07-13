@@ -1,14 +1,15 @@
 use stackable_operator::{
     builder::VolumeBuilder,
-    k8s_openapi::{
-        api::core::v1::{ConfigMapVolumeSource, EmptyDirVolumeSource, Volume},
-        apimachinery::pkg::api::resource::Quantity,
-    },
-    product_logging::spec::{
-        ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice, CustomContainerLogConfig,
+    k8s_openapi::api::core::v1::{ConfigMapVolumeSource, EmptyDirVolumeSource, Volume},
+    product_logging::{
+        self,
+        spec::{
+            ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
+            CustomContainerLogConfig,
+        },
     },
 };
-use stackable_superset_crd::LOG_VOLUME_SIZE_IN_MIB;
+use stackable_superset_crd::MAX_LOG_FILES_SIZE;
 
 pub const CONFIG_VOLUME_NAME: &str = "config";
 pub const LOG_CONFIG_VOLUME_NAME: &str = "log-config";
@@ -29,7 +30,9 @@ pub fn create_volumes(
         name: LOG_VOLUME_NAME.into(),
         empty_dir: Some(EmptyDirVolumeSource {
             medium: None,
-            size_limit: Some(Quantity(format!("{LOG_VOLUME_SIZE_IN_MIB}Mi"))),
+            size_limit: Some(product_logging::framework::calculate_log_volume_size_limit(
+                &[MAX_LOG_FILES_SIZE],
+            )),
         }),
         ..Volume::default()
     });
