@@ -77,7 +77,7 @@
 - Fixed the RoleGroup `selector`. It was not used before. ([#306])
 - Updated stackable image versions ([#295])
 - [BREAKING] Use Product image selection instead of version ([#304])
-  - `spec.version` has been replaced by `spec.image` 
+  - `spec.version` has been replaced by `spec.image`
   - `spec.statsdExporterVersion` has been removed, the statsd-exporter is now part of the images itself
 - Refactored LDAP authentication handling to use functionality from the `LdapAuthenticationProvider` ([#311])
 
