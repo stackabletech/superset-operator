@@ -59,8 +59,6 @@ a list of available versions please check our
 https://repo.stackable.tech/#browse/browse:docker:v2%2Fstackable%2Fsuperset%2Ftags[image registry].
 It should generally be safe to simply use the latest image version that is available.
 
-`spec.statsdExporterVersion` must contain the tag of a statsd-exporter Docker image in the Stackable repository.
-
 The previously created secret must be referenced in `spec.credentialsSecret`.
 
 The `spec.loadExamplesOnInit` key is optional and defaults to `false`, it can be set to `true` to load example data into Superset when the database is initialized.
@@ -68,7 +66,7 @@ The `spec.loadExamplesOnInit` key is optional and defaults to `false`, it can be
 The `rowLimit` configuration option defines the row limit when requesting chart data.
 
 The `webserverTimeout` configuration option defines the maximum number of seconds a Superset request can take before timing out.
-This settings effect the maximum duration a query to an underlying datasource can take.
+These settings affect the maximum duration a query to an underlying datasource can take.
 If you get timeout errors before your query returns the result you may need to increase this timeout.
 
 === Initialization of the Superset database
