@@ -190,8 +190,10 @@ pub async fn reconcile_druid_connection(
                         client,
                     )
                     .await?;
-                    let resolved_product_image: ResolvedProductImage =
-                        superset_db.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
+                    let resolved_product_image: ResolvedProductImage = superset_db
+                        .spec
+                        .image
+                        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::CARGO_PKG_VERSION);
                     let job = build_import_job(
                         &superset_db,
                         &druid_connection,

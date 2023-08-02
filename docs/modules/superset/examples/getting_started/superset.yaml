@@ -6,7 +6,6 @@ metadata:
 spec:
   image:
     productVersion: 2.1.0
-    stackableVersion: 0.0.0-dev
   clusterConfig:
     credentialsSecret: simple-superset-credentials
     listenerClass: external-unstable

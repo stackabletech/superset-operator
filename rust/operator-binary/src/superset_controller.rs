@@ -210,8 +210,10 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     tracing::info!("Starting reconcile");
 
     let client = &ctx.client;
-    let resolved_product_image: ResolvedProductImage =
-        superset.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
+    let resolved_product_image: ResolvedProductImage = superset
+        .spec
+        .image
+        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::CARGO_PKG_VERSION);
     let superset_role = SupersetRole::Node;
 
     let cluster_operation_cond_builder =

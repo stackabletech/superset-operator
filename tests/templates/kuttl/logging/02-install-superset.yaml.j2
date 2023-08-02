@@ -53,8 +53,7 @@ metadata:
   name: superset
 spec:
   image:
-    productVersion: "{{ test_scenario['values']['superset'].split('-stackable')[0] }}"
-    stackableVersion: "{{ test_scenario['values']['superset'].split('-stackable')[1] }}"
+    productVersion: "{{ test_scenario['values']['superset'] }}"
   clusterConfig:
     credentialsSecret: superset-credentials
     vectorAggregatorConfigMapName: superset-vector-aggregator-discovery

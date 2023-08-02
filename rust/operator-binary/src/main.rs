@@ -37,6 +37,7 @@ use std::sync::Arc;
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
     pub const TARGET_PLATFORM: Option<&str> = option_env!("TARGET");
+    pub const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 }
 
 pub const APP_PORT: u16 = 8088;

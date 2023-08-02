@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Default stackableVersion to operator version ([#390]).
+
+[#390]: https://github.com/stackabletech/superset-operator/pull/390
+
 ## [23.7.0] - 2023-07-14
 
 ### Added

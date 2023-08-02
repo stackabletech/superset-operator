@@ -88,7 +88,7 @@ impl SupersetDbConfig {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetDBSpec {
-    /// The Superset image to use<
+    /// The Superset image to use
     pub image: ProductImage,
     pub credentials_secret: String,
     pub load_examples: bool,
