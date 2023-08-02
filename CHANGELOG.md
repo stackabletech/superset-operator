@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Default stackableVersion to operator version ([#XXX]).
+
 ## [23.7.0] - 2023-07-14
 
 ### Added

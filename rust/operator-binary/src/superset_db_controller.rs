@@ -126,8 +126,10 @@ pub async fn reconcile_superset_db(superset_db: Arc<SupersetDB>, ctx: Arc<Ctx>) 
 
     let client = &ctx.client;
     let namespace = superset_db.namespace().context(ObjectHasNoNamespaceSnafu)?;
-    let resolved_product_image: ResolvedProductImage =
-        superset_db.spec.image.resolve(DOCKER_IMAGE_BASE_NAME);
+    let resolved_product_image: ResolvedProductImage = superset_db
+        .spec
+        .image
+        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::CARGO_PKG_VERSION);
 
     let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(superset_db.as_ref(), APP_NAME);
     client
