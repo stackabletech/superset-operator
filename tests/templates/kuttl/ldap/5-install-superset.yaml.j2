@@ -29,8 +29,7 @@ metadata:
   name: superset-with-ldap
 spec:
   image:
-    productVersion: "{{ test_scenario['values']['superset'].split('-stackable')[0] }}"
-    stackableVersion: "{{ test_scenario['values']['superset'].split('-stackable')[1] }}"
+    productVersion: "{{ test_scenario['values']['superset'] }}"
   clusterConfig:
     authentication:
       - authenticationClass: {% if test_scenario['values']['ldap-authentication'] == 'no-tls' -%}

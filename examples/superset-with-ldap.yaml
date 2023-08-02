@@ -150,7 +150,6 @@ metadata:
 spec:
   image:
     productVersion: 2.1.0
-    stackableVersion: 0.0.0-dev
   clusterConfig:
     authentication:
       - authenticationClass: superset-with-ldap-server-veri-tls-ldap
