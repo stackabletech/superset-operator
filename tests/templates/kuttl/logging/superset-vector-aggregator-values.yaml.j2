@@ -20,40 +20,52 @@ customConfig:
       type: vector
       version: "2"
   transforms:
-    automaticLogConfigSuperset:
+    filteredAutomaticLogConfigSuperset:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "superset-node-automatic-log-config-0" &&
         .container == "superset"
-    automaticLogConfigVector:
+    filteredAutomaticLogConfigVector:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "superset-node-automatic-log-config-0" &&
         .container == "vector"
-    customLogConfigSuperset:
+    filteredCustomLogConfigSuperset:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "superset-node-custom-log-config-0" &&
         .container == "superset"
-    customLogConfigVector:
+    filteredCustomLogConfigVector:
       type: filter
       inputs: [vector]
       condition: >-
         .pod == "superset-node-custom-log-config-0" &&
         .container == "vector"
-    automaticLogConfigInitDb:
+    filteredAutomaticLogConfigInitDb:
       type: filter
       inputs: [vector]
       condition: .container == "superset-init-db"
+    filteredInvalidEvents:
+      type: filter
+      inputs: [vector]
+      condition: |-
+        .timestamp == from_unix_timestamp!(0) ||
+        is_null(.level) ||
+        is_null(.logger) ||
+        is_null(.message)
   sinks:
     out:
-      inputs: [automaticLogConfig*, customLogConfig*]
+      inputs: [filtered*]
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
       type: vector
       address: {{ lookup('env', 'VECTOR_AGGREGATOR') }}
+      buffer:
+        # Avoid back pressure from VECTOR_AGGREGATOR. The test should
+        # not fail if the aggregator is not available.
+        when_full: drop_newest
 {% else %}
       type: blackhole
 {% endif %}
