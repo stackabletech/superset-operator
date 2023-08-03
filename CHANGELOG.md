@@ -6,7 +6,13 @@
 
 - Default stackableVersion to operator version ([#390]).
 
+### Changed
+
+- `vector` `0.26.0` -> `0.31.0` ([#391]).
+- `operator-rs` `0.44.0` -> `0.45.1` ([#390]).
+
 [#390]: https://github.com/stackabletech/superset-operator/pull/390
+[#391]: https://github.com/stackabletech/superset-operator/pull/391
 
 ## [23.7.0] - 2023-07-14
 
