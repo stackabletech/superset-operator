@@ -32,7 +32,7 @@ For every xref:concepts:roles-and-role-groups.adoc#_role_groups[role group] you 
 
 ConfigMaps are created, one per RoleGroup and also one for the SupersetDB. Both ConfigMaps contains two files: `log_config.py` and `superset_config.py` which contain logging and general Superset configuration respectively.
 
-== Dependencies
+== Required external component: Metastore SQL database
 
 Superset requires an SQL database in which to store its metadata, dashboards and users. The xref:getting_started/index.adoc[] guides you through installing an example database with a Superset instance that you can use to get started, but is not suitable for production use. Follow the setup instructions for one of the xref:required-external-components.adoc[supported databases] for a production database.
 
