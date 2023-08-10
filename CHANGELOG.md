@@ -11,6 +11,10 @@
 - `vector` `0.26.0` -> `0.31.0` ([#391]).
 - `operator-rs` `0.44.0` -> `0.45.1` ([#390]).
 
+### Fixed
+
+- Rename Service port name from `superset` to `http` for consistency reasons ([#XXX]).
+
 [#390]: https://github.com/stackabletech/superset-operator/pull/390
 [#391]: https://github.com/stackabletech/superset-operator/pull/391
 
