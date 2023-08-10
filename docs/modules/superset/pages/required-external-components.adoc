@@ -1,0 +1,8 @@
+= Required external components
+
+Superset uses an SQL database to store metadata. The supported databases and versions are:
+
+* PostgreSQL 10, 11, 12, 13, 14, 15
+* MySQL 5
+
+Reference: https://superset.apache.org/docs/installation/configuring-superset/#using-a-production-metastore[Superset documentation]
