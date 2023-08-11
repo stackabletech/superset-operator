@@ -413,7 +413,7 @@ fn build_node_role_service(
                     .k8s_service_type(),
             ),
             ports: Some(vec![ServicePort {
-                name: Some("superset".to_string()),
+                name: Some("http".to_string()),
                 port: APP_PORT.into(),
                 protocol: Some("TCP".to_string()),
                 ..ServicePort::default()
@@ -525,7 +525,7 @@ fn build_node_rolegroup_service(
             cluster_ip: Some("None".to_string()),
             ports: Some(vec![
                 ServicePort {
-                    name: Some("superset".to_string()),
+                    name: Some("http".to_string()),
                     port: APP_PORT.into(),
                     protocol: Some("TCP".to_string()),
                     ..ServicePort::default()
