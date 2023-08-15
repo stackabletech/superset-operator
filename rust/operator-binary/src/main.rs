@@ -4,12 +4,10 @@ mod druid_connection_controller;
 mod product_logging;
 mod rbac;
 mod superset_controller;
-mod superset_db_controller;
 mod util;
 
 use crate::druid_connection_controller::DRUID_CONNECTION_CONTROLLER_NAME;
 use crate::superset_controller::SUPERSET_CONTROLLER_NAME;
-use crate::superset_db_controller::SUPERSET_DB_CONTROLLER_NAME;
 
 use clap::{crate_description, crate_version, Parser};
 use futures::StreamExt;
@@ -19,7 +17,7 @@ use stackable_operator::{
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         batch::v1::Job,
-        core::v1::{ConfigMap, Secret, Service},
+        core::v1::{ConfigMap, Service},
     },
     kube::{
         runtime::{reflector::ObjectRef, watcher, Controller},
@@ -30,7 +28,7 @@ use stackable_operator::{
 };
 use stackable_superset_crd::{
     authentication::SupersetAuthentication, druidconnection::DruidConnection,
-    supersetdb::SupersetDB, SupersetCluster, APP_NAME,
+    SupersetCluster, APP_NAME,
 };
 use std::sync::Arc;
 
@@ -56,7 +54,6 @@ async fn main() -> anyhow::Result<()> {
     match opts.cmd {
         Command::Crd => {
             SupersetCluster::print_yaml_schema()?;
-            SupersetDB::print_yaml_schema()?;
             DruidConnection::print_yaml_schema()?;
         }
         Command::Run(ProductOperatorRun {
@@ -91,7 +88,6 @@ async fn main() -> anyhow::Result<()> {
                 watcher::Config::default(),
             );
             let superset_store_1 = superset_controller_builder.store();
-            let superset_store_2 = superset_controller_builder.store();
             let superset_controller = superset_controller_builder
                 .owns(
                     watch_namespace.get_api::<Service>(&client),
@@ -118,20 +114,6 @@ async fn main() -> anyhow::Result<()> {
                             .map(|superset| ObjectRef::from_obj(&*superset))
                     },
                 )
-                .watches(
-                    watch_namespace.get_api::<SupersetDB>(&client),
-                    watcher::Config::default(),
-                    move |superset_db| {
-                        superset_store_2
-                            .state()
-                            .into_iter()
-                            .filter(move |superset| {
-                                superset_db.name_unchecked() == superset.name_unchecked()
-                                    && superset_db.namespace() == superset.namespace()
-                            })
-                            .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
-                    },
-                )
                 .run(
                     superset_controller::reconcile_superset,
                     superset_controller::error_policy,
@@ -148,62 +130,6 @@ async fn main() -> anyhow::Result<()> {
                     )
                 });
 
-            let superset_db_controller_builder = Controller::new(
-                watch_namespace.get_api::<SupersetDB>(&client),
-                watcher::Config::default(),
-            );
-            let superset_db_store1 = superset_db_controller_builder.store();
-            let superset_db_store2 = superset_db_controller_builder.store();
-            let superset_db_controller = superset_db_controller_builder
-                .shutdown_on_signal()
-                .watches(
-                    watch_namespace.get_api::<Secret>(&client),
-                    watcher::Config::default(),
-                    move |secret| {
-                        superset_db_store1
-                            .state()
-                            .into_iter()
-                            .filter(move |superset_db| {
-                                if let Some(n) = &secret.metadata.name {
-                                    &superset_db.spec.credentials_secret == n
-                                } else {
-                                    false
-                                }
-                            })
-                            .map(|superset_db| ObjectRef::from_obj(&*superset_db))
-                    },
-                )
-                // We have to watch jobs so we can react to finished init jobs
-                // and update our status accordingly
-                .watches(
-                    watch_namespace.get_api::<Job>(&client),
-                    watcher::Config::default(),
-                    move |job| {
-                        superset_db_store2
-                            .state()
-                            .into_iter()
-                            .filter(move |superset_db| {
-                                job.name_unchecked() == superset_db.name_unchecked()
-                                    && job.namespace() == superset_db.namespace()
-                            })
-                            .map(|superset_db| ObjectRef::from_obj(&*superset_db))
-                    },
-                )
-                .run(
-                    superset_db_controller::reconcile_superset_db,
-                    superset_db_controller::error_policy,
-                    Arc::new(superset_db_controller::Ctx {
-                        client: client.clone(),
-                    }),
-                )
-                .map(|res| {
-                    report_controller_reconciled(
-                        &client,
-                        &format!("{SUPERSET_DB_CONTROLLER_NAME}.{OPERATOR_NAME}"),
-                        &res,
-                    )
-                });
-
             let druid_connection_controller_builder = Controller::new(
                 watch_namespace.get_api::<DruidConnection>(&client),
                 watcher::Config::default(),
@@ -214,16 +140,16 @@ async fn main() -> anyhow::Result<()> {
             let druid_connection_controller = druid_connection_controller_builder
                 .shutdown_on_signal()
                 .watches(
-                    watch_namespace.get_api::<SupersetDB>(&client),
+                    watch_namespace.get_api::<SupersetCluster>(&client),
                     watcher::Config::default(),
-                    move |superset_db| {
+                    move |superset_cluster| {
                         druid_connection_store_1
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                druid_connection.superset_name() == superset_db.name_unchecked()
+                                druid_connection.superset_name() == superset_cluster.name_unchecked()
                                     && druid_connection.superset_namespace().ok()
-                                        == superset_db.namespace()
+                                        == superset_cluster.namespace()
                             })
                             .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
@@ -274,7 +200,7 @@ async fn main() -> anyhow::Result<()> {
                 });
 
             futures::stream::select(
-                futures::stream::select(superset_controller, superset_db_controller),
+                superset_controller,
                 druid_connection_controller,
             )
             .collect::<()>()

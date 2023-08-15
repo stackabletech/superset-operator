@@ -1,7 +1,6 @@
 pub mod affinity;
 pub mod authentication;
 pub mod druidconnection;
-pub mod supersetdb;
 
 use crate::authentication::SupersetAuthentication;
 use affinity::get_affinity;
@@ -166,8 +165,6 @@ pub struct SupersetClusterConfig {
     /// Cluster operations like pause reconciliation or cluster stop.
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub database_initialization: Option<supersetdb::SupersetDbConfigFragment>,
     /// In the future this setting will control, which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html>
     /// will be used to expose the service.
     /// Currently only a subset of the ListenerClasses are supported by choosing the type of the created Services

@@ -17,9 +17,9 @@ use stackable_operator::{
     },
     logging::controller::ReconcilerError,
 };
+use stackable_superset_crd::SupersetCluster;
 use stackable_superset_crd::{
     druidconnection::{DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition},
-    supersetdb::{SupersetDB, SupersetDBStatusCondition},
     PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
 use std::{sync::Arc, time::Duration};
@@ -63,10 +63,6 @@ pub enum Error {
     DruidDiscoveryCheck {
         source: stackable_operator::error::Error,
     },
-    #[snafu(display("failed to retrieve superset db"))]
-    SupersetDBRetrieval {
-        source: stackable_operator::error::Error,
-    },
     #[snafu(display("namespace missing on DruidConnection {druid_connection}"))]
     DruidConnectionNoNamespace {
         source: stackable_superset_crd::druidconnection::Error,
@@ -78,6 +74,10 @@ pub enum Error {
     },
     #[snafu(display("failed to patch role binding"))]
     ApplyRoleBinding {
+        source: stackable_operator::error::Error,
+    },
+    #[snafu(display("failed to retrieve superset cluster"))]
+    SupersetClusterRetrieval {
         source: stackable_operator::error::Error,
     },
 }
@@ -100,12 +100,12 @@ impl ReconcilerError for Error {
             Error::MissingDruidConnString => None,
             Error::GetImportJob { import_job, .. } => Some(import_job.clone().erase()),
             Error::DruidDiscoveryCheck { .. } => None,
-            Error::SupersetDBRetrieval { .. } => None,
             Error::DruidConnectionNoNamespace {
                 druid_connection, ..
             } => Some(druid_connection.clone().erase()),
             Error::ApplyServiceAccount { .. } => None,
             Error::ApplyRoleBinding { .. } => None,
+            Error::SupersetClusterRetrieval { .. } => None,
         }
     }
 }
@@ -136,23 +136,6 @@ pub async fn reconcile_druid_connection(
     if let Some(ref s) = druid_connection.status {
         match s.condition {
             DruidConnectionStatusCondition::Pending => {
-                // Is the superset DB object there, and is its status "Ready"?
-                let mut superset_db_ready = false;
-                if let Some(status) = client
-                    .get::<SupersetDB>(
-                        &druid_connection.superset_name(),
-                        &druid_connection.superset_namespace().context(
-                            DruidConnectionNoNamespaceSnafu {
-                                druid_connection: ObjectRef::from_obj(&*druid_connection),
-                            },
-                        )?,
-                    )
-                    .await
-                    .context(SupersetDBRetrievalSnafu)?
-                    .status
-                {
-                    superset_db_ready = status.condition == SupersetDBStatusCondition::Ready;
-                }
                 // Is the referenced druid discovery configmap there?
                 let druid_discovery_cm_exists = client
                     .get_opt::<ConfigMap>(
@@ -167,9 +150,9 @@ pub async fn reconcile_druid_connection(
                     .context(DruidDiscoveryCheckSnafu)?
                     .is_some();
 
-                if superset_db_ready && druid_discovery_cm_exists {
-                    let superset_db = client
-                        .get::<SupersetDB>(
+                if druid_discovery_cm_exists {
+                    let superset_cluster = client
+                        .get::<SupersetCluster>(
                             &druid_connection.superset_name(),
                             &druid_connection.superset_namespace().context(
                                 DruidConnectionNoNamespaceSnafu {
@@ -178,7 +161,7 @@ pub async fn reconcile_druid_connection(
                             )?,
                         )
                         .await
-                        .context(SupersetDBRetrievalSnafu)?;
+                        .context(SupersetClusterRetrievalSnafu)?;
                     // Everything is there, retrieve all necessary info and start the job
                     let sqlalchemy_str = get_sqlalchemy_uri_for_druid_cluster(
                         &druid_connection.druid_name(),
@@ -190,12 +173,12 @@ pub async fn reconcile_druid_connection(
                         client,
                     )
                     .await?;
-                    let resolved_product_image: ResolvedProductImage = superset_db
+                    let resolved_product_image: ResolvedProductImage = superset_cluster
                         .spec
                         .image
                         .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::CARGO_PKG_VERSION);
                     let job = build_import_job(
-                        &superset_db,
+                        &superset_cluster,
                         &druid_connection,
                         &resolved_product_image,
                         &sqlalchemy_str,
@@ -290,7 +273,7 @@ fn build_druid_db_yaml(druid_cluster_name: &str, sqlalchemy_str: &str) -> Result
 
 /// Builds the import job.  When run it will import the druid connection into the database.
 async fn build_import_job(
-    superset_db: &SupersetDB,
+    superset_cluster: &SupersetCluster,
     druid_connection: &DruidConnection,
     resolved_product_image: &ResolvedProductImage,
     sqlalchemy_str: &str,
@@ -310,7 +293,7 @@ async fn build_import_job(
         "superset import_datasources -p /tmp/druids.yaml",
     ));
 
-    let secret = &superset_db.spec.credentials_secret;
+    let secret = &superset_cluster.spec.cluster_config.credentials_secret;
 
     let container = ContainerBuilder::new("superset-import-druid-connection")
         .expect("ContainerBuilder not created")
