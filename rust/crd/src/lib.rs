@@ -165,6 +165,8 @@ pub struct SupersetClusterConfig {
     /// Cluster operations like pause reconciliation or cluster stop.
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub database_initialization: Option<SupersetInitConfigFragment>,
     /// In the future this setting will control, which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html>
     /// will be used to expose the service.
     /// Currently only a subset of the ListenerClasses are supported by choosing the type of the created Services
@@ -178,8 +180,6 @@ pub struct SupersetClusterConfig {
     /// * external-stable: Use a LoadBalancer service
     #[serde(default)]
     pub listener_class: CurrentlySupportedListenerClasses,
-    #[serde(default)]
-    pub load_examples_on_init: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mapbox_secret: Option<String>,
     /// Name of the Vector aggregator discovery ConfigMap.
@@ -281,6 +281,25 @@ pub enum Container {
     Vector,
 }
 
+#[derive(
+    Clone,
+    Debug,
+    Deserialize,
+    Display,
+    Eq,
+    EnumIter,
+    JsonSchema,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+)]
+#[serde(rename_all = "kebab-case")]
+#[strum(serialize_all = "kebab-case")]
+pub enum InitContainer {
+    SupersetInit,
+    Vector,
+}
 #[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
 #[fragment_attrs(
     derive(
@@ -486,4 +505,43 @@ pub struct SupersetClusterRef {
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
+}
+
+
+#[derive(Clone, Debug, Default, Eq, Fragment, JsonSchema, PartialEq)]
+#[fragment_attrs(
+    derive(
+        Clone,
+        Debug,
+        Default,
+        Deserialize,
+        Merge,
+        JsonSchema,
+        PartialEq,
+        Serialize
+    ),
+    serde(rename_all = "camelCase")
+)]
+pub struct SupersetInitConfig {
+    #[fragment_attrs(serde(default))]
+    pub logging: Logging<InitContainer>,
+    #[fragment_attrs(serde(default))]
+    pub load_examples: bool,
+}
+
+impl SupersetInitConfigFragment {
+    pub fn merged(&self) -> Result<SupersetInitConfig, Error> {
+        let mut default_config = SupersetInitConfigFragment {
+            logging: product_logging::spec::default_logging(),
+            load_examples: Some(false),
+        };
+        default_config.merge(self);
+        fragment::validate(default_config).context(FragmentValidationFailureSnafu)
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetInitStatus {
+    pub initialized: bool,
 }

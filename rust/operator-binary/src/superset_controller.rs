@@ -1,7 +1,14 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 
+use serde::{Deserialize, Serialize};
 use stackable_operator::builder::resources::ResourceRequirementsBuilder;
+use stackable_operator::config::merge;
 use stackable_operator::k8s_openapi::DeepMerge;
+use stackable_operator::k8s_openapi::api::batch::v1::{Job, JobSpec};
+use stackable_operator::k8s_openapi::api::core::v1::{PodTemplateSpec, PodSpec};
+use stackable_operator::schemars;
+use stackable_operator::schemars::JsonSchema;
+use stackable_operator::status::condition::{ConditionBuilder, ClusterConditionSet, ClusterConditionStatus, ClusterCondition, ClusterConditionType};
 
 use crate::util::build_recommended_labels;
 use crate::{
@@ -52,7 +59,7 @@ use stackable_operator::{
     },
 };
 use stackable_superset_crd::authentication::SuperSetAuthenticationConfigResolved;
-use stackable_superset_crd::SupersetClusterStatus;
+use stackable_superset_crd::{SupersetClusterStatus, InitContainer, SupersetInitStatus};
 use stackable_superset_crd::{
     Container, SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole, APP_NAME,
     CONFIG_DIR, LOG_CONFIG_DIR, LOG_DIR, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
@@ -63,7 +70,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use strum::{EnumDiscriminants, IntoStaticStr};
+use strum::{EnumDiscriminants, IntoStaticStr, EnumIter, Display};
 
 pub const SUPERSET_CONTROLLER_NAME: &str = "supersetcluster";
 pub const DOCKER_IMAGE_BASE_NAME: &str = "superset";
@@ -82,6 +89,10 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object has no namespace"))]
     ObjectHasNoNamespace,
+    #[snafu(display("failed to apply init Job"))]
+    ApplyJob {
+        source: stackable_operator::error::Error,
+    },
     #[snafu(display("object defines no node role"))]
     NoNodeRole,
     #[snafu(display("failed to calculate global service name"))]
@@ -280,6 +291,17 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         .add(client, node_role_service)
         .await
         .context(ApplyRoleServiceSnafu)?;
+
+    if wait_for_init_job_and_update_status(
+        client,
+        &superset,
+        &resolved_product_image,
+        &rbac_sa.name_any(),
+    )
+    .await?
+    {
+        return Ok(Action::await_change());
+    }
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
@@ -600,20 +622,12 @@ fn build_server_rolegroup_statefulset(
         .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
         .context(MissingWebServerTimeoutInSupersetConfigSnafu)?;
 
-    let secret = superset.spec.cluster_config.credentials_secret.clone();
-
-    // superset.spec.cluster_config.load_examples_on_init
     superset_cb
         .image_from_product_image(resolved_product_image)
         .add_container_port("http", APP_PORT.into())
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_DIR)
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
         .add_volume_mount(LOG_VOLUME_NAME, LOG_DIR)
-        .add_env_var_from_secret("ADMIN_USERNAME", &secret, "adminUser.username")
-        .add_env_var_from_secret("ADMIN_FIRSTNAME", &secret, "adminUser.firstname")
-        .add_env_var_from_secret("ADMIN_LASTNAME", &secret, "adminUser.lastname")
-        .add_env_var_from_secret("ADMIN_EMAIL", &secret, "adminUser.email")
-        .add_env_var_from_secret("ADMIN_PASSWORD", &secret, "adminUser.password")
         .command(vec![
             "/bin/sh".to_string(),
             "-c".to_string(),
@@ -621,15 +635,8 @@ fn build_server_rolegroup_statefulset(
                 mkdir --parents {PYTHONPATH} && \
                 cp {CONFIG_DIR}/* {PYTHONPATH} && \
                 cp {LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH} && \
-                superset fab create-admin \
-                    --username \"$ADMIN_USERNAME\" \
-                    --firstname \"$ADMIN_FIRSTNAME\" \
-                    --lastname \"$ADMIN_LASTNAME\" \
-                    --email \"$ADMIN_EMAIL\" \
-                    --password \"$ADMIN_PASSWORD\" && \
                 superset db upgrade && \
                 superset init && \
-                superset load_examples && \
                 gunicorn \
                 --bind 0.0.0.0:${{SUPERSET_PORT}} \
                 --worker-class gthread \
@@ -742,4 +749,193 @@ fn add_authentication_volumes_and_volume_mounts(
 
 pub fn error_policy(_obj: Arc<SupersetCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
+}
+
+fn build_init_job(
+    superset_cluster: &SupersetCluster,
+    resolved_product_image: &ResolvedProductImage,
+    sa_name: &str,
+) -> Result<Job> {
+    let mut commands = vec![
+        format!("mkdir -p {PYTHONPATH}"),
+        format!("cp {CONFIG_DIR}/* {PYTHONPATH}"),
+        format!("cp {LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH}"),
+        String::from(
+            "superset fab create-admin \
+                    --username \"$ADMIN_USERNAME\" \
+                    --firstname \"$ADMIN_FIRSTNAME\" \
+                    --lastname \"$ADMIN_LASTNAME\" \
+                    --email \"$ADMIN_EMAIL\" \
+                    --password \"$ADMIN_PASSWORD\"",
+        ),
+        String::from("superset db upgrade"),
+        String::from("superset init"),
+    ];
+
+    let cluster_config = superset_cluster.spec.cluster_config;
+    let init_job_config = cluster_config.database_initialization.unwrap_or_default().merged().context(FailedToResolveConfigSnafu)?;
+
+    if init_job_config.load_examples == true {
+        commands.push(String::from("superset load_examples"));
+    }
+
+    commands.push(product_logging::framework::shutdown_vector_command(LOG_DIR));
+
+    let secret = &cluster_config.credentials_secret;
+
+    let mut containers = Vec::new();
+
+    let mut cb = ContainerBuilder::new(&InitContainer::SupersetInit.to_string())
+        .context(InvalidContainerNameSnafu)?;
+
+    cb.image_from_product_image(resolved_product_image)
+        .command(vec!["/bin/bash".to_string()])
+        .args(vec![
+            String::from("-euo"),
+            String::from("pipefail"),
+            String::from("-c"),
+            commands.join("; "),
+        ])
+        .add_env_var_from_secret("SECRET_KEY", secret, "connections.secretKey")
+        .add_env_var_from_secret(
+            "SQLALCHEMY_DATABASE_URI",
+            secret,
+            "connections.sqlalchemyDatabaseUri",
+        )
+        .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
+        .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
+        .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
+        .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
+        .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
+        .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_DIR)
+        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
+        .add_volume_mount(LOG_VOLUME_NAME, LOG_DIR)
+        .resources(
+            ResourceRequirementsBuilder::new()
+                .with_cpu_request("100m")
+                .with_cpu_limit("400m")
+                .with_memory_request("256Mi")
+                .with_memory_limit("256Mi")
+                .build(),
+        );
+
+    containers.push(cb.build());
+
+    if init_job_config.logging.enable_vector_agent {
+        containers.push(product_logging::framework::vector_container(
+            resolved_product_image,
+            CONFIG_VOLUME_NAME,
+            LOG_VOLUME_NAME,
+            init_job_config.logging.containers.get(&InitContainer::Vector),
+            ResourceRequirementsBuilder::new()
+                .with_cpu_request("250m")
+                .with_cpu_limit("500m")
+                .with_memory_request("128Mi")
+                .with_memory_limit("128Mi")
+                .build(),
+        ));
+    }
+
+    let pod = PodTemplateSpec {
+        metadata: Some(
+            ObjectMetaBuilder::new()
+                .name(format!("{}-init", superset_cluster.name_unchecked()))
+                .build(),
+        ),
+        spec: Some(PodSpec {
+            containers,
+            image_pull_secrets: resolved_product_image.pull_secrets.clone(),
+            restart_policy: Some("Never".to_string()),
+            service_account: Some(sa_name.to_string()),
+            security_context: Some(
+                PodSecurityContextBuilder::new()
+                    .run_as_user(1000)
+                    .run_as_group(0)
+                    .build(),
+            ),
+            ..Default::default()
+        }),
+    };
+
+    let job = Job {
+        metadata: ObjectMetaBuilder::new()
+            .name(superset_cluster.name_unchecked())
+            .namespace_opt(superset_cluster.namespace())
+            .ownerreference_from_resource(superset_cluster, None, Some(true))
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
+            .build(),
+        spec: Some(JobSpec {
+            template: pod,
+            ..Default::default()
+        }),
+        status: None,
+    };
+
+    Ok(job)
+}
+
+async fn wait_for_init_job_and_update_status(
+    client: &stackable_operator::client::Client,
+    superset: &SupersetCluster,
+    resolved_product_image: &ResolvedProductImage,
+    rbac: &str,
+) -> Result<bool> {
+    if let Some(ref s) = superset.status {
+        if !s.conditions.iter().any(|condition| condition.
+            let job = build_init_job(
+                &superset,
+                &resolved_product_image,
+                rbac,
+            )?;
+            client
+                .apply_patch(OPERATOR_NAME, &job, &job)
+                .await
+                .context(ApplyJobSnafu)?;
+            // The job is started, update status to reflect new state
+            client
+                .apply_patch_status(
+                    OPERATOR_NAME,
+                    &*superset,
+                    &s,
+                )
+                .await
+                .context(ApplyStatusSnafu)?;
+        }
+    }
+    Ok(true)
+}
+
+struct SupersetInitConditionBuilder(Option<SupersetInitStatus>);
+impl ConditionBuilder for SupersetInitConditionBuilder {
+    fn build_conditions(&self) -> ClusterConditionSet {
+        let (status, message) = if let Some(ref status) = self.0 {
+            if status.initialized {
+                (
+                    ClusterConditionStatus::True,
+                    "Superset initialization ready.",
+                )
+            } else {
+                (
+                    ClusterConditionStatus::False,
+                    "Waiting for Superset initialization to complete.",
+                )
+            }
+        } else {
+            (
+                ClusterConditionStatus::Unknown,
+                "Waiting for Superset initialization to start.",
+            )
+        };
+
+        let cond = ClusterCondition {
+            reason: None,
+            message: Some(String::from(message)),
+            status,
+            type_: ClusterConditionType::Available,
+            last_transition_time: None,
+            last_update_time: None,
+        };
+
+        vec![cond].into()
+    }
 }
