@@ -2,6 +2,8 @@
 
 use stackable_operator::builder::resources::ResourceRequirementsBuilder;
 use stackable_operator::k8s_openapi::DeepMerge;
+use stackable_operator::k8s_openapi::api::core::v1::{TCPSocketAction, Probe, HTTPGetAction};
+use stackable_operator::k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 
 use crate::util::build_recommended_labels;
 use crate::{
@@ -621,15 +623,15 @@ fn build_server_rolegroup_statefulset(
                 mkdir --parents {PYTHONPATH} && \
                 cp {CONFIG_DIR}/* {PYTHONPATH} && \
                 cp {LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH} && \
+                superset db upgrade && \
                 superset fab create-admin \
                     --username \"$ADMIN_USERNAME\" \
                     --firstname \"$ADMIN_FIRSTNAME\" \
                     --lastname \"$ADMIN_LASTNAME\" \
                     --email \"$ADMIN_EMAIL\" \
                     --password \"$ADMIN_PASSWORD\" && \
-                superset db upgrade && \
-                superset init && \
                 superset load_examples && \
+                superset init && \
                 gunicorn \
                 --bind 0.0.0.0:${{SUPERSET_PORT}} \
                 --worker-class gthread \
@@ -641,6 +643,21 @@ fn build_server_rolegroup_statefulset(
             "},
         ])
         .resources(merged_config.resources.clone().into());
+
+    let probe = Probe {
+        http_get: Some(HTTPGetAction {
+            port: IntOrString::Int(APP_PORT.into()),
+            path: Some("/health".to_string()),
+            ..HTTPGetAction::default()
+        }),
+        initial_delay_seconds: Some(60),
+        period_seconds: Some(10),
+        timeout_seconds: Some(5),
+        failure_threshold: Some(5),
+        ..Probe::default()
+    };
+    superset_cb.readiness_probe(probe.clone());
+    superset_cb.liveness_probe(probe);
 
     pb.add_container(superset_cb.build());
 
