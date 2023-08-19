@@ -604,7 +604,6 @@ fn build_server_rolegroup_statefulset(
 
     let secret = superset.spec.cluster_config.credentials_secret.clone();
 
-    // superset.spec.cluster_config.load_examples_on_init
     superset_cb
         .image_from_product_image(resolved_product_image)
         .add_container_port("http", APP_PORT.into())
@@ -630,7 +629,6 @@ fn build_server_rolegroup_statefulset(
                     --lastname \"$ADMIN_LASTNAME\" \
                     --email \"$ADMIN_EMAIL\" \
                     --password \"$ADMIN_PASSWORD\" && \
-                superset load_examples && \
                 superset init && \
                 gunicorn \
                 --bind 0.0.0.0:${{SUPERSET_PORT}} \
@@ -650,10 +648,10 @@ fn build_server_rolegroup_statefulset(
             path: Some("/health".to_string()),
             ..HTTPGetAction::default()
         }),
-        initial_delay_seconds: Some(60),
-        period_seconds: Some(10),
-        timeout_seconds: Some(5),
-        failure_threshold: Some(5),
+        initial_delay_seconds: Some(15),
+        period_seconds: Some(15),
+        timeout_seconds: Some(1),
+        failure_threshold: Some(3),
         ..Probe::default()
     };
     superset_cb.readiness_probe(probe.clone());
