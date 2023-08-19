@@ -716,7 +716,7 @@ fn build_server_rolegroup_statefulset(
             .with_label("restarter.stackable.tech/enabled", "true")
             .build(),
         spec: Some(StatefulSetSpec {
-            pod_management_policy: Some("Parallel".to_string()),
+            pod_management_policy: Some("OrderedReady".to_string()),
             replicas: role_group.replicas.map(i32::from),
             selector: LabelSelector {
                 match_labels: Some(role_group_selector_labels(
