@@ -128,8 +128,6 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
     }
 }
 
-pub const HTTP_PORT: &str = "http";
-
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "superset.stackable.tech",

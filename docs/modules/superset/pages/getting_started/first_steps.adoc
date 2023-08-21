@@ -14,6 +14,8 @@ include::example$getting_started/getting_started.sh[tag=add-bitnami-repo]
 [source,bash]
 include::example$getting_started/getting_started.sh[tag=install-bitnami-psql]
 
+WARNING: This setup is unsuitable for production use! Follow the specific production setup instuctions for one of the xref:required-external-components[supported databases] to get a production-ready database.
+
 == Secret with Superset credentials
 
 A secret with the necessary credentials must be created: this contains database connection credentials as well as an admin account for Superset itself. Create a file called `superset-credentials.yaml`:
