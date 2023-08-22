@@ -3,7 +3,7 @@ use crate::util::{get_job_state, JobState};
 use crate::{rbac, superset_controller::DOCKER_IMAGE_BASE_NAME, APP_NAME};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::commons::product_image_selection::ResolvedProductImage;
-use stackable_operator::status::condition::{ClusterConditionType, ClusterConditionStatus};
+use stackable_operator::status::condition::{ClusterConditionStatus, ClusterConditionType};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
     client::Client,
@@ -163,11 +163,16 @@ pub async fn reconcile_druid_connection(
                     .await
                     .context(SupersetClusterRetrievalSnafu)?;
 
-                let superset_cluster_is_ready = superset_cluster.status.as_ref().and_then(|s| {
-                    s.conditions
-                        .iter()
-                        .find(|c| c.type_ == ClusterConditionType::Available && c.status == ClusterConditionStatus::True)
-                }).is_some();
+                let superset_cluster_is_ready = superset_cluster
+                    .status
+                    .as_ref()
+                    .and_then(|s| {
+                        s.conditions.iter().find(|c| {
+                            c.type_ == ClusterConditionType::Available
+                                && c.status == ClusterConditionStatus::True
+                        })
+                    })
+                    .is_some();
 
                 if druid_discovery_cm_exists && superset_cluster_is_ready {
                     // Everything is there, retrieve all necessary info and start the job

@@ -27,8 +27,8 @@ use stackable_operator::{
     CustomResourceExt,
 };
 use stackable_superset_crd::{
-    authentication::SupersetAuthentication, druidconnection::DruidConnection,
-    SupersetCluster, APP_NAME,
+    authentication::SupersetAuthentication, druidconnection::DruidConnection, SupersetCluster,
+    APP_NAME,
 };
 use std::sync::Arc;
 
@@ -147,7 +147,8 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                druid_connection.superset_name() == superset_cluster.name_unchecked()
+                                druid_connection.superset_name()
+                                    == superset_cluster.name_unchecked()
                                     && druid_connection.superset_namespace().ok()
                                         == superset_cluster.namespace()
                             })
@@ -199,12 +200,9 @@ async fn main() -> anyhow::Result<()> {
                     )
                 });
 
-            futures::stream::select(
-                superset_controller,
-                druid_connection_controller,
-            )
-            .collect::<()>()
-            .await;
+            futures::stream::select(superset_controller, druid_connection_controller)
+                .collect::<()>()
+                .await;
         }
     }
 

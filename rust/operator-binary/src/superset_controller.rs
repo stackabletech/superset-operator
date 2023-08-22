@@ -1,9 +1,9 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 
 use stackable_operator::builder::resources::ResourceRequirementsBuilder;
-use stackable_operator::k8s_openapi::DeepMerge;
-use stackable_operator::k8s_openapi::api::core::v1::{TCPSocketAction, Probe, HTTPGetAction};
+use stackable_operator::k8s_openapi::api::core::v1::{HTTPGetAction, Probe};
 use stackable_operator::k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
+use stackable_operator::k8s_openapi::DeepMerge;
 
 use crate::util::build_recommended_labels;
 use crate::{
@@ -34,10 +34,7 @@ use stackable_operator::{
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
-    kube::{
-        runtime::{controller::Action, reflector::ObjectRef},
-        Resource, ResourceExt,
-    },
+    kube::{runtime::controller::Action, Resource, ResourceExt},
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
     product_config::{
@@ -50,7 +47,7 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
-        statefulset::StatefulSetConditionBuilder
+        statefulset::StatefulSetConditionBuilder,
     },
 };
 use stackable_superset_crd::authentication::SuperSetAuthenticationConfigResolved;
@@ -652,6 +649,7 @@ fn build_server_rolegroup_statefulset(
         period_seconds: Some(15),
         timeout_seconds: Some(1),
         failure_threshold: Some(3),
+        success_threshold: Some(1),
         ..Probe::default()
     };
     superset_cb.readiness_probe(probe.clone());
