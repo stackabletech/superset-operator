@@ -147,8 +147,7 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                druid_connection.superset_name()
-                                    == superset_cluster.name_unchecked()
+                                druid_connection.superset_name() == superset_cluster.name_any()
                                     && druid_connection.superset_namespace().ok()
                                         == superset_cluster.namespace()
                             })
