@@ -599,7 +599,7 @@ fn build_server_rolegroup_statefulset(
         .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
         .context(MissingWebServerTimeoutInSupersetConfigSnafu)?;
 
-    let secret = superset.spec.cluster_config.credentials_secret.clone();
+    let secret = &superset.spec.cluster_config.credentials_secret;
 
     superset_cb
         .image_from_product_image(resolved_product_image)
@@ -607,11 +607,11 @@ fn build_server_rolegroup_statefulset(
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_DIR)
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
         .add_volume_mount(LOG_VOLUME_NAME, LOG_DIR)
-        .add_env_var_from_secret("ADMIN_USERNAME", &secret, "adminUser.username")
-        .add_env_var_from_secret("ADMIN_FIRSTNAME", &secret, "adminUser.firstname")
-        .add_env_var_from_secret("ADMIN_LASTNAME", &secret, "adminUser.lastname")
-        .add_env_var_from_secret("ADMIN_EMAIL", &secret, "adminUser.email")
-        .add_env_var_from_secret("ADMIN_PASSWORD", &secret, "adminUser.password")
+        .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
+        .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
+        .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
+        .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
+        .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
         .command(vec![
             "/bin/sh".to_string(),
             "-c".to_string(),
