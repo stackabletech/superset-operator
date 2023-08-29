@@ -82,7 +82,7 @@ You can use kubectl to wait on the resource:
 [source,bash]
 include::example$getting_started/getting_started.sh[tag=wait-supersetdb]
 
-== Using Superset
+== Connecting to the web interface
 
 When the Superset node is created and the database is initialized, Superset can be opened in the
 browser.
@@ -98,7 +98,14 @@ Enter the admin credentials from the Kubernetes secret:
 
 image::getting_started/superset-login.png[Login screen of Superset]
 
-If the examples were loaded then some dashboards are already available:
+== Loading examples and accessing example dashboards
+
+To have some data to play with and some dashboards to explore, Superset comes with some example data that you can load:
+
+[source,bash]
+include::example$getting_started/getting_started.sh[tag=load-examples]
+
+This command will take a few minutes to load the data. Afterwards, check back again on the web interface. New dashboards should be available:
 
 image::getting_started/superset-dashboard.png[Superset dashboard showing birth names]
 

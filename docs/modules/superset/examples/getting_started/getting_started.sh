@@ -110,3 +110,8 @@ else
   echo "Could not reach web interface."
   exit 1
 fi
+
+echo "Loading examples ..."
+# tag::load-examples[]
+kubectl exec simple-superset-node-default-0 -- ./app/bin/superset load_examples
+# end::load-examples[]
