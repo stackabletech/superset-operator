@@ -9,7 +9,6 @@ spec:
   clusterConfig:
     credentialsSecret: simple-superset-credentials
     listenerClass: external-unstable
-    loadExamplesOnInit: true
   nodes:
     roleGroups:
       default:

@@ -71,13 +71,6 @@ kubectl apply -f superset.yaml
 
 sleep 5
 
-echo "Waiting on SupersetDB ..."
-# tag::wait-supersetdb[]
-time kubectl wait supersetdb/simple-superset \
-  --for jsonpath='{.status.condition}'=Ready \
-  --timeout 600s
-# end::wait-supersetdb[]
-
 for (( i=1; i<=15; i++ ))
 do
   echo "Waiting for SupersetCluster to appear ..."
