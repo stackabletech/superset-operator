@@ -1,6 +1,8 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 
 use stackable_operator::builder::resources::ResourceRequirementsBuilder;
+use stackable_operator::k8s_openapi::api::core::v1::{HTTPGetAction, Probe};
+use stackable_operator::k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use stackable_operator::k8s_openapi::DeepMerge;
 
 use crate::util::build_recommended_labels;
@@ -32,10 +34,7 @@ use stackable_operator::{
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
-    kube::{
-        runtime::{controller::Action, reflector::ObjectRef},
-        Resource, ResourceExt,
-    },
+    kube::{runtime::controller::Action, Resource, ResourceExt},
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
     product_config::{
@@ -48,15 +47,12 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
-        statefulset::StatefulSetConditionBuilder, ClusterCondition, ClusterConditionSet,
-        ClusterConditionStatus, ClusterConditionType, ConditionBuilder,
+        statefulset::StatefulSetConditionBuilder,
     },
 };
 use stackable_superset_crd::authentication::SuperSetAuthenticationConfigResolved;
-use stackable_superset_crd::supersetdb::SupersetDBStatus;
 use stackable_superset_crd::SupersetClusterStatus;
 use stackable_superset_crd::{
-    supersetdb::{SupersetDB, SupersetDBStatusCondition},
     Container, SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole, APP_NAME,
     CONFIG_DIR, LOG_CONFIG_DIR, LOG_DIR, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
@@ -106,20 +102,6 @@ pub enum Error {
         source: stackable_operator::error::Error,
     },
 
-    #[snafu(display("failed to retrieve superset db"))]
-    SupersetDBRetrieval {
-        source: stackable_operator::error::Error,
-    },
-    #[snafu(display("superset db {superset_db} initialization failed, not starting superset"))]
-    SupersetDBFailed { superset_db: ObjectRef<SupersetDB> },
-    #[snafu(display("failed to apply Superset DB"))]
-    CreateSupersetObject {
-        source: stackable_superset_crd::supersetdb::Error,
-    },
-    #[snafu(display("failed to apply Superset DB"))]
-    ApplySupersetDB {
-        source: stackable_operator::error::Error,
-    },
     #[snafu(display("failed to apply Service for {rolegroup}"))]
     ApplyRoleGroupService {
         source: stackable_operator::error::Error,
@@ -218,17 +200,6 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
 
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&superset.spec.cluster_config.cluster_operation);
-
-    if wait_for_db_and_update_status(
-        client,
-        &superset,
-        &resolved_product_image,
-        &cluster_operation_cond_builder,
-    )
-    .await?
-    {
-        return Ok(Action::await_change());
-    }
 
     let vector_aggregator_address = resolve_vector_aggregator_address(
         client,
@@ -628,12 +599,19 @@ fn build_server_rolegroup_statefulset(
         .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
         .context(MissingWebServerTimeoutInSupersetConfigSnafu)?;
 
+    let secret = &superset.spec.cluster_config.credentials_secret;
+
     superset_cb
         .image_from_product_image(resolved_product_image)
         .add_container_port("http", APP_PORT.into())
         .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_DIR)
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
         .add_volume_mount(LOG_VOLUME_NAME, LOG_DIR)
+        .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
+        .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
+        .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
+        .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
+        .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
         .command(vec![
             "/bin/sh".to_string(),
             "-c".to_string(),
@@ -641,6 +619,13 @@ fn build_server_rolegroup_statefulset(
                 mkdir --parents {PYTHONPATH} && \
                 cp {CONFIG_DIR}/* {PYTHONPATH} && \
                 cp {LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH} && \
+                superset db upgrade && \
+                superset fab create-admin \
+                    --username \"$ADMIN_USERNAME\" \
+                    --firstname \"$ADMIN_FIRSTNAME\" \
+                    --lastname \"$ADMIN_LASTNAME\" \
+                    --email \"$ADMIN_EMAIL\" \
+                    --password \"$ADMIN_PASSWORD\" && \
                 superset init && \
                 gunicorn \
                 --bind 0.0.0.0:${{SUPERSET_PORT}} \
@@ -653,6 +638,22 @@ fn build_server_rolegroup_statefulset(
             "},
         ])
         .resources(merged_config.resources.clone().into());
+
+    let probe = Probe {
+        http_get: Some(HTTPGetAction {
+            port: IntOrString::Int(APP_PORT.into()),
+            path: Some("/health".to_string()),
+            ..HTTPGetAction::default()
+        }),
+        initial_delay_seconds: Some(15),
+        period_seconds: Some(15),
+        timeout_seconds: Some(1),
+        failure_threshold: Some(3),
+        success_threshold: Some(1),
+        ..Probe::default()
+    };
+    superset_cb.readiness_probe(probe.clone());
+    superset_cb.liveness_probe(probe);
 
     pb.add_container(superset_cb.build());
 
@@ -713,7 +714,8 @@ fn build_server_rolegroup_statefulset(
             .with_label("restarter.stackable.tech/enabled", "true")
             .build(),
         spec: Some(StatefulSetSpec {
-            pod_management_policy: Some("Parallel".to_string()),
+            // Set to `OrderedReady`, to make sure Pods start after another and the init commands don't run in parallel
+            pod_management_policy: Some("OrderedReady".to_string()),
             replicas: role_group.replicas.map(i32::from),
             selector: LabelSelector {
                 match_labels: Some(role_group_selector_labels(
@@ -754,118 +756,4 @@ fn add_authentication_volumes_and_volume_mounts(
 
 pub fn error_policy(_obj: Arc<SupersetCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
-}
-
-/// Return true if the controller should wait for the DB to be set up.
-///
-/// As a side-effect, the Superset cluster status is updated as long as the controller waits
-/// for the DB to come up.
-///
-/// Having the DB set up by a Job managed by a different controller has it's own
-/// set of problems as described here: <https://github.com/stackabletech/superset-operator/issues/351>.
-/// The Airflow operator uses the same pattern as implemented here for setting up the DB.
-///
-/// When the ticket above is implemented, this function will most likely be removed completely.
-async fn wait_for_db_and_update_status(
-    client: &stackable_operator::client::Client,
-    superset: &SupersetCluster,
-    resolved_product_image: &ResolvedProductImage,
-    cluster_operation_condition_builder: &ClusterOperationsConditionBuilder<'_>,
-) -> Result<bool> {
-    // Ensure DB Schema exists
-    let superset_db = SupersetDB::for_superset(superset, resolved_product_image)
-        .context(CreateSupersetObjectSnafu)?;
-    client
-        .apply_patch(SUPERSET_CONTROLLER_NAME, &superset_db, &superset_db)
-        .await
-        .context(ApplySupersetDBSnafu)?;
-
-    let superset_db = client
-        .get::<SupersetDB>(
-            &superset.name_unchecked(),
-            superset
-                .namespace()
-                .as_deref()
-                .context(ObjectHasNoNamespaceSnafu)?,
-        )
-        .await
-        .context(SupersetDBRetrievalSnafu)?;
-
-    tracing::debug!("{}", format!("Checking status: {:#?}", superset_db.status));
-
-    // Update the Superset cluster status, only if the controller needs to wait.
-    // This avoids updating the status twice per reconcile call. when the DB
-    // has a ready condition.
-    let db_cond_builder = DbConditionBuilder(superset_db.status);
-    if bool::from(&db_cond_builder) {
-        let status = SupersetClusterStatus {
-            conditions: compute_conditions(
-                superset,
-                &[&db_cond_builder, cluster_operation_condition_builder],
-            ),
-        };
-
-        client
-            .apply_patch_status(OPERATOR_NAME, superset, &status)
-            .await
-            .context(ApplyStatusSnafu)?;
-    }
-
-    Ok(bool::from(&db_cond_builder))
-}
-
-struct DbConditionBuilder(Option<SupersetDBStatus>);
-impl ConditionBuilder for DbConditionBuilder {
-    fn build_conditions(&self) -> ClusterConditionSet {
-        let (status, message) = if let Some(ref status) = self.0 {
-            match status.condition {
-                SupersetDBStatusCondition::Pending | SupersetDBStatusCondition::Initializing => (
-                    ClusterConditionStatus::False,
-                    "Waiting for SupersetDB initialization to complete",
-                ),
-                SupersetDBStatusCondition::Failed => (
-                    ClusterConditionStatus::False,
-                    "Superset database initialization failed.",
-                ),
-                SupersetDBStatusCondition::Ready => (
-                    ClusterConditionStatus::True,
-                    "Superset database initialization ready.",
-                ),
-            }
-        } else {
-            (
-                ClusterConditionStatus::Unknown,
-                "Waiting for Superset database initialization to start.",
-            )
-        };
-
-        let cond = ClusterCondition {
-            reason: None,
-            message: Some(String::from(message)),
-            status,
-            type_: ClusterConditionType::Available,
-            last_transition_time: None,
-            last_update_time: None,
-        };
-
-        vec![cond].into()
-    }
-}
-
-/// Evaluates to true if the DB is not ready yet (the controller needs to wait).
-/// Otherwise false.
-impl From<&DbConditionBuilder> for bool {
-    fn from(cond_builder: &DbConditionBuilder) -> bool {
-        if let Some(ref status) = cond_builder.0 {
-            match status.condition {
-                SupersetDBStatusCondition::Pending | SupersetDBStatusCondition::Initializing => {
-                    true
-                }
-                SupersetDBStatusCondition::Failed => true,
-                SupersetDBStatusCondition::Ready => false,
-            }
-        } else {
-            true
-        }
-    }
 }
