@@ -44,10 +44,6 @@ customConfig:
       condition: >-
         .pod == "superset-node-custom-log-config-0" &&
         .container == "vector"
-    filteredAutomaticLogConfigInitDb:
-      type: filter
-      inputs: [vector]
-      condition: .container == "superset-init-db"
     filteredInvalidEvents:
       type: filter
       inputs: [vector]
