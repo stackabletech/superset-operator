@@ -60,6 +60,11 @@ The `webserverTimeout` configuration option defines the maximum number of second
 These settings affect the maximum duration a query to an underlying datasource can take.
 If you get timeout errors before your query returns the result you may need to increase this timeout.
 
+You need to wait for the Superset node to finish deploying. You can do so with this command:
+
+[source,bash]
+include::example$getting_started/getting_started.sh[tag=wait-superset]
+
 == Connecting to the web interface
 
 When the Superset node is created and the database is initialized, Superset can be opened in the
@@ -75,6 +80,8 @@ Then it can be opened in the browser with `http://localhost:8088`.
 Enter the admin credentials from the Kubernetes secret:
 
 image::getting_started/superset-login.png[Login screen of Superset]
+
+Great! Now the Superset is already ready to use. The next step is just about loading some sample data to play with.
 
 == Loading examples and accessing example dashboards
 

@@ -81,8 +81,10 @@ do
   sleep 1
 done
 
-echo "Wainting on superset StatefulSet ..."
+echo "Waiting on superset StatefulSet ..."
+# tag::wait-superset[]
 kubectl rollout status --watch statefulset/simple-superset-node-default --timeout 300s
+# end::wait-superset[]
 
 # wait a bit for the port to open
 sleep 10
