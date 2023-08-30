@@ -108,5 +108,7 @@ fi
 
 echo "Loading examples ..."
 # tag::load-examples[]
-kubectl exec simple-superset-node-default-0 -- ./app/bin/superset load_examples
+kubectl apply -f superset-load-examples-job.yaml
+sleep 5
+kubectl wait --for=condition=complete --timeout=300s job/superset-load-examples
 # end::load-examples[]
