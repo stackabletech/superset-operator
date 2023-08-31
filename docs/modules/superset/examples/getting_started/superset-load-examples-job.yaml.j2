@@ -12,7 +12,7 @@ spec:
         name: config
       containers:
       - name: superset
-        image: docker.stackable.tech/stackable/superset:2.1.0-stackable0.0.0-dev
+        image: docker.stackable.tech/stackable/superset:2.1.0-stackable{{ versions.superset }}
         command: [
           "/bin/sh",
           "-c",
