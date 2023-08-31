@@ -39,7 +39,7 @@ Please note that the admin user will be disabled if you use a non-default authen
 
 == Creation of a Superset node
 
-A Superset node must be created as a custom resource, create file called `superset.yaml`:
+A Superset node must be created as a custom resource, create a file called `superset.yaml`:
 
 [source,yaml]
 include::example$getting_started/superset.yaml[]
@@ -52,18 +52,7 @@ include::example$getting_started/getting_started.sh[tag=apply-superset-cluster]
 
 `metadata.name` contains the name of the Superset cluster.
 
-The label of the Docker image provided by Stackable must be set in `spec.version`.
-
-Please note that the version you need to specify is not only the version of Apache Superset which
-you want to roll out, but has to also include the Stackable version as shown. This Stackable
-version is the version of the underlying container image which is used to execute the processes. For
-a list of available versions please check our
-https://repo.stackable.tech/#browse/browse:docker:v2%2Fstackable%2Fsuperset%2Ftags[image registry].
-It should generally be safe to simply use the latest image version that is available.
-
 The previously created secret must be referenced in `spec.credentialsSecret`.
-
-The `spec.loadExamplesOnInit` key is optional and defaults to `false`, it can be set to `true` to load example data into Superset when the database is initialized.
 
 The `rowLimit` configuration option defines the row limit when requesting chart data.
 
@@ -71,18 +60,12 @@ The `webserverTimeout` configuration option defines the maximum number of second
 These settings affect the maximum duration a query to an underlying datasource can take.
 If you get timeout errors before your query returns the result you may need to increase this timeout.
 
-=== Initialization of the Superset database
-
-The first time the cluster is created, the operator creates a `SupersetDB` resource with the same name as the cluster.  It ensures that the database is initialized (with the creation of a schema and admin user).
-
-A Kubernetes job is created which starts a pod to initialize the database. This can take a while.
-
-You can use kubectl to wait on the resource:
+You need to wait for the Superset node to finish deploying. You can do so with this command:
 
 [source,bash]
-include::example$getting_started/getting_started.sh[tag=wait-supersetdb]
+include::example$getting_started/getting_started.sh[tag=wait-superset]
 
-== Using Superset
+== Connecting to the web interface
 
 When the Superset node is created and the database is initialized, Superset can be opened in the
 browser.
@@ -98,11 +81,25 @@ Enter the admin credentials from the Kubernetes secret:
 
 image::getting_started/superset-login.png[Login screen of Superset]
 
-If the examples were loaded then some dashboards are already available:
+Great! Now the Superset is already ready to use, but if you also want some sample data and dashboards to explore the functionalities Superset has to offer, continue with the next step.
+
+== Loading examples and accessing example dashboards
+
+To have some data to play with and some dashboards to explore, Superset comes with some example data that you can load. To do so, create a file `superset-load-examples-job.yaml` with this content:
+
+[source,bash]
+include::example$getting_started/superset-load-examples-job.yaml[]
+
+This is a Kubernetes Job. The same connection information and credentials are loaded that are also used by the Superset instance. The Job will load the example data. Execute it and await its termination like so:
+
+[source,bash]
+include::example$getting_started/getting_started.sh[tag=load-examples]
+
+The Job will take a few minutes to terminate. Afterwards, check back again on the web interface. New dashboards should be available:
 
 image::getting_started/superset-dashboard.png[Superset dashboard showing birth names]
 
-Great! You have set up a Superset instance and connected to it!
+Great! Now you can explore this sample data, run queries on it or create your own dashboards.
 
 == What's next
 

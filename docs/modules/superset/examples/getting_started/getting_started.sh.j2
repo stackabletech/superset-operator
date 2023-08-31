@@ -71,13 +71,6 @@ kubectl apply -f superset.yaml
 
 sleep 5
 
-echo "Waiting on SupersetDB ..."
-# tag::wait-supersetdb[]
-time kubectl wait supersetdb/simple-superset \
-  --for jsonpath='{.status.condition}'=Ready \
-  --timeout 600s
-# end::wait-supersetdb[]
-
 for (( i=1; i<=15; i++ ))
 do
   echo "Waiting for SupersetCluster to appear ..."
@@ -88,8 +81,10 @@ do
   sleep 1
 done
 
-echo "Wainting on superset StatefulSet ..."
+echo "Waiting on superset StatefulSet ..."
+# tag::wait-superset[]
 kubectl rollout status --watch statefulset/simple-superset-node-default --timeout 300s
+# end::wait-superset[]
 
 # wait a bit for the port to open
 sleep 10
@@ -110,3 +105,10 @@ else
   echo "Could not reach web interface."
   exit 1
 fi
+
+echo "Loading examples ..."
+# tag::load-examples[]
+kubectl apply -f superset-load-examples-job.yaml
+sleep 5
+kubectl wait --for=condition=complete --timeout=300s job/superset-load-examples
+# end::load-examples[]
