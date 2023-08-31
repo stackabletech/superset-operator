@@ -3,6 +3,7 @@
 ** xref:superset:getting_started/first_steps.adoc[]
 * xref:superset:usage-guide/index.adoc[]
 ** xref:superset:usage-guide/pod-placement.adoc[]
+** xref:superset:usage-guide/listenerclass.adoc[]
 ** xref:superset:usage-guide/storage-resource-configuration.adoc[]
 ** xref:superset:usage-guide/security.adoc[]
 ** xref:superset:usage-guide/connecting-druid.adoc[]
