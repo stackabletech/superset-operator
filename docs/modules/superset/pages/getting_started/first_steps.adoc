@@ -99,7 +99,7 @@ The Job will take a few minutes to terminate. Afterwards, check back again on th
 
 image::getting_started/superset-dashboard.png[Superset dashboard showing birth names]
 
-Great! Now you can explore this sample data, run queries on it or make your own dashboards.
+Great! Now you can explore this sample data, run queries on it or create your own dashboards.
 
 == What's next
 
