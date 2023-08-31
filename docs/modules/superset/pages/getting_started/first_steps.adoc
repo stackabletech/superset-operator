@@ -81,20 +81,25 @@ Enter the admin credentials from the Kubernetes secret:
 
 image::getting_started/superset-login.png[Login screen of Superset]
 
-Great! Now the Superset is already ready to use. The next step is just about loading some sample data to play with.
+Great! Now the Superset is already ready to use, but if you also want some sample data and dashboards to explore the functionalities Superset has to offer, continue with the next step.
 
 == Loading examples and accessing example dashboards
 
-To have some data to play with and some dashboards to explore, Superset comes with some example data that you can load:
+To have some data to play with and some dashboards to explore, Superset comes with some example data that you can load. To do so, create a file `superset-load-examples-job.yaml` with this content:
+
+[source,bash]
+include::example$getting_started/superset-load-examples-job.yaml[]
+
+This is a Kubernetes Job. The same connection information and credentials are loaded that are also used by the Superset instance. The Job will load the example data. Execute it and await its termination like so:
 
 [source,bash]
 include::example$getting_started/getting_started.sh[tag=load-examples]
 
-This command will take a few minutes to load the data. Afterwards, check back again on the web interface. New dashboards should be available:
+The Job will take a few minutes to terminate. Afterwards, check back again on the web interface. New dashboards should be available:
 
 image::getting_started/superset-dashboard.png[Superset dashboard showing birth names]
 
-Great! You have set up a Superset instance and connected to it!
+Great! Now you can explore this sample data, run queries on it or make your own dashboards.
 
 == What's next
 
