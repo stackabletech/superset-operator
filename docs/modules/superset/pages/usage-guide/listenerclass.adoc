@@ -1,6 +1,6 @@
 = Service exposition with ListenerClasses
 
-Apache Superset offers a web UI and an API. The Operator deploys a service called `<name>-external` (where `<name>` is the name of the SupersetCluster) through which Trino can be reached.
+Apache Superset offers a web UI and an API. The Operator deploys a service called `<name>-external` (where `<name>` is the name of the SupersetCluster) through which Superset can be reached.
 
 This service can have three different types: `cluster-internal`, `external-unstable` and `external-stable`. Read more about the types in the xref:concepts:service-exposition.adoc[service exposition] documentation at platform level.
 
