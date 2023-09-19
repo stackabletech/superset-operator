@@ -1,21 +1,21 @@
 = Installation
 
-On this page you will install the Stackable Superset Operator as well as the commons and secret Operator which are required by all Stackable Operators.
+On this page you will install the Stackable Superset Operator as well as the commons and secret Operator which are
+required by all Stackable Operators.
 
 == Stackable Operators
 
 There are 2 ways to run Stackable Operators
 
-1. Using xref:stackablectl::index.adoc[]
-
-2. Using Helm
+. Using xref:management:stackablectl:index.adoc[]
+. Using Helm
 
 === stackablectl
 
-stackablectl is the command line tool to interact with Stackable operators and our recommended way to install Operators.
-Follow the xref:stackablectl::installation.adoc[installation steps] for your platform.
+`stackablectl` is the command line tool to interact with Stackable operators and our recommended way to install
+Operators. Follow the xref:management:stackablectl:installation.adoc[installation steps] for your platform.
 
-After you have installed stackablectl run the following command to install all Operators necessary for Superset:
+After you have installed `stackablectl`, run the following command to install all Operators necessary for Superset:
 
 [source,bash]
 ----
@@ -30,7 +30,8 @@ The tool will show
 [INFO ] Installing superset operator
 ----
 
-TIP: Consult the xref:stackablectl::quickstart.adoc[] to learn more about how to use stackablectl. For example, you can use the `-k` flag to create a Kubernetes cluster with link:https://kind.sigs.k8s.io/[kind].
+TIP: Consult the xref:management:stackablectl:quickstart.adoc[] to learn more about how to use `stackablectl`. For
+example, you can use the `--cluster kind` flag to create a Kubernetes cluster with link:https://kind.sigs.k8s.io/[kind].
 
 === Helm
 
@@ -46,7 +47,8 @@ Then install the Stackable Operators:
 include::example$getting_started/getting_started.sh[tag=helm-install-operators]
 ----
 
-Helm will deploy the Operators in a Kubernetes Deployment and apply the CRDs for the Superset service (as well as the CRDs for the required operators). You are now ready to deploy Superset in Kubernetes.
+Helm will deploy the Operators in a Kubernetes Deployment and apply the CRDs for the Superset service (as well as the
+CRDs for the required operators). You are now ready to deploy Superset in Kubernetes.
 
 == What's next
 
