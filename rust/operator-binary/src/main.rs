@@ -1,6 +1,7 @@
 mod config;
 mod controller_commons;
 mod druid_connection_controller;
+mod operations;
 mod product_logging;
 mod rbac;
 mod superset_controller;

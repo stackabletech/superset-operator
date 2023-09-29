@@ -1,0 +1,7 @@
+= Pod Placement
+
+You can configure the Pod placement of the Superset pods as described in xref:concepts:operations/pod_placement.adoc[].
+
+The default affinities created by the operator are:
+
+1. Distribute all the Superset Pods (weight 70)
