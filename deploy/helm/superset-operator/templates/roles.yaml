@@ -82,8 +82,6 @@ rules:
       - {{ include "operator.name" . }}clusters
       - druidconnections
       - druidconnections/status
-      - supersetdbs
-      - supersetdbs/status
     verbs:
       - get
       - list
@@ -95,13 +93,6 @@ rules:
       - {{ include "operator.name" . }}clusters/status
     verbs:
       - patch
-  # The operator creates the supersetdb for the cluster automatically
-  - apiGroups:
-      - {{ include "operator.name" . }}.stackable.tech
-    resources:
-      - supersetdbs
-    verbs:
-      - create
   - apiGroups:
       - authentication.stackable.tech
     resources:
