@@ -16,8 +16,8 @@ preloaded example data.
 
 == Resources
 
-The Operator manages three https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/[custom
-resources]: The _SupersetCluster_, _SupersetDB_ and _DruidConnection_. It creates a number of different Kubernetes
+The Operator manages two https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/[custom
+resources]: The _SupersetCluster_ and _DruidConnection_. It creates a number of different Kubernetes
 resources based on the custom resources.
 
 === Custom resources
@@ -27,11 +27,6 @@ xref:concepts:roles-and-role-groups.adoc[role], the `node`. The various configur
 xref:usage-guide/index.adoc[]. It helps you tune your cluster to your needs by configuring
 xref:usage-guide/storage-resource-configuration.adoc[resource usage], xref:usage-guide/security.adoc[security],
 xref:usage-guide/logging.adoc[logging] and more.
-
-When a SupersetCluster is first deployed, a SupersetDB resource is created. The SupersetDB resource is a wrapper
-resource for the SQL database that is used by Superset for its metadata. The resource contains some configuration but
-also keeps track of whether the database has been initialized or not. It is not deleted automatically if a
-SupersetCluster is deleted, and so can be reused.
 
 DruidConnection resources link a Superset and Druid instance. It lets you define this connection in the familiar way of
 deploying a resource (instead of configuring the connection via the Superset UI or API). The operator configures the
@@ -44,14 +39,14 @@ Based on the custom resources you define, the Operator creates ConfigMaps, State
 image::superset_overview.drawio.svg[A diagram depicting the Kubernetes resources created by the operator]
 
 The diagram above depicts all the Kubernetes resources created by the operator, and how they relate to each other. The
-Jobs created for the SupersetDB and DruidConnnection resources are not shown.
+Job created for the DruidConnnection resource is not shown.
 
 For every xref:concepts:roles-and-role-groups.adoc#_role_groups[role group] you define, the Operator creates a
 StatefulSet with the amount of replicas defined in the RoleGroup. Every Pod in the StatefulSet has two containers: the
 main container running Superset and a sidecar container gathering metrics for xref:operators:monitoring.adoc[]. The
 Operator creates a Service for the `node` role as well as a single service per role group.
 
-ConfigMaps are created, one per RoleGroup and also one for the SupersetDB. Both ConfigMaps contains two files:
+Additionally, a ConfigMap is created for each RoleGroup. These ConfigMaps contains two files:
 `log_config.py` and `superset_config.py` which contain logging and general Superset configuration respectively.
 
 == Required external component: Metastore SQL database
