@@ -273,6 +273,7 @@ pub struct SupersetStorageConfig {}
 #[serde(rename_all = "kebab-case")]
 #[strum(serialize_all = "kebab-case")]
 pub enum Container {
+    Init,
     Superset,
     Vector,
 }

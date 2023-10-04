@@ -565,53 +565,43 @@ fn build_server_rolegroup_statefulset(
 
     let mut superset_cb = ContainerBuilder::new(&Container::Superset.to_string())
         .context(InvalidContainerNameSnafu)?;
+    let mut init_cb =
+        ContainerBuilder::new(&Container::Init.to_string()).context(InvalidContainerNameSnafu)?;
 
-    for (name, value) in node_config
-        .get(&PropertyNameKind::Env)
-        .cloned()
-        .unwrap_or_default()
-    {
-        if name == SupersetConfig::CREDENTIALS_SECRET_PROPERTY {
-            superset_cb.add_env_var_from_secret("SECRET_KEY", &value, "connections.secretKey");
-            superset_cb.add_env_var_from_secret(
-                "SQLALCHEMY_DATABASE_URI",
-                &value,
-                "connections.sqlalchemyDatabaseUri",
-            );
-        } else if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
-            superset_cb.add_env_var_from_secret(
-                "MAPBOX_API_KEY",
-                &value,
-                "connections.mapboxApiKey",
-            );
-        } else {
-            superset_cb.add_env_var(name, value);
-        };
+    for cb in [&mut init_cb, &mut superset_cb].into_iter() {
+        for (name, value) in node_config
+            .get(&PropertyNameKind::Env)
+            .cloned()
+            .unwrap_or_default()
+        {
+            if name == SupersetConfig::CREDENTIALS_SECRET_PROPERTY {
+                cb.add_env_var_from_secret("SECRET_KEY", &value, "connections.secretKey");
+                cb.add_env_var_from_secret(
+                    "SQLALCHEMY_DATABASE_URI",
+                    &value,
+                    "connections.sqlalchemyDatabaseUri",
+                );
+            } else if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
+                cb.add_env_var_from_secret("MAPBOX_API_KEY", &value, "connections.mapboxApiKey");
+            } else {
+                cb.add_env_var(name, value);
+            };
+        }
+        add_authentication_volumes_and_volume_mounts(authentication_config, cb, &mut pb);
     }
-
-    add_authentication_volumes_and_volume_mounts(authentication_config, &mut superset_cb, &mut pb);
-
-    let webserver_timeout = node_config
-        .get(&PropertyNameKind::File(
-            SUPERSET_CONFIG_FILENAME.to_string(),
-        ))
-        .context(MissingSupersetConfigInNodeConfigSnafu)?
-        .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
-        .context(MissingWebServerTimeoutInSupersetConfigSnafu)?;
 
     let secret = &superset.spec.cluster_config.credentials_secret;
 
-    superset_cb
-        .image_from_product_image(resolved_product_image)
-        .add_container_port("http", APP_PORT.into())
-        .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_DIR)
-        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
-        .add_volume_mount(LOG_VOLUME_NAME, LOG_DIR)
+    init_cb
         .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
         .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
         .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
         .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
         .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
+        .image_from_product_image(resolved_product_image)
+        .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_DIR)
+        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
+        .add_volume_mount(LOG_VOLUME_NAME, LOG_DIR)
         .command(vec![
             "/bin/sh".to_string(),
             "-c".to_string(),
@@ -626,7 +616,33 @@ fn build_server_rolegroup_statefulset(
                     --lastname \"$ADMIN_LASTNAME\" \
                     --email \"$ADMIN_EMAIL\" \
                     --password \"$ADMIN_PASSWORD\" && \
-                superset init && \
+                superset init
+            "},
+        ])
+        .resources(merged_config.resources.clone().into());
+    pb.add_init_container(init_cb.build());
+
+    let webserver_timeout = node_config
+        .get(&PropertyNameKind::File(
+            SUPERSET_CONFIG_FILENAME.to_string(),
+        ))
+        .context(MissingSupersetConfigInNodeConfigSnafu)?
+        .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
+        .context(MissingWebServerTimeoutInSupersetConfigSnafu)?;
+
+    superset_cb
+        .image_from_product_image(resolved_product_image)
+        .add_container_port("http", APP_PORT.into())
+        .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_DIR)
+        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
+        .add_volume_mount(LOG_VOLUME_NAME, LOG_DIR)
+        .command(vec![
+            "/bin/sh".to_string(),
+            "-c".to_string(),
+            formatdoc! {"
+                mkdir --parents {PYTHONPATH} && \
+                cp {CONFIG_DIR}/* {PYTHONPATH} && \
+                cp {LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH} && \
                 gunicorn \
                 --bind 0.0.0.0:${{SUPERSET_PORT}} \
                 --worker-class gthread \
