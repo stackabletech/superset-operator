@@ -23,7 +23,7 @@ use stackable_operator::{
     product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
     product_config_utils::{ConfigError, Configuration},
     product_logging::{self, spec::Logging},
-    role_utils::{Role, RoleConfig, RoleGroup, RoleGroupRef},
+    role_utils::{GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
 };
@@ -424,7 +424,7 @@ impl SupersetCluster {
         }
     }
 
-    pub fn role_config(&self, role: &SupersetRole) -> Option<&RoleConfig> {
+    pub fn role_config(&self, role: &SupersetRole) -> Option<&GenericRoleConfig> {
         match role {
             SupersetRole::Node => self.spec.nodes.as_ref().map(|n| &n.role_config),
         }

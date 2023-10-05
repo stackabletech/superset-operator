@@ -4,7 +4,7 @@ use stackable_operator::builder::resources::ResourceRequirementsBuilder;
 use stackable_operator::k8s_openapi::api::core::v1::{HTTPGetAction, Probe};
 use stackable_operator::k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use stackable_operator::k8s_openapi::DeepMerge;
-use stackable_operator::role_utils::RoleConfig;
+use stackable_operator::role_utils::GenericRoleConfig;
 
 use crate::operations::pdb::add_pdbs;
 use crate::util::build_recommended_labels;
@@ -339,7 +339,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     }
 
     let role_config = superset.role_config(&superset_role);
-    if let Some(RoleConfig {
+    if let Some(GenericRoleConfig {
         pod_disruption_budget: pdb,
     }) = role_config
     {
