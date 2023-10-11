@@ -9,7 +9,7 @@
 
 ### Changed
 
-- `vector` `0.26.0` -> `0.31.0` ([#391]).
+- `vector` `0.26.0` -> `0.33.0` ([#391], [#413]).
 - `operator-rs` `0.44.0` -> `0.52.1` ([#390], [#407]).
 - BREAKING: Removed SupersetDB object, since it created some problems when reinstalling or upgrading a Superset cluster. Instead, the initialization of the database was moved to the startup phase of each Superset pod. To make sure the initialization does not run in parallel, the `PodManagementPolicy` was set to `OrderedReady` and liveness/readiness probes were added. The `.spec.clusterConfig.loadExamplesOnInit` option was removed from the CRD, because loading the examples at every startup caused problems in certain scenarios, e.g. after an upgrade from Superset 1.5.3 to 2.1.0 ([#396]).
 
@@ -22,6 +22,7 @@
 [#394]: https://github.com/stackabletech/superset-operator/pull/394
 [#396]: https://github.com/stackabletech/superset-operator/pull/396
 [#407]: https://github.com/stackabletech/superset-operator/pull/407
+[#413]: https://github.com/stackabletech/superset-operator/pull/413
 
 ## [23.7.0] - 2023-07-14
 
