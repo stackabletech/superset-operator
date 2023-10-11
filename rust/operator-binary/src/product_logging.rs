@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Display, Write};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -126,13 +126,14 @@ fn create_superset_config(log_config: &AutomaticContainerLogConfig, log_dir: &st
         .loggers
         .iter()
         .filter(|(name, _)| name.as_str() != AutomaticContainerLogConfig::ROOT_LOGGER)
-        .map(|(name, config)| {
-            format!(
-                "        logging.getLogger('{name}').setLevel({level})\n",
+        .fold(String::new(), |mut output, (name, config)| {
+            let _ = writeln!(
+                output,
+                "        logging.getLogger('{name}').setLevel({level})",
                 level = config.level.to_python_expression()
-            )
-        })
-        .collect::<String>();
+            );
+            output
+        });
 
     format!(
         "\
