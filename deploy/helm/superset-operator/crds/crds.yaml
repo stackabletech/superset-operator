@@ -746,10 +746,9 @@ spec:
                           nullable: true
                           type: integer
                         webserverTimeout:
-                          format: uint32
-                          minimum: 0.0
+                          description: Maximum number of seconds a Superset request can take before timing out. See https://docs.stackable.tech/home/nightly/concepts/duration for more information on the duration format
                           nullable: true
-                          type: integer
+                          type: string
                       type: object
                     configOverrides:
                       additionalProperties:
@@ -4185,10 +4184,9 @@ spec:
                                 nullable: true
                                 type: integer
                               webserverTimeout:
-                                format: uint32
-                                minimum: 0.0
+                                description: Maximum number of seconds a Superset request can take before timing out. See https://docs.stackable.tech/home/nightly/concepts/duration for more information on the duration format
                                 nullable: true
-                                type: integer
+                                type: string
                             type: object
                           configOverrides:
                             additionalProperties:

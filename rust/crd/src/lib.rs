@@ -17,6 +17,7 @@ use stackable_operator::{
         },
     },
     config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
+    duration::Duration,
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     memory::{BinaryMultiple, MemoryQuantity},
@@ -295,16 +296,23 @@ pub struct SupersetConfig {
     /// Row limit when requesting chart data.
     /// Corresponds to ROW_LIMIT
     pub row_limit: Option<i32>,
+
     /// Maximum number of seconds a Superset request can take before timing out.
     /// This setting affects the maximum duration a query to an underlying datasource can take.
     /// If you get timeout errors before your query returns the result you may need to increase this timeout.
     /// Corresponds to SUPERSET_WEBSERVER_TIMEOUT
-    pub webserver_timeout: Option<u32>,
+    #[fragment_attrs(schemars(
+        description = "Maximum number of seconds a Superset request can take before timing out. See https://docs.stackable.tech/home/nightly/concepts/duration for more information on the duration format"
+    ))]
+    pub webserver_timeout: Option<Duration>,
+
     /// CPU and memory limits for Superset pods
     #[fragment_attrs(serde(default))]
     pub resources: Resources<SupersetStorageConfig, NoRuntimeLimits>,
+
     #[fragment_attrs(serde(default))]
     pub logging: Logging<Container>,
+
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
 }
