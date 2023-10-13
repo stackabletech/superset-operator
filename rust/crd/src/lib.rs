@@ -293,16 +293,16 @@ pub enum Container {
     serde(rename_all = "camelCase")
 )]
 pub struct SupersetConfig {
-    /// Row limit when requesting chart data.
-    /// Corresponds to ROW_LIMIT
+    /// Row limit when requesting chart data. Corresponds to ROW_LIMIT.
     pub row_limit: Option<i32>,
 
-    /// Maximum number of seconds a Superset request can take before timing out.
-    /// This setting affects the maximum duration a query to an underlying datasource can take.
-    /// If you get timeout errors before your query returns the result you may need to increase this timeout.
-    /// Corresponds to SUPERSET_WEBSERVER_TIMEOUT
+    /// Maximum time period a Superset request can take before timing out. This
+    /// setting affects the maximum duration a query to an underlying datasource
+    /// can take. If you get timeout errors before your query returns the result
+    /// you may need to increase this timeout. Corresponds to
+    /// SUPERSET_WEBSERVER_TIMEOUT.
     #[fragment_attrs(schemars(
-        description = "Maximum number of seconds a Superset request can take before timing out. See https://docs.stackable.tech/home/nightly/concepts/duration for more information on the duration format"
+        description = "Maximum time period a Superset request can take before timing out. See https://docs.stackable.tech/home/nightly/concepts/duration for more information on the duration format"
     ))]
     pub webserver_timeout: Option<Duration>,
 
