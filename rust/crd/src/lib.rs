@@ -300,8 +300,8 @@ pub struct SupersetConfig {
     /// setting affects the maximum duration a query to an underlying datasource
     /// can take. If you get timeout errors before your query returns the result
     /// you may need to increase this timeout. Corresponds to SUPERSET_WEBSERVER_TIMEOUT.
-    /// See https://docs.stackable.tech/home/nightly/concepts/duration for more
-    /// information on the duration format.
+    /// See <https://docs.stackable.tech/home/nightly/concepts/duration> for
+    /// more information on the duration format.
     pub webserver_timeout: Option<Duration>,
 
     /// CPU and memory limits for Superset pods
