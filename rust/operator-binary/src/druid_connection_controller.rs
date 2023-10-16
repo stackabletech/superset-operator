@@ -6,7 +6,6 @@ use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
     client::Client,
     commons::product_image_selection::ResolvedProductImage,
-    duration::Duration,
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
         core::v1::{ConfigMap, PodSpec, PodTemplateSpec},
@@ -18,6 +17,7 @@ use stackable_operator::{
     },
     logging::controller::ReconcilerError,
     status::condition::{ClusterConditionStatus, ClusterConditionType},
+    time::Duration,
 };
 use stackable_superset_crd::{
     druidconnection::{DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition},

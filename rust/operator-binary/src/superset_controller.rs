@@ -23,7 +23,6 @@ use stackable_operator::{
         authentication::AuthenticationClassProvider, product_image_selection::ResolvedProductImage,
         rbac::build_rbac_resources,
     },
-    duration::Duration,
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -47,6 +46,7 @@ use stackable_operator::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
+    time::Duration,
 };
 use stackable_superset_crd::{
     authentication::SuperSetAuthenticationConfigResolved, Container, SupersetCluster,

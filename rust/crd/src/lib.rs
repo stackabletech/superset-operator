@@ -17,7 +17,6 @@ use stackable_operator::{
         },
     },
     config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
-    duration::Duration,
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     memory::{BinaryMultiple, MemoryQuantity},
@@ -27,6 +26,7 @@ use stackable_operator::{
     role_utils::{GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
+    time::Duration,
 };
 use std::collections::BTreeMap;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
@@ -299,11 +299,9 @@ pub struct SupersetConfig {
     /// Maximum time period a Superset request can take before timing out. This
     /// setting affects the maximum duration a query to an underlying datasource
     /// can take. If you get timeout errors before your query returns the result
-    /// you may need to increase this timeout. Corresponds to
-    /// SUPERSET_WEBSERVER_TIMEOUT.
-    #[fragment_attrs(schemars(
-        description = "Maximum time period a Superset request can take before timing out. See https://docs.stackable.tech/home/nightly/concepts/duration for more information on the duration format"
-    ))]
+    /// you may need to increase this timeout. Corresponds to SUPERSET_WEBSERVER_TIMEOUT.
+    /// See https://docs.stackable.tech/home/nightly/concepts/duration for more
+    /// information on the duration format.
     pub webserver_timeout: Option<Duration>,
 
     /// CPU and memory limits for Superset pods

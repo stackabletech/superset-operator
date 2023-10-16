@@ -633,6 +633,7 @@ spec:
                           default:
                             enableVectorAgent: null
                             containers: {}
+                          description: Logging configuration
                           properties:
                             containers:
                               additionalProperties:
@@ -640,13 +641,14 @@ spec:
                                   - required:
                                       - custom
                                   - {}
-                                description: Fragment derived from `ContainerLogConfigChoice`
+                                description: Log configuration of the container
                                 properties:
                                   console:
+                                    description: Configuration for the console appender
                                     nullable: true
                                     properties:
                                       level:
-                                        description: Log levels
+                                        description: The log level threshold. Log events with a lower log level are discarded.
                                         enum:
                                           - TRACE
                                           - DEBUG
@@ -662,14 +664,16 @@ spec:
                                     description: Custom log configuration provided in a ConfigMap
                                     properties:
                                       configMap:
+                                        description: ConfigMap containing the log configuration files
                                         nullable: true
                                         type: string
                                     type: object
                                   file:
+                                    description: Configuration for the file appender
                                     nullable: true
                                     properties:
                                       level:
-                                        description: Log levels
+                                        description: The log level threshold. Log events with a lower log level are discarded.
                                         enum:
                                           - TRACE
                                           - DEBUG
@@ -683,9 +687,10 @@ spec:
                                     type: object
                                   loggers:
                                     additionalProperties:
+                                      description: Configuration of a logger
                                       properties:
                                         level:
-                                          description: Log levels
+                                          description: The log level threshold. Log events with a lower log level are discarded.
                                           enum:
                                             - TRACE
                                             - DEBUG
@@ -698,10 +703,13 @@ spec:
                                           type: string
                                       type: object
                                     default: {}
+                                    description: Configuration per logger
                                     type: object
                                 type: object
+                              description: Log configuration per container
                               type: object
                             enableVectorAgent:
+                              description: Wether or not to deploy a container with the Vector log agent
                               nullable: true
                               type: boolean
                           type: object
@@ -714,6 +722,7 @@ spec:
                               min: null
                               max: null
                             storage: {}
+                          description: CPU and memory limits for Superset pods
                           properties:
                             cpu:
                               default:
@@ -742,11 +751,12 @@ spec:
                               type: object
                           type: object
                         rowLimit:
+                          description: Row limit when requesting chart data. Corresponds to ROW_LIMIT.
                           format: int32
                           nullable: true
                           type: integer
                         webserverTimeout:
-                          description: Maximum number of seconds a Superset request can take before timing out. See https://docs.stackable.tech/home/nightly/concepts/duration for more information on the duration format
+                          description: Maximum time period a Superset request can take before timing out. This setting affects the maximum duration a query to an underlying datasource can take. If you get timeout errors before your query returns the result you may need to increase this timeout. Corresponds to SUPERSET_WEBSERVER_TIMEOUT. See https://docs.stackable.tech/home/nightly/concepts/duration for more information on the duration format.
                           nullable: true
                           type: string
                       type: object
@@ -4071,6 +4081,7 @@ spec:
                                 default:
                                   enableVectorAgent: null
                                   containers: {}
+                                description: Logging configuration
                                 properties:
                                   containers:
                                     additionalProperties:
@@ -4078,13 +4089,14 @@ spec:
                                         - required:
                                             - custom
                                         - {}
-                                      description: Fragment derived from `ContainerLogConfigChoice`
+                                      description: Log configuration of the container
                                       properties:
                                         console:
+                                          description: Configuration for the console appender
                                           nullable: true
                                           properties:
                                             level:
-                                              description: Log levels
+                                              description: The log level threshold. Log events with a lower log level are discarded.
                                               enum:
                                                 - TRACE
                                                 - DEBUG
@@ -4100,14 +4112,16 @@ spec:
                                           description: Custom log configuration provided in a ConfigMap
                                           properties:
                                             configMap:
+                                              description: ConfigMap containing the log configuration files
                                               nullable: true
                                               type: string
                                           type: object
                                         file:
+                                          description: Configuration for the file appender
                                           nullable: true
                                           properties:
                                             level:
-                                              description: Log levels
+                                              description: The log level threshold. Log events with a lower log level are discarded.
                                               enum:
                                                 - TRACE
                                                 - DEBUG
@@ -4121,9 +4135,10 @@ spec:
                                           type: object
                                         loggers:
                                           additionalProperties:
+                                            description: Configuration of a logger
                                             properties:
                                               level:
-                                                description: Log levels
+                                                description: The log level threshold. Log events with a lower log level are discarded.
                                                 enum:
                                                   - TRACE
                                                   - DEBUG
@@ -4136,10 +4151,13 @@ spec:
                                                 type: string
                                             type: object
                                           default: {}
+                                          description: Configuration per logger
                                           type: object
                                       type: object
+                                    description: Log configuration per container
                                     type: object
                                   enableVectorAgent:
+                                    description: Wether or not to deploy a container with the Vector log agent
                                     nullable: true
                                     type: boolean
                                 type: object
@@ -4152,6 +4170,7 @@ spec:
                                     min: null
                                     max: null
                                   storage: {}
+                                description: CPU and memory limits for Superset pods
                                 properties:
                                   cpu:
                                     default:
@@ -4180,11 +4199,12 @@ spec:
                                     type: object
                                 type: object
                               rowLimit:
+                                description: Row limit when requesting chart data. Corresponds to ROW_LIMIT.
                                 format: int32
                                 nullable: true
                                 type: integer
                               webserverTimeout:
-                                description: Maximum number of seconds a Superset request can take before timing out. See https://docs.stackable.tech/home/nightly/concepts/duration for more information on the duration format
+                                description: Maximum time period a Superset request can take before timing out. This setting affects the maximum duration a query to an underlying datasource can take. If you get timeout errors before your query returns the result you may need to increase this timeout. Corresponds to SUPERSET_WEBSERVER_TIMEOUT. See https://docs.stackable.tech/home/nightly/concepts/duration for more information on the duration format.
                                 nullable: true
                                 type: string
                             type: object
