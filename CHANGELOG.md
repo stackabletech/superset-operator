@@ -6,6 +6,7 @@
 
 - Default stackableVersion to operator version ([#390]).
 - Support PodDisruptionBudgets ([#407]).
+- Added support for versions 2.1.1, 3.0.0 ([#415]).
 
 ### Changed
 
@@ -17,11 +18,16 @@
 
 - BREAKING: Rename Service port name from `superset` to `http` for consistency reasons. This change should normally not be breaking, as we only change the name, not the port. However, there might be some e.g. Ingresses that rely on the port name and need to be updated ([#394]).
 
+### Removed
+
+- Removed support for versions 1.3.2, 1.4.1, 1.4.2, 1.5.1, 1.5.3, 2.0.1 ([#415]).
+
 [#390]: https://github.com/stackabletech/superset-operator/pull/390
 [#391]: https://github.com/stackabletech/superset-operator/pull/391
 [#394]: https://github.com/stackabletech/superset-operator/pull/394
 [#396]: https://github.com/stackabletech/superset-operator/pull/396
 [#407]: https://github.com/stackabletech/superset-operator/pull/407
+[#415]: https://github.com/stackabletech/superset-operator/pull/415
 
 ## [23.7.0] - 2023-07-14
 
