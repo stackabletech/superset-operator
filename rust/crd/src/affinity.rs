@@ -46,7 +46,7 @@ mod tests {
           name: simple-superset
         spec:
           image:
-            productVersion: 2.1.0
+            productVersion: 3.0.0
           credentialsSecret: simple-superset-credentials
           nodes:
             roleGroups:
@@ -107,7 +107,7 @@ mod tests {
           name: simple-superset
         spec:
           image:
-            productVersion: 2.1.0
+            productVersion: 3.0.0
           credentialsSecret: simple-superset-credentials
           nodes:
             roleGroups:

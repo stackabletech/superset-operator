@@ -149,7 +149,7 @@ metadata:
   name: superset-with-ldap-server-veri-tls
 spec:
   image:
-    productVersion: 2.1.0
+    productVersion: 3.0.0
   clusterConfig:
     authentication:
       - authenticationClass: superset-with-ldap-server-veri-tls-ldap
