@@ -437,6 +437,14 @@ fn build_rolegroup_config_map(
 
     config::add_superset_config(&mut config, authentication_config);
 
+    // TODO: this is true per default for versions 3.0.0 and up.
+    //    We deactivate it here to keep existing functionality.
+    //    However this is a security issue and should be configured properly
+    //    Issue: https://github.com/stackabletech/superset-operator/issues/416
+    //    See: https://github.com/apache/superset/pull/24262
+    //    See: https://superset.apache.org/docs/security/#content-security-policy-csp
+    config.insert("TALISMAN_ENABLED".to_string(), "False".to_string());
+
     let mut config_file = Vec::new();
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
         &mut config_file,
