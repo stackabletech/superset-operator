@@ -6,7 +6,7 @@
 
 - Default stackableVersion to operator version ([#390]).
 - Support PodDisruptionBudgets ([#407]).
-- Added support for versions 2.1.1, 3.0.0 ([#415]).
+- Added support for versions 2.1.1, 3.0.1 ([#415]).
 
 ### Changed
 
