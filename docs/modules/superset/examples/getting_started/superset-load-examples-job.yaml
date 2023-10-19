@@ -13,7 +13,7 @@ spec:
         name: config
       containers:
       - name: superset
-        image: docker.stackable.tech/stackable/superset:3.0.0-stackable0.0.0-dev
+        image: docker.stackable.tech/stackable/superset:3.0.1-stackable0.0.0-dev
         command: [
           "/bin/sh",
           "-c",

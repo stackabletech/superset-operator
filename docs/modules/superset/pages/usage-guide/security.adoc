@@ -19,7 +19,7 @@ metadata:
   name: superset-with-ldap-server
 spec:
   image:
-    productVersion: 3.0.0
+    productVersion: 3.0.1
   clusterConfig:
     authentication:
     - authenticationClass: ldap    # <1>
@@ -48,7 +48,7 @@ metadata:
   name: superset-with-oauth
 spec:
   image:
-    productVersion: 3.0.0
+    productVersion: 3.0.1
   [...]
   nodes:
     configOverrides:
