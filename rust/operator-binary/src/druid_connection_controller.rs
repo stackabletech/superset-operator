@@ -2,11 +2,10 @@ use crate::util::{get_job_state, JobState};
 
 use crate::{rbac, superset_controller::DOCKER_IMAGE_BASE_NAME, APP_NAME};
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::commons::product_image_selection::ResolvedProductImage;
-use stackable_operator::status::condition::{ClusterConditionStatus, ClusterConditionType};
 use stackable_operator::{
     builder::{ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
     client::Client,
+    commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
         core::v1::{ConfigMap, PodSpec, PodTemplateSpec},
@@ -17,13 +16,14 @@ use stackable_operator::{
         ResourceExt,
     },
     logging::controller::ReconcilerError,
+    status::condition::{ClusterConditionStatus, ClusterConditionType},
+    time::Duration,
 };
-use stackable_superset_crd::SupersetCluster;
 use stackable_superset_crd::{
     druidconnection::{DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition},
-    PYTHONPATH, SUPERSET_CONFIG_FILENAME,
+    SupersetCluster, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 pub const DRUID_CONNECTION_CONTROLLER_NAME: &str = "druid-connection";
@@ -358,5 +358,5 @@ async fn build_import_job(
 }
 
 pub fn error_policy(_obj: Arc<DruidConnection>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
-    Action::requeue(Duration::from_secs(5))
+    Action::requeue(*Duration::from_secs(5))
 }
