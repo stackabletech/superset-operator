@@ -1,7 +1,5 @@
 [workspace]
-members = [
-    "rust/crd", "rust/operator-binary"
-]
+members = ["rust/crd", "rust/operator-binary"]
 
 [workspace.package]
 version = "0.0.0-dev"
@@ -12,7 +10,7 @@ repository = "https://github.com/stackabletech/superset-operator"
 
 [workspace.dependencies]
 anyhow = "1.0"
-built = { version =  "0.6", features = ["chrono", "git2"] }
+built = { version = "0.6", features = ["chrono", "git2"] }
 clap = "4.3"
 fnv = "1.0"
 futures = { version = "0.3", features = ["compat"] }

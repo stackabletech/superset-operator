@@ -1,11 +1,5 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 
-use stackable_operator::builder::resources::ResourceRequirementsBuilder;
-use stackable_operator::k8s_openapi::api::core::v1::{HTTPGetAction, Probe};
-use stackable_operator::k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
-use stackable_operator::k8s_openapi::DeepMerge;
-use stackable_operator::role_utils::GenericRoleConfig;
-
 use crate::operations::pdb::add_pdbs;
 use crate::util::build_recommended_labels;
 use crate::{
@@ -21,8 +15,8 @@ use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
-        ConfigMapBuilder, ContainerBuilder, ObjectMetaBuilder, PodBuilder,
-        PodSecurityContextBuilder,
+        resources::ResourceRequirementsBuilder, ConfigMapBuilder, ContainerBuilder,
+        ObjectMetaBuilder, PodBuilder, PodSecurityContextBuilder,
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
@@ -32,9 +26,10 @@ use stackable_operator::{
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{ConfigMap, Service, ServicePort, ServiceSpec},
+            core::v1::{ConfigMap, HTTPGetAction, Probe, Service, ServicePort, ServiceSpec},
         },
-        apimachinery::pkg::apis::meta::v1::LabelSelector,
+        apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
+        DeepMerge,
     },
     kube::{runtime::controller::Action, Resource, ResourceExt},
     labels::{role_group_selector_labels, role_selector_labels},
@@ -46,23 +41,22 @@ use stackable_operator::{
     },
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{self, spec::Logging},
-    role_utils::RoleGroupRef,
+    role_utils::{GenericRoleConfig, RoleGroupRef},
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
+    time::Duration,
 };
-use stackable_superset_crd::authentication::SuperSetAuthenticationConfigResolved;
-use stackable_superset_crd::SupersetClusterStatus;
 use stackable_superset_crd::{
-    Container, SupersetCluster, SupersetConfig, SupersetConfigOptions, SupersetRole, APP_NAME,
+    authentication::SuperSetAuthenticationConfigResolved, Container, SupersetCluster,
+    SupersetClusterStatus, SupersetConfig, SupersetConfigOptions, SupersetRole, APP_NAME,
     CONFIG_DIR, LOG_CONFIG_DIR, LOG_DIR, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
 use std::{
     borrow::Cow,
     collections::{BTreeMap, HashMap},
     sync::Arc,
-    time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -789,5 +783,5 @@ fn add_authentication_volumes_and_volume_mounts(
 }
 
 pub fn error_policy(_obj: Arc<SupersetCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
-    Action::requeue(Duration::from_secs(5))
+    Action::requeue(*Duration::from_secs(5))
 }
