@@ -428,27 +428,31 @@ fn build_rolegroup_config_map(
     logging: &Logging<Container>,
     vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
-    let mut config = rolegroup_config
-        .get(&PropertyNameKind::File(
-            SUPERSET_CONFIG_FILENAME.to_string(),
-        ))
-        .cloned()
-        .unwrap_or_default();
-
-    config::add_superset_config(&mut config, authentication_config);
+    let mut config_properties = BTreeMap::new();
 
     // TODO: this is true per default for versions 3.0.0 and up.
     //    We deactivate it here to keep existing functionality.
     //    However this is a security issue and should be configured properly
     //    Issue: https://github.com/stackabletech/superset-operator/issues/416
-    //    See: https://github.com/apache/superset/pull/24262
-    //    See: https://superset.apache.org/docs/security/#content-security-policy-csp
-    config.insert("TALISMAN_ENABLED".to_string(), "False".to_string());
+    config_properties.insert("TALISMAN_ENABLED".to_string(), "False".to_string());
+
+    config::add_superset_config(&mut config_properties, authentication_config);
+
+    // The order here should be kept in order to preserve overrides.
+    // No properties should be added after this extend.
+    config_properties.extend(
+        rolegroup_config
+            .get(&PropertyNameKind::File(
+                SUPERSET_CONFIG_FILENAME.to_string(),
+            ))
+            .cloned()
+            .unwrap_or_default(),
+    );
 
     let mut config_file = Vec::new();
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
         &mut config_file,
-        config.iter(),
+        config_properties.iter(),
         PYTHON_IMPORTS,
     )
     .with_context(|_| BuildRoleGroupConfigFileSnafu {
