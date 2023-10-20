@@ -17,6 +17,7 @@
 ### Fixed
 
 - BREAKING: Rename Service port name from `superset` to `http` for consistency reasons. This change should normally not be breaking, as we only change the name, not the port. However, there might be some e.g. Ingresses that rely on the port name and need to be updated ([#394]).
+- Fixed config override support ([#415]).
 
 ### Removed
 
