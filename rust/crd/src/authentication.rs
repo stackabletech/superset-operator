@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use stackable_operator::commons::authentication::AuthenticationClassProvider;
+use stackable_operator::commons::authentication::{
+    AuthenticationClassProvider, LdapAuthenticationProvider, OidcAuthenticationProvider,
+};
 use stackable_operator::{
     client::Client,
     commons::authentication::AuthenticationClass,
@@ -31,9 +33,20 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+pub enum SupersetAuthenticationClassResolved {
+    Ldap {
+        provider: LdapAuthenticationProvider,
+    },
+    Oidc {
+        provider: OidcAuthenticationProvider,
+        client_credentials_secret: String,
+        api_path: String,
+    },
+}
+
 /// Resolved counter part for `SuperSetAuthenticationConfig`.
-pub struct SuperSetAuthenticationConfigResolved {
-    pub authentication_class: Option<AuthenticationClass>,
+pub struct SupersetAuthenticationConfigResolved {
+    pub authentication_class: Option<SupersetAuthenticationClassResolved>,
     pub user_registration: bool,
     pub user_registration_role: String,
     pub sync_roles_at: FlaskRolesSyncMoment,
@@ -62,9 +75,14 @@ impl SupersetAuthentication {
 #[serde(rename_all = "camelCase")]
 pub struct SuperSetAuthenticationConfig {
     /// Name of the AuthenticationClass used to authenticate the users.
-    /// At the moment only LDAP is supported.
     /// If not specified the default authentication (AUTH_DB) will be used.
     pub authentication_class: Option<String>,
+    /// Mandatory in case OIDC is used
+    pub oidc_client_credentials_secret: Option<String>,
+    /// Path appended to the root path
+    /// Only used in case of OIDC
+    #[serde(default = "default_oidc_api_path")]
+    pub oidc_api_path: String,
     /// Allow users who are not already in the FAB DB.
     /// Gets mapped to `AUTH_USER_REGISTRATION`
     #[serde(default = "default_user_registration")]
@@ -87,6 +105,10 @@ pub fn default_user_registration_role() -> String {
     "Public".to_string()
 }
 
+pub fn default_oidc_api_path() -> String {
+    "protocol".to_string()
+}
+
 /// Matches Flask's default mode of syncing at registration
 pub fn default_sync_roles_at() -> FlaskRolesSyncMoment {
     FlaskRolesSyncMoment::Registration
@@ -103,41 +125,64 @@ impl SupersetAuthentication {
     pub async fn resolve(
         &self,
         client: &Client,
-    ) -> Result<Vec<SuperSetAuthenticationConfigResolved>> {
+    ) -> Result<Vec<SupersetAuthenticationConfigResolved>> {
         let mut resolved = vec![];
 
-        // TODO: adapt if multiple authentication classes are supported by superset.
-        //    This is currently not possible due to the Flask App Builder not supporting it.
+        // TODO: Adapt if multiple authentication types are supported by Superset.
+        // This is currently not possible due to the Flask-AppBuilder not supporting it,
+        // see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924.
         if self.authentication.len() > 1 {
             return Err(Error::MultipleAuthenticationClassesProvided);
         }
 
         for config in &self.authentication {
-            let auth_class = if let Some(auth_class) = &config.authentication_class {
-                let resolved = AuthenticationClass::resolve(client, auth_class)
-                    .await
-                    .context(AuthenticationClassRetrievalSnafu {
-                        authentication_class: ObjectRef::<AuthenticationClass>::new(auth_class),
-                    })?;
+            let opt_auth_class = match &config.authentication_class {
+                Some(auth_class_name) => Some(
+                    AuthenticationClass::resolve(client, auth_class_name)
+                        .await
+                        .context(AuthenticationClassRetrievalSnafu {
+                            authentication_class: ObjectRef::<AuthenticationClass>::new(
+                                auth_class_name,
+                            ),
+                        })?,
+                ),
+                None => None,
+            };
 
-                // Checking for supported AuthenticationClass here is a little out of place, but is does not
-                // make sense to iterate further after finding an unsupported AuthenticationClass.
-                Some(match resolved.spec.provider {
-                    AuthenticationClassProvider::Ldap(_) => resolved,
-                    AuthenticationClassProvider::Tls(_)
-                    | AuthenticationClassProvider::Static(_) => {
-                        return Err(Error::AuthenticationProviderNotSupported {
-                            authentication_class: ObjectRef::from_obj(&resolved),
-                            provider: resolved.spec.provider.to_string(),
+            let opt_auth_class_resolved = if let Some(auth_class) = &opt_auth_class {
+                match &auth_class.spec.provider {
+                    AuthenticationClassProvider::Ldap(ldap_authentication_provider) => {
+                        Some(SupersetAuthenticationClassResolved::Ldap {
+                            provider: ldap_authentication_provider.clone(),
                         })
                     }
-                })
+                    AuthenticationClassProvider::Oidc(oidc_authentication_provider) => {
+                        Some(SupersetAuthenticationClassResolved::Oidc {
+                            provider: oidc_authentication_provider.clone(),
+                            client_credentials_secret: config
+                                .oidc_client_credentials_secret
+                                .clone()
+                                // TODO Throw error if not present
+                                .unwrap(),
+                            api_path: config.oidc_api_path.clone(),
+                        })
+                    }
+                    _ => {
+                        // Checking for supported AuthenticationClass here is a little out of place,
+                        // but is does not make sense to iterate further after finding an unsupported
+                        // AuthenticationClass.
+                        return Err(Error::AuthenticationProviderNotSupported {
+                            authentication_class: ObjectRef::from_obj(auth_class),
+                            provider: auth_class.spec.provider.to_string(),
+                        });
+                    }
+                }
             } else {
                 None
             };
 
-            resolved.push(SuperSetAuthenticationConfigResolved {
-                authentication_class: auth_class,
+            resolved.push(SupersetAuthenticationConfigResolved {
+                authentication_class: opt_auth_class_resolved,
                 user_registration: config.user_registration,
                 user_registration_role: config.user_registration_role.clone(),
                 sync_roles_at: config.sync_roles_at.clone(),

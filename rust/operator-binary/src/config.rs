@@ -1,7 +1,9 @@
-use stackable_operator::commons::authentication::{
-    ldap::LdapAuthenticationProvider, tls::TlsVerification, AuthenticationClassProvider,
+use stackable_operator::commons::authentication::ldap::LdapAuthenticationProvider;
+use stackable_operator::commons::authentication::oidc::OidcAuthenticationProvider;
+use stackable_operator::commons::authentication::TlsVerification;
+use stackable_superset_crd::authentication::{
+    SupersetAuthenticationClassResolved, SupersetAuthenticationConfigResolved,
 };
-use stackable_superset_crd::authentication::SuperSetAuthenticationConfigResolved;
 use stackable_superset_crd::{authentication::FlaskRolesSyncMoment, SupersetConfigOptions};
 use std::collections::BTreeMap;
 
@@ -14,7 +16,7 @@ pub const PYTHON_IMPORTS: &[&str] = &[
 
 pub fn add_superset_config(
     config: &mut BTreeMap<String, String>,
-    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
+    authentication_config: &Vec<SupersetAuthenticationConfigResolved>,
 ) {
     config.insert(
         SupersetConfigOptions::SecretKey.to_string(),
@@ -42,16 +44,22 @@ pub fn add_superset_config(
 
 fn append_authentication_config(
     config: &mut BTreeMap<String, String>,
-    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
+    authentication_config: &Vec<SupersetAuthenticationConfigResolved>,
 ) {
     // TODO: we make sure in crd/src/authentication.rs that currently there is only one
     //    AuthenticationClass provided. If the FlaskAppBuilder ever supports this we have
     //    to adapt the config here accordingly
     for auth_config in authentication_config {
-        if let Some(auth_class) = &auth_config.authentication_class {
-            if let AuthenticationClassProvider::Ldap(ldap) = &auth_class.spec.provider {
-                append_ldap_config(config, ldap);
+        match &auth_config.authentication_class {
+            Some(SupersetAuthenticationClassResolved::Ldap { provider }) => {
+                append_ldap_config(config, provider)
             }
+            Some(SupersetAuthenticationClassResolved::Oidc {
+                provider,
+                client_credentials_secret,
+                api_path,
+            }) => append_oidc_config(config, provider, client_credentials_secret, api_path),
+            None => (),
         }
 
         config.insert(
@@ -78,12 +86,12 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenti
         SupersetConfigOptions::AuthLdapServer.to_string(),
         format!(
             "{protocol}{server_hostname}:{server_port}",
-            protocol = match ldap.tls {
+            protocol = match ldap.tls.tls {
                 None => "ldap://",
                 Some(_) => "ldaps://",
             },
             server_hostname = ldap.hostname,
-            server_port = ldap.port.unwrap_or_else(|| ldap.default_port()),
+            server_port = ldap.port(),
         ),
     );
     config.insert(
@@ -113,10 +121,10 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenti
 
     config.insert(
         SupersetConfigOptions::AuthLdapTlsDemand.to_string(),
-        ldap.use_tls().to_string(),
+        ldap.tls.use_tls().to_string(),
     );
 
-    if let Some(tls) = &ldap.tls {
+    if let Some(tls) = &ldap.tls.tls {
         match &tls.verification {
             TlsVerification::None {} => {
                 config.insert(
@@ -125,7 +133,7 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenti
                 );
             }
             TlsVerification::Server(_) => {
-                if let Some(ca_cert_path) = ldap.tls_ca_cert_mount_path() {
+                if let Some(ca_cert_path) = ldap.tls.tls_ca_cert_mount_path() {
                     config.insert(
                         SupersetConfigOptions::AuthLdapTlsCacertfile.to_string(),
                         ca_cert_path,
@@ -145,4 +153,41 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenti
             format!("open('{password_path}').read()"),
         );
     }
+}
+
+fn append_oidc_config(
+    config: &mut BTreeMap<String, String>,
+    oidc: &OidcAuthenticationProvider,
+    oidc_client_credentials_secret: &str,
+    api_path: &str,
+) {
+    config.insert(
+        SupersetConfigOptions::AuthType.to_string(),
+        "AUTH_OAUTH".into(),
+    );
+    let (env_client_id, env_client_secret) =
+        OidcAuthenticationProvider::client_credentials_env_names(oidc_client_credentials_secret);
+    config.insert(
+        SupersetConfigOptions::OauthProviders.to_string(),
+        format!(
+            // TODO Make provider configurable and derive API path
+            "[
+              {{ 'name': 'keycloak',
+                'icon': 'fa-key',
+                'token_key': 'access_token',
+                'remote_app': {{
+                  'client_id': os.environ.get('{env_client_id}'),
+                  'client_secret': os.environ.get('{env_client_secret}'),
+                  'client_kwargs': {{
+                    'scope': '{scopes}'
+                  }},
+                  'api_base_url': '{url}/{api_path}/',
+                  'server_metadata_url': '{url}/.well-known/openid-configuration',
+                }},
+              }}
+            ]",
+            url = oidc.endpoint_url().unwrap(),
+            scopes = oidc.scopes.join(" "),
+        ),
+    );
 }

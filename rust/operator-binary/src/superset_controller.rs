@@ -13,16 +13,14 @@ use crate::{
 
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::commons::authentication::OidcAuthenticationProvider;
 use stackable_operator::{
     builder::{
         resources::ResourceRequirementsBuilder, ConfigMapBuilder, ContainerBuilder,
         ObjectMetaBuilder, PodBuilder, PodSecurityContextBuilder,
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{
-        authentication::AuthenticationClassProvider, product_image_selection::ResolvedProductImage,
-        rbac::build_rbac_resources,
-    },
+    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
@@ -48,8 +46,9 @@ use stackable_operator::{
     },
     time::Duration,
 };
+use stackable_superset_crd::authentication::SupersetAuthenticationClassResolved;
 use stackable_superset_crd::{
-    authentication::SuperSetAuthenticationConfigResolved, Container, SupersetCluster,
+    authentication::SupersetAuthenticationConfigResolved, Container, SupersetCluster,
     SupersetClusterStatus, SupersetConfig, SupersetConfigOptions, SupersetRole, APP_NAME,
     CONFIG_DIR, LOG_CONFIG_DIR, LOG_DIR, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
@@ -418,7 +417,7 @@ fn build_rolegroup_config_map(
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<SupersetCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
+    authentication_config: &Vec<SupersetAuthenticationConfigResolved>,
     logging: &Logging<Container>,
     vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
@@ -559,7 +558,7 @@ fn build_server_rolegroup_statefulset(
     superset_role: &SupersetRole,
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
+    authentication_config: &Vec<SupersetAuthenticationConfigResolved>,
     sa_name: &str,
     merged_config: &SupersetConfig,
 ) -> Result<StatefulSet> {
@@ -763,7 +762,7 @@ fn build_server_rolegroup_statefulset(
 }
 
 fn add_authentication_volumes_and_volume_mounts(
-    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
+    authentication_config: &Vec<SupersetAuthenticationConfigResolved>,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
 ) {
@@ -771,13 +770,22 @@ fn add_authentication_volumes_and_volume_mounts(
     //    Needs adaptation once FAB and superset support multiple auth methods.
     // The checks for max one AuthenticationClass and the provider are done in crd/src/authentication.rs
     for config in authentication_config {
-        if let Some(auth_class) = &config.authentication_class {
-            match &auth_class.spec.provider {
-                AuthenticationClassProvider::Ldap(ldap) => {
-                    ldap.add_volumes_and_mounts(pb, vec![cb]);
-                }
-                AuthenticationClassProvider::Tls(_) | AuthenticationClassProvider::Static(_) => {}
+        match &config.authentication_class {
+            Some(SupersetAuthenticationClassResolved::Ldap { provider }) => {
+                provider.add_volumes_and_mounts(pb, vec![cb]);
             }
+            Some(SupersetAuthenticationClassResolved::Oidc {
+                provider: _,
+                client_credentials_secret,
+                api_path: _,
+            }) => {
+                cb.add_env_vars(
+                    OidcAuthenticationProvider::client_credentials_env_var_mounts(
+                        client_credentials_secret.into(),
+                    ),
+                );
+            }
+            None => (),
         }
     }
 }
