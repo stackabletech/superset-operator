@@ -1,17 +1,16 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
-
-use crate::operations::pdb::add_pdbs;
-use crate::util::build_recommended_labels;
-use crate::{
-    config::{self, PYTHON_IMPORTS},
-    controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
-    product_logging::{
-        extend_config_map_with_log_config, resolve_vector_aggregator_address, LOG_CONFIG_FILE,
-    },
-    APP_PORT, OPERATOR_NAME,
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
 };
 
 use indoc::formatdoc;
+use product_config::{
+    flask_app_config_writer::{self, FlaskAppConfigWriterError},
+    types::PropertyNameKind,
+    ProductConfigManager,
+};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
@@ -34,11 +33,6 @@ use stackable_operator::{
     kube::{runtime::controller::Action, Resource, ResourceExt},
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
-    product_config::{
-        flask_app_config_writer::{self, FlaskAppConfigWriterError},
-        types::PropertyNameKind,
-        ProductConfigManager,
-    },
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{self, spec::Logging},
     role_utils::{GenericRoleConfig, RoleGroupRef},
@@ -53,12 +47,18 @@ use stackable_superset_crd::{
     SupersetClusterStatus, SupersetConfig, SupersetConfigOptions, SupersetRole, APP_NAME,
     CONFIG_DIR, LOG_CONFIG_DIR, LOG_DIR, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
 use strum::{EnumDiscriminants, IntoStaticStr};
+
+use crate::{
+    config::{self, PYTHON_IMPORTS},
+    controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
+    operations::pdb::add_pdbs,
+    product_logging::{
+        extend_config_map_with_log_config, resolve_vector_aggregator_address, LOG_CONFIG_FILE,
+    },
+    util::build_recommended_labels,
+    APP_PORT, OPERATOR_NAME,
+};
 
 pub const SUPERSET_CONTROLLER_NAME: &str = "supersetcluster";
 pub const DOCKER_IMAGE_BASE_NAME: &str = "superset";
@@ -77,22 +77,28 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object has no namespace"))]
     ObjectHasNoNamespace,
+
     #[snafu(display("object defines no node role"))]
     NoNodeRole,
+
     #[snafu(display("failed to calculate global service name"))]
     GlobalServiceNameNotFound,
+
     #[snafu(display("invalid container name"))]
     InvalidContainerName {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to delete orphaned resources"))]
     DeleteOrphanedResources {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to apply global Service"))]
     ApplyRoleService {
         source: stackable_operator::error::Error,
@@ -103,77 +109,95 @@ pub enum Error {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
+
     #[snafu(display("failed to build config file for {rolegroup}"))]
     BuildRoleGroupConfigFile {
         source: FlaskAppConfigWriterError,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
+
     #[snafu(display("failed to build ConfigMap for {rolegroup}"))]
     BuildRoleGroupConfig {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
+
     #[snafu(display("failed to apply ConfigMap for {rolegroup}"))]
     ApplyRoleGroupConfig {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
+
     #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::error::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
+
     #[snafu(display("failed to generate product config"))]
     GenerateProductConfig {
         source: stackable_operator::product_config_utils::ConfigError,
     },
+
     #[snafu(display("invalid product config"))]
     InvalidProductConfig {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("object is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to apply authentication configuration"))]
     InvalidAuthenticationConfig {
         source: stackable_superset_crd::authentication::Error,
     },
+
     #[snafu(display(
         "failed to get the {SUPERSET_CONFIG_FILENAME} file from node or product config"
     ))]
     MissingSupersetConfigInNodeConfig,
+
     #[snafu(display("failed to get {timeout} from {SUPERSET_CONFIG_FILENAME} file. It should be set in the product config or by user input", timeout = SupersetConfigOptions::SupersetWebserverTimeout))]
     MissingWebServerTimeoutInSupersetConfig,
+
     #[snafu(display("failed to resolve and merge config for role and role group"))]
     FailedToResolveConfig {
         source: stackable_superset_crd::Error,
     },
+
     #[snafu(display("failed to resolve the Vector aggregator address"))]
     ResolveVectorAggregatorAddress {
         source: crate::product_logging::Error,
     },
+
     #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
     InvalidLoggingConfig {
         source: crate::product_logging::Error,
         cm_name: String,
     },
+
     #[snafu(display("failed to update status"))]
     ApplyStatus {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to patch role binding"))]
     ApplyRoleBinding {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to build RBAC objects"))]
     BuildRBACObjects {
         source: stackable_operator::error::Error,
     },
+
     #[snafu(display("failed to create PodDisruptionBudget"))]
     FailedToCreatePdb {
         source: crate::operations::pdb::Error,
