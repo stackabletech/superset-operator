@@ -1,9 +1,6 @@
-pub mod affinity;
-pub mod authentication;
-pub mod druidconnection;
+use std::collections::BTreeMap;
 
-use crate::authentication::SupersetAuthentication;
-use affinity::get_affinity;
+use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -20,15 +17,19 @@ use stackable_operator::{
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
     product_config_utils::{ConfigError, Configuration},
     product_logging::{self, spec::Logging},
     role_utils::{GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
 };
-use std::collections::BTreeMap;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+
+use crate::{affinity::get_affinity, authentication::SupersetAuthentication};
+
+pub mod affinity;
+pub mod authentication;
+pub mod druidconnection;
 
 pub const APP_NAME: &str = "superset";
 pub const CONFIG_DIR: &str = "/stackable/config";
@@ -45,6 +46,7 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
 pub enum Error {
     #[snafu(display("unknown Superset role found {role}. Should be one of {roles:?}"))]
     UnknownSupersetRole { role: String, roles: Vec<String> },
+
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
 }
