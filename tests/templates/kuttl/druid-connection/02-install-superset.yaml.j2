@@ -29,7 +29,6 @@ spec:
   clusterConfig:
     credentialsSecret: superset-credentials
     listenerClass: external-unstable
-    loadExamplesOnInit: false
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
