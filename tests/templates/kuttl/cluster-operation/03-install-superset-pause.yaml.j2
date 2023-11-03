@@ -31,7 +31,6 @@ spec:
       stopped: false
       reconciliationPaused: true
     credentialsSecret: superset-credentials
-    loadExamplesOnInit: false
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}

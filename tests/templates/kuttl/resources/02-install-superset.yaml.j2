@@ -26,7 +26,6 @@ spec:
     productVersion: "{{ test_scenario['values']['superset-latest'] }}"
   clusterConfig:
     credentialsSecret: superset-credentials
-    loadExamplesOnInit: false
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
