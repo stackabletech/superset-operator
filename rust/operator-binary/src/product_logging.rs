@@ -14,7 +14,7 @@ use stackable_operator::{
     },
     role_utils::RoleGroupRef,
 };
-use stackable_superset_crd::LOG_DIR;
+use stackable_superset_crd::STACKABLE_LOG_DIR;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -91,7 +91,7 @@ where
         choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
     }) = logging.containers.get(main_container)
     {
-        let log_dir = format!("{LOG_DIR}/{main_container}");
+        let log_dir = format!("{STACKABLE_LOG_DIR}/{main_container}");
         cm_builder.add_data(
             LOG_CONFIG_FILE,
             create_superset_config(log_config, &log_dir),

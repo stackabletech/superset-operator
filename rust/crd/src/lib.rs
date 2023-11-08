@@ -1,4 +1,8 @@
-use std::collections::BTreeMap;
+pub mod affinity;
+pub mod authentication;
+pub mod druidconnection;
+
+use crate::{affinity::get_affinity, authentication::SupersetAuthentication};
 
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
@@ -22,25 +26,23 @@ use stackable_operator::{
     role_utils::{GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
+    time::Duration,
 };
+use std::collections::BTreeMap;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
-use crate::{affinity::get_affinity, authentication::SupersetAuthentication};
-
-pub mod affinity;
-pub mod authentication;
-pub mod druidconnection;
-
 pub const APP_NAME: &str = "superset";
-pub const CONFIG_DIR: &str = "/stackable/config";
-pub const LOG_CONFIG_DIR: &str = "/stackable/log_config";
-pub const LOG_DIR: &str = "/stackable/log";
+pub const STACKABLE_CONFIG_DIR: &str = "/stackable/config";
+pub const STACKABLE_LOG_CONFIG_DIR: &str = "/stackable/log_config";
+pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const PYTHONPATH: &str = "/stackable/app/pythonpath";
 pub const SUPERSET_CONFIG_FILENAME: &str = "superset_config.py";
 pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
 };
+
+const DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -313,6 +315,10 @@ pub struct SupersetConfig {
 
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
+
+    /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
+    #[fragment_attrs(serde(default))]
+    pub graceful_shutdown_timeout: Option<Duration>,
 }
 
 impl SupersetConfig {
@@ -334,6 +340,7 @@ impl SupersetConfig {
             },
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, role),
+            graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
             ..Default::default()
         }
     }
