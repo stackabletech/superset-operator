@@ -1,9 +1,3 @@
-pub mod affinity;
-pub mod authentication;
-pub mod druidconnection;
-
-use crate::{affinity::get_affinity, authentication::SupersetAuthentication};
-
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -30,6 +24,12 @@ use stackable_operator::{
 };
 use std::collections::BTreeMap;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+
+pub mod affinity;
+pub mod authentication;
+pub mod druidconnection;
+
+use crate::{affinity::get_affinity, authentication::SupersetAuthentication};
 
 pub const APP_NAME: &str = "superset";
 pub const STACKABLE_CONFIG_DIR: &str = "/stackable/config";

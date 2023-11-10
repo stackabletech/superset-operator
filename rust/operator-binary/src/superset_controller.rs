@@ -1,16 +1,4 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
-use crate::operations::graceful_shutdown::add_graceful_shutdown_config;
-use crate::{
-    config::{self, PYTHON_IMPORTS},
-    controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
-    operations::pdb::add_pdbs,
-    product_logging::{
-        extend_config_map_with_log_config, resolve_vector_aggregator_address, LOG_CONFIG_FILE,
-    },
-    util::build_recommended_labels,
-    APP_PORT, OPERATOR_NAME,
-};
-
 use indoc::formatdoc;
 use product_config::{
     flask_app_config_writer::{self, FlaskAppConfigWriterError},
@@ -65,6 +53,18 @@ use std::{
     sync::Arc,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
+
+use crate::operations::graceful_shutdown::add_graceful_shutdown_config;
+use crate::{
+    config::{self, PYTHON_IMPORTS},
+    controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
+    operations::pdb::add_pdbs,
+    product_logging::{
+        extend_config_map_with_log_config, resolve_vector_aggregator_address, LOG_CONFIG_FILE,
+    },
+    util::build_recommended_labels,
+    APP_PORT, OPERATOR_NAME,
+};
 
 pub const SUPERSET_CONTROLLER_NAME: &str = "supersetcluster";
 pub const DOCKER_IMAGE_BASE_NAME: &str = "superset";
