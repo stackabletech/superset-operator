@@ -1,7 +1,20 @@
 = Graceful shutdown
 
-Graceful shutdown of Superset nodes is either not supported by the product itself
-or we have not implemented it yet.
+You can configure the graceful shutdown as described in xref:concepts:operations/graceful_shutdown.adoc[].
 
-Outstanding implementation work for the graceful shutdowns of all products where this functionality is relevant is tracked in
-https://github.com/stackabletech/issues/issues/357
+== Nodes
+
+As a default, Superset nodes have `2 minutes` to shut down gracefully.
+
+The Superset node process will receive a `SIGTERM` signal when Kubernetes wants to terminate the Pod.
+It will log the received signal as shown in the log below and initiate a graceful shutdown.
+After the graceful shutdown timeout runs out, and the process still didn't exit, Kubernetes will issue a `SIGKILL` signal.
+
+[source,text]
+----
+superset [2023-11-08 13:14:39 +0000] [206] [INFO] Handling signal: term
+metrics ts=2023-11-08T13:14:39.818Z caller=main.go:553 level=info msg="Received os signal, exiting" signal=terminated
+superset [2023-11-08 13:14:39 +0000] [207] [INFO] Worker exiting (pid: 207)
+superset Loaded your LOCAL configuration at [/stackable/app/pythonpath/superset_config.py]
+superset [2023-11-08 13:14:40 +0000] [206] [INFO] Shutting down: Master
+----

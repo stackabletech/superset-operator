@@ -7,6 +7,7 @@
 - Default stackableVersion to operator version ([#390]).
 - Support PodDisruptionBudgets ([#407]).
 - Added support for versions 2.1.1, 3.0.1 ([#415]).
+- Support graceful shutdown ([#422]).
 
 ### Changed
 
@@ -29,6 +30,7 @@
 [#396]: https://github.com/stackabletech/superset-operator/pull/396
 [#407]: https://github.com/stackabletech/superset-operator/pull/407
 [#415]: https://github.com/stackabletech/superset-operator/pull/415
+[#422]: https://github.com/stackabletech/superset-operator/pull/422
 
 ## [23.7.0] - 2023-07-14
 

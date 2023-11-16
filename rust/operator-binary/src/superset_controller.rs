@@ -34,25 +34,31 @@ use stackable_operator::{
     labels::{role_group_selector_labels, role_selector_labels},
     logging::controller::ReconcilerError,
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
-    product_logging::{self, spec::Logging},
+    product_logging::{
+        self,
+        framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
+        spec::Logging,
+    },
     role_utils::{GenericRoleConfig, RoleGroupRef},
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
     time::Duration,
+    utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
 use stackable_superset_crd::{
     authentication::SuperSetAuthenticationConfigResolved, Container, SupersetCluster,
     SupersetClusterStatus, SupersetConfig, SupersetConfigOptions, SupersetRole, APP_NAME,
-    CONFIG_DIR, LOG_CONFIG_DIR, LOG_DIR, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
+    PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+    SUPERSET_CONFIG_FILENAME,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
-    operations::pdb::add_pdbs,
+    operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{
         extend_config_map_with_log_config, resolve_vector_aggregator_address, LOG_CONFIG_FILE,
     },
@@ -201,6 +207,11 @@ pub enum Error {
     #[snafu(display("failed to create PodDisruptionBudget"))]
     FailedToCreatePdb {
         source: crate::operations::pdb::Error,
+    },
+
+    #[snafu(display("failed to configure graceful shutdown"))]
+    GracefulShutdown {
+        source: crate::operations::graceful_shutdown::Error,
     },
 }
 
@@ -656,21 +667,24 @@ fn build_server_rolegroup_statefulset(
     superset_cb
         .image_from_product_image(resolved_product_image)
         .add_container_port("http", APP_PORT.into())
-        .add_volume_mount(CONFIG_VOLUME_NAME, CONFIG_DIR)
-        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, LOG_CONFIG_DIR)
-        .add_volume_mount(LOG_VOLUME_NAME, LOG_DIR)
+        .add_volume_mount(CONFIG_VOLUME_NAME, STACKABLE_CONFIG_DIR)
+        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, STACKABLE_LOG_CONFIG_DIR)
+        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
         .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
         .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
         .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
         .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
         .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
         .command(vec![
-            "/bin/sh".to_string(),
+            "/bin/bash".to_string(),
+            "-x".to_string(),
+            "-euo".to_string(),
+            "pipefail".to_string(),
             "-c".to_string(),
             formatdoc! {"
                 mkdir --parents {PYTHONPATH} && \
-                cp {CONFIG_DIR}/* {PYTHONPATH} && \
-                cp {LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH} && \
+                cp {STACKABLE_CONFIG_DIR}/* {PYTHONPATH} && \
+                cp {STACKABLE_LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH} && \
                 superset db upgrade && \
                 superset fab create-admin \
                     --username \"$ADMIN_USERNAME\" \
@@ -679,6 +693,9 @@ fn build_server_rolegroup_statefulset(
                     --email \"$ADMIN_EMAIL\" \
                     --password \"$ADMIN_PASSWORD\" && \
                 superset init && \
+                {COMMON_BASH_TRAP_FUNCTIONS}
+                {remove_vector_shutdown_file_command}
+                prepare_signal_handlers
                 gunicorn \
                 --bind 0.0.0.0:${{SUPERSET_PORT}} \
                 --worker-class gthread \
@@ -686,11 +703,16 @@ fn build_server_rolegroup_statefulset(
                 --timeout {webserver_timeout} \
                 --limit-request-line 0 \
                 --limit-request-field_size 0 \
-                'superset.app:create_app()'
-            "},
+                'superset.app:create_app()' &
+                wait_for_termination $!
+                {create_vector_shutdown_file_command}",
+            remove_vector_shutdown_file_command =
+                remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
+            create_vector_shutdown_file_command =
+                create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
+            },
         ])
         .resources(merged_config.resources.clone().into());
-
     let probe = Probe {
         http_get: Some(HTTPGetAction {
             port: IntOrString::Int(APP_PORT.into()),
@@ -708,12 +730,24 @@ fn build_server_rolegroup_statefulset(
     superset_cb.liveness_probe(probe);
 
     pb.add_container(superset_cb.build());
+    add_graceful_shutdown_config(merged_config, &mut pb).context(GracefulShutdownSnafu)?;
 
     let metrics_container = ContainerBuilder::new("metrics")
         .context(InvalidContainerNameSnafu)?
         .image_from_product_image(resolved_product_image)
-        .command(vec!["/bin/bash".to_string(), "-c".to_string()])
-        .args(vec!["/stackable/statsd_exporter".to_string()])
+        .command(vec![
+            "/bin/bash".to_string(),
+            "-x".to_string(),
+            "-euo".to_string(),
+            "pipefail".to_string(),
+            "-c".to_string(),
+        ])
+        .args(vec![formatdoc! {"
+            {COMMON_BASH_TRAP_FUNCTIONS}
+            prepare_signal_handlers
+            /stackable/statsd_exporter &
+            wait_for_termination $!
+        "}])
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
         .resources(
             ResourceRequirementsBuilder::new()
