@@ -1,4 +1,10 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
+
 use indoc::formatdoc;
 use product_config::{
     flask_app_config_writer::{self, FlaskAppConfigWriterError},
@@ -47,18 +53,12 @@ use stackable_superset_crd::{
     PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
     SUPERSET_CONFIG_FILENAME,
 };
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-use crate::operations::graceful_shutdown::add_graceful_shutdown_config;
 use crate::{
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
-    operations::pdb::add_pdbs,
+    operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{
         extend_config_map_with_log_config, resolve_vector_aggregator_address, LOG_CONFIG_FILE,
     },
