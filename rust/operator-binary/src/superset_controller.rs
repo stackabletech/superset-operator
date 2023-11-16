@@ -676,7 +676,10 @@ fn build_server_rolegroup_statefulset(
         .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
         .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
         .command(vec![
-            "/bin/sh".to_string(),
+            "/bin/bash".to_string(),
+            "-x".to_string(),
+            "-euo".to_string(),
+            "pipefail".to_string(),
             "-c".to_string(),
             formatdoc! {"
                 mkdir --parents {PYTHONPATH} && \
@@ -732,7 +735,13 @@ fn build_server_rolegroup_statefulset(
     let metrics_container = ContainerBuilder::new("metrics")
         .context(InvalidContainerNameSnafu)?
         .image_from_product_image(resolved_product_image)
-        .command(vec!["/bin/bash".to_string(), "-c".to_string()])
+        .command(vec![
+            "/bin/bash".to_string(),
+            "-x".to_string(),
+            "-euo".to_string(),
+            "pipefail".to_string(),
+            "-c".to_string(),
+        ])
         .args(vec![formatdoc! {"
             {COMMON_BASH_TRAP_FUNCTIONS}
             prepare_signal_handlers
