@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use authentication::SupersetClientAuthenticationDetails;
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -26,7 +27,7 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
-use crate::{affinity::get_affinity, authentication::SupersetAuthentication};
+use crate::affinity::get_affinity;
 
 pub mod affinity;
 pub mod authentication;
@@ -164,12 +165,14 @@ pub struct SupersetClusterSpec {
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClusterConfig {
-    #[serde(flatten)]
-    pub authentication: SupersetAuthentication,
+    pub authentication: Vec<SupersetClientAuthenticationDetails>,
+
     pub credentials_secret: String,
+
     /// Cluster operations like pause reconciliation or cluster stop.
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
+
     /// This field controls which type of Service the Operator creates for this SupersetCluster:
     ///
     /// * cluster-internal: Use a ClusterIP service
@@ -183,8 +186,10 @@ pub struct SupersetClusterConfig {
     /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
     #[serde(default)]
     pub listener_class: CurrentlySupportedListenerClasses,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mapbox_secret: Option<String>,
+
     /// Name of the Vector aggregator discovery ConfigMap.
     /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
     #[serde(skip_serializing_if = "Option::is_none")]

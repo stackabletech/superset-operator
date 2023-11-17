@@ -1,10 +1,12 @@
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use stackable_operator::commons::authentication::{ldap, oidc, AuthenticationClassProvider};
+use stackable_operator::commons::authentication::{
+    ldap, oidc, AuthenticationClassProvider, ClientAuthenticationConfig,
+    ClientAuthenticationDetails,
+};
+use stackable_operator::kube::ResourceExt;
 use stackable_operator::{
     client::Client,
-    commons::authentication::AuthenticationClass,
-    kube::runtime::reflector::ObjectRef,
     schemars::{self, JsonSchema},
 };
 
@@ -12,19 +14,20 @@ const SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS: [&str; 1] = ["LDAP"];
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("Failed to retrieve AuthenticationClass {authentication_class}"))]
+    #[snafu(display("Failed to retrieve AuthenticationClass"))]
     AuthenticationClassRetrieval {
         source: stackable_operator::error::Error,
-        authentication_class: ObjectRef<AuthenticationClass>,
     },
+
     // TODO: Adapt message if multiple authentication classes are supported simultaneously
     #[snafu(display("Only one authentication class is currently supported at a time"))]
     MultipleAuthenticationClassesProvided,
+
     #[snafu(display(
-        "Failed to use authentication provider [{provider}] for authentication class [{authentication_class}] - supported providers: {SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS:?}",
+        "Failed to use authentication provider {provider:?} for authentication class {authentication_class:?} - supported providers: {SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS:?}",
     ))]
     AuthenticationProviderNotSupported {
-        authentication_class: ObjectRef<AuthenticationClass>,
+        authentication_class: String,
         provider: String,
     },
 }
@@ -37,61 +40,35 @@ pub enum SupersetAuthenticationClassResolved {
     },
     Oidc {
         provider: oidc::AuthenticationProvider,
-        client_credentials_secret: String,
+        oidc: oidc::ClientAuthenticationOptions,
         api_path: String,
     },
 }
 
-/// Resolved counter part for `SuperSetAuthenticationConfig`.
-pub struct SupersetAuthenticationConfigResolved {
-    pub authentication_class: Option<SupersetAuthenticationClassResolved>,
-    pub user_registration: bool,
-    pub user_registration_role: String,
-    pub sync_roles_at: FlaskRolesSyncMoment,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetAuthentication {
-    #[serde(default)]
-    authentication: Vec<SuperSetAuthenticationConfig>,
-}
-
-impl SupersetAuthentication {
-    pub fn authentication_class_names(&self) -> Vec<&str> {
-        let mut auth_classes = vec![];
-        for config in &self.authentication {
-            if let Some(auth_config) = &config.authentication_class {
-                auth_classes.push(auth_config.as_str());
-            }
-        }
-        auth_classes
-    }
-}
-
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SuperSetAuthenticationConfig {
-    /// Name of the AuthenticationClass used to authenticate the users.
-    /// If not specified the default authentication (AUTH_DB) will be used.
-    pub authentication_class: Option<String>,
-    /// Mandatory in case OIDC is used
-    pub oidc_client_credentials_secret: Option<String>,
+pub struct SupersetClientAuthenticationDetails {
+    #[serde(flatten)]
+    pub common: ClientAuthenticationDetails,
+
     /// Path appended to the root path
     /// Only used in case of OIDC
     #[serde(default = "default_oidc_api_path")]
     pub oidc_api_path: String,
+
     /// Allow users who are not already in the FAB DB.
     /// Gets mapped to `AUTH_USER_REGISTRATION`
     #[serde(default = "default_user_registration")]
     pub user_registration: bool,
+
     /// This role will be given in addition to any AUTH_ROLES_MAPPING.
     /// Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
     #[serde(default = "default_user_registration_role")]
     pub user_registration_role: String,
+
     /// If we should replace ALL the user's roles each login, or only on registration.
     /// Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
-    #[serde(default = "default_sync_roles_at")]
+    #[serde(default)]
     pub sync_roles_at: FlaskRolesSyncMoment,
 }
 
@@ -107,86 +84,81 @@ pub fn default_oidc_api_path() -> String {
     "protocol".to_string()
 }
 
-/// Matches Flask's default mode of syncing at registration
-pub fn default_sync_roles_at() -> FlaskRolesSyncMoment {
-    FlaskRolesSyncMoment::Registration
+/// Resolved counter part for `SuperSetAuthenticationConfig`.
+pub struct SupersetAuthenticationConfigResolved {
+    pub authentication_class_resolved: Option<SupersetAuthenticationClassResolved>,
+    pub user_registration: bool,
+    pub user_registration_role: String,
+    pub sync_roles_at: FlaskRolesSyncMoment,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-pub enum FlaskRolesSyncMoment {
-    Registration,
-    Login,
-}
-
-impl SupersetAuthentication {
-    /// Retrieve all provided `AuthenticationClass` references.
-    pub async fn resolve(
-        &self,
+impl SupersetAuthenticationConfigResolved {
+    pub async fn from(
+        auth_details: &Vec<SupersetClientAuthenticationDetails>,
         client: &Client,
-    ) -> Result<Vec<SupersetAuthenticationConfigResolved>> {
-        let mut resolved = vec![];
-
+    ) -> Result<SupersetAuthenticationConfigResolved> {
         // TODO: Adapt if multiple authentication types are supported by Superset.
         // This is currently not possible due to the Flask-AppBuilder not supporting it,
         // see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924.
-        if self.authentication.len() > 1 {
+        if auth_details.len() > 1 {
             return Err(Error::MultipleAuthenticationClassesProvided);
         }
 
-        for config in &self.authentication {
-            let opt_auth_class = match &config.authentication_class {
-                Some(auth_class_name) => Some(
-                    AuthenticationClass::resolve(client, auth_class_name)
-                        .await
-                        .context(AuthenticationClassRetrievalSnafu {
-                            authentication_class: ObjectRef::<AuthenticationClass>::new(
-                                auth_class_name,
-                            ),
-                        })?,
-                ),
-                None => None,
-            };
+        let mut user_registration = true;
+        let mut user_registration_role = Default::default();
+        let mut sync_roles_at = Default::default();
 
-            let opt_auth_class_resolved = if let Some(auth_class) = &opt_auth_class {
-                match &auth_class.spec.provider {
-                    AuthenticationClassProvider::Ldap(ldap_authentication_provider) => {
-                        Some(SupersetAuthenticationClassResolved::Ldap {
-                            provider: ldap_authentication_provider.clone(),
-                        })
+        let authentication_class_resolved = match auth_details.first() {
+            Some(auth_details) => {
+                let auth_class = auth_details
+                    .common
+                    .resolve_class(client)
+                    .await
+                    .context(AuthenticationClassRetrievalSnafu)?;
+                let auth_class_name = auth_class.name_any();
+
+                user_registration = auth_details.user_registration;
+                user_registration_role = auth_details.user_registration_role.clone();
+                sync_roles_at = auth_details.sync_roles_at.clone();
+
+                Some(match auth_class.spec.provider {
+                    AuthenticationClassProvider::Ldap(provider) => {
+                        SupersetAuthenticationClassResolved::Ldap { provider }
                     }
-                    AuthenticationClassProvider::Oidc(oidc_authentication_provider) => {
-                        Some(SupersetAuthenticationClassResolved::Oidc {
-                            provider: oidc_authentication_provider.clone(),
-                            client_credentials_secret: config
-                                .oidc_client_credentials_secret
-                                .clone()
-                                // TODO Throw error if not present
-                                .unwrap(),
-                            api_path: config.oidc_api_path.clone(),
-                        })
+                    AuthenticationClassProvider::Oidc(provider) => {
+                        let ClientAuthenticationConfig::Oidc(oidc) = &auth_details.common.config;
+                        SupersetAuthenticationClassResolved::Oidc {
+                            provider,
+                            oidc: oidc.clone(),
+                            api_path: auth_details.oidc_api_path.clone(),
+                        }
                     }
                     _ => {
                         // Checking for supported AuthenticationClass here is a little out of place,
                         // but is does not make sense to iterate further after finding an unsupported
                         // AuthenticationClass.
                         return Err(Error::AuthenticationProviderNotSupported {
-                            authentication_class: ObjectRef::from_obj(auth_class),
+                            authentication_class: auth_class_name,
                             provider: auth_class.spec.provider.to_string(),
                         });
                     }
-                }
-            } else {
-                None
-            };
+                })
+            }
+            None => None,
+        };
 
-            resolved.push(SupersetAuthenticationConfigResolved {
-                authentication_class: opt_auth_class_resolved,
-                user_registration: config.user_registration,
-                user_registration_role: config.user_registration_role.clone(),
-                sync_roles_at: config.sync_roles_at.clone(),
-            })
-        }
-
-        Ok(resolved)
+        Ok(SupersetAuthenticationConfigResolved {
+            authentication_class_resolved,
+            user_registration,
+            user_registration_role,
+            sync_roles_at,
+        })
     }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+pub enum FlaskRolesSyncMoment {
+    #[default]
+    Registration,
+    Login,
 }

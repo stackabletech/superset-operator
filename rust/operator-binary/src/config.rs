@@ -15,7 +15,7 @@ pub const PYTHON_IMPORTS: &[&str] = &[
 
 pub fn add_superset_config(
     config: &mut BTreeMap<String, String>,
-    authentication_config: &Vec<SupersetAuthenticationConfigResolved>,
+    authentication_config: &SupersetAuthenticationConfigResolved,
 ) {
     config.insert(
         SupersetConfigOptions::SecretKey.to_string(),
@@ -43,37 +43,32 @@ pub fn add_superset_config(
 
 fn append_authentication_config(
     config: &mut BTreeMap<String, String>,
-    authentication_config: &Vec<SupersetAuthenticationConfigResolved>,
+    auth_config: &SupersetAuthenticationConfigResolved,
 ) {
-    // TODO: we make sure in crd/src/authentication.rs that currently there is only one
-    //    AuthenticationClass provided. If the FlaskAppBuilder ever supports this we have
-    //    to adapt the config here accordingly
-    for auth_config in authentication_config {
-        match &auth_config.authentication_class {
-            Some(SupersetAuthenticationClassResolved::Ldap { provider }) => {
-                append_ldap_config(config, provider)
-            }
-            Some(SupersetAuthenticationClassResolved::Oidc {
-                provider,
-                client_credentials_secret,
-                api_path,
-            }) => append_oidc_config(config, provider, client_credentials_secret, api_path),
-            None => (),
+    match &auth_config.authentication_class_resolved {
+        Some(SupersetAuthenticationClassResolved::Ldap { provider }) => {
+            append_ldap_config(config, provider)
         }
-
-        config.insert(
-            SupersetConfigOptions::AuthUserRegistration.to_string(),
-            auth_config.user_registration.to_string(),
-        );
-        config.insert(
-            SupersetConfigOptions::AuthUserRegistrationRole.to_string(),
-            auth_config.user_registration_role.to_string(),
-        );
-        config.insert(
-            SupersetConfigOptions::AuthRolesSyncAtLogin.to_string(),
-            (auth_config.sync_roles_at == FlaskRolesSyncMoment::Login).to_string(),
-        );
+        Some(SupersetAuthenticationClassResolved::Oidc {
+            provider,
+            oidc,
+            api_path,
+        }) => append_oidc_config(config, provider, oidc, api_path),
+        None => (),
     }
+
+    config.insert(
+        SupersetConfigOptions::AuthUserRegistration.to_string(),
+        auth_config.user_registration.to_string(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthUserRegistrationRole.to_string(),
+        auth_config.user_registration_role.to_string(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthRolesSyncAtLogin.to_string(),
+        (auth_config.sync_roles_at == FlaskRolesSyncMoment::Login).to_string(),
+    );
 }
 
 fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &ldap::AuthenticationProvider) {
@@ -157,7 +152,7 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &ldap::Authen
 fn append_oidc_config(
     config: &mut BTreeMap<String, String>,
     oidc: &oidc::AuthenticationProvider,
-    oidc_client_credentials_secret: &str,
+    client_options: &oidc::ClientAuthenticationOptions,
     api_path: &str,
 ) {
     config.insert(
@@ -165,7 +160,12 @@ fn append_oidc_config(
         "AUTH_OAUTH".into(),
     );
     let (env_client_id, env_client_secret) =
-        oidc::AuthenticationProvider::client_credentials_env_names(oidc_client_credentials_secret);
+        oidc::AuthenticationProvider::client_credentials_env_names(
+            &client_options.client_credentials_secret_ref,
+        );
+    let mut scopes = oidc.scopes.clone();
+    scopes.extend(client_options.extra_scopes.clone());
+
     config.insert(
         SupersetConfigOptions::OauthProviders.to_string(),
         format!(
@@ -186,7 +186,7 @@ fn append_oidc_config(
               }}
             ]",
             url = oidc.endpoint_url().unwrap(),
-            scopes = oidc.scopes.join(" "),
+            scopes = scopes.join(" "),
         ),
     );
 }

@@ -27,10 +27,7 @@ use stackable_operator::{
     logging::controller::report_controller_reconciled,
     CustomResourceExt,
 };
-use stackable_superset_crd::{
-    authentication::SupersetAuthentication, druidconnection::DruidConnection, SupersetCluster,
-    APP_NAME,
-};
+use stackable_superset_crd::{druidconnection::DruidConnection, SupersetCluster, APP_NAME};
 use std::sync::Arc;
 
 mod built_info {
@@ -107,10 +104,7 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |superset: &Arc<SupersetCluster>| {
-                                references_authentication_class(
-                                    &superset.spec.cluster_config.authentication,
-                                    &authentication_class,
-                                )
+                                references_authentication_class(superset, &authentication_class)
                             })
                             .map(|superset| ObjectRef::from_obj(&*superset))
                     },
@@ -210,15 +204,14 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn references_authentication_class(
-    authentication_config: &SupersetAuthentication,
+    superset: &SupersetCluster,
     authentication_class: &AuthenticationClass,
 ) -> bool {
-    assert!(authentication_class.metadata.name.is_some());
-
-    authentication_config
-        .authentication_class_names()
-        .into_iter()
-        .filter(|c| *c == authentication_class.name_any())
-        .count()
-        > 0
+    let authentication_class_name = authentication_class.name_any();
+    superset
+        .spec
+        .cluster_config
+        .authentication
+        .iter()
+        .any(|c| c.common.authentication_class_name() == &authentication_class_name)
 }
