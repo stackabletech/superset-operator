@@ -67,7 +67,10 @@ spec:
                             type: object
                           oidcApiPath:
                             default: protocol
-                            description: Path appended to the root path Only used in case of OIDC
+                            description: |-
+                              Path appended to the root path Only used in case of OIDC
+
+                              FIXME: Remove and move to correct oidc location
                             type: string
                           syncRolesAt:
                             default: Registration
