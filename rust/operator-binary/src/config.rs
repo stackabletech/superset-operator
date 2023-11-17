@@ -1,6 +1,5 @@
-use stackable_operator::commons::authentication::ldap::LdapAuthenticationProvider;
-use stackable_operator::commons::authentication::oidc::OidcAuthenticationProvider;
-use stackable_operator::commons::authentication::TlsVerification;
+use stackable_operator::commons::authentication::tls::TlsVerification;
+use stackable_operator::commons::authentication::{ldap, oidc};
 use stackable_superset_crd::authentication::{
     SupersetAuthenticationClassResolved, SupersetAuthenticationConfigResolved,
 };
@@ -77,7 +76,7 @@ fn append_authentication_config(
     }
 }
 
-fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenticationProvider) {
+fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &ldap::AuthenticationProvider) {
     config.insert(
         SupersetConfigOptions::AuthType.to_string(),
         "AUTH_LDAP".into(),
@@ -121,7 +120,7 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenti
 
     config.insert(
         SupersetConfigOptions::AuthLdapTlsDemand.to_string(),
-        ldap.tls.use_tls().to_string(),
+        ldap.tls.uses_tls().to_string(),
     );
 
     if let Some(tls) = &ldap.tls.tls {
@@ -157,7 +156,7 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenti
 
 fn append_oidc_config(
     config: &mut BTreeMap<String, String>,
-    oidc: &OidcAuthenticationProvider,
+    oidc: &oidc::AuthenticationProvider,
     oidc_client_credentials_secret: &str,
     api_path: &str,
 ) {
@@ -166,7 +165,7 @@ fn append_oidc_config(
         "AUTH_OAUTH".into(),
     );
     let (env_client_id, env_client_secret) =
-        OidcAuthenticationProvider::client_credentials_env_names(oidc_client_credentials_secret);
+        oidc::AuthenticationProvider::client_credentials_env_names(oidc_client_credentials_secret);
     config.insert(
         SupersetConfigOptions::OauthProviders.to_string(),
         format!(

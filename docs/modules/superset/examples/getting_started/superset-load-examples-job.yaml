@@ -17,7 +17,10 @@ spec:
         command: [
           "/bin/sh",
           "-c",
-          "mkdir --parents /stackable/app/pythonpath && cp /stackable/config/* /stackable/app/pythonpath && superset load_examples"
+          "mkdir --parents /stackable/app/pythonpath && \
+          cp /stackable/config/* /stackable/app/pythonpath && \
+          echo 'SQLALCHEMY_EXAMPLES_URI = os.environ.get(\"SQLALCHEMY_DATABASE_URI\")' >> /stackable/app/pythonpath/superset_config.py && \
+          superset load_examples"
         ]
         env:
         - name: SECRET_KEY

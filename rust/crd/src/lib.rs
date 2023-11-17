@@ -1,9 +1,6 @@
-pub mod affinity;
-pub mod authentication;
-pub mod druidconnection;
+use std::collections::BTreeMap;
 
-use crate::authentication::SupersetAuthentication;
-use affinity::get_affinity;
+use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -20,20 +17,25 @@ use stackable_operator::{
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType},
     product_config_utils::{ConfigError, Configuration},
     product_logging::{self, spec::Logging},
     role_utils::{GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
+    time::Duration,
 };
-use std::collections::BTreeMap;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
+use crate::{affinity::get_affinity, authentication::SupersetAuthentication};
+
+pub mod affinity;
+pub mod authentication;
+pub mod druidconnection;
+
 pub const APP_NAME: &str = "superset";
-pub const CONFIG_DIR: &str = "/stackable/config";
-pub const LOG_CONFIG_DIR: &str = "/stackable/log_config";
-pub const LOG_DIR: &str = "/stackable/log";
+pub const STACKABLE_CONFIG_DIR: &str = "/stackable/config";
+pub const STACKABLE_LOG_CONFIG_DIR: &str = "/stackable/log_config";
+pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const PYTHONPATH: &str = "/stackable/app/pythonpath";
 pub const SUPERSET_CONFIG_FILENAME: &str = "superset_config.py";
 pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
@@ -41,10 +43,13 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     unit: BinaryMultiple::Mebi,
 };
 
+const DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
+
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("unknown Superset role found {role}. Should be one of {roles:?}"))]
     UnknownSupersetRole { role: String, roles: Vec<String> },
+
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
 }
@@ -313,6 +318,10 @@ pub struct SupersetConfig {
 
     #[fragment_attrs(serde(default))]
     pub affinity: StackableAffinity,
+
+    /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
+    #[fragment_attrs(serde(default))]
+    pub graceful_shutdown_timeout: Option<Duration>,
 }
 
 impl SupersetConfig {
@@ -334,6 +343,7 @@ impl SupersetConfig {
             },
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, role),
+            graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
             ..Default::default()
         }
     }

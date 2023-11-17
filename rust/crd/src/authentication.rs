@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use stackable_operator::commons::authentication::{
-    AuthenticationClassProvider, LdapAuthenticationProvider, OidcAuthenticationProvider,
-};
+use stackable_operator::commons::authentication::{ldap, oidc, AuthenticationClassProvider};
 use stackable_operator::{
     client::Client,
     commons::authentication::AuthenticationClass,
@@ -35,10 +33,10 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub enum SupersetAuthenticationClassResolved {
     Ldap {
-        provider: LdapAuthenticationProvider,
+        provider: ldap::AuthenticationProvider,
     },
     Oidc {
-        provider: OidcAuthenticationProvider,
+        provider: oidc::AuthenticationProvider,
         client_credentials_secret: String,
         api_path: String,
     },
