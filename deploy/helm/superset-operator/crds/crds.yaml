@@ -35,12 +35,39 @@ spec:
                   description: Superset cluster configuration options.
                   properties:
                     authentication:
-                      default: []
                       items:
+                        description: |-
+                          An enum of supported authentication providers. Each variant contains provider specific options. The structure is based on disussions around the [OIDC ADR][oidc-adr].
+
+                          [oidc-adr]: https://docs.stackable.tech/home/nightly/contributor/adr/adr032-oauth-oidc-support
+                        oneOf:
+                          - required:
+                              - oidc
                         properties:
                           authenticationClass:
-                            description: Name of the AuthenticationClass used to authenticate the users. At the moment only LDAP is supported. If not specified the default authentication (AUTH_DB) will be used.
-                            nullable: true
+                            description: A name/key which references an authentication class. To get the concrete [`AuthenticationClass`], we must resolve it. This resolution can be achieved by using [`ClientAuthenticationDetails::resolve_class`].
+                            type: string
+                          oidc:
+                            description: OIDC specific config options. These are set on the product config level.
+                            properties:
+                              clientCredentialsSecret:
+                                description: A reference to the OIDC client credentials secret. The secret contains the client id and secret.
+                                type: string
+                              extraScopes:
+                                default: []
+                                description: |-
+                                  An optional list of extra scopes which get merged with the scopes defined in the [`AuthenticationClass`][authclass].
+
+                                  [authclass]: crate::commons::authentication::AuthenticationClass
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                              - clientCredentialsSecret
+                            type: object
+                          oidcApiPath:
+                            default: protocol
+                            description: Path appended to the root path Only used in case of OIDC
                             type: string
                           syncRolesAt:
                             default: Registration
@@ -57,6 +84,8 @@ spec:
                             default: Public
                             description: This role will be given in addition to any AUTH_ROLES_MAPPING. Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
                             type: string
+                        required:
+                          - authenticationClass
                         type: object
                       type: array
                     clusterOperation:
@@ -101,6 +130,7 @@ spec:
                       nullable: true
                       type: string
                   required:
+                    - authentication
                     - credentialsSecret
                   type: object
                 image:
