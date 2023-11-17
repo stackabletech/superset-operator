@@ -57,6 +57,7 @@ use stackable_superset_crd::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
+    commands::add_cert_to_system_truststore_command,
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
@@ -675,6 +676,7 @@ fn build_server_rolegroup_statefulset(
         .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
         .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
         .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
+        .add_env_var("SSL_CERT_DIR", "/stackable/certs/")
         .command(vec![
             "/bin/bash".to_string(),
             "-x".to_string(),
@@ -685,6 +687,7 @@ fn build_server_rolegroup_statefulset(
                 mkdir --parents {PYTHONPATH} && \
                 cp {STACKABLE_CONFIG_DIR}/* {PYTHONPATH} && \
                 cp {STACKABLE_LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH} && \
+                {auth_commands}
                 superset db upgrade && \
                 superset fab create-admin \
                     --username \"$ADMIN_USERNAME\" \
@@ -706,6 +709,7 @@ fn build_server_rolegroup_statefulset(
                 'superset.app:create_app()' &
                 wait_for_termination $!
                 {create_vector_shutdown_file_command}",
+            auth_commands = authentication_start_commands(authentication_config).unwrap_or_default(),
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             create_vector_shutdown_file_command =
@@ -829,14 +833,38 @@ fn add_authentication_volumes_and_volume_mounts(
         Some(SupersetAuthenticationClassResolved::Ldap { provider }) => {
             provider.add_volumes_and_mounts(pb, vec![cb]);
         }
-        Some(SupersetAuthenticationClassResolved::Oidc { oidc, .. }) => {
+        Some(SupersetAuthenticationClassResolved::Oidc { oidc, provider, .. }) => {
             cb.add_env_vars(
                 oidc::AuthenticationProvider::client_credentials_env_var_mounts(
                     oidc.client_credentials_secret_ref.clone(),
                 ),
             );
+            provider.tls.add_volumes_and_mounts(pb, vec![cb]);
         }
         None => (),
+    }
+}
+
+fn authentication_start_commands(
+    auth_config: &SupersetAuthenticationConfigResolved,
+) -> Option<String> {
+    match &auth_config.authentication_class_resolved {
+        Some(SupersetAuthenticationClassResolved::Oidc { provider, .. }) => {
+            if provider.tls.uses_tls() && !provider.tls.uses_tls_verification() {
+                // TODO Add snafu error
+                panic!("Superset does not allow that");
+            }
+
+            provider
+                .tls
+                .tls_ca_cert_mount_path()
+                .map(|tls_ca_cert_mount_path| {
+                    add_cert_to_system_truststore_command(&tls_ca_cert_mount_path)
+                })
+
+            // WebPKI will be handled implicitly
+        }
+        Some(SupersetAuthenticationClassResolved::Ldap { .. }) | None => None,
     }
 }
 

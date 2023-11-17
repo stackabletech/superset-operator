@@ -1,14 +1,4 @@
-mod config;
-mod controller_commons;
-mod druid_connection_controller;
-mod operations;
-mod product_logging;
-mod rbac;
-mod superset_controller;
-mod util;
-
-use crate::druid_connection_controller::DRUID_CONNECTION_CONTROLLER_NAME;
-use crate::superset_controller::SUPERSET_CONTROLLER_NAME;
+use std::sync::Arc;
 
 use clap::{crate_description, crate_version, Parser};
 use futures::StreamExt;
@@ -28,7 +18,19 @@ use stackable_operator::{
     CustomResourceExt,
 };
 use stackable_superset_crd::{druidconnection::DruidConnection, SupersetCluster, APP_NAME};
-use std::sync::Arc;
+
+use crate::druid_connection_controller::DRUID_CONNECTION_CONTROLLER_NAME;
+use crate::superset_controller::SUPERSET_CONTROLLER_NAME;
+
+mod commands;
+mod config;
+mod controller_commons;
+mod druid_connection_controller;
+mod operations;
+mod product_logging;
+mod rbac;
+mod superset_controller;
+mod util;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));

@@ -53,6 +53,8 @@ pub struct SupersetClientAuthenticationDetails {
 
     /// Path appended to the root path
     /// Only used in case of OIDC
+    ///
+    /// FIXME: Remove and move to correct oidc location
     #[serde(default = "default_oidc_api_path")]
     pub oidc_api_path: String,
 
