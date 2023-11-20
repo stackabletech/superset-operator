@@ -1,6 +1,6 @@
 = Installation
 
-On this page you will install the Stackable Superset Operator as well as the commons and secret Operator which are
+On this page you will install the Stackable Superset Operator as well as the commons, secret and listener Operator which are
 required by all Stackable Operators.
 
 == Stackable Operators
@@ -27,6 +27,7 @@ The tool will show
 ----
 [INFO ] Installing commons operator
 [INFO ] Installing secret operator
+[INFO ] Installing listener operator
 [INFO ] Installing superset operator
 ----
 
