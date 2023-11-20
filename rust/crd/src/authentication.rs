@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use stackable_operator::commons::authentication::{
-    ldap, oidc, AuthenticationClassProvider, ClientAuthenticationConfig,
-    ClientAuthenticationDetails,
+    ldap, oidc, AuthenticationClassProvider, ClientAuthenticationDetails,
 };
 use stackable_operator::kube::ResourceExt;
 use stackable_operator::{
@@ -24,11 +23,16 @@ pub enum Error {
     MultipleAuthenticationClassesProvided,
 
     #[snafu(display(
-        "Failed to use authentication provider {provider:?} for authentication class {authentication_class:?} - supported providers: {SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS:?}",
+        "Failed to use authentication provider {provider:?} for authentication class {auth_class:?} - supported providers: {SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS:?}",
     ))]
     AuthenticationProviderNotSupported {
-        authentication_class: String,
+        auth_class: String,
         provider: String,
+    },
+
+    #[snafu(display("Invalid OIDC configuration"))]
+    OidcConfiguration {
+        source: stackable_operator::error::Error,
     },
 }
 
@@ -128,10 +132,13 @@ impl SupersetAuthenticationConfigResolved {
                         SupersetAuthenticationClassResolved::Ldap { provider }
                     }
                     AuthenticationClassProvider::Oidc(provider) => {
-                        let ClientAuthenticationConfig::Oidc(oidc) = &auth_details.common.config;
                         SupersetAuthenticationClassResolved::Oidc {
                             provider,
-                            oidc: oidc.clone(),
+                            oidc: auth_details
+                                .common
+                                .oidc_or_error(&auth_class_name)
+                                .context(OidcConfigurationSnafu)?
+                                .clone(),
                             api_path: auth_details.oidc_api_path.clone(),
                         }
                     }
@@ -140,7 +147,7 @@ impl SupersetAuthenticationConfigResolved {
                         // but is does not make sense to iterate further after finding an unsupported
                         // AuthenticationClass.
                         return Err(Error::AuthenticationProviderNotSupported {
-                            authentication_class: auth_class_name,
+                            auth_class: auth_class_name,
                             provider: auth_class.spec.provider.to_string(),
                         });
                     }
