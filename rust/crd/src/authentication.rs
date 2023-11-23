@@ -44,8 +44,7 @@ pub enum SupersetAuthenticationClassResolved {
     },
     Oidc {
         provider: oidc::AuthenticationProvider,
-        oidc: oidc::ClientAuthenticationOptions,
-        api_path: String,
+        oidc: oidc::ClientAuthenticationOptions<SupersetOidcExtraFields>,
     },
 }
 
@@ -53,14 +52,7 @@ pub enum SupersetAuthenticationClassResolved {
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClientAuthenticationDetails {
     #[serde(flatten)]
-    pub common: ClientAuthenticationDetails,
-
-    /// Path appended to the root path
-    /// Only used in case of OIDC
-    ///
-    /// FIXME: Remove and move to correct oidc location
-    #[serde(default = "default_oidc_api_path")]
-    pub oidc_api_path: String,
+    pub common: ClientAuthenticationDetails<SupersetOidcExtraFields>,
 
     /// Allow users who are not already in the FAB DB.
     /// Gets mapped to `AUTH_USER_REGISTRATION`
@@ -76,6 +68,14 @@ pub struct SupersetClientAuthenticationDetails {
     /// Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
     #[serde(default)]
     pub sync_roles_at: FlaskRolesSyncMoment,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetOidcExtraFields {
+    /// Path appended to the root path
+    #[serde(default = "default_oidc_api_path")]
+    pub oidc_api_path: String,
 }
 
 pub fn default_user_registration() -> bool {
@@ -139,7 +139,6 @@ impl SupersetAuthenticationConfigResolved {
                                 .oidc_or_error(&auth_class_name)
                                 .context(OidcConfigurationSnafu)?
                                 .clone(),
-                            api_path: auth_details.oidc_api_path.clone(),
                         }
                     }
                     _ => {

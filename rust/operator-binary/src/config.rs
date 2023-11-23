@@ -2,6 +2,7 @@ use stackable_operator::commons::authentication::tls::TlsVerification;
 use stackable_operator::commons::authentication::{ldap, oidc};
 use stackable_superset_crd::authentication::{
     SupersetAuthenticationClassResolved, SupersetAuthenticationConfigResolved,
+    SupersetOidcExtraFields,
 };
 use stackable_superset_crd::{authentication::FlaskRolesSyncMoment, SupersetConfigOptions};
 use std::collections::BTreeMap;
@@ -49,11 +50,9 @@ fn append_authentication_config(
         Some(SupersetAuthenticationClassResolved::Ldap { provider }) => {
             append_ldap_config(config, provider)
         }
-        Some(SupersetAuthenticationClassResolved::Oidc {
-            provider,
-            oidc,
-            api_path,
-        }) => append_oidc_config(config, provider, oidc, api_path),
+        Some(SupersetAuthenticationClassResolved::Oidc { provider, oidc }) => {
+            append_oidc_config(config, provider, oidc)
+        }
         None => (),
     }
 
@@ -152,8 +151,7 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &ldap::Authen
 fn append_oidc_config(
     config: &mut BTreeMap<String, String>,
     oidc: &oidc::AuthenticationProvider,
-    client_options: &oidc::ClientAuthenticationOptions,
-    api_path: &str,
+    client_options: &oidc::ClientAuthenticationOptions<SupersetOidcExtraFields>,
 ) {
     config.insert(
         SupersetConfigOptions::AuthType.to_string(),
@@ -186,6 +184,7 @@ fn append_oidc_config(
               }}
             ]",
             url = oidc.endpoint_url().unwrap(),
+            api_path = client_options.extra_fields_for_product.oidc_api_path,
             scopes = scopes.join(" "),
         ),
     );
