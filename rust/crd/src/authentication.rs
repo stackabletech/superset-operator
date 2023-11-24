@@ -34,6 +34,15 @@ pub enum Error {
     OidcConfiguration {
         source: stackable_operator::error::Error,
     },
+
+    #[snafu(display(
+        "{configured:?} is not a supported principalClaim in superset for the keycloak oidc provider. Please use {supported:?} in the AuthenticationClass {auth_class_name:?}"
+    ))]
+    OidcPrincipalClaimNotSupported {
+        configured: String,
+        supported: String,
+        auth_class_name: String,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -132,6 +141,14 @@ impl SupersetAuthenticationConfigResolved {
                         SupersetAuthenticationClassResolved::Ldap { provider }
                     }
                     AuthenticationClassProvider::Oidc(provider) => {
+                        if &provider.principal_claim != "preferred_username" {
+                            return OidcPrincipalClaimNotSupportedSnafu {
+                                configured: provider.principal_claim.clone(),
+                                supported: "preferred_username".to_owned(),
+                                auth_class_name: auth_class_name,
+                            }
+                            .fail();
+                        }
                         SupersetAuthenticationClassResolved::Oidc {
                             provider,
                             oidc: auth_details
