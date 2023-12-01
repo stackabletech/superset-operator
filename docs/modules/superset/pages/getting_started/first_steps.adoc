@@ -14,7 +14,7 @@ include::example$getting_started/getting_started.sh[tag=add-bitnami-repo]
 [source,bash]
 include::example$getting_started/getting_started.sh[tag=install-bitnami-psql]
 
-WARNING: This setup is unsuitable for production use! Follow the specific production setup instuctions for one of the xref:required-external-components[supported databases] to get a production-ready database.
+WARNING: This setup is unsuitable for production use! Follow the specific production setup instructions for one of the xref:required-external-components[supported databases] to get a production-ready database.
 
 == Secret with Superset credentials
 
@@ -52,7 +52,7 @@ include::example$getting_started/getting_started.sh[tag=apply-superset-cluster]
 
 `metadata.name` contains the name of the Superset cluster.
 
-The previously created secret must be referenced in `spec.credentialsSecret`.
+The previously created secret must be referenced in `spec.clusterConfig.credentialsSecret`.
 
 The `rowLimit` configuration option defines the row limit when requesting chart data.
 
