@@ -184,7 +184,7 @@ fn append_oidc_config(
               }}
             ]",
             url = oidc.endpoint_url().unwrap(),
-            api_path = client_options.extra_fields_for_product.oidc_api_path,
+            api_path = client_options.product_specific_fields.oidc_api_path,
             scopes = scopes.join(" "),
         ),
     );
