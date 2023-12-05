@@ -4,7 +4,9 @@
 
 ### Fixed
 
-- BREAKING: Fixed various issues in the CRD structure. `clusterConfig.credentialsSecret` is now mandatory ([#XXX]).
+- BREAKING: Fixed various issues in the CRD structure. `clusterConfig.credentialsSecret` is now mandatory ([#429]).
+
+[#429]: https://github.com/stackabletech/superset-operator/pull/429
 
 ## [23.11.0] - 2023-11-24
 
