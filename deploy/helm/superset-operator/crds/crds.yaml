@@ -25,13 +25,6 @@ spec:
             spec:
               properties:
                 clusterConfig:
-                  default:
-                    authentication: []
-                    credentialsSecret: ''
-                    clusterOperation:
-                      stopped: false
-                      reconciliationPaused: false
-                    listenerClass: cluster-internal
                   description: Superset cluster configuration options.
                   properties:
                     authentication:
@@ -7072,6 +7065,7 @@ spec:
                     - roleGroups
                   type: object
               required:
+                - clusterConfig
                 - image
               type: object
             status:

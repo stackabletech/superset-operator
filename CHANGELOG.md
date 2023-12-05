@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- BREAKING: Fixed various issues in the CRD structure. `clusterConfig.credentialsSecret` is now mandatory ([#XXX]).
+
 ## [23.11.0] - 2023-11-24
 
 ### Added

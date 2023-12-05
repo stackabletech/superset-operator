@@ -152,22 +152,26 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
 pub struct SupersetClusterSpec {
     /// The Superset image to use
     pub image: ProductImage,
+
     /// Superset cluster configuration options.
-    #[serde(default)]
     pub cluster_config: SupersetClusterConfig,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nodes: Option<Role<SupersetConfigFragment>>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClusterConfig {
-    #[serde(flatten)]
+    #[serde(default, flatten)]
     pub authentication: SupersetAuthentication,
+
     pub credentials_secret: String,
+
     /// Cluster operations like pause reconciliation or cluster stop.
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
+
     /// This field controls which type of Service the Operator creates for this SupersetCluster:
     ///
     /// * cluster-internal: Use a ClusterIP service
@@ -181,11 +185,13 @@ pub struct SupersetClusterConfig {
     /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
     #[serde(default)]
     pub listener_class: CurrentlySupportedListenerClasses,
-    #[serde(skip_serializing_if = "Option::is_none")]
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mapbox_secret: Option<String>,
+
     /// Name of the Vector aggregator discovery ConfigMap.
     /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vector_aggregator_config_map_name: Option<String>,
 }
 
@@ -196,8 +202,10 @@ pub enum CurrentlySupportedListenerClasses {
     #[default]
     #[serde(rename = "cluster-internal")]
     ClusterInternal,
+
     #[serde(rename = "external-unstable")]
     ExternalUnstable,
+
     #[serde(rename = "external-stable")]
     ExternalStable,
 }
