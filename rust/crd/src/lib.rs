@@ -133,6 +133,9 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
     }
 }
 
+/// A Superset cluster stacklet. This resource is managed by the Stackable operator for Apache Superset.
+/// Find more information on how to use it and the resources that the operator generates in the
+/// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/superset/).
 #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "superset.stackable.tech",
@@ -150,12 +153,14 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClusterSpec {
-    /// The Superset image to use
+    // no doc - docs in the struct.
     pub image: ProductImage,
 
-    /// Superset cluster configuration options.
+    /// Settings that affect all roles and role groups.
+    /// The settings in the `clusterConfig` are cluster wide settings that do not need to be configurable at role or role group level.
     pub cluster_config: SupersetClusterConfig,
 
+    // no doc - docs in the struct.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nodes: Option<Role<SupersetConfigFragment>>,
 }
@@ -166,9 +171,13 @@ pub struct SupersetClusterConfig {
     #[serde(default, flatten)]
     pub authentication: SupersetAuthentication,
 
+    /// The name of the Secret object containing the admin user credentials and database connection details.
+    /// Read the
+    /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/superset/getting_started/first_steps)
+    /// to find out more.
     pub credentials_secret: String,
 
-    /// Cluster operations like pause reconciliation or cluster stop.
+    // no doc - docs in the struct.
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
 
@@ -181,16 +190,22 @@ pub struct SupersetClusterConfig {
     /// * external-stable: Use a LoadBalancer service
     ///
     /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
-    /// In the future, this setting will control which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html>
+    /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
     /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
     #[serde(default)]
     pub listener_class: CurrentlySupportedListenerClasses,
 
+    /// The name of a Secret object.
+    /// The Secret should contain a key `connections.mapboxApiKey`.
+    /// This is the API key required for map charts to work that use mapbox.
+    /// The token should be in the JWT format.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mapbox_secret: Option<String>,
 
-    /// Name of the Vector aggregator discovery ConfigMap.
+    /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
     /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+    /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
+    /// to learn how to configure log aggregation with Vector.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vector_aggregator_config_map_name: Option<String>,
 }
