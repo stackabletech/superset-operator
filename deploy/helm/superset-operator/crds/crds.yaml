@@ -23,16 +23,18 @@ spec:
           description: Auto-generated derived type for SupersetClusterSpec via `CustomResource`
           properties:
             spec:
+              description: A Superset cluster stacklet. This resource is managed by the Stackable operator for Apache Superset. Find more information on how to use it and the resources that the operator generates in the [operator documentation](https://docs.stackable.tech/home/nightly/superset/).
               properties:
                 clusterConfig:
-                  description: Superset cluster configuration options.
+                  description: Settings that affect all roles and role groups. The settings in the `clusterConfig` are cluster wide settings that do not need to be configurable at role or role group level.
                   properties:
                     authentication:
                       default: []
+                      description: The Superset [authentication](https://docs.stackable.tech/home/nightly/superset/usage-guide/security) settings. Currently the underlying Flask App Builder only supports one authentication mechanism at a time. This means the operator will error out if multiple references to an AuthenticationClass are provided.
                       items:
                         properties:
                           authenticationClass:
-                            description: Name of the AuthenticationClass used to authenticate the users. At the moment only LDAP is supported. If not specified the default authentication (AUTH_DB) will be used.
+                            description: Name of the [AuthenticationClass](https://docs.stackable.tech/home/nightly/concepts/authentication.html#authenticationclass) used to authenticate the users. At the moment only LDAP is supported. If not specified the default authentication (AUTH_DB) will be used.
                             nullable: true
                             type: string
                           syncRolesAt:
@@ -56,7 +58,7 @@ spec:
                       default:
                         stopped: false
                         reconciliationPaused: false
-                      description: Cluster operations like pause reconciliation or cluster stop.
+                      description: '[Cluster operations](https://docs.stackable.tech/home/nightly/concepts/operations/cluster_operations) properties, allow stopping the product instance as well as pausing reconciliation.'
                       properties:
                         reconciliationPaused:
                           default: false
@@ -68,6 +70,7 @@ spec:
                           type: boolean
                       type: object
                     credentialsSecret:
+                      description: The name of the Secret object containing the admin user credentials and database connection details. Read the [getting started guide first steps](https://docs.stackable.tech/home/nightly/superset/getting_started/first_steps) to find out more.
                       type: string
                     listenerClass:
                       default: cluster-internal
@@ -80,17 +83,18 @@ spec:
 
                         * external-stable: Use a LoadBalancer service
 
-                        This is a temporary solution with the goal to keep yaml manifests forward compatible. In the future, this setting will control which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html> will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
+                        This is a temporary solution with the goal to keep yaml manifests forward compatible. In the future, this setting will control which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
                       enum:
                         - cluster-internal
                         - external-unstable
                         - external-stable
                       type: string
                     mapboxSecret:
+                      description: The name of a Secret object. The Secret should contain a key `connections.mapboxApiKey`. This is the API key required for map charts to work that use mapbox. The token should be in the JWT format.
                       nullable: true
                       type: string
                     vectorAggregatorConfigMapName:
-                      description: Name of the Vector aggregator discovery ConfigMap. It must contain the key `ADDRESS` with the address of the Vector aggregator.
+                      description: Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery). It must contain the key `ADDRESS` with the address of the Vector aggregator. Follow the [logging tutorial](https://docs.stackable.tech/home/nightly/tutorials/logging-vector-aggregator) to learn how to configure log aggregation with Vector.
                       nullable: true
                       type: string
                   required:
@@ -103,7 +107,10 @@ spec:
                         - productVersion
                     - required:
                         - productVersion
-                  description: The Superset image to use
+                  description: |-
+                    Specify which image to use, the easiest way is to only configure the `productVersion`. You can also configure a custom image registry to pull from, as well as completely custom images.
+
+                    Consult the [Product image selection documentation](https://docs.stackable.tech/home/nightly/concepts/product_image_selection) for details.
                   properties:
                     custom:
                       description: Overwrite the docker image. Specify the full docker image name, e.g. `docker.stackable.tech/stackable/superset:1.4.1-stackable2.1.0`
