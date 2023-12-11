@@ -17,7 +17,9 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClusterRef {
+    /// The name of the stacklet.
     pub name: String,
+    /// The namespace. Defaults to the namespace of the `DruidConnection` if it is not specified.
     pub namespace: Option<String>,
 }
 
@@ -39,7 +41,9 @@ pub struct ClusterRef {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct DruidConnectionSpec {
+    /// The Superset to connect.
     pub superset: ClusterRef,
+    /// The Druid to connect.
     pub druid: ClusterRef,
 }
 

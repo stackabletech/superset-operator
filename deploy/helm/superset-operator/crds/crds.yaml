@@ -7160,22 +7160,29 @@ spec:
           description: Auto-generated derived type for DruidConnectionSpec via `CustomResource`
           properties:
             spec:
+              description: The DruidConnection resource can be used to automatically deploy a Druid datasource in Superset. Learn more about it in the [Superset operator usage guide](https://docs.stackable.tech/home/nightly/superset/usage-guide/connecting-druid).
               properties:
                 druid:
+                  description: The Druid to connect.
                   properties:
                     name:
+                      description: The name of the stacklet.
                       type: string
                     namespace:
+                      description: The namespace. Defaults to the namespace of the `DruidConnection` if it is not specified.
                       nullable: true
                       type: string
                   required:
                     - name
                   type: object
                 superset:
+                  description: The Superset to connect.
                   properties:
                     name:
+                      description: The name of the stacklet.
                       type: string
                     namespace:
+                      description: The namespace. Defaults to the namespace of the `DruidConnection` if it is not specified.
                       nullable: true
                       type: string
                   required:
