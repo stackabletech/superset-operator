@@ -21,6 +21,8 @@ pub struct ClusterRef {
     pub namespace: Option<String>,
 }
 
+/// The DruidConnection resource can be used to automatically deploy a Druid datasource in Superset.
+/// Learn more about it in the [Superset operator usage guide](DOCS_BASE_URL_PLACEHOLDER/superset/usage-guide/connecting-druid).
 #[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[kube(
     group = "superset.stackable.tech",
