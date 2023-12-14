@@ -26,6 +26,7 @@ metadata:
 spec:
   image:
     productVersion: "{{ test_scenario['values']['superset'] }}"
+    pullPolicy: IfNotPresent
   clusterConfig:
     credentialsSecret: superset-credentials
     listenerClass: external-unstable

@@ -24,6 +24,7 @@ metadata:
 spec:
   image:
     productVersion: "{{ test_scenario['values']['superset-latest'] }}"
+    pullPolicy: IfNotPresent
   clusterConfig:
     credentialsSecret: superset-credentials
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
