@@ -26,6 +26,7 @@ metadata:
 spec:
   image:
     productVersion: "{{ test_scenario['values']['superset-latest'] }}"
+    pullPolicy: IfNotPresent
   clusterConfig:
     clusterOperation:
       stopped: false

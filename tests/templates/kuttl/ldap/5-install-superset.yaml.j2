@@ -30,6 +30,7 @@ metadata:
 spec:
   image:
     productVersion: "{{ test_scenario['values']['superset'] }}"
+    pullPolicy: IfNotPresent
   clusterConfig:
     authentication:
       - authenticationClass: {% if test_scenario['values']['ldap-authentication'] == 'no-tls' -%}
