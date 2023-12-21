@@ -1,5 +1,8 @@
+= Command Line Parameters
 
-=== product-config
+This operator accepts the following command line parameters:
+
+== product-config
 
 *Default value*: `/etc/stackable/superset-operator/config-spec/properties.yaml`
 
@@ -12,7 +15,7 @@
 stackable-superset-operator run --product-config /foo/bar/properties.yaml
 ----
 
-=== watch-namespace
+== watch-namespace
 
 *Default value*: All namespaces
 
