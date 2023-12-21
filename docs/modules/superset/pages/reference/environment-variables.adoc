@@ -1,5 +1,9 @@
+= Environment variables
 
-=== PRODUCT_CONFIG
+This operator accepts the following environment variables:
+
+
+== PRODUCT_CONFIG
 
 *Default value*: `/etc/stackable/superset-operator/config-spec/properties.yaml`
 
@@ -25,7 +29,7 @@ docker run \
     docker.stackable.tech/stackable/superset-operator:latest
 ----
 
-=== WATCH_NAMESPACE
+== WATCH_NAMESPACE
 
 *Default value*: All namespaces
 
