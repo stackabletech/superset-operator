@@ -47,7 +47,8 @@ mod tests {
         spec:
           image:
             productVersion: 3.0.1
-          credentialsSecret: simple-superset-credentials
+          clusterConfig:
+            credentialsSecret: superset-credentials
           nodes:
             roleGroups:
               default:
@@ -108,7 +109,8 @@ mod tests {
         spec:
           image:
             productVersion: 3.0.1
-          credentialsSecret: simple-superset-credentials
+          clusterConfig:
+            credentialsSecret: superset-credentials
           nodes:
             roleGroups:
               default:

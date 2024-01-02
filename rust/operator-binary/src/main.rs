@@ -53,8 +53,8 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => {
-            SupersetCluster::print_yaml_schema()?;
-            DruidConnection::print_yaml_schema()?;
+            SupersetCluster::print_yaml_schema(built_info::CARGO_PKG_VERSION)?;
+            DruidConnection::print_yaml_schema(built_info::CARGO_PKG_VERSION)?;
         }
         Command::Run(ProductOperatorRun {
             product_config,

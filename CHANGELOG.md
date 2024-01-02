@@ -4,6 +4,19 @@
 
 ### Added
 
+- Improved CRD docs ([#431]).
+
+### Fixed
+
+- BREAKING: Fixed various issues in the CRD structure. `clusterConfig.credentialsSecret` is now mandatory ([#429]).
+
+[#429]: https://github.com/stackabletech/superset-operator/pull/429
+[#431]: https://github.com/stackabletech/superset-operator/pull/431
+
+## [23.11.0] - 2023-11-24
+
+### Added
+
 - Default stackableVersion to operator version ([#390]).
 - Support PodDisruptionBudgets ([#407]).
 - Added support for versions 2.1.1, 3.0.1 ([#415]).

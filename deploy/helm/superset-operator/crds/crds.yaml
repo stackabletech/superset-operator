@@ -23,16 +23,10 @@ spec:
           description: Auto-generated derived type for SupersetClusterSpec via `CustomResource`
           properties:
             spec:
+              description: A Superset cluster stacklet. This resource is managed by the Stackable operator for Apache Superset. Find more information on how to use it and the resources that the operator generates in the [operator documentation](https://docs.stackable.tech/home/nightly/superset/).
               properties:
                 clusterConfig:
-                  default:
-                    authentication: []
-                    credentialsSecret: ''
-                    clusterOperation:
-                      stopped: false
-                      reconciliationPaused: false
-                    listenerClass: cluster-internal
-                  description: Superset cluster configuration options.
+                  description: Settings that affect all roles and role groups. The settings in the `clusterConfig` are cluster wide settings that do not need to be configurable at role or role group level.
                   properties:
                     authentication:
                       items:
@@ -84,8 +78,8 @@ spec:
                       type: array
                     clusterOperation:
                       default:
-                        stopped: false
                         reconciliationPaused: false
+                        stopped: false
                       description: Cluster operations like pause reconciliation or cluster stop.
                       properties:
                         reconciliationPaused:
@@ -98,6 +92,7 @@ spec:
                           type: boolean
                       type: object
                     credentialsSecret:
+                      description: The name of the Secret object containing the admin user credentials and database connection details. Read the [getting started guide first steps](https://docs.stackable.tech/home/nightly/superset/getting_started/first_steps) to find out more.
                       type: string
                     listenerClass:
                       default: cluster-internal
@@ -110,17 +105,18 @@ spec:
 
                         * external-stable: Use a LoadBalancer service
 
-                        This is a temporary solution with the goal to keep yaml manifests forward compatible. In the future, this setting will control which ListenerClass <https://docs.stackable.tech/home/stable/listener-operator/listenerclass.html> will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
+                        This is a temporary solution with the goal to keep yaml manifests forward compatible. In the future, this setting will control which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
                       enum:
                         - cluster-internal
                         - external-unstable
                         - external-stable
                       type: string
                     mapboxSecret:
+                      description: The name of a Secret object. The Secret should contain a key `connections.mapboxApiKey`. This is the API key required for map charts to work that use mapbox. The token should be in the JWT format.
                       nullable: true
                       type: string
                     vectorAggregatorConfigMapName:
-                      description: Name of the Vector aggregator discovery ConfigMap. It must contain the key `ADDRESS` with the address of the Vector aggregator.
+                      description: Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery). It must contain the key `ADDRESS` with the address of the Vector aggregator. Follow the [logging tutorial](https://docs.stackable.tech/home/nightly/tutorials/logging-vector-aggregator) to learn how to configure log aggregation with Vector.
                       nullable: true
                       type: string
                   required:
@@ -134,7 +130,10 @@ spec:
                         - productVersion
                     - required:
                         - productVersion
-                  description: The Superset image to use
+                  description: |-
+                    Specify which image to use, the easiest way is to only configure the `productVersion`. You can also configure a custom image registry to pull from, as well as completely custom images.
+
+                    Consult the [Product image selection documentation](https://docs.stackable.tech/home/nightly/concepts/product_image_selection) for details.
                   properties:
                     custom:
                       description: Overwrite the docker image. Specify the full docker image name, e.g. `docker.stackable.tech/stackable/superset:1.4.1-stackable2.1.0`
@@ -184,10 +183,10 @@ spec:
                       properties:
                         affinity:
                           default:
-                            podAffinity: null
-                            podAntiAffinity: null
                             nodeAffinity: null
                             nodeSelector: null
+                            podAffinity: null
+                            podAntiAffinity: null
                           description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
                           properties:
                             nodeAffinity:
@@ -660,8 +659,8 @@ spec:
                           type: string
                         logging:
                           default:
-                            enableVectorAgent: null
                             containers: {}
+                            enableVectorAgent: null
                           description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
                           properties:
                             containers:
@@ -744,19 +743,19 @@ spec:
                           type: object
                         resources:
                           default:
+                            cpu:
+                              max: null
+                              min: null
                             memory:
                               limit: null
                               runtimeLimits: {}
-                            cpu:
-                              min: null
-                              max: null
                             storage: {}
                           description: CPU and memory limits for Superset pods
                           properties:
                             cpu:
                               default:
-                                min: null
                                 max: null
+                                min: null
                               properties:
                                 max:
                                   description: The maximum amount of CPU cores that can be requested by Pods. Equivalent to the `limit` for Pod resource configuration. Cores are specified either as a decimal point number or as milli units. For example:`1.5` will be 1.5 cores, also written as `1500m`.
@@ -798,12 +797,7 @@ spec:
                           type: string
                         type: object
                       default: {}
-                      description: |-
-                        The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. For example, for a HdfsCluster:
-
-                        ```yaml configOverrides: # on role level core-site.xml: # the name of the configuration file fs.trash.interval: "5"  # the name of the property and the value to set ```
-
-                        Read the [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
+                      description: The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. Read the [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
                       type: object
                     envOverrides:
                       additionalProperties:
@@ -3652,10 +3646,10 @@ spec:
                             properties:
                               affinity:
                                 default:
-                                  podAffinity: null
-                                  podAntiAffinity: null
                                   nodeAffinity: null
                                   nodeSelector: null
+                                  podAffinity: null
+                                  podAntiAffinity: null
                                 description: These configuration settings control [Pod placement](https://docs.stackable.tech/home/nightly/concepts/operations/pod_placement).
                                 properties:
                                   nodeAffinity:
@@ -4128,8 +4122,8 @@ spec:
                                 type: string
                               logging:
                                 default:
-                                  enableVectorAgent: null
                                   containers: {}
+                                  enableVectorAgent: null
                                 description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
                                 properties:
                                   containers:
@@ -4212,19 +4206,19 @@ spec:
                                 type: object
                               resources:
                                 default:
+                                  cpu:
+                                    max: null
+                                    min: null
                                   memory:
                                     limit: null
                                     runtimeLimits: {}
-                                  cpu:
-                                    min: null
-                                    max: null
                                   storage: {}
                                 description: CPU and memory limits for Superset pods
                                 properties:
                                   cpu:
                                     default:
-                                      min: null
                                       max: null
+                                      min: null
                                     properties:
                                       max:
                                         description: The maximum amount of CPU cores that can be requested by Pods. Equivalent to the `limit` for Pod resource configuration. Cores are specified either as a decimal point number or as milli units. For example:`1.5` will be 1.5 cores, also written as `1500m`.
@@ -4266,12 +4260,7 @@ spec:
                                 type: string
                               type: object
                             default: {}
-                            description: |-
-                              The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. For example, for a HdfsCluster:
-
-                              ```yaml configOverrides: # on role level core-site.xml: # the name of the configuration file fs.trash.interval: "5"  # the name of the property and the value to set ```
-
-                              Read the [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
+                            description: The `configOverrides` can be used to configure properties in product config files that are not exposed in the CRD. Read the [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides) and consult the operator specific usage guide documentation for details on the available config files and settings for the specific product.
                             type: object
                           envOverrides:
                             additionalProperties:
@@ -7119,6 +7108,7 @@ spec:
                     - roleGroups
                   type: object
               required:
+                - clusterConfig
                 - image
               type: object
             status:
@@ -7200,22 +7190,29 @@ spec:
           description: Auto-generated derived type for DruidConnectionSpec via `CustomResource`
           properties:
             spec:
+              description: The DruidConnection resource can be used to automatically deploy a Druid datasource in Superset. Learn more about it in the [Superset operator usage guide](https://docs.stackable.tech/home/nightly/superset/usage-guide/connecting-druid).
               properties:
                 druid:
+                  description: The Druid to connect.
                   properties:
                     name:
+                      description: The name of the stacklet.
                       type: string
                     namespace:
+                      description: The namespace. Defaults to the namespace of the `DruidConnection` if it is not specified.
                       nullable: true
                       type: string
                   required:
                     - name
                   type: object
                 superset:
+                  description: The Superset to connect.
                   properties:
                     name:
+                      description: The name of the stacklet.
                       type: string
                     namespace:
+                      description: The namespace. Defaults to the namespace of the `DruidConnection` if it is not specified.
                       nullable: true
                       type: string
                   required:
