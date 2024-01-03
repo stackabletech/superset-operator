@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Display, Write};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -122,17 +122,19 @@ where
 }
 
 fn create_superset_config(log_config: &AutomaticContainerLogConfig, log_dir: &str) -> String {
-    let loggers_config = log_config
+    let mut loggers_config = String::new();
+    log_config
         .loggers
         .iter()
         .filter(|(name, _)| name.as_str() != AutomaticContainerLogConfig::ROOT_LOGGER)
-        .map(|(name, config)| {
-            format!(
-                "        logging.getLogger('{name}').setLevel({level})\n",
+        .for_each(|(name, config)| {
+            // String formatting is an infallible operation, see https://doc.rust-lang.org/stable/std/fmt/index.html#formatting-traits
+            let _ = writeln!(
+                loggers_config,
+                "        logging.getLogger('{name}').setLevel({level})",
                 level = config.level.to_python_expression()
-            )
-        })
-        .collect::<String>();
+            );
+        });
 
     format!(
         "\
@@ -167,7 +169,7 @@ class StackableLoggingConfigurator(LoggingConfigurator):
         rootLogger.setLevel({root_log_level})
         rootLogger.addHandler(consoleHandler)
         rootLogger.addHandler(fileHandler)
- 
+
 {loggers_config}",
         root_log_level = log_config.root_log_level().to_python_expression(),
         console_log_level = log_config
