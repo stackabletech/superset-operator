@@ -145,7 +145,7 @@ impl SupersetAuthenticationConfigResolved {
                             return OidcPrincipalClaimNotSupportedSnafu {
                                 configured: provider.principal_claim.clone(),
                                 supported: "preferred_username".to_owned(),
-                                auth_class_name: auth_class_name,
+                                auth_class_name,
                             }
                             .fail();
                         }
