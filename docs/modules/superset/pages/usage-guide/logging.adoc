@@ -7,9 +7,6 @@ ConfigMap for the aggregator and by enabling the log agent:
 ----
 spec:
   clusterConfig:
-    databaseInitialization:
-      logging:
-        enableVectorAgent: true
     vectorAggregatorConfigMapName: vector-aggregator-discovery
   nodes:
     config:

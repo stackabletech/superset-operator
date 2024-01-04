@@ -57,26 +57,6 @@ spec:
   clusterConfig:
     credentialsSecret: superset-credentials
     vectorAggregatorConfigMapName: superset-vector-aggregator-discovery
-    databaseInitialization:
-      logging:
-        enableVectorAgent: true
-        containers:
-          superset-init-db:
-            console:
-              level: INFO
-            file:
-              level: INFO
-            loggers:
-              ROOT:
-                level: INFO
-          vector:
-            console:
-              level: INFO
-            file:
-              level: INFO
-            loggers:
-              ROOT:
-                level: INFO
   nodes:
     roleGroups:
       automatic-log-config:
