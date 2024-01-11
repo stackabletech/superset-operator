@@ -171,8 +171,9 @@ pub struct SupersetClusterSpec {
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClusterConfig {
-    /// Mandatory list of AuthenticationClasses used to authenticate users.
-    pub authentication: Vec<SupersetClientAuthenticationDetails>,
+    /// List of AuthenticationClasses used to authenticate users.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authentication: Option<Vec<SupersetClientAuthenticationDetails>>,
 
     /// The name of the Secret object containing the admin user credentials and database connection details.
     /// Read the

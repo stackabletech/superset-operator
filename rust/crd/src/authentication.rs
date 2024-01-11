@@ -109,7 +109,7 @@ pub struct SupersetAuthenticationConfigResolved {
 
 impl SupersetAuthenticationConfigResolved {
     pub async fn from(
-        auth_details: &Vec<SupersetClientAuthenticationDetails>,
+        auth_details: &[SupersetClientAuthenticationDetails],
         client: &Client,
     ) -> Result<SupersetAuthenticationConfigResolved> {
         // TODO: Adapt if multiple authentication types are supported by Superset.

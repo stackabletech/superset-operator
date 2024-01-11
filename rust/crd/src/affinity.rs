@@ -49,7 +49,6 @@ mod tests {
             productVersion: 3.0.1
           clusterConfig:
             credentialsSecret: superset-db-credentials
-            authentication: []
           nodes:
             roleGroups:
               default:
@@ -112,7 +111,6 @@ mod tests {
             productVersion: 3.0.1
           clusterConfig:
             credentialsSecret: superset-db-credentials
-            authentication: []
           nodes:
             roleGroups:
               default:
