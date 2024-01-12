@@ -49,7 +49,7 @@ use stackable_operator::{
 };
 use stackable_superset_crd::authentication::SupersetAuthenticationClassResolved;
 use stackable_superset_crd::{
-    authentication::SupersetAuthenticationConfigResolved, Container, SupersetCluster,
+    authentication::SupersetClientAuthenticationDetailsResolved, Container, SupersetCluster,
     SupersetClusterStatus, SupersetConfig, SupersetConfigOptions, SupersetRole, APP_NAME,
     PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
     SUPERSET_CONFIG_FILENAME,
@@ -250,7 +250,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     .await
     .context(ResolveVectorAggregatorAddressSnafu)?;
 
-    let auth_config = SupersetAuthenticationConfigResolved::from(
+    let auth_config = SupersetClientAuthenticationDetailsResolved::from(
         superset
             .spec
             .cluster_config
@@ -459,7 +459,7 @@ fn build_rolegroup_config_map(
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<SupersetCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    authentication_config: &SupersetAuthenticationConfigResolved,
+    authentication_config: &SupersetClientAuthenticationDetailsResolved,
     logging: &Logging<Container>,
     vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
@@ -600,7 +600,7 @@ fn build_server_rolegroup_statefulset(
     superset_role: &SupersetRole,
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    authentication_config: &SupersetAuthenticationConfigResolved,
+    authentication_config: &SupersetClientAuthenticationDetailsResolved,
     sa_name: &str,
     merged_config: &SupersetConfig,
 ) -> Result<StatefulSet> {
@@ -830,7 +830,7 @@ fn build_server_rolegroup_statefulset(
 }
 
 fn add_authentication_volumes_and_volume_mounts(
-    auth_config: &SupersetAuthenticationConfigResolved,
+    auth_config: &SupersetClientAuthenticationDetailsResolved,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
 ) {
@@ -851,7 +851,7 @@ fn add_authentication_volumes_and_volume_mounts(
 }
 
 fn authentication_start_commands(
-    auth_config: &SupersetAuthenticationConfigResolved,
+    auth_config: &SupersetClientAuthenticationDetailsResolved,
 ) -> Option<String> {
     match &auth_config.authentication_class_resolved {
         Some(SupersetAuthenticationClassResolved::Oidc { provider, .. }) => {

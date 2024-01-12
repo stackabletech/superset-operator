@@ -1,7 +1,7 @@
 use stackable_operator::commons::authentication::tls::TlsVerification;
 use stackable_operator::commons::authentication::{ldap, oidc};
 use stackable_superset_crd::authentication::{
-    SupersetAuthenticationClassResolved, SupersetAuthenticationConfigResolved,
+    SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
     SupersetOidcExtraFields,
 };
 use stackable_superset_crd::{authentication::FlaskRolesSyncMoment, SupersetConfigOptions};
@@ -16,7 +16,7 @@ pub const PYTHON_IMPORTS: &[&str] = &[
 
 pub fn add_superset_config(
     config: &mut BTreeMap<String, String>,
-    authentication_config: &SupersetAuthenticationConfigResolved,
+    authentication_config: &SupersetClientAuthenticationDetailsResolved,
 ) {
     config.insert(
         SupersetConfigOptions::SecretKey.to_string(),
@@ -44,7 +44,7 @@ pub fn add_superset_config(
 
 fn append_authentication_config(
     config: &mut BTreeMap<String, String>,
-    auth_config: &SupersetAuthenticationConfigResolved,
+    auth_config: &SupersetClientAuthenticationDetailsResolved,
 ) {
     match &auth_config.authentication_class_resolved {
         Some(SupersetAuthenticationClassResolved::Ldap { provider }) => {

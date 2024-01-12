@@ -1,11 +1,11 @@
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use stackable_operator::commons::authentication::{
-    ldap, oidc, AuthenticationClassProvider, ClientAuthenticationDetails,
-};
-use stackable_operator::kube::ResourceExt;
 use stackable_operator::{
     client::Client,
+    commons::authentication::{
+        ldap, oidc, AuthenticationClassProvider, ClientAuthenticationDetails,
+    },
+    kube::ResourceExt,
     schemars::{self, JsonSchema},
 };
 
@@ -14,7 +14,7 @@ const SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS: [&str; 1] = ["LDAP"];
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("Failed to retrieve AuthenticationClass"))]
-    AuthenticationClassRetrieval {
+    AuthenticationClassRetrievalFailed {
         source: stackable_operator::error::Error,
     },
 
@@ -31,12 +31,12 @@ pub enum Error {
     },
 
     #[snafu(display("Invalid OIDC configuration"))]
-    OidcConfiguration {
+    OidcConfigurationInvalid {
         source: stackable_operator::error::Error,
     },
 
     #[snafu(display(
-        "{configured:?} is not a supported principalClaim in superset for the keycloak oidc provider. Please use {supported:?} in the AuthenticationClass {auth_class_name:?}"
+        "{configured:?} is not a supported principalClaim in Superset for the Keycloak OIDC provider. Please use {supported:?} in the AuthenticationClass {auth_class_name:?}"
     ))]
     OidcPrincipalClaimNotSupported {
         configured: String,
@@ -46,16 +46,6 @@ pub enum Error {
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
-
-pub enum SupersetAuthenticationClassResolved {
-    Ldap {
-        provider: ldap::AuthenticationProvider,
-    },
-    Oidc {
-        provider: oidc::AuthenticationProvider,
-        oidc: oidc::ClientAuthenticationOptions<SupersetOidcExtraFields>,
-    },
-}
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -99,19 +89,36 @@ pub fn default_oidc_api_path() -> String {
     "protocol".to_string()
 }
 
-/// Resolved counter part for `SuperSetAuthenticationConfig`.
-pub struct SupersetAuthenticationConfigResolved {
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+pub enum FlaskRolesSyncMoment {
+    #[default]
+    Registration,
+    Login,
+}
+
+/// Resolved counter part for `SupersetClientAuthenticationDetails`.
+pub struct SupersetClientAuthenticationDetailsResolved {
     pub authentication_class_resolved: Option<SupersetAuthenticationClassResolved>,
     pub user_registration: bool,
     pub user_registration_role: String,
     pub sync_roles_at: FlaskRolesSyncMoment,
 }
 
-impl SupersetAuthenticationConfigResolved {
+pub enum SupersetAuthenticationClassResolved {
+    Ldap {
+        provider: ldap::AuthenticationProvider,
+    },
+    Oidc {
+        provider: oidc::AuthenticationProvider,
+        oidc: oidc::ClientAuthenticationOptions<SupersetOidcExtraFields>,
+    },
+}
+
+impl SupersetClientAuthenticationDetailsResolved {
     pub async fn from(
         auth_details: &[SupersetClientAuthenticationDetails],
         client: &Client,
-    ) -> Result<SupersetAuthenticationConfigResolved> {
+    ) -> Result<SupersetClientAuthenticationDetailsResolved> {
         // TODO: Adapt if multiple authentication types are supported by Superset.
         // This is currently not possible due to the Flask-AppBuilder not supporting it,
         // see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924.
@@ -119,8 +126,8 @@ impl SupersetAuthenticationConfigResolved {
             return Err(Error::MultipleAuthenticationClassesProvided);
         }
 
-        let mut user_registration = true;
-        let mut user_registration_role = Default::default();
+        let mut user_registration = default_user_registration();
+        let mut user_registration_role = default_user_registration_role();
         let mut sync_roles_at = Default::default();
 
         let authentication_class_resolved = match auth_details.first() {
@@ -129,7 +136,7 @@ impl SupersetAuthenticationConfigResolved {
                     .common
                     .resolve_class(client)
                     .await
-                    .context(AuthenticationClassRetrievalSnafu)?;
+                    .context(AuthenticationClassRetrievalFailedSnafu)?;
                 let auth_class_name = auth_class.name_any();
 
                 user_registration = auth_details.user_registration;
@@ -154,7 +161,7 @@ impl SupersetAuthenticationConfigResolved {
                             oidc: auth_details
                                 .common
                                 .oidc_or_error(&auth_class_name)
-                                .context(OidcConfigurationSnafu)?
+                                .context(OidcConfigurationInvalidSnafu)?
                                 .clone(),
                         }
                     }
@@ -172,18 +179,11 @@ impl SupersetAuthenticationConfigResolved {
             None => None,
         };
 
-        Ok(SupersetAuthenticationConfigResolved {
+        Ok(SupersetClientAuthenticationDetailsResolved {
             authentication_class_resolved,
             user_registration,
             user_registration_role,
             sync_roles_at,
         })
     }
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-pub enum FlaskRolesSyncMoment {
-    #[default]
-    Registration,
-    Login,
 }
