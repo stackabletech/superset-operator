@@ -214,8 +214,6 @@ fn references_authentication_class(
         .spec
         .cluster_config
         .authentication
-        .as_deref()
-        .unwrap_or_default()
         .iter()
         .any(|c| c.common.authentication_class_name() == &authentication_class_name)
 }

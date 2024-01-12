@@ -251,12 +251,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     .context(ResolveVectorAggregatorAddressSnafu)?;
 
     let auth_config = SupersetClientAuthenticationDetailsResolved::from(
-        superset
-            .spec
-            .cluster_config
-            .authentication
-            .as_deref()
-            .unwrap_or_default(),
+        &superset.spec.cluster_config.authentication,
         client,
     )
     .await

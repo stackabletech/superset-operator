@@ -172,8 +172,8 @@ pub struct SupersetClusterSpec {
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClusterConfig {
     /// List of AuthenticationClasses used to authenticate users.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub authentication: Option<Vec<SupersetClientAuthenticationDetails>>,
+    #[serde(default)]
+    pub authentication: Vec<SupersetClientAuthenticationDetails>,
 
     /// The name of the Secret object containing the admin user credentials and database connection details.
     /// Read the
