@@ -28,6 +28,7 @@ use stackable_operator::{
             core::v1::{ConfigMap, HTTPGetAction, Probe, Service, ServicePort, ServiceSpec},
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
+        DeepMerge,
     },
     kube::{runtime::controller::Action, Resource, ResourceExt},
     kvp::{Label, Labels},
@@ -654,8 +655,7 @@ fn build_server_rolegroup_statefulset(
                 .build(),
         )
         .affinity(&merged_config.affinity)
-        .service_account_name(sa_name)
-        .build_template();
+        .service_account_name(sa_name);
 
     let mut superset_cb = ContainerBuilder::new(&Container::Superset.to_string())
         .context(InvalidContainerNameSnafu)?;

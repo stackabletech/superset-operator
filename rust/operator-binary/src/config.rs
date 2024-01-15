@@ -1,5 +1,5 @@
 use stackable_operator::commons::authentication::{
-    ldap::LdapAuthenticationProvider, tls::TlsVerification, AuthenticationClassProvider,
+    ldap, tls::TlsVerification, AuthenticationClassProvider,
 };
 use stackable_superset_crd::authentication::SuperSetAuthenticationConfigResolved;
 use stackable_superset_crd::{authentication::FlaskRolesSyncMoment, SupersetConfigOptions};
@@ -69,22 +69,14 @@ fn append_authentication_config(
     }
 }
 
-fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenticationProvider) {
+fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &ldap::AuthenticationProvider) {
     config.insert(
         SupersetConfigOptions::AuthType.to_string(),
         "AUTH_LDAP".into(),
     );
     config.insert(
         SupersetConfigOptions::AuthLdapServer.to_string(),
-        format!(
-            "{protocol}{server_hostname}:{server_port}",
-            protocol = match ldap.tls {
-                None => "ldap://",
-                Some(_) => "ldaps://",
-            },
-            server_hostname = ldap.hostname,
-            server_port = ldap.port.unwrap_or_else(|| ldap.default_port()),
-        ),
+        ldap.endpoint_url().unwrap().into(),
     );
     config.insert(
         SupersetConfigOptions::AuthLdapSearch.to_string(),
