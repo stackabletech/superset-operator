@@ -229,6 +229,16 @@ pub enum Error {
         source:
             stackable_operator::kvp::KeyValuePairError<stackable_operator::kvp::LabelValueError>,
     },
+
+    #[snafu(display("failed to add Superset config settings"))]
+    AddSupersetConfig {
+        source: crate::config::Error,
+    },
+
+    #[snafu(display("failed to add LDAP Volumes and VolumeMounts"))]
+    AddLdapVolumesAndVolumeMounts {
+        source: stackable_operator::commons::authentication::ldap::Error,
+    }
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -488,7 +498,7 @@ fn build_rolegroup_config_map(
     //    Issue: https://github.com/stackabletech/superset-operator/issues/416
     config_properties.insert("TALISMAN_ENABLED".to_string(), "False".to_string());
 
-    config::add_superset_config(&mut config_properties, authentication_config);
+    config::add_superset_config(&mut config_properties, authentication_config).context(AddSupersetConfigSnafu)?;
 
     // The order here should be kept in order to preserve overrides.
     // No properties should be added after this extend.
@@ -644,7 +654,11 @@ fn build_server_rolegroup_statefulset(
         .context(MetadataBuildSnafu)?
         .build();
 
-    let mut pb = PodBuilder::new()
+    let mut pb = &mut PodBuilder::new();
+
+    
+
+    pb = pb
         .metadata(metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
         .security_context(
@@ -683,7 +697,7 @@ fn build_server_rolegroup_statefulset(
         };
     }
 
-    add_authentication_volumes_and_volume_mounts(authentication_config, &mut superset_cb, &mut pb);
+    add_authentication_volumes_and_volume_mounts(authentication_config, &mut superset_cb, &mut pb)?;
 
     let webserver_timeout = node_config
         .get(&PropertyNameKind::File(
@@ -863,7 +877,7 @@ fn add_authentication_volumes_and_volume_mounts(
     authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
-) {
+) -> Result<()> {
     // TODO: Currently there can be only one AuthenticationClass due to FlaskAppBuilder restrictions.
     //    Needs adaptation once FAB and superset support multiple auth methods.
     // The checks for max one AuthenticationClass and the provider are done in crd/src/authentication.rs
@@ -871,7 +885,7 @@ fn add_authentication_volumes_and_volume_mounts(
         if let Some(auth_class) = &config.authentication_class {
             match &auth_class.spec.provider {
                 AuthenticationClassProvider::Ldap(ldap) => {
-                    ldap.add_volumes_and_mounts(pb, vec![cb]);
+                    ldap.add_volumes_and_mounts(pb, vec![cb]).context(AddLdapVolumesAndVolumeMountsSnafu)?;
                 }
                 AuthenticationClassProvider::Oidc(_)
                 | AuthenticationClassProvider::Tls(_)
@@ -879,6 +893,8 @@ fn add_authentication_volumes_and_volume_mounts(
             }
         }
     }
+
+    Ok(())
 }
 
 pub fn error_policy(_obj: Arc<SupersetCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
