@@ -28,10 +28,9 @@ use stackable_operator::{
             core::v1::{ConfigMap, HTTPGetAction, Probe, Service, ServicePort, ServiceSpec},
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
-        DeepMerge,
     },
     kube::{runtime::controller::Action, Resource, ResourceExt},
-    labels::{role_group_selector_labels, role_selector_labels},
+    kvp::{Label, Labels},
     logging::controller::ReconcilerError,
     product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
     product_logging::{
@@ -213,6 +212,22 @@ pub enum Error {
     GracefulShutdown {
         source: crate::operations::graceful_shutdown::Error,
     },
+
+    #[snafu(display("failed to build Labels"))]
+    LabelBuild {
+        source: stackable_operator::kvp::LabelError,
+    },
+
+    #[snafu(display("failed to build Metadata"))]
+    MetadataBuild {
+        source: stackable_operator::builder::ObjectMetaBuilderError,
+    },
+
+    #[snafu(display("failed to get required Labels"))]
+    GetRequiredLabels {
+        source:
+            stackable_operator::kvp::KeyValuePairError<stackable_operator::kvp::LabelValueError>,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -296,7 +311,9 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
         superset.as_ref(),
         APP_NAME,
-        cluster_resources.get_required_labels(),
+        cluster_resources
+            .get_required_labels()
+            .context(GetRequiredLabelsSnafu)?,
     )
     .context(BuildRBACObjectsSnafu)?;
 
@@ -425,6 +442,7 @@ fn build_node_role_service(
                 &role_name,
                 "global",
             ))
+            .context(MetadataBuildSnafu)?
             .build(),
         spec: Some(ServiceSpec {
             type_: Some(
@@ -440,7 +458,11 @@ fn build_node_role_service(
                 protocol: Some("TCP".to_string()),
                 ..ServicePort::default()
             }]),
-            selector: Some(role_selector_labels(superset, APP_NAME, &role_name)),
+            selector: Some(
+                Labels::role_selector(superset, APP_NAME, &role_name)
+                    .context(LabelBuildSnafu)?
+                    .into(),
+            ),
             ..ServiceSpec::default()
         }),
         status: None,
@@ -504,6 +526,7 @@ fn build_rolegroup_config_map(
                     &rolegroup.role,
                     &rolegroup.role_group,
                 ))
+                .context(MetadataBuildSnafu)?
                 .build(),
         )
         .add_data(
@@ -551,7 +574,8 @@ fn build_node_rolegroup_service(
                 &rolegroup.role,
                 &rolegroup.role_group,
             ))
-            .with_label("prometheus.io/scrape", "true")
+            .context(MetadataBuildSnafu)?
+            .with_label(Label::try_from(("prometheus.io/scrape", "true")).context(LabelBuildSnafu)?)
             .build(),
         spec: Some(ServiceSpec {
             // Internal communication does not need to be exposed
@@ -571,12 +595,16 @@ fn build_node_rolegroup_service(
                     ..ServicePort::default()
                 },
             ]),
-            selector: Some(role_group_selector_labels(
-                superset,
-                APP_NAME,
-                &rolegroup.role,
-                &rolegroup.role_group,
-            )),
+            selector: Some(
+                Labels::role_group_selector(
+                    superset,
+                    APP_NAME,
+                    &rolegroup.role,
+                    &rolegroup.role_group,
+                )
+                .context(LabelBuildSnafu)?
+                .into(),
+            ),
             publish_not_ready_addresses: Some(true),
             ..ServiceSpec::default()
         }),
@@ -604,27 +632,30 @@ fn build_server_rolegroup_statefulset(
         .get(&rolegroup_ref.role_group)
         .context(NoNodeRoleSnafu)?;
 
-    let mut pb = PodBuilder::new();
-    pb.metadata_builder(|m| {
-        m.with_recommended_labels(build_recommended_labels(
+    let metadata = ObjectMetaBuilder::new()
+        .with_recommended_labels(build_recommended_labels(
             superset,
             SUPERSET_CONTROLLER_NAME,
             &resolved_product_image.app_version_label,
             &rolegroup_ref.role,
             &rolegroup_ref.role_group,
         ))
-    })
-    .image_pull_secrets_from_product_image(resolved_product_image)
-    .security_context(
-        PodSecurityContextBuilder::new()
-            .run_as_user(1000)
-            .run_as_group(0)
-            .fs_group(1000) // Needed for secret-operator
-            .build(),
-    )
-    .affinity(&merged_config.affinity)
-    .service_account_name(sa_name)
-    .build_template();
+        .context(MetadataBuildSnafu)?
+        .build();
+
+    let mut pb = PodBuilder::new()
+        .metadata(metadata)
+        .image_pull_secrets_from_product_image(resolved_product_image)
+        .security_context(
+            PodSecurityContextBuilder::new()
+                .run_as_user(1000)
+                .run_as_group(0)
+                .fs_group(1000) // Needed for secret-operator
+                .build(),
+        )
+        .affinity(&merged_config.affinity)
+        .service_account_name(sa_name)
+        .build_template();
 
     let mut superset_cb = ContainerBuilder::new(&Container::Superset.to_string())
         .context(InvalidContainerNameSnafu)?;
@@ -797,19 +828,27 @@ fn build_server_rolegroup_statefulset(
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
             ))
-            .with_label("restarter.stackable.tech/enabled", "true")
+            .context(MetadataBuildSnafu)?
+            .with_label(
+                Label::try_from(("restarter.stackable.tech/enabled", "true"))
+                    .context(LabelBuildSnafu)?,
+            )
             .build(),
         spec: Some(StatefulSetSpec {
             // Set to `OrderedReady`, to make sure Pods start after another and the init commands don't run in parallel
             pod_management_policy: Some("OrderedReady".to_string()),
             replicas: role_group.replicas.map(i32::from),
             selector: LabelSelector {
-                match_labels: Some(role_group_selector_labels(
-                    superset,
-                    APP_NAME,
-                    &rolegroup_ref.role,
-                    &rolegroup_ref.role_group,
-                )),
+                match_labels: Some(
+                    Labels::role_group_selector(
+                        superset,
+                        APP_NAME,
+                        &rolegroup_ref.role,
+                        &rolegroup_ref.role_group,
+                    )
+                    .context(LabelBuildSnafu)?
+                    .into(),
+                ),
                 ..LabelSelector::default()
             },
             service_name: rolegroup_ref.object_name(),
@@ -834,7 +873,9 @@ fn add_authentication_volumes_and_volume_mounts(
                 AuthenticationClassProvider::Ldap(ldap) => {
                     ldap.add_volumes_and_mounts(pb, vec![cb]);
                 }
-                AuthenticationClassProvider::Tls(_) | AuthenticationClassProvider::Static(_) => {}
+                AuthenticationClassProvider::Oidc(_)
+                | AuthenticationClassProvider::Tls(_)
+                | AuthenticationClassProvider::Static(_) => {}
             }
         }
     }
