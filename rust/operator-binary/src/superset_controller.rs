@@ -231,14 +231,12 @@ pub enum Error {
     },
 
     #[snafu(display("failed to add Superset config settings"))]
-    AddSupersetConfig {
-        source: crate::config::Error,
-    },
+    AddSupersetConfig { source: crate::config::Error },
 
     #[snafu(display("failed to add LDAP Volumes and VolumeMounts"))]
     AddLdapVolumesAndVolumeMounts {
         source: stackable_operator::commons::authentication::ldap::Error,
-    }
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -498,7 +496,8 @@ fn build_rolegroup_config_map(
     //    Issue: https://github.com/stackabletech/superset-operator/issues/416
     config_properties.insert("TALISMAN_ENABLED".to_string(), "False".to_string());
 
-    config::add_superset_config(&mut config_properties, authentication_config).context(AddSupersetConfigSnafu)?;
+    config::add_superset_config(&mut config_properties, authentication_config)
+        .context(AddSupersetConfigSnafu)?;
 
     // The order here should be kept in order to preserve overrides.
     // No properties should be added after this extend.
@@ -655,8 +654,6 @@ fn build_server_rolegroup_statefulset(
         .build();
 
     let mut pb = &mut PodBuilder::new();
-
-    
 
     pb = pb
         .metadata(metadata)
@@ -885,7 +882,8 @@ fn add_authentication_volumes_and_volume_mounts(
         if let Some(auth_class) = &config.authentication_class {
             match &auth_class.spec.provider {
                 AuthenticationClassProvider::Ldap(ldap) => {
-                    ldap.add_volumes_and_mounts(pb, vec![cb]).context(AddLdapVolumesAndVolumeMountsSnafu)?;
+                    ldap.add_volumes_and_mounts(pb, vec![cb])
+                        .context(AddLdapVolumesAndVolumeMountsSnafu)?;
                 }
                 AuthenticationClassProvider::Oidc(_)
                 | AuthenticationClassProvider::Tls(_)

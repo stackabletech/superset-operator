@@ -1,7 +1,5 @@
-use snafu::{Snafu, ResultExt};
-use stackable_operator::commons::authentication::{
-    ldap, AuthenticationClassProvider,
-};
+use snafu::{ResultExt, Snafu};
+use stackable_operator::commons::authentication::{ldap, AuthenticationClassProvider};
 use stackable_superset_crd::authentication::SuperSetAuthenticationConfigResolved;
 use stackable_superset_crd::{authentication::FlaskRolesSyncMoment, SupersetConfigOptions};
 use std::collections::BTreeMap;
@@ -82,14 +80,19 @@ fn append_authentication_config(
     Ok(())
 }
 
-fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &ldap::AuthenticationProvider) -> Result<(), Error> {
+fn append_ldap_config(
+    config: &mut BTreeMap<String, String>,
+    ldap: &ldap::AuthenticationProvider,
+) -> Result<(), Error> {
     config.insert(
         SupersetConfigOptions::AuthType.to_string(),
         "AUTH_LDAP".into(),
     );
     config.insert(
         SupersetConfigOptions::AuthLdapServer.to_string(),
-        ldap.endpoint_url().context(FailedToCreateLdapEndpointUrlSnafu)?.into(),
+        ldap.endpoint_url()
+            .context(FailedToCreateLdapEndpointUrlSnafu)?
+            .into(),
     );
     config.insert(
         SupersetConfigOptions::AuthLdapSearch.to_string(),
