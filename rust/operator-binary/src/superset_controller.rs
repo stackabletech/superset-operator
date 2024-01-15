@@ -694,7 +694,7 @@ fn build_server_rolegroup_statefulset(
         };
     }
 
-    add_authentication_volumes_and_volume_mounts(authentication_config, &mut superset_cb, &mut pb)?;
+    add_authentication_volumes_and_volume_mounts(authentication_config, &mut superset_cb, pb)?;
 
     let webserver_timeout = node_config
         .get(&PropertyNameKind::File(
@@ -772,7 +772,7 @@ fn build_server_rolegroup_statefulset(
     superset_cb.liveness_probe(probe);
 
     pb.add_container(superset_cb.build());
-    add_graceful_shutdown_config(merged_config, &mut pb).context(GracefulShutdownSnafu)?;
+    add_graceful_shutdown_config(merged_config, pb).context(GracefulShutdownSnafu)?;
 
     let metrics_container = ContainerBuilder::new("metrics")
         .context(InvalidContainerNameSnafu)?
