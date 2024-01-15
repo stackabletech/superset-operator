@@ -1,9 +1,16 @@
-use stackable_operator::commons::authentication::{
-    ldap::LdapAuthenticationProvider, tls::TlsVerification, AuthenticationClassProvider,
-};
+use snafu::{ResultExt, Snafu};
+use stackable_operator::commons::authentication::{ldap, AuthenticationClassProvider};
 use stackable_superset_crd::authentication::SuperSetAuthenticationConfigResolved;
 use stackable_superset_crd::{authentication::FlaskRolesSyncMoment, SupersetConfigOptions};
 use std::collections::BTreeMap;
+
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display("Failed to create LDAP endpoint url."))]
+    FailedToCreateLdapEndpointUrl {
+        source: stackable_operator::commons::authentication::ldap::Error,
+    },
+}
 
 pub const PYTHON_IMPORTS: &[&str] = &[
     "import os",
@@ -15,7 +22,7 @@ pub const PYTHON_IMPORTS: &[&str] = &[
 pub fn add_superset_config(
     config: &mut BTreeMap<String, String>,
     authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
-) {
+) -> Result<(), Error> {
     config.insert(
         SupersetConfigOptions::SecretKey.to_string(),
         "os.environ.get('SECRET_KEY')".into(),
@@ -37,20 +44,22 @@ pub fn add_superset_config(
         "StackableLoggingConfigurator()".into(),
     );
 
-    append_authentication_config(config, authentication_config);
+    append_authentication_config(config, authentication_config)?;
+
+    Ok(())
 }
 
 fn append_authentication_config(
     config: &mut BTreeMap<String, String>,
     authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
-) {
+) -> Result<(), Error> {
     // TODO: we make sure in crd/src/authentication.rs that currently there is only one
     //    AuthenticationClass provided. If the FlaskAppBuilder ever supports this we have
     //    to adapt the config here accordingly
     for auth_config in authentication_config {
         if let Some(auth_class) = &auth_config.authentication_class {
             if let AuthenticationClassProvider::Ldap(ldap) = &auth_class.spec.provider {
-                append_ldap_config(config, ldap);
+                append_ldap_config(config, ldap)?;
             }
         }
 
@@ -67,24 +76,23 @@ fn append_authentication_config(
             (auth_config.sync_roles_at == FlaskRolesSyncMoment::Login).to_string(),
         );
     }
+
+    Ok(())
 }
 
-fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenticationProvider) {
+fn append_ldap_config(
+    config: &mut BTreeMap<String, String>,
+    ldap: &ldap::AuthenticationProvider,
+) -> Result<(), Error> {
     config.insert(
         SupersetConfigOptions::AuthType.to_string(),
         "AUTH_LDAP".into(),
     );
     config.insert(
         SupersetConfigOptions::AuthLdapServer.to_string(),
-        format!(
-            "{protocol}{server_hostname}:{server_port}",
-            protocol = match ldap.tls {
-                None => "ldap://",
-                Some(_) => "ldaps://",
-            },
-            server_hostname = ldap.hostname,
-            server_port = ldap.port.unwrap_or_else(|| ldap.default_port()),
-        ),
+        ldap.endpoint_url()
+            .context(FailedToCreateLdapEndpointUrlSnafu)?
+            .into(),
     );
     config.insert(
         SupersetConfigOptions::AuthLdapSearch.to_string(),
@@ -113,25 +121,22 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenti
 
     config.insert(
         SupersetConfigOptions::AuthLdapTlsDemand.to_string(),
-        ldap.use_tls().to_string(),
+        ldap.tls.uses_tls().to_string(),
     );
 
-    if let Some(tls) = &ldap.tls {
-        match &tls.verification {
-            TlsVerification::None {} => {
+    if ldap.tls.uses_tls() {
+        if ldap.tls.uses_tls_verification() {
+            if let Some(ca_cert_path) = ldap.tls.tls_ca_cert_mount_path() {
                 config.insert(
-                    SupersetConfigOptions::AuthLdapAllowSelfSigned.to_string(),
-                    true.to_string(),
+                    SupersetConfigOptions::AuthLdapTlsCacertfile.to_string(),
+                    ca_cert_path,
                 );
             }
-            TlsVerification::Server(_) => {
-                if let Some(ca_cert_path) = ldap.tls_ca_cert_mount_path() {
-                    config.insert(
-                        SupersetConfigOptions::AuthLdapTlsCacertfile.to_string(),
-                        ca_cert_path,
-                    );
-                }
-            }
+        } else {
+            config.insert(
+                SupersetConfigOptions::AuthLdapAllowSelfSigned.to_string(),
+                true.to_string(),
+            );
         }
     }
 
@@ -145,4 +150,6 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &LdapAuthenti
             format!("open('{password_path}').read()"),
         );
     }
+
+    Ok(())
 }
