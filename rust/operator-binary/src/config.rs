@@ -1,10 +1,11 @@
-use stackable_operator::commons::authentication::tls::TlsVerification;
-use stackable_operator::commons::authentication::{ldap, oidc};
-use stackable_superset_crd::authentication::{
-    SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
-    SupersetOidcExtraFields,
+use stackable_operator::commons::authentication::{ldap, oidc, tls::TlsVerification};
+use stackable_superset_crd::{
+    authentication::{
+        FlaskRolesSyncMoment, SupersetAuthenticationClassResolved,
+        SupersetClientAuthenticationDetailsResolved, DEFAULT_OIDC_PROVIDER,
+    },
+    SupersetConfigOptions,
 };
-use stackable_superset_crd::{authentication::FlaskRolesSyncMoment, SupersetConfigOptions};
 use std::collections::BTreeMap;
 
 pub const PYTHON_IMPORTS: &[&str] = &[
@@ -151,7 +152,7 @@ fn append_ldap_config(config: &mut BTreeMap<String, String>, ldap: &ldap::Authen
 fn append_oidc_config(
     config: &mut BTreeMap<String, String>,
     oidc: &oidc::AuthenticationProvider,
-    client_options: &oidc::ClientAuthenticationOptions<SupersetOidcExtraFields>,
+    client_options: &oidc::ClientAuthenticationOptions<()>,
 ) {
     config.insert(
         SupersetConfigOptions::AuthType.to_string(),
@@ -162,30 +163,40 @@ fn append_oidc_config(
             &client_options.client_credentials_secret_ref,
         );
     let mut scopes = oidc.scopes.clone();
-    scopes.extend(client_options.extra_scopes.clone());
+    scopes.extend_from_slice(&client_options.extra_scopes);
+
+    let oidc_provider = oidc
+        .provider_hint
+        .as_ref()
+        .unwrap_or(&DEFAULT_OIDC_PROVIDER);
+
+    // TODO Isn't the API base path protocol/openid-connect?
+    let oauth_providers_config = match oidc_provider {
+        oidc::IdentityProviderHint::Keycloak => {
+            format!(
+                "[
+                  {{ 'name': 'keycloak',
+                    'icon': 'fa-key',
+                    'token_key': 'access_token',
+                    'remote_app': {{
+                      'client_id': os.environ.get('{env_client_id}'),
+                      'client_secret': os.environ.get('{env_client_secret}'),
+                      'client_kwargs': {{
+                        'scope': '{scopes}'
+                      }},
+                      'api_base_url': '{url}/protocol/',
+                      'server_metadata_url': '{url}/.well-known/openid-configuration',
+                    }},
+                  }}
+                ]",
+                url = oidc.endpoint_url().unwrap(),
+                scopes = scopes.join(" "),
+            )
+        }
+    };
 
     config.insert(
         SupersetConfigOptions::OauthProviders.to_string(),
-        format!(
-            // TODO Make provider configurable and derive API path
-            "[
-              {{ 'name': 'keycloak',
-                'icon': 'fa-key',
-                'token_key': 'access_token',
-                'remote_app': {{
-                  'client_id': os.environ.get('{env_client_id}'),
-                  'client_secret': os.environ.get('{env_client_secret}'),
-                  'client_kwargs': {{
-                    'scope': '{scopes}'
-                  }},
-                  'api_base_url': '{url}/{api_path}/',
-                  'server_metadata_url': '{url}/.well-known/openid-configuration',
-                }},
-              }}
-            ]",
-            url = oidc.endpoint_url().unwrap(),
-            api_path = client_options.product_specific_fields.oidc_api_path,
-            scopes = scopes.join(" "),
-        ),
+        oauth_providers_config,
     );
 }

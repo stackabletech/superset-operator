@@ -1,15 +1,25 @@
+use std::future::Future;
+
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+use snafu::{ensure, ResultExt, Snafu};
 use stackable_operator::{
     client::Client,
     commons::authentication::{
-        ldap, oidc, AuthenticationClassProvider, ClientAuthenticationDetails,
+        ldap,
+        oidc::{self, IdentityProviderHint},
+        AuthenticationClass, AuthenticationClassProvider, ClientAuthenticationDetails,
     },
+    error::OperatorResult,
     kube::ResourceExt,
     schemars::{self, JsonSchema},
 };
+use tracing::info;
 
-const SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS: [&str; 1] = ["LDAP"];
+// The assumed OIDC provider if no hint is given in the AuthClass
+pub const DEFAULT_OIDC_PROVIDER: IdentityProviderHint = IdentityProviderHint::Keycloak;
+
+const SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS: &[&str] = &["LDAP", "OIDC"];
+const SUPPORTED_OIDC_PROVIDERS: &[IdentityProviderHint] = &[IdentityProviderHint::Keycloak];
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -35,6 +45,9 @@ pub enum Error {
         source: stackable_operator::error::Error,
     },
 
+    #[snafu(display("The OIDC provider {oidc_provider:?} is not yet supported."))]
+    OidcProviderNotSupported { oidc_provider: String },
+
     #[snafu(display(
         "{configured:?} is not a supported principalClaim in Superset for the Keycloak OIDC provider. Please use {supported:?} in the AuthenticationClass {auth_class_name:?}"
     ))]
@@ -51,7 +64,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClientAuthenticationDetails {
     #[serde(flatten)]
-    pub common: ClientAuthenticationDetails<SupersetOidcExtraFields>,
+    pub common: ClientAuthenticationDetails<()>,
 
     /// Allow users who are not already in the FAB DB.
     /// Gets mapped to `AUTH_USER_REGISTRATION`
@@ -69,24 +82,12 @@ pub struct SupersetClientAuthenticationDetails {
     pub sync_roles_at: FlaskRolesSyncMoment,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetOidcExtraFields {
-    /// Path appended to the root path
-    #[serde(default = "default_oidc_api_path")]
-    pub oidc_api_path: String,
-}
-
 pub fn default_user_registration() -> bool {
     true
 }
 
 pub fn default_user_registration_role() -> String {
     "Public".to_string()
-}
-
-pub fn default_oidc_api_path() -> String {
-    "protocol".to_string()
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -97,6 +98,7 @@ pub enum FlaskRolesSyncMoment {
 }
 
 /// Resolved counter part for `SupersetClientAuthenticationDetails`.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SupersetClientAuthenticationDetailsResolved {
     pub authentication_class_resolved: Option<SupersetAuthenticationClassResolved>,
     pub user_registration: bool,
@@ -104,13 +106,14 @@ pub struct SupersetClientAuthenticationDetailsResolved {
     pub sync_roles_at: FlaskRolesSyncMoment,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SupersetAuthenticationClassResolved {
     Ldap {
         provider: ldap::AuthenticationProvider,
     },
     Oidc {
         provider: oidc::AuthenticationProvider,
-        oidc: oidc::ClientAuthenticationOptions<SupersetOidcExtraFields>,
+        oidc: oidc::ClientAuthenticationOptions<()>,
     },
 }
 
@@ -119,6 +122,19 @@ impl SupersetClientAuthenticationDetailsResolved {
         auth_details: &[SupersetClientAuthenticationDetails],
         client: &Client,
     ) -> Result<SupersetClientAuthenticationDetailsResolved> {
+        let resolve_auth_class = |auth_details: ClientAuthenticationDetails| async move {
+            auth_details.resolve_class(client).await
+        };
+        SupersetClientAuthenticationDetailsResolved::resolve(auth_details, resolve_auth_class).await
+    }
+
+    pub async fn resolve<R>(
+        auth_details: &[SupersetClientAuthenticationDetails],
+        resolve_auth_class: impl FnOnce(ClientAuthenticationDetails) -> R,
+    ) -> Result<SupersetClientAuthenticationDetailsResolved>
+    where
+        R: Future<Output = OperatorResult<AuthenticationClass>>,
+    {
         // TODO: Adapt if multiple authentication types are supported by Superset.
         // This is currently not possible due to the Flask-AppBuilder not supporting it,
         // see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924.
@@ -132,9 +148,7 @@ impl SupersetClientAuthenticationDetailsResolved {
 
         let authentication_class_resolved = match auth_details.first() {
             Some(auth_details) => {
-                let auth_class = auth_details
-                    .common
-                    .resolve_class(client)
+                let auth_class = resolve_auth_class(auth_details.common.clone())
                     .await
                     .context(AuthenticationClassRetrievalFailedSnafu)?;
                 let auth_class_name = auth_class.name_any();
@@ -143,27 +157,19 @@ impl SupersetClientAuthenticationDetailsResolved {
                 user_registration_role = auth_details.user_registration_role.clone();
                 sync_roles_at = auth_details.sync_roles_at.clone();
 
-                Some(match auth_class.spec.provider {
+                Some(match &auth_class.spec.provider {
                     AuthenticationClassProvider::Ldap(provider) => {
-                        SupersetAuthenticationClassResolved::Ldap { provider }
+                        SupersetAuthenticationClassResolved::Ldap {
+                            provider: provider.to_owned(),
+                        }
                     }
+                    // TODO Several OIDC providers are possible
                     AuthenticationClassProvider::Oidc(provider) => {
-                        if &provider.principal_claim != "preferred_username" {
-                            return OidcPrincipalClaimNotSupportedSnafu {
-                                configured: provider.principal_claim.clone(),
-                                supported: "preferred_username".to_owned(),
-                                auth_class_name,
-                            }
-                            .fail();
-                        }
-                        SupersetAuthenticationClassResolved::Oidc {
+                        SupersetClientAuthenticationDetailsResolved::from_oidc(
+                            &auth_class_name,
                             provider,
-                            oidc: auth_details
-                                .common
-                                .oidc_or_error(&auth_class_name)
-                                .context(OidcConfigurationInvalidSnafu)?
-                                .clone(),
-                        }
+                            auth_details,
+                        )?
                     }
                     _ => {
                         // Checking for supported AuthenticationClass here is a little out of place,
@@ -185,5 +191,344 @@ impl SupersetClientAuthenticationDetailsResolved {
             user_registration_role,
             sync_roles_at,
         })
+    }
+
+    fn from_oidc(
+        auth_class_name: &str,
+        provider: &oidc::AuthenticationProvider,
+        auth_details: &SupersetClientAuthenticationDetails,
+    ) -> Result<SupersetAuthenticationClassResolved> {
+        let oidc_provider = match &provider.provider_hint {
+            None => {
+                info!("No OIDC provider hint given in AuthClass {auth_class_name}, assuming {default_oidc_provider_name}",
+                    default_oidc_provider_name = serde_json::to_string(&DEFAULT_OIDC_PROVIDER).unwrap());
+                DEFAULT_OIDC_PROVIDER
+            }
+            Some(oidc_provider) => oidc_provider.to_owned(),
+        };
+
+        ensure!(
+            SUPPORTED_OIDC_PROVIDERS.contains(&oidc_provider),
+            OidcProviderNotSupportedSnafu {
+                oidc_provider: serde_json::to_string(&oidc_provider).unwrap(),
+            }
+        );
+
+        match oidc_provider {
+            IdentityProviderHint::Keycloak => {
+                ensure!(
+                    &provider.principal_claim == "preferred_username",
+                    OidcPrincipalClaimNotSupportedSnafu {
+                        configured: provider.principal_claim.clone(),
+                        supported: "preferred_username".to_owned(),
+                        auth_class_name,
+                    }
+                );
+            }
+        }
+
+        Ok(SupersetAuthenticationClassResolved::Oidc {
+            provider: provider.to_owned(),
+            oidc: auth_details
+                .common
+                .oidc_or_error(auth_class_name)
+                .context(OidcConfigurationInvalidSnafu)?
+                .clone(),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::pin::Pin;
+
+    use indoc::indoc;
+    use stackable_operator::{
+        commons::authentication::{
+            oidc,
+            tls::{Tls, TlsClientDetails, TlsVerification},
+        },
+        kube,
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn resolve_without_authentication_details() {
+        let auth_details_resolved = test_resolve_and_expect_success("[]", "").await;
+
+        assert_eq!(
+            SupersetClientAuthenticationDetailsResolved {
+                authentication_class_resolved: None,
+                user_registration: default_user_registration(),
+                user_registration_role: default_user_registration_role(),
+                sync_roles_at: FlaskRolesSyncMoment::default()
+            },
+            auth_details_resolved
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_with_all_authentication_details() {
+        // Avoid using defaults here
+        let auth_details_resolved = test_resolve_and_expect_success(
+            indoc! {"
+                - authenticationClass: oidc
+                  oidc:
+                    clientCredentialsSecret: superset-keycloak-client
+                    extraScopes:
+                      - groups
+                    userRegistration: false
+                    userRegistrationRole: asrt
+                    syncRolesAt: Registration
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc
+                spec:
+                  provider:
+                    oidc:
+                      hostname: my.keycloak.server
+                      port: 443
+                      rootPath: /realms/master
+                      principalClaim: preferred_username
+                      scopes:
+                        - openid
+                        - email
+                        - profile
+                      providerHint: Keycloak
+                      tls:
+                        verification:
+                          none: {}
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            SupersetClientAuthenticationDetailsResolved {
+                authentication_class_resolved: Some(SupersetAuthenticationClassResolved::Oidc {
+                    provider: oidc::AuthenticationProvider::new(
+                        "my.keycloak.server".into(),
+                        Some(443),
+                        "/realms/master".into(),
+                        TlsClientDetails {
+                            tls: Some(Tls {
+                                verification: TlsVerification::None {}
+                            })
+                        },
+                        "preferred_username".into(),
+                        vec!["openid".into(), "email".into(), "profile".into()],
+                        Some(IdentityProviderHint::Keycloak)
+                    ),
+                    oidc: oidc::ClientAuthenticationOptions {
+                        client_credentials_secret_ref: "superset-keycloak-client".into(),
+                        extra_scopes: vec!["groups".into()],
+                        product_specific_fields: ()
+                    }
+                }),
+                user_registration: true,
+                user_registration_role: "Public".into(),
+                sync_roles_at: FlaskRolesSyncMoment::Registration
+            },
+            auth_details_resolved
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_different_authentication_types() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc
+                  oidc:
+                    clientCredentialsSecret: superset-keycloak-client
+                - authenticationClass: ldap
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc
+                spec:
+                  provider:
+                    oidc:
+                      hostname: my.keycloak.server
+                      principalClaim: preferred_username
+                      scopes:
+                        - openid
+                        - email
+                        - profile
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: ldap
+                spec:
+                  provider:
+                    ldap:
+                      hostname: my.ldap.server
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            "Only one authentication class is currently supported at a time",
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_if_oidc_details_are_missing() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc
+                spec:
+                  provider:
+                    oidc:
+                      hostname: my.keycloak.server
+                      principalClaim: preferred_username
+                      scopes:
+                        - openid
+                        - email
+                        - profile
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            indoc! { r#"
+                Invalid OIDC configuration
+
+                Caused by this error:
+                  1: OIDC authentication details not specified. The AuthenticationClass "oidc" uses an OIDC provider, you need to specify OIDC authentication details (such as client credentials) as well"#
+            },
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_wrong_principal_claim() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc
+                  oidc:
+                    clientCredentialsSecret: superset-keycloak-client
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc
+                spec:
+                  provider:
+                    oidc:
+                      hostname: my.keycloak.server
+                      principalClaim: sub
+                      scopes:
+                        - openid
+                        - email
+                        - profile
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            r#""sub" is not a supported principalClaim in Superset for the Keycloak OIDC provider. Please use "preferred_username" in the AuthenticationClass "oidc""#,
+            error_message
+        );
+    }
+
+    async fn test_resolve_and_expect_success(
+        auth_details_yaml: &str,
+        auth_classes_yaml: &str,
+    ) -> SupersetClientAuthenticationDetailsResolved {
+        test_resolve(auth_details_yaml, auth_classes_yaml)
+            .await
+            .expect("The SupersetClientAuthenticationDetails should be resolvable.")
+    }
+
+    async fn test_resolve_and_expect_error(
+        auth_details_yaml: &str,
+        auth_classes_yaml: &str,
+    ) -> String {
+        let error = test_resolve(auth_details_yaml, auth_classes_yaml)
+            .await
+            .expect_err("failure");
+        snafu::Report::from_error(error)
+            .to_string()
+            .trim_end()
+            .to_owned()
+    }
+
+    async fn test_resolve(
+        auth_details_yaml: &str,
+        auth_classes_yaml: &str,
+    ) -> Result<SupersetClientAuthenticationDetailsResolved> {
+        let auth_details = deserialize_superset_client_authentication_details(auth_details_yaml);
+
+        let auth_classes = deserialize_auth_classes(auth_classes_yaml);
+
+        let resolve_auth_class = create_auth_class_resolver(auth_classes);
+
+        SupersetClientAuthenticationDetailsResolved::resolve(&auth_details, resolve_auth_class)
+            .await
+    }
+
+    fn deserialize_superset_client_authentication_details(
+        input: &str,
+    ) -> Vec<SupersetClientAuthenticationDetails> {
+        serde_yaml::from_str(input)
+            .expect("The definition of the authentication configuration should be valid.")
+    }
+
+    fn deserialize_auth_classes(input: &str) -> Vec<AuthenticationClass> {
+        if input.is_empty() {
+            Vec::new()
+        } else {
+            let deserializer = serde_yaml::Deserializer::from_str(input);
+            deserializer
+                .map(|d| {
+                    serde_yaml::with::singleton_map_recursive::deserialize(d)
+                        .expect("The definition of the AuthenticationClass should be valid.")
+                })
+                .collect()
+        }
+    }
+
+    fn create_auth_class_resolver(
+        auth_classes: Vec<AuthenticationClass>,
+    ) -> impl FnOnce(
+        ClientAuthenticationDetails,
+    ) -> Pin<Box<dyn Future<Output = OperatorResult<AuthenticationClass>>>> {
+        |auth_details: ClientAuthenticationDetails| {
+            Box::pin(async move {
+                auth_classes
+                    .iter()
+                    .find(|auth_class| {
+                        auth_class.metadata.name.as_ref()
+                            == Some(auth_details.authentication_class_name())
+                    })
+                    .cloned()
+                    .ok_or_else(|| stackable_operator::error::Error::KubeError {
+                        source: kube::Error::Api(kube::error::ErrorResponse {
+                            code: 404,
+                            message: "AuthenticationClass not found".into(),
+                            reason: "NotFound".into(),
+                            status: "Failure".into(),
+                        }),
+                    })
+            })
+        }
     }
 }

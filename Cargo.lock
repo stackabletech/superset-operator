@@ -1912,6 +1912,7 @@ dependencies = [
 name = "stackable-superset-crd"
 version = "0.0.0-dev"
 dependencies = [
+ "indoc",
  "product-config",
  "serde",
  "serde_json",
@@ -1919,6 +1920,7 @@ dependencies = [
  "snafu 0.7.5",
  "stackable-operator",
  "strum",
+ "tokio",
  "tracing",
 ]
 

@@ -18,4 +18,6 @@ snafu.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+indoc.workspace = true
 serde_yaml.workspace = true
+tokio.workspace = true
