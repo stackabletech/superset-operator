@@ -20,7 +20,7 @@ use stackable_operator::{
     memory::{BinaryMultiple, MemoryQuantity},
     product_config_utils::{ConfigError, Configuration},
     product_logging::{self, spec::Logging},
-    role_utils::{GenericRoleConfig, Role, RoleGroup, RoleGroupRef},
+    role_utils::{GenericRoleConfig, Role, RoleGroupRef},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
@@ -496,17 +496,6 @@ impl SupersetCluster {
             .get(&rolegroup_ref.role_group)
             .map(|rg| rg.config.config.clone())
             .unwrap_or_default();
-
-        if let Some(RoleGroup {
-            selector: Some(selector),
-            ..
-        }) = role.role_groups.get(&rolegroup_ref.role_group)
-        {
-            // Migrate old `selector` attribute, see ADR 26 affinities.
-            // TODO Can be removed after support for the old `selector` field is dropped.
-            #[allow(deprecated)]
-            conf_rolegroup.affinity.add_legacy_selector(selector);
-        }
 
         // Merge more specific configs into default config
         // Hierarchy is:

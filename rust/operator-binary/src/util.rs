@@ -1,6 +1,6 @@
 use crate::OPERATOR_NAME;
 use stackable_operator::k8s_openapi::api::batch::v1::Job;
-use stackable_operator::labels::ObjectLabels;
+use stackable_operator::kvp::ObjectLabels;
 use stackable_superset_crd::APP_NAME;
 
 pub enum JobState {
