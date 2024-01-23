@@ -1,0 +1,73 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: install-superset
+timeout: 300
+---
+apiVersion: authentication.stackable.tech/v1alpha1
+kind: AuthenticationClass
+metadata:
+  name: keycloak
+spec:
+  provider:
+    oidc:
+      hostname: keycloak
+      port: 8080
+      rootPath: /realms/superset
+      scopes:
+        - email
+        - openid
+        - profile
+      principalClaim: preferred_username
+      providerHint: Keycloak
+      # tls:
+      #   verification:
+      #     none: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-credentials
+type: Opaque
+stringData:
+  adminUser.username: admin
+  adminUser.firstname: Superset
+  adminUser.lastname: Admin
+  adminUser.email: admin@superset.com
+  adminUser.password: admin
+  connections.secretKey: thisISaSECRET_1234
+  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql/superset
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-keycloak-client
+stringData:
+  clientId: superset
+  clientSecret: SUPERSET_CLIENT_SECRET
+---
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: superset
+spec:
+  image:
+    productVersion: "{{ test_scenario['values']['superset'] }}"
+    pullPolicy: IfNotPresent
+  clusterConfig:
+    authentication:
+      - authenticationClass: keycloak
+        oidc:
+          clientCredentialsSecret: superset-keycloak-client
+    credentialsSecret: superset-credentials
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+  nodes:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1

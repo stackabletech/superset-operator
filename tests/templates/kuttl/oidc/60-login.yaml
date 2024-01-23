@@ -1,0 +1,7 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: login
+commands:
+  - script: kubectl cp -n $NAMESPACE ./login.py python-0:/tmp
