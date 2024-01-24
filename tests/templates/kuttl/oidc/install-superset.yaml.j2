@@ -1,29 +1,4 @@
----
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-metadata:
-  name: install-superset
-timeout: 300
----
-apiVersion: authentication.stackable.tech/v1alpha1
-kind: AuthenticationClass
-metadata:
-  name: keycloak
-spec:
-  provider:
-    oidc:
-      hostname: keycloak
-      port: 8080
-      rootPath: /realms/superset
-      scopes:
-        - email
-        - openid
-        - profile
-      principalClaim: preferred_username
-      providerHint: Keycloak
-      # tls:
-      #   verification:
-      #     none: {}
+# $NAMESPACE will be replaced with the namespace of the test case.
 ---
 apiVersion: v1
 kind: Secret
@@ -57,7 +32,7 @@ spec:
     pullPolicy: IfNotPresent
   clusterConfig:
     authentication:
-      - authenticationClass: keycloak
+      - authenticationClass: keycloak-$NAMESPACE
         oidc:
           clientCredentialsSecret: superset-keycloak-client
     credentialsSecret: superset-credentials

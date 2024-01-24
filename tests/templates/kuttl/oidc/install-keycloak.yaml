@@ -1,0 +1,154 @@
+# $NAMESPACE will be replaced with the namespace of the test case.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realms
+data:
+  test-realm.json: |
+    {
+      "realm": "test",
+      "enabled": true,
+      "users": [
+        {
+          "username": "admin",
+          "enabled": true,
+          "credentials": [
+            {
+              "type": "password",
+              "value": "admin"
+            }
+          ],
+          "realmRoles": [
+            "admin"
+          ]
+        },
+        {
+          "username": "test",
+          "enabled": true,
+          "credentials": [
+            {
+              "type": "password",
+              "value": "test"
+            }
+          ],
+          "realmRoles": [
+            "user"
+          ]
+        }
+      ],
+      "roles": {
+        "realm": [
+          {
+            "name": "admin",
+            "description": "Admin privileges"
+          },
+          {
+            "name": "user",
+            "description": "User privileges"
+          }
+        ]
+      },
+      "clients": [
+        {
+          "clientId": "superset",
+          "enabled": true,
+          "clientAuthenticatorType": "client-secret",
+          "secret": "SUPERSET_CLIENT_SECRET",
+          "redirectUris": [
+            "*"
+          ],
+          "webOrigins": [
+            "*"
+          ],
+          "standardFlowEnabled": true,
+          "protocol": "openid-connect"
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels:
+    app: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:23.0.4
+          args:
+            - start-dev
+            - --import-realm
+            - --https-certificate-file=/tls/tls.crt
+            - --https-certificate-key-file=/tls/tls.key
+          env:
+            - name: KEYCLOAK_ADMIN
+              value: admin
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              value: admin
+          ports:
+            - name: https
+              containerPort: 8443
+          volumeMounts:
+            - name: realms
+              mountPath: /opt/keycloak/data/import
+            - name: tls
+              mountPath: /tls
+          readinessProbe:
+            httpGet:
+              scheme: HTTPS
+              path: /realms/test
+              port: 8443
+      volumes:
+        - name: realms
+          configMap:
+            name: keycloak-realms
+        - name: tls
+          csi:
+            driver: secrets.stackable.tech
+            volumeAttributes:
+              secrets.stackable.tech/class: tls
+              secrets.stackable.tech/scope: service=keycloak
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - protocol: TCP
+      port: 8443
+---
+apiVersion: authentication.stackable.tech/v1alpha1
+kind: AuthenticationClass
+metadata:
+  name: keycloak-$NAMESPACE
+spec:
+  provider:
+    oidc:
+      hostname: keycloak.$NAMESPACE.svc.cluster.local
+      port: 8443
+      rootPath: /realms/test
+      scopes:
+        - email
+        - openid
+        - profile
+      principalClaim: preferred_username
+      providerHint: Keycloak
+      tls:
+        verification:
+          server:
+            caCert:
+              secretClass: tls

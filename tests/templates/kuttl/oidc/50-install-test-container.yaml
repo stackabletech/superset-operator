@@ -21,9 +21,11 @@ spec:
       labels:
         app: python
     spec:
+      securityContext:
+        fsGroup: 1000
       containers:
         - name: python
-          image: docker.stackable.tech/sandbox/sigi/testing-tools:0.2.0-stackable0.0.0-dev
+          image: docker.stackable.tech/stackable/testing-tools:0.2.0-stackable0.0.0-dev
           stdin: true
           tty: true
           resources:
@@ -33,3 +35,16 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "1"
+          volumeMounts:
+            - name: tls
+              mountPath: /stackable/tls
+          env:
+            - name: REQUESTS_CA_BUNDLE
+              value: /stackable/tls/ca.crt
+      volumes:
+        - name: tls
+          csi:
+            driver: secrets.stackable.tech
+            volumeAttributes:
+              secrets.stackable.tech/class: tls
+              secrets.stackable.tech/scope: service=keycloak

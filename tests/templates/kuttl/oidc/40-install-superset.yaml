@@ -1,7 +1,8 @@
 ---
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
+timeout: 300
 commands:
   - script: >
-      envsubst '$NAMESPACE' < install-keycloak.yaml |
+      envsubst '$NAMESPACE' < install-superset.yaml |
       kubectl apply -n $NAMESPACE -f -

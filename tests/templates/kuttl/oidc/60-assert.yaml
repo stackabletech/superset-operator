@@ -5,4 +5,4 @@ metadata:
   name: login
 timeout: 300
 commands:
-  - script: kubectl exec -n $NAMESPACE python-0 -- python /tmp/login.py
+  - script: kubectl exec -n $NAMESPACE python-0 -- python /stackable/login.py
