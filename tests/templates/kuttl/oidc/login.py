@@ -23,7 +23,7 @@ assert login_page.url.startswith("https://keycloak.$NAMESPACE.svc.cluster.local:
 # Enter username and password into the Keycloak login page and click on "Sign In"
 login_page_html = BeautifulSoup(login_page.text, 'html.parser')
 authenticate_url = login_page_html.form['action']
-welcome_page = session.post(authenticate_url, data = {
+welcome_page = session.post(authenticate_url, data={
     'username': "jane.doe",
     'password': "T8mn72D9"
 })
@@ -41,7 +41,7 @@ assert userinfo_page.url == "http://superset-external:8088/superset/welcome/", \
 
 # Expect the user data provided by Keycloak in Superset
 userinfo_page_html = BeautifulSoup(userinfo_page.text, 'html.parser')
-raw_data = userinfo_page_html.find(id = 'app')['data-bootstrap']
+raw_data = userinfo_page_html.find(id='app')['data-bootstrap']
 data = json.loads(raw_data)
 user_data = data['user']
 
