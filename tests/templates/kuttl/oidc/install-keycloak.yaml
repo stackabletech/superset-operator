@@ -11,25 +11,15 @@ data:
       "enabled": true,
       "users": [
         {
-          "username": "admin",
           "enabled": true,
+          "username": "jane.doe",
+          "firstName" : "Jane",
+          "lastName" : "Doe",
+          "email" : "jane.doe@stackable.tech",
           "credentials": [
             {
               "type": "password",
-              "value": "admin"
-            }
-          ],
-          "realmRoles": [
-            "admin"
-          ]
-        },
-        {
-          "username": "test",
-          "enabled": true,
-          "credentials": [
-            {
-              "type": "password",
-              "value": "test"
+              "value": "T8mn72D9"
             }
           ],
           "realmRoles": [
@@ -39,10 +29,6 @@ data:
       ],
       "roles": {
         "realm": [
-          {
-            "name": "admin",
-            "description": "Admin privileges"
-          },
           {
             "name": "user",
             "description": "User privileges"
@@ -54,7 +40,7 @@ data:
           "clientId": "superset",
           "enabled": true,
           "clientAuthenticatorType": "client-secret",
-          "secret": "SUPERSET_CLIENT_SECRET",
+          "secret": "R1bxHUD569vHeQdw",
           "redirectUris": [
             "*"
           ],
