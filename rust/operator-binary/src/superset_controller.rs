@@ -912,11 +912,6 @@ fn authentication_start_commands(
 ) -> Option<String> {
     match &auth_config.authentication_class_resolved {
         Some(SupersetAuthenticationClassResolved::Oidc { provider, .. }) => {
-            if provider.tls.uses_tls() && !provider.tls.uses_tls_verification() {
-                // TODO Add snafu error
-                panic!("Superset does not allow that");
-            }
-
             provider
                 .tls
                 .tls_ca_cert_mount_path()

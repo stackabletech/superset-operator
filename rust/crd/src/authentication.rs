@@ -45,8 +45,16 @@ pub enum Error {
         source: stackable_operator::error::Error,
     },
 
-    #[snafu(display("The OIDC provider {oidc_provider:?} is not yet supported."))]
-    OidcProviderNotSupported { oidc_provider: String },
+    #[snafu(display("The OIDC provider {oidc_provider:?} is not yet supported (AuthenticationClass {auth_class_name:?})."))]
+    OidcProviderNotSupported {
+        auth_class_name: String,
+        oidc_provider: String,
+    },
+
+    #[snafu(display(
+        "TLS verification cannot be disabled in Superset (AuthenticationClass {auth_class_name:?})."
+    ))]
+    TlsVerificationCannotBeDisabled { auth_class_name: String },
 
     #[snafu(display(
         "{configured:?} is not a supported principalClaim in Superset for the Keycloak OIDC provider. Please use {supported:?} in the AuthenticationClass {auth_class_name:?}"
@@ -210,6 +218,7 @@ impl SupersetClientAuthenticationDetailsResolved {
         ensure!(
             SUPPORTED_OIDC_PROVIDERS.contains(&oidc_provider),
             OidcProviderNotSupportedSnafu {
+                auth_class_name,
                 oidc_provider: serde_json::to_string(&oidc_provider).unwrap(),
             }
         );
@@ -226,6 +235,11 @@ impl SupersetClientAuthenticationDetailsResolved {
                 );
             }
         }
+
+        ensure!(
+            !provider.tls.uses_tls() || provider.tls.uses_tls_verification(),
+            TlsVerificationCannotBeDisabledSnafu { auth_class_name }
+        );
 
         Ok(SupersetAuthenticationClassResolved::Oidc {
             provider: provider.to_owned(),
@@ -246,7 +260,7 @@ mod tests {
     use stackable_operator::{
         commons::authentication::{
             oidc,
-            tls::{Tls, TlsClientDetails, TlsVerification},
+            tls::{CaCert, Tls, TlsClientDetails, TlsServerVerification, TlsVerification},
         },
         kube,
     };
@@ -279,7 +293,7 @@ mod tests {
                     extraScopes:
                       - groups
                     userRegistration: false
-                    userRegistrationRole: asrt
+                    userRegistrationRole: Gamma
                     syncRolesAt: Registration
             "},
             indoc! {"
@@ -302,7 +316,9 @@ mod tests {
                       providerHint: Keycloak
                       tls:
                         verification:
-                          none: {}
+                          server:
+                            caCert:
+                              secretClass: tls
             "},
         )
         .await;
@@ -316,7 +332,9 @@ mod tests {
                         "/realms/master".into(),
                         TlsClientDetails {
                             tls: Some(Tls {
-                                verification: TlsVerification::None {}
+                                verification: TlsVerification::Server(TlsServerVerification {
+                                    ca_cert: CaCert::SecretClass("tls".into())
+                                })
                             })
                         },
                         "preferred_username".into(),
@@ -445,6 +463,42 @@ mod tests {
 
         assert_eq!(
             r#""sub" is not a supported principalClaim in Superset for the Keycloak OIDC provider. Please use "preferred_username" in the AuthenticationClass "oidc""#,
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_disabled_tls_verification() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc
+                  oidc:
+                    clientCredentialsSecret: superset-keycloak-client
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc
+                spec:
+                  provider:
+                    oidc:
+                      hostname: my.keycloak.server
+                      principalClaim: preferred_username
+                      scopes:
+                        - openid
+                        - email
+                        - profile
+                      tls:
+                        verification:
+                          none: {}
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            r#"TLS verification cannot be disabled in Superset (AuthenticationClass "oidc")."#,
             error_message
         );
     }

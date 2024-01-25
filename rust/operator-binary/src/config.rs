@@ -179,7 +179,6 @@ fn append_oidc_config(
         .as_ref()
         .unwrap_or(&DEFAULT_OIDC_PROVIDER);
 
-    // TODO Isn't the API base path protocol/openid-connect?
     let oauth_providers_config = match oidc_provider {
         oidc::IdentityProviderHint::Keycloak => {
             format!(
