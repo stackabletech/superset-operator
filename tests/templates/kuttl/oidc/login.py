@@ -32,7 +32,7 @@ assert welcome_page.ok, "Login failed"
 assert welcome_page.url == "http://superset-external:8088/superset/welcome/", \
     "Redirection to the Superset welcome page expected"
 
-# Open the user information page
+# Open the user information page in Superset
 userinfo_page = session.get("http://superset-external:8088/users/userinfo/")
 
 assert userinfo_page.ok, "Retrieving user information failed"
