@@ -5,6 +5,7 @@
 ### Added
 
 - Improved CRD docs ([#431]).
+- Helm: support labels in values.yaml ([#448]).
 
 ### Fixed
 
@@ -12,6 +13,7 @@
 
 [#429]: https://github.com/stackabletech/superset-operator/pull/429
 [#431]: https://github.com/stackabletech/superset-operator/pull/431
+[#448]: https://github.com/stackabletech/superset-operator/pull/448
 
 ## [23.11.0] - 2023-11-24
 
