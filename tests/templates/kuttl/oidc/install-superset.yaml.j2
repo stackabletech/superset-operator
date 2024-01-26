@@ -17,10 +17,18 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: superset-keycloak-client
+  name: superset-keycloak1-client
 stringData:
-  clientId: superset
+  clientId: superset1
   clientSecret: R1bxHUD569vHeQdw
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-keycloak2-client
+stringData:
+  clientId: superset2
+  clientSecret: scWzh0D4v0GN8NrN
 ---
 apiVersion: superset.stackable.tech/v1alpha1
 kind: SupersetCluster
@@ -32,9 +40,12 @@ spec:
     pullPolicy: IfNotPresent
   clusterConfig:
     authentication:
-      - authenticationClass: keycloak-$NAMESPACE
+      - authenticationClass: keycloak1-$NAMESPACE
         oidc:
-          clientCredentialsSecret: superset-keycloak-client
+          clientCredentialsSecret: superset-keycloak1-client
+      - authenticationClass: keycloak2-$NAMESPACE
+        oidc:
+          clientCredentialsSecret: superset-keycloak2-client
     credentialsSecret: superset-credentials
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery

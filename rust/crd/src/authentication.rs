@@ -1,4 +1,4 @@
-use std::future::Future;
+use std::{collections::BTreeSet, future::Future, mem};
 
 use serde::{Deserialize, Serialize};
 use snafu::{ensure, ResultExt, Snafu};
@@ -10,7 +10,6 @@ use stackable_operator::{
         AuthenticationClass, AuthenticationClassProvider, ClientAuthenticationDetails,
     },
     error::OperatorResult,
-    kube::ResourceExt,
     schemars::{self, JsonSchema},
 };
 use tracing::info;
@@ -23,20 +22,42 @@ const SUPPORTED_OIDC_PROVIDERS: &[IdentityProviderHint] = &[IdentityProviderHint
 
 #[derive(Snafu, Debug)]
 pub enum Error {
+    #[snafu(display(
+        "The AuthenticationClass {auth_class_name:?} is referenced several times which is not allowed."
+    ))]
+    DuplicateAuthenticationClassReferencesNotAllowed { auth_class_name: String },
+
     #[snafu(display("Failed to retrieve AuthenticationClass"))]
     AuthenticationClassRetrievalFailed {
         source: stackable_operator::error::Error,
     },
 
-    // TODO: Adapt message if multiple authentication classes are supported simultaneously
-    #[snafu(display("Only one authentication class is currently supported at a time"))]
-    MultipleAuthenticationClassesProvided,
+    #[snafu(display("Only one authentication type at a time is supported by Superset, see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924."))]
+    MultipleAuthenticationTypesNotSupported,
+
+    #[snafu(display("Only one LDAP provider at a time is supported by Superset."))]
+    MultipleLdapProvidersNotSupported,
 
     #[snafu(display(
-        "Failed to use authentication provider {provider:?} for authentication class {auth_class:?} - supported providers: {SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS:?}",
+        "The userRegistration settings must not differ between the authentication entries.",
+    ))]
+    DifferentUserRegistrationSettingsNotAllowed,
+
+    #[snafu(display(
+        "The userRegistrationRole settings must not differ between the authentication entries.",
+    ))]
+    DifferentUserRegistrationRoleSettingsNotAllowed,
+
+    #[snafu(display(
+        "The syncRolesAt settings must not differ between the authentication entries.",
+    ))]
+    DifferentSyncRolesAtSettingsNotAllowed,
+
+    #[snafu(display(
+        "Failed to use authentication provider {provider:?} for authentication class {auth_class_name:?} - supported providers: {SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS:?}",
     ))]
     AuthenticationProviderNotSupported {
-        auth_class: String,
+        auth_class_name: String,
         provider: String,
     },
 
@@ -108,7 +129,7 @@ pub enum FlaskRolesSyncMoment {
 /// Resolved counter part for `SupersetClientAuthenticationDetails`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SupersetClientAuthenticationDetailsResolved {
-    pub authentication_class_resolved: Option<SupersetAuthenticationClassResolved>,
+    pub authentication_classes_resolved: Vec<SupersetAuthenticationClassResolved>,
     pub user_registration: bool,
     pub user_registration_role: String,
     pub sync_roles_at: FlaskRolesSyncMoment,
@@ -138,66 +159,113 @@ impl SupersetClientAuthenticationDetailsResolved {
 
     pub async fn resolve<R>(
         auth_details: &[SupersetClientAuthenticationDetails],
-        resolve_auth_class: impl FnOnce(ClientAuthenticationDetails) -> R,
+        resolve_auth_class: impl Fn(ClientAuthenticationDetails) -> R,
     ) -> Result<SupersetClientAuthenticationDetailsResolved>
     where
         R: Future<Output = OperatorResult<AuthenticationClass>>,
     {
-        // TODO: Adapt if multiple authentication types are supported by Superset.
-        // This is currently not possible due to the Flask-AppBuilder not supporting it,
-        // see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924.
-        if auth_details.len() > 1 {
-            return Err(Error::MultipleAuthenticationClassesProvided);
+        let mut resolved_auth_classes = Vec::new();
+        let mut user_registration = None;
+        let mut user_registration_role = None;
+        let mut sync_roles_at = None;
+
+        let mut auth_class_names = BTreeSet::new();
+
+        for entry in auth_details {
+            let auth_class_name = entry.common.authentication_class_name();
+
+            let is_new_auth_class = auth_class_names.insert(auth_class_name);
+            ensure!(
+                is_new_auth_class,
+                DuplicateAuthenticationClassReferencesNotAllowedSnafu { auth_class_name }
+            );
+
+            let auth_class = resolve_auth_class(entry.common.clone())
+                .await
+                .context(AuthenticationClassRetrievalFailedSnafu)?;
+
+            match &auth_class.spec.provider {
+                AuthenticationClassProvider::Ldap(provider) => {
+                    let resolved_auth_class = SupersetAuthenticationClassResolved::Ldap {
+                        provider: provider.to_owned(),
+                    };
+
+                    if let Some(other) = resolved_auth_classes.first() {
+                        ensure!(
+                            mem::discriminant(other) == mem::discriminant(&resolved_auth_class),
+                            MultipleAuthenticationTypesNotSupportedSnafu
+                        );
+                    }
+
+                    ensure!(
+                        resolved_auth_classes.is_empty(),
+                        MultipleLdapProvidersNotSupportedSnafu
+                    );
+
+                    resolved_auth_classes.push(resolved_auth_class);
+                }
+                AuthenticationClassProvider::Oidc(provider) => {
+                    let resolved_auth_class =
+                        SupersetClientAuthenticationDetailsResolved::from_oidc(
+                            auth_class_name,
+                            provider,
+                            entry,
+                        )?;
+
+                    if let Some(other) = resolved_auth_classes.first() {
+                        ensure!(
+                            mem::discriminant(other) == mem::discriminant(&resolved_auth_class),
+                            MultipleAuthenticationTypesNotSupportedSnafu
+                        );
+                    }
+
+                    resolved_auth_classes.push(resolved_auth_class);
+                }
+                _ => {
+                    return Err(Error::AuthenticationProviderNotSupported {
+                        auth_class_name: auth_class_name.to_owned(),
+                        provider: auth_class.spec.provider.to_string(),
+                    });
+                }
+            }
+
+            match user_registration {
+                Some(user_registration) => {
+                    ensure!(
+                        user_registration == entry.user_registration,
+                        DifferentUserRegistrationSettingsNotAllowedSnafu
+                    );
+                }
+                None => user_registration = Some(entry.user_registration),
+            }
+
+            match &user_registration_role {
+                Some(user_registration_role) => {
+                    ensure!(
+                        user_registration_role == &entry.user_registration_role,
+                        DifferentUserRegistrationRoleSettingsNotAllowedSnafu
+                    );
+                }
+                None => user_registration_role = Some(entry.user_registration_role.to_owned()),
+            }
+
+            match &sync_roles_at {
+                Some(sync_roles_at) => {
+                    ensure!(
+                        sync_roles_at == &entry.sync_roles_at,
+                        DifferentSyncRolesAtSettingsNotAllowedSnafu
+                    );
+                }
+                None => sync_roles_at = Some(entry.sync_roles_at.to_owned()),
+            }
         }
 
-        let mut user_registration = default_user_registration();
-        let mut user_registration_role = default_user_registration_role();
-        let mut sync_roles_at = Default::default();
-
-        let authentication_class_resolved = match auth_details.first() {
-            Some(auth_details) => {
-                let auth_class = resolve_auth_class(auth_details.common.clone())
-                    .await
-                    .context(AuthenticationClassRetrievalFailedSnafu)?;
-                let auth_class_name = auth_class.name_any();
-
-                user_registration = auth_details.user_registration;
-                user_registration_role = auth_details.user_registration_role.clone();
-                sync_roles_at = auth_details.sync_roles_at.clone();
-
-                Some(match &auth_class.spec.provider {
-                    AuthenticationClassProvider::Ldap(provider) => {
-                        SupersetAuthenticationClassResolved::Ldap {
-                            provider: provider.to_owned(),
-                        }
-                    }
-                    // TODO Several OIDC providers are possible
-                    AuthenticationClassProvider::Oidc(provider) => {
-                        SupersetClientAuthenticationDetailsResolved::from_oidc(
-                            &auth_class_name,
-                            provider,
-                            auth_details,
-                        )?
-                    }
-                    _ => {
-                        // Checking for supported AuthenticationClass here is a little out of place,
-                        // but is does not make sense to iterate further after finding an unsupported
-                        // AuthenticationClass.
-                        return Err(Error::AuthenticationProviderNotSupported {
-                            auth_class: auth_class_name,
-                            provider: auth_class.spec.provider.to_string(),
-                        });
-                    }
-                })
-            }
-            None => None,
-        };
-
         Ok(SupersetClientAuthenticationDetailsResolved {
-            authentication_class_resolved,
-            user_registration,
-            user_registration_role,
-            sync_roles_at,
+            authentication_classes_resolved: resolved_auth_classes,
+            user_registration: user_registration.unwrap_or_else(default_user_registration),
+            user_registration_role: user_registration_role
+                .unwrap_or_else(default_user_registration_role),
+            sync_roles_at: sync_roles_at.unwrap_or_else(FlaskRolesSyncMoment::default),
         })
     }
 
@@ -273,7 +341,7 @@ mod tests {
 
         assert_eq!(
             SupersetClientAuthenticationDetailsResolved {
-                authentication_class_resolved: None,
+                authentication_classes_resolved: Vec::default(),
                 user_registration: default_user_registration(),
                 user_registration_role: default_user_registration_role(),
                 sync_roles_at: FlaskRolesSyncMoment::default()
@@ -283,102 +351,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn resolve_with_all_authentication_details() {
+    async fn resolve_ldap_with_all_authentication_details() {
         // Avoid using defaults here
         let auth_details_resolved = test_resolve_and_expect_success(
             indoc! {"
-                - authenticationClass: oidc
-                  oidc:
-                    clientCredentialsSecret: superset-keycloak-client
-                    extraScopes:
-                      - groups
-                    userRegistration: false
-                    userRegistrationRole: Gamma
-                    syncRolesAt: Registration
-            "},
-            indoc! {"
-                ---
-                apiVersion: authentication.stackable.tech/v1alpha1
-                kind: AuthenticationClass
-                metadata:
-                  name: oidc
-                spec:
-                  provider:
-                    oidc:
-                      hostname: my.keycloak.server
-                      port: 443
-                      rootPath: /realms/master
-                      principalClaim: preferred_username
-                      scopes:
-                        - openid
-                        - email
-                        - profile
-                      providerHint: Keycloak
-                      tls:
-                        verification:
-                          server:
-                            caCert:
-                              secretClass: tls
-            "},
-        )
-        .await;
-
-        assert_eq!(
-            SupersetClientAuthenticationDetailsResolved {
-                authentication_class_resolved: Some(SupersetAuthenticationClassResolved::Oidc {
-                    provider: oidc::AuthenticationProvider::new(
-                        "my.keycloak.server".into(),
-                        Some(443),
-                        "/realms/master".into(),
-                        TlsClientDetails {
-                            tls: Some(Tls {
-                                verification: TlsVerification::Server(TlsServerVerification {
-                                    ca_cert: CaCert::SecretClass("tls".into())
-                                })
-                            })
-                        },
-                        "preferred_username".into(),
-                        vec!["openid".into(), "email".into(), "profile".into()],
-                        Some(IdentityProviderHint::Keycloak)
-                    ),
-                    oidc: oidc::ClientAuthenticationOptions {
-                        client_credentials_secret_ref: "superset-keycloak-client".into(),
-                        extra_scopes: vec!["groups".into()],
-                        product_specific_fields: ()
-                    }
-                }),
-                user_registration: true,
-                user_registration_role: "Public".into(),
-                sync_roles_at: FlaskRolesSyncMoment::Registration
-            },
-            auth_details_resolved
-        );
-    }
-
-    #[tokio::test]
-    async fn reject_different_authentication_types() {
-        let error_message = test_resolve_and_expect_error(
-            indoc! {"
-                - authenticationClass: oidc
-                  oidc:
-                    clientCredentialsSecret: superset-keycloak-client
                 - authenticationClass: ldap
+                  userRegistration: false
+                  userRegistrationRole: Gamma
+                  syncRolesAt: Login
             "},
             indoc! {"
-                ---
-                apiVersion: authentication.stackable.tech/v1alpha1
-                kind: AuthenticationClass
-                metadata:
-                  name: oidc
-                spec:
-                  provider:
-                    oidc:
-                      hostname: my.keycloak.server
-                      principalClaim: preferred_username
-                      scopes:
-                        - openid
-                        - email
-                        - profile
                 ---
                 apiVersion: authentication.stackable.tech/v1alpha1
                 kind: AuthenticationClass
@@ -393,7 +375,370 @@ mod tests {
         .await;
 
         assert_eq!(
-            "Only one authentication class is currently supported at a time",
+            SupersetClientAuthenticationDetailsResolved {
+                authentication_classes_resolved: vec![SupersetAuthenticationClassResolved::Ldap {
+                    provider: serde_yaml::from_str("hostname: my.ldap.server").unwrap()
+                }],
+                user_registration: false,
+                user_registration_role: "Gamma".into(),
+                sync_roles_at: FlaskRolesSyncMoment::Login
+            },
+            auth_details_resolved
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_oidc_with_all_authentication_details() {
+        // Avoid using defaults here
+        let auth_details_resolved = test_resolve_and_expect_success(
+            indoc! {"
+                - authenticationClass: oidc1
+                  oidc:
+                    clientCredentialsSecret: superset-oidc-client1
+                    extraScopes:
+                      - groups
+                  userRegistration: false
+                  userRegistrationRole: Gamma
+                  syncRolesAt: Login
+                - authenticationClass: oidc2
+                  oidc:
+                    clientCredentialsSecret: superset-oidc-client2
+                  userRegistration: false
+                  userRegistrationRole: Gamma
+                  syncRolesAt: Login
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc1
+                spec:
+                  provider:
+                    oidc:
+                      hostname: first.oidc.server
+                      port: 443
+                      rootPath: /realms/main
+                      principalClaim: preferred_username
+                      scopes:
+                        - openid
+                        - email
+                        - profile
+                      providerHint: Keycloak
+                      tls:
+                        verification:
+                          server:
+                            caCert:
+                              secretClass: tls
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc2
+                spec:
+                  provider:
+                    oidc:
+                      hostname: second.oidc.server
+                      rootPath: /realms/test
+                      principalClaim: preferred_username
+                      scopes:
+                        - openid
+                        - email
+                        - profile
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            SupersetClientAuthenticationDetailsResolved {
+                authentication_classes_resolved: vec![
+                    SupersetAuthenticationClassResolved::Oidc {
+                        provider: oidc::AuthenticationProvider::new(
+                            "first.oidc.server".into(),
+                            Some(443),
+                            "/realms/main".into(),
+                            TlsClientDetails {
+                                tls: Some(Tls {
+                                    verification: TlsVerification::Server(TlsServerVerification {
+                                        ca_cert: CaCert::SecretClass("tls".into())
+                                    })
+                                })
+                            },
+                            "preferred_username".into(),
+                            vec!["openid".into(), "email".into(), "profile".into()],
+                            Some(IdentityProviderHint::Keycloak)
+                        ),
+                        oidc: oidc::ClientAuthenticationOptions {
+                            client_credentials_secret_ref: "superset-oidc-client1".into(),
+                            extra_scopes: vec!["groups".into()],
+                            product_specific_fields: ()
+                        }
+                    },
+                    SupersetAuthenticationClassResolved::Oidc {
+                        provider: oidc::AuthenticationProvider::new(
+                            "second.oidc.server".into(),
+                            None,
+                            "/realms/test".into(),
+                            TlsClientDetails { tls: None },
+                            "preferred_username".into(),
+                            vec!["openid".into(), "email".into(), "profile".into()],
+                            None
+                        ),
+                        oidc: oidc::ClientAuthenticationOptions {
+                            client_credentials_secret_ref: "superset-oidc-client2".into(),
+                            extra_scopes: Vec::new(),
+                            product_specific_fields: ()
+                        }
+                    }
+                ],
+                user_registration: false,
+                user_registration_role: "Gamma".into(),
+                sync_roles_at: FlaskRolesSyncMoment::Login
+            },
+            auth_details_resolved
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_duplicate_authentication_class_references() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc
+                  oidc:
+                    clientCredentialsSecret: superset-oidc-client1
+                - authenticationClass: oidc
+                  oidc:
+                    clientCredentialsSecret: superset-oidc-client2
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc
+                spec:
+                  provider:
+                    oidc:
+                      hostname: my.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            r#"The AuthenticationClass "oidc" is referenced several times which is not allowed."#,
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_different_authentication_types() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc
+                  oidc:
+                    clientCredentialsSecret: superset-oidc-client
+                - authenticationClass: ldap
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc
+                spec:
+                  provider:
+                    oidc:
+                      hostname: my.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: ldap
+                spec:
+                  provider:
+                    ldap:
+                      hostname: my.ldap.server
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            "Only one authentication type at a time is supported by Superset, see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924.",
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_multiple_ldap_providers() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: ldap1
+                - authenticationClass: ldap2
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: ldap1
+                spec:
+                  provider:
+                    ldap:
+                      hostname: first.ldap.server
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: ldap2
+                spec:
+                  provider:
+                    ldap:
+                      hostname: second.ldap.server
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            "Only one LDAP provider at a time is supported by Superset.",
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_different_user_registration_settings() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc1
+                  oidc:
+                    clientCredentialsSecret: superset-oidc-client1
+                - authenticationClass: oidc2
+                  oidc:
+                    clientCredentialsSecret: superset-oidc-client2
+                  userRegistration: false
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc1
+                spec:
+                  provider:
+                    oidc:
+                      hostname: first.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc2
+                spec:
+                  provider:
+                    oidc:
+                      hostname: second.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            "The userRegistration settings must not differ between the authentication entries.",
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_different_user_registration_role_settings() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc1
+                  oidc:
+                    clientCredentialsSecret: superset-oidc-client1
+                - authenticationClass: oidc2
+                  oidc:
+                    clientCredentialsSecret: superset-oidc-client2
+                  userRegistrationRole: Gamma
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc1
+                spec:
+                  provider:
+                    oidc:
+                      hostname: first.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc2
+                spec:
+                  provider:
+                    oidc:
+                      hostname: second.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            "The userRegistrationRole settings must not differ between the authentication entries.",
+            error_message
+        );
+    }
+
+    #[tokio::test]
+    async fn reject_different_sync_roles_at_settings() {
+        let error_message = test_resolve_and_expect_error(
+            indoc! {"
+                - authenticationClass: oidc1
+                  oidc:
+                    clientCredentialsSecret: superset-oidc-client1
+                - authenticationClass: oidc2
+                  oidc:
+                    clientCredentialsSecret: superset-oidc-client2
+                  syncRolesAt: Login
+            "},
+            indoc! {"
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc1
+                spec:
+                  provider:
+                    oidc:
+                      hostname: first.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+                ---
+                apiVersion: authentication.stackable.tech/v1alpha1
+                kind: AuthenticationClass
+                metadata:
+                  name: oidc2
+                spec:
+                  provider:
+                    oidc:
+                      hostname: second.oidc.server
+                      principalClaim: preferred_username
+                      scopes: []
+            "},
+        )
+        .await;
+
+        assert_eq!(
+            "The syncRolesAt settings must not differ between the authentication entries.",
             error_message
         );
     }
@@ -413,12 +758,9 @@ mod tests {
                 spec:
                   provider:
                     oidc:
-                      hostname: my.keycloak.server
+                      hostname: my.oidc.server
                       principalClaim: preferred_username
-                      scopes:
-                        - openid
-                        - email
-                        - profile
+                      scopes: []
             "},
         )
         .await;
@@ -440,7 +782,7 @@ mod tests {
             indoc! {"
                 - authenticationClass: oidc
                   oidc:
-                    clientCredentialsSecret: superset-keycloak-client
+                    clientCredentialsSecret: superset-oidc-client
             "},
             indoc! {"
                 ---
@@ -451,12 +793,9 @@ mod tests {
                 spec:
                   provider:
                     oidc:
-                      hostname: my.keycloak.server
+                      hostname: my.oidc.server
                       principalClaim: sub
-                      scopes:
-                        - openid
-                        - email
-                        - profile
+                      scopes: []
             "},
         )
         .await;
@@ -473,7 +812,7 @@ mod tests {
             indoc! {"
                 - authenticationClass: oidc
                   oidc:
-                    clientCredentialsSecret: superset-keycloak-client
+                    clientCredentialsSecret: superset-oidc-client
             "},
             indoc! {"
                 ---
@@ -484,12 +823,9 @@ mod tests {
                 spec:
                   provider:
                     oidc:
-                      hostname: my.keycloak.server
+                      hostname: my.oidc.server
                       principalClaim: preferred_username
-                      scopes:
-                        - openid
-                        - email
-                        - profile
+                      scopes: []
                       tls:
                         verification:
                           none: {}
@@ -562,10 +898,11 @@ mod tests {
 
     fn create_auth_class_resolver(
         auth_classes: Vec<AuthenticationClass>,
-    ) -> impl FnOnce(
+    ) -> impl Fn(
         ClientAuthenticationDetails,
     ) -> Pin<Box<dyn Future<Output = OperatorResult<AuthenticationClass>>>> {
-        |auth_details: ClientAuthenticationDetails| {
+        move |auth_details: ClientAuthenticationDetails| {
+            let auth_classes = auth_classes.clone();
             Box::pin(async move {
                 auth_classes
                     .iter()

@@ -1,7 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 use std::{
     borrow::Cow,
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     sync::Arc,
 };
 
@@ -57,7 +57,7 @@ use stackable_superset_crd::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    commands::add_cert_to_system_truststore_command,
+    commands::add_cert_to_python_certifi_command,
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
@@ -756,7 +756,7 @@ fn build_server_rolegroup_statefulset(
                 'superset.app:create_app()' &
                 wait_for_termination $!
                 {create_vector_shutdown_file_command}",
-            auth_commands = authentication_start_commands(authentication_config).unwrap_or_default(),
+            auth_commands = authentication_start_commands(authentication_config),
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             create_vector_shutdown_file_command =
@@ -884,24 +884,41 @@ fn add_authentication_volumes_and_volume_mounts(
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
 ) -> Result<()> {
-    match &auth_config.authentication_class_resolved {
-        Some(SupersetAuthenticationClassResolved::Ldap { provider }) => {
-            provider
-                .add_volumes_and_mounts(pb, vec![cb])
-                .context(AddLdapVolumesAndVolumeMountsSnafu)?;
+    // Different authentication entries can reference the same secret
+    // class or TLS certificate. It must be ensured that the volumes
+    // and volume mounts are only added once in such a case.
+
+    let mut ldap_authentication_providers = BTreeSet::new();
+    let mut oidc_client_credentials_secrets = BTreeSet::new();
+    let mut tls_client_credentials = BTreeSet::new();
+
+    for auth_class_resolved in &auth_config.authentication_classes_resolved {
+        match auth_class_resolved {
+            SupersetAuthenticationClassResolved::Ldap { provider } => {
+                ldap_authentication_providers.insert(provider);
+            }
+            SupersetAuthenticationClassResolved::Oidc { oidc, provider, .. } => {
+                oidc_client_credentials_secrets.insert(&oidc.client_credentials_secret_ref);
+                tls_client_credentials.insert(&provider.tls);
+            }
         }
-        Some(SupersetAuthenticationClassResolved::Oidc { oidc, provider, .. }) => {
-            cb.add_env_vars(
-                oidc::AuthenticationProvider::client_credentials_env_var_mounts(
-                    oidc.client_credentials_secret_ref.clone(),
-                ),
-            );
-            provider
-                .tls
-                .add_volumes_and_mounts(pb, vec![cb])
-                .context(AddTlsVolumesAndVolumeMountsSnafu)?;
-        }
-        None => (),
+    }
+
+    for provider in ldap_authentication_providers {
+        provider
+            .add_volumes_and_mounts(pb, vec![cb])
+            .context(AddLdapVolumesAndVolumeMountsSnafu)?;
+    }
+
+    for secret in oidc_client_credentials_secrets {
+        cb.add_env_vars(
+            oidc::AuthenticationProvider::client_credentials_env_var_mounts(secret.to_owned()),
+        );
+    }
+
+    for tls in tls_client_credentials {
+        tls.add_volumes_and_mounts(pb, vec![cb])
+            .context(AddTlsVolumesAndVolumeMountsSnafu)?;
     }
 
     Ok(())
@@ -909,20 +926,34 @@ fn add_authentication_volumes_and_volume_mounts(
 
 fn authentication_start_commands(
     auth_config: &SupersetClientAuthenticationDetailsResolved,
-) -> Option<String> {
-    match &auth_config.authentication_class_resolved {
-        Some(SupersetAuthenticationClassResolved::Oidc { provider, .. }) => {
-            provider
-                .tls
-                .tls_ca_cert_mount_path()
-                .map(|tls_ca_cert_mount_path| {
-                    add_cert_to_system_truststore_command(&tls_ca_cert_mount_path)
-                })
+) -> String {
+    let mut commands = Vec::new();
 
-            // WebPKI will be handled implicitly
+    let mut tls_client_credentials = BTreeSet::new();
+
+    for auth_class_resolved in &auth_config.authentication_classes_resolved {
+        match auth_class_resolved {
+            SupersetAuthenticationClassResolved::Oidc { provider, .. } => {
+                tls_client_credentials.insert(&provider.tls);
+
+                // WebPKI will be handled implicitly
+            }
+            SupersetAuthenticationClassResolved::Ldap { .. } => {}
         }
-        Some(SupersetAuthenticationClassResolved::Ldap { .. }) | None => None,
     }
+
+    for tls in tls_client_credentials {
+        commands.push(tls.tls_ca_cert_mount_path().map(|tls_ca_cert_mount_path| {
+            add_cert_to_python_certifi_command(&tls_ca_cert_mount_path)
+        }));
+    }
+
+    commands
+        .iter()
+        .flatten()
+        .cloned()
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 pub fn error_policy(_obj: Arc<SupersetCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {

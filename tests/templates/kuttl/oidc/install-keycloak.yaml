@@ -1,25 +1,25 @@
-# $NAMESPACE will be replaced with the namespace of the test case.
+# The environment variables must be replaced.
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: keycloak-realms
+  name: $INSTANCE_NAME-realms
 data:
   test-realm.json: |
     {
-      "realm": "test",
+      "realm": "$REALM",
       "enabled": true,
       "users": [
         {
           "enabled": true,
-          "username": "jane.doe",
-          "firstName" : "Jane",
-          "lastName" : "Doe",
-          "email" : "jane.doe@stackable.tech",
+          "username": "$USERNAME",
+          "firstName" : "$FIRST_NAME",
+          "lastName" : "$LAST_NAME",
+          "email" : "$EMAIL",
           "credentials": [
             {
               "type": "password",
-              "value": "T8mn72D9"
+              "value": "$PASSWORD"
             }
           ],
           "realmRoles": [
@@ -37,10 +37,10 @@ data:
       },
       "clients": [
         {
-          "clientId": "superset",
+          "clientId": "$CLIENT_ID",
           "enabled": true,
           "clientAuthenticatorType": "client-secret",
-          "secret": "R1bxHUD569vHeQdw",
+          "secret": "$CLIENT_SECRET",
           "redirectUris": [
             "*"
           ],
@@ -56,18 +56,18 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: keycloak
+  name: $INSTANCE_NAME
   labels:
-    app: keycloak
+    app: $INSTANCE_NAME
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: keycloak
+      app: $INSTANCE_NAME
   template:
     metadata:
       labels:
-        app: keycloak
+        app: $INSTANCE_NAME
     spec:
       containers:
         - name: keycloak
@@ -93,26 +93,26 @@ spec:
           readinessProbe:
             httpGet:
               scheme: HTTPS
-              path: /realms/test
+              path: /realms/$REALM
               port: 8443
       volumes:
         - name: realms
           configMap:
-            name: keycloak-realms
+            name: $INSTANCE_NAME-realms
         - name: tls
           csi:
             driver: secrets.stackable.tech
             volumeAttributes:
               secrets.stackable.tech/class: tls
-              secrets.stackable.tech/scope: service=keycloak
+              secrets.stackable.tech/scope: service=$INSTANCE_NAME
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: keycloak
+  name: $INSTANCE_NAME
 spec:
   selector:
-    app: keycloak
+    app: $INSTANCE_NAME
   ports:
     - protocol: TCP
       port: 8443
@@ -120,13 +120,13 @@ spec:
 apiVersion: authentication.stackable.tech/v1alpha1
 kind: AuthenticationClass
 metadata:
-  name: keycloak-$NAMESPACE
+  name: $INSTANCE_NAME-$NAMESPACE
 spec:
   provider:
     oidc:
-      hostname: keycloak.$NAMESPACE.svc.cluster.local
+      hostname: $INSTANCE_NAME.$NAMESPACE.svc.cluster.local
       port: 8443
-      rootPath: /realms/test
+      rootPath: /realms/$REALM
       scopes:
         - email
         - openid

@@ -8,7 +8,15 @@ timeout: 480
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: keycloak
+  name: keycloak1
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak2
 status:
   readyReplicas: 1
   replicas: 1
