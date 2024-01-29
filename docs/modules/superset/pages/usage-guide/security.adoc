@@ -1,14 +1,22 @@
 = Security
 
 == [[authentication]]Authentication
-Every user has to be authenticated before using Superset: there are several ways in which this can be set up.
 
-=== Webinterface
-The default setting is to manually set up users via the Webinterface.
+Every user has to be authenticated before using Superset:
+there are several ways in which this can be set up.
+
+Only one authentication type is supported at a time.
+For instance, it is not possible to add an LDAP and an OIDC authentication class.
+But it is possible to add several OIDC authentication classes.
+
+=== Superset database
+
+The default setting is to manually set up users via the web interface where they are stored in the database attached to Superset.
 
 === LDAP
 
-Superset supports xref:home:concepts:authentication.adoc[authentication] of users against an LDAP server. This requires setting up an AuthenticationClass for the LDAP server.
+Superset supports xref:home:concepts:authentication.adoc[authentication] of users against a single LDAP server.
+This requires setting up an AuthenticationClass for the LDAP server.
 The AuthenticationClass is then referenced in the SupersetCluster resource as follows:
 
 [source,yaml]
@@ -31,81 +39,63 @@ spec:
 
 Users that log in with LDAP are assigned to a default https://superset.apache.org/docs/security/#roles[Role] which is specified with the `userRegistrationRole` property.
 
-You can follow the xref:home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the {crd-docs}/authentication.stackable.tech/authenticationclass/v1alpha1/[AuthenticationClass reference {external-link-icon}^].
+You can follow the xref:home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:home:concepts:authentication.adoc#_ldap[AuthenticationClass concepts page].
 
-=== [[oauth]]OAuth
+=== [[oidc]]OpenID Connect
 
-Strictly speaking, OAuth is an authorization protocol but can be used for authentication if the
-security implications are acceptable. In the Superset cluster CRD, authentication via OAuth is not
-directly supported but can be configured by overriding properties in `superset_config.py`. The
-following example uses https://www.keycloak.org/[Keycloak 21.1] as OAuth provider:
+An OpenID Connect provider can be used for authentication.
+Unfortunately, there is no generic support for OpenID Connect built into Superset.
+This means that only specific OpenID Connect providers can be configured.
+Currently only https://www.keycloak.org/[Keycloak {external-link-icon}^] is supported by the Stackable Data Platform.
 
 [source,yaml]
 ----
 apiVersion: superset.stackable.tech/v1alpha1
 kind: SupersetCluster
 metadata:
-  name: superset-with-oauth
+  name: superset-with-oidc
 spec:
   image:
     productVersion: 3.0.1
-  [...]
-  nodes:
-    configOverrides:
-      superset_config.py:
-        AUTH_TYPE: AUTH_OAUTH # <1>
-        AUTH_USER_REGISTRATION: 'true' # <2>
-        AUTH_USER_REGISTRATION_ROLE: 'Gamma' # <3>
-        OAUTH_PROVIDERS: |-
-          [
-            { 'name': 'keycloak', # <4>
-              'icon': 'fa-key', # <5>
-              'token_key': 'access_token', # <6>
-              'remote_app': {
-                'client_id': 'KEYCLOAK_CLIENT_ID',
-                'client_secret': 'KEYCLOAK_CLIENT_SECRET',
-                'api_base_url': 'https://KEYCLOAK_DOMAIN/realms/KEYCLOAK_REALM/protocol/openid-connect', # <7>
-                'client_kwargs': {
-                  'scope': 'email profile openid' # <8>
-                },
-                'access_token_url': 'https://KEYCLOAK_DOMAIN/realms/KEYCLOAK_REALM/protocol/openid-connect/token', # <9>
-                'authorize_url': 'https://KEYCLOAK_DOMAIN/realms/KEYCLOAK_REALM/protocol/openid-connect/auth', # <10>
-                'request_token_url': None,
-              },
-            }
-          ]
+  clusterConfig:
+    authentication:
+    - authenticationClass: keycloak                        # <1>
+      oidc:
+        clientCredentialsSecret: superset-keycloak-client  # <2>
+      userRegistrationRole: Gamma                          # <3>
 ----
 
-<1> The authentication type must be set to `AUTH_OAUTH`.
-<2> Authenticated users are added to the Superset database if they do not exist yet. The user
-    information is fetched from the `/userinfo` endpoint of the OAuth provider which is only
-    available if the `openid` scope is requested. The admin user is already present in the Superset
-    database as defined in the credentials secret, but the authentication is performed with the
-    password stored in Keycloak. The property `clusterConfig.authenticationConfig.userRegistration`
-    cannot be used here because it is only taken into account when an authentication class is set.
-<3> This role will be given in addition to any roles defined in `AUTH_ROLE_MAPPING`. The property
-    `clusterConfig.authenticationConfig.userRegistrationRole` cannot be used here because it is only
-    taken into account when an authentication class is set.
-<4> The name of the OAuth provider; Superset has built-in logic for `keycloak` and some other
-    providers.
-<5> The Font Awesome icon on the sign-in button
-<6> The token key name the provider uses
-<7> The base URL used for well-known endpoints like `/userinfo`. It must be reachable from the
-    Kubernetes cluster/Superset pod.
-<8> The scopes `email` and `profile` return claims which contain the user's name and email address
-    respectively. The `openid` scope is required for the `/userinfo` endpoint.
-<9> The access token URL must be reachable from the Kubernetes client/Superset pod.
-<10> The authorize URL must be reachable from the user's browser.
+<1> The reference to an AuthenticationClass called `keycloak`
+<2> The reference to the Secret containing the Superset client credentials
+<3> The default role to which all users are assigned
 
-A minimum client configuration in Keycloak looks like this:
+Users that log in with OpenID Connect are assigned to a default https://superset.apache.org/docs/security/#roles[Role] which is specified with the `userRegistrationRole` property.
+
+The Secret containing the Superset client credentials:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-keycloak-client
+stringData:
+  clientId: superset                    # <1>
+  clientSecret: superset_client_secret  # <2>
+----
+
+<1> The client ID of Superset as defined in Keycloak
+<1> The client secret as defined in Keycloak
+
+A minimum client configuration in Keycloak for this example looks like this:
 
 [source,json]
 ----
 {
-  "clientId": "KEYCLOAK_CLIENT_ID",
+  "clientId": "superset",
   "enabled": true,
   "clientAuthenticatorType": "client-secret", # <1>
-  "secret": "KEYCLOAK_CLIENT_SECRET",
+  "secret": "superset_client_secret",
   "redirectUris": [
     "*"
   ],
@@ -121,33 +111,19 @@ A minimum client configuration in Keycloak looks like this:
 <2> Enables the OAuth2 "Authorization Code Flow".
 <3> Enables OpenID Connect and OAuth2 support.
 
-Superset configuration examples for other providers can be found at
-https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-oauth[].
-
-=== [[oidc]]OpenID Connect
-
-OpenID Connect (OIDC) is an authentication protocol based on the OAuth 2.0 framework. Unfortunately,
-it is not supported by Superset out of the box. An adapted `SupersetSecurityManager` and the
-https://github.com/puiterwijk/flask-oidc[`flask-oidc`] library would be required which are both not
-included in the official Stackable product image. But as OpenID Connect is just an authentication
-layer on top of the OAuth 2.0 authorization framework, the configuration described in the
-xref:oauth[OAuth section] usually works for OpenID Connect providers too.
-
-=== OpenID
-
-OpenID Authentication 2.0 is an authentication protocol. It is deprecated in favor of
-xref:oidc[OpenID Connect]. Superset provides the authentication type `AUTH_OID` for it but also
-requires the https://github.com/pallets-eco/flask-openid[Flask-OpenID] library which is not included
-in the official Stackable product image.
+Further information for specifying an AuthenticationClass for an OIDC provider can be found at the xref:home:concepts:authentication.adoc#_oidc[concepts page].
 
 == [[authorization]]Authorization
+
 Superset has a concept called `Roles` which allows you to grant user permissions based on roles.
 Have a look at the https://superset.apache.org/docs/security[Superset documentation on Security].
 
-=== Webinterface
-You can view all the available roles in the Webinterface of Superset and can also assign users to these roles.
+=== Superset database
+
+You can view all the available roles in the web interface of Superset and can also assign users to these roles.
 
 === LDAP
+
 Superset supports assigning https://superset.apache.org/docs/security/#roles[Roles] to users based on their LDAP group membership, though this is not yet supported by the Stackable operator.
 All the users logging in via LDAP get assigned to the same role which you can configure via the attribute `authentication[*].userRegistrationRole` on the `SupersetCluster` object:
 
@@ -165,3 +141,28 @@ spec:
 ----
 
 <1> All users are assigned to the `Admin` role
+
+=== OpenID Connect
+
+The same as for LDAP also applies to OpenID Connect.
+Superset supports assigning https://superset.apache.org/docs/security/#roles[Roles] to users based on their OpenID Connect scopes, though this is not yet supported by the Stackable operator.
+All the users logging in via OpenID Connect get assigned to the same role which you can configure via the attribute `authentication[*].userRegistrationRole` on the `SupersetCluster` object:
+
+[source,yaml]
+----
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: superset-with-oidc
+spec:
+  image:
+    productVersion: 3.0.1
+  clusterConfig:
+    authentication:
+    - authenticationClass: keycloak
+      oidc:
+        clientCredentialsSecret: superset-keycloak-client
+      userRegistrationRole: Gamma  # <1>
+----
+
+<1> All users are assigned to the `Gamma` role
