@@ -59,6 +59,10 @@ fn append_authentication_config(
     config: &mut BTreeMap<String, String>,
     auth_config: &SupersetClientAuthenticationDetailsResolved,
 ) -> Result<(), Error> {
+    // SupersetClientAuthenticationDetailsResolved ensures that there
+    // are either only LDAP or OIDC providers configured. It is not
+    // necessary to check this here again.
+
     let ldap_providers = auth_config
         .authentication_classes_resolved
         .iter()

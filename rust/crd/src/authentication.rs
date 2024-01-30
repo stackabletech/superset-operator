@@ -126,7 +126,7 @@ pub enum FlaskRolesSyncMoment {
     Login,
 }
 
-/// Resolved counter part for `SupersetClientAuthenticationDetails`.
+/// Resolved and validated counter part for `SupersetClientAuthenticationDetails`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SupersetClientAuthenticationDetailsResolved {
     pub authentication_classes_resolved: Vec<SupersetAuthenticationClassResolved>,
@@ -839,6 +839,13 @@ mod tests {
         );
     }
 
+    /// Call `SupersetClientAuthenticationDetailsResolved::resolve` with
+    /// the given lists of `SupersetClientAuthenticationDetails` and
+    /// `AuthenticationClass`es and return the
+    /// `SupersetClientAuthenticationDetailsResolved`.
+    ///
+    /// The parameters are meant to be valid and resolvable. Just fail
+    /// if there is an error.
     async fn test_resolve_and_expect_success(
         auth_details_yaml: &str,
         auth_classes_yaml: &str,
@@ -848,19 +855,30 @@ mod tests {
             .expect("The SupersetClientAuthenticationDetails should be resolvable.")
     }
 
+    /// Call `SupersetClientAuthenticationDetailsResolved::resolve` with
+    /// the given lists of `SupersetClientAuthenticationDetails` and
+    /// `AuthenticationClass`es and return the error message.
+    ///
+    /// The parameters are meant to be invalid or not resolvable. Just
+    /// fail if there is no error.
     async fn test_resolve_and_expect_error(
         auth_details_yaml: &str,
         auth_classes_yaml: &str,
     ) -> String {
         let error = test_resolve(auth_details_yaml, auth_classes_yaml)
             .await
-            .expect_err("failure");
+            .expect_err(
+                "The SupersetClientAuthenticationDetails are invalid and should not be resolvable.",
+            );
         snafu::Report::from_error(error)
             .to_string()
             .trim_end()
             .to_owned()
     }
 
+    /// Call `SupersetClientAuthenticationDetailsResolved::resolve` with
+    /// the given lists of `SupersetClientAuthenticationDetails` and
+    /// `AuthenticationClass`es and return the result.
     async fn test_resolve(
         auth_details_yaml: &str,
         auth_classes_yaml: &str,
@@ -875,6 +893,10 @@ mod tests {
             .await
     }
 
+    /// Deserialize the given list of
+    /// `SupersetClientAuthenticationDetails`.
+    ///
+    /// Fail if the given string cannot be deserialized.
     fn deserialize_superset_client_authentication_details(
         input: &str,
     ) -> Vec<SupersetClientAuthenticationDetails> {
@@ -882,6 +904,9 @@ mod tests {
             .expect("The definition of the authentication configuration should be valid.")
     }
 
+    /// Deserialize the given `AuthenticationClass` YAML documents.
+    ///
+    /// Fail if the given string cannot be deserialized.
     fn deserialize_auth_classes(input: &str) -> Vec<AuthenticationClass> {
         if input.is_empty() {
             Vec::new()
@@ -896,6 +921,12 @@ mod tests {
         }
     }
 
+    /// Returns a function which resolves `AuthenticationClass` names to
+    /// the given list of `AuthenticationClass`es.
+    ///
+    /// Use this function in the tests to replace
+    /// `stackable_operator::commons::authentication::ClientAuthenticationDetails`
+    /// which requires a Kubernetes client.
     fn create_auth_class_resolver(
         auth_classes: Vec<AuthenticationClass>,
     ) -> impl Fn(
