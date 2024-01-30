@@ -46,7 +46,7 @@ You can follow the xref:home:tutorials:authentication_with_openldap.adoc[] tutor
 An OpenID Connect provider can be used for authentication.
 Unfortunately, there is no generic support for OpenID Connect built into Superset.
 This means that only specific OpenID Connect providers can be configured.
-Currently only https://www.keycloak.org/[Keycloak {external-link-icon}^] is supported by the Stackable Data Platform.
+Currently, only https://www.keycloak.org/[Keycloak {external-link-icon}^] is supported by the Stackable Data Platform.
 
 [source,yaml]
 ----
