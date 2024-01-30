@@ -29,7 +29,7 @@ The `namespace` part is optional in both cases; if it is omitted it will default
 
 Once Superset startup is complete and the database is initialized, the Superset operator will create a https://kubernetes.io/docs/concepts/workloads/controllers/job/[Job] that will connect to the Superset cluster to run an import command to add the Druid cluster as a datasource.
 
-NOTE: The Job is connecting to the Superset Pods. If you are restricting network traffic in your Kubernetes cluster, make sure to configure a https://kubernetes.io/docs/concepts/services-networking/network-policies/[NetworkPolicy] that allows the Job to connect to Superset.
+IMPORTANT: The Job is connecting to the Superset Pods. If you are restricting network traffic in your Kubernetes cluster, make sure to configure a https://kubernetes.io/docs/concepts/services-networking/network-policies/[NetworkPolicy] that allows the Job to connect to Superset.
 
 Once the Job is completed you can see the Druid cluster as a database in the user interface under Data > Databases:
 
