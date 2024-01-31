@@ -147,7 +147,7 @@ spec:
 
 === OpenID Connect
 
-The same as for LDAP also applies to OpenID Connect.
+The mechanism for assigning roles to users described in the LDAP section also applies to OpenID Connect.
 Superset supports assigning https://superset.apache.org/docs/security/#roles[Roles] to users based on their OpenID Connect scopes, though this is not yet supported by the Stackable operator.
 All the users logging in via OpenID Connect get assigned to the same role which you can configure via the attribute `authentication[*].userRegistrationRole` on the `SupersetCluster` object:
 
