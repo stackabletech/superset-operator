@@ -5,9 +5,12 @@
 Every user has to be authenticated before using Superset:
 there are several ways in which this can be set up.
 
-Only one authentication type is supported at a time.
-For instance, it is not possible to add an LDAP and an OIDC authentication class.
-But it is possible to add several OIDC authentication classes.
+[IMPORTANT]
+.Multiple authentication methods
+====
+Only one authentication method is supported at a time, and in case of LDAP, only one authentication class is allowed. 
+This means, it is not possible to configure both  LDAP and OIDC authentication methods at the same time, but *it is* possible to configure multiple OIDC classes *or* one LDAP authentication class.
+====
 
 === Superset database
 
