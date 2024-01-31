@@ -1,6 +1,8 @@
 = Connecting Apache Druid clusters
+:description: A guide on how to connect Apache Superset to Apache Druid on the Stackable Data Platform using the DruidConnection CustomResource.
+:keywords: Stackable, SDP, Druid, Superset, database, connection
 
-The operator can automatically connect Superset to Apache Druid clusters managed by the https://docs.stackable.tech/druid/index.html[Stackable Druid Cluster].
+The operator can automatically connect Superset clusters that it manages to Apache Druid clusters managed by the xref:druid:index.adoc[Stackable operator for Apache Druid].
 
 To do so, create a _DruidConnection_ resource:
 
@@ -11,23 +13,28 @@ kind: DruidConnection
 metadata:
   name: superset-druid-connection
 spec:
-  superset:
+  superset:  # <1>
     name: superset
     namespace: default
-  druid:
-    name: my-druid-cluster
+  druid:  # <2>
+    name: druid
     namespace: default
 
 ----
 
-The `name` and `namespace` in `spec.superset` refer to the Superset cluster that you want to connect. Following our example above, the name is `superset`.
+<1> The `name` and `namespace` in `spec.superset` refer to the Superset cluster that you want to connect. Following our example above, the name is `superset`.
+<2> In `spec.druid` you specify the `name` and `namespace` of your Druid cluster. Following our example above, the name is `druid`.
 
-In `spec.druid` you specify the `name` and `namespace` of your Druid cluster.
+The `namespace` part is optional in both cases; if it is omitted it will default to the namespace of the DruidConnection.
 
-The `namespace` part is optional; if it is omitted it will default to the namespace of the DruidConnection.
+Once Superset startup is complete and the database is initialized, the Superset operator will create a https://kubernetes.io/docs/concepts/workloads/controllers/job/[Job] that will connect to the Superset cluster to run an import command to add the Druid cluster as a datasource.
 
-The namespace for both the Superset and Druid clusters can be omitted, in which case the Operator will assume that they are in the same namespace as the DruidConnection.
+IMPORTANT: The Job is connecting to the Superset Pods. If you are restricting network traffic in your Kubernetes cluster, make sure to configure a https://kubernetes.io/docs/concepts/services-networking/network-policies/[NetworkPolicy] that allows the Job to connect to Superset.
 
-Once the database is initialized, the connection will be added to the cluster by the operator. You can see it in the user interface under Data > Databases:
+Once the Job is completed you can see the Druid cluster as a database in the user interface under Data > Databases:
 
 image::superset-databases.png[Superset databases showing the connected Druid cluster]
+
+== Further reading
+
+Read the CRD reference for the {crd-docs}/superset.stackable.tech/druidconnection/v1alpha1/[DruidConnection {external-link-icon}^] CustomResource.
