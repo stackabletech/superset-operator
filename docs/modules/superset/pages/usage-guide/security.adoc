@@ -89,7 +89,7 @@ stringData:
 ----
 
 <1> The client ID of Superset as defined in Keycloak
-<1> The client secret as defined in Keycloak
+<2> The client secret as defined in Keycloak
 
 A minimum client configuration in Keycloak for this example looks like this:
 
