@@ -1,0 +1,31 @@
+---
+volumePermissions:
+  enabled: false
+  securityContext:
+    runAsUser: auto
+
+primary:
+  podSecurityContext:
+{% if test_scenario['values']['openshift'] == 'true' %}
+    enabled: false
+{% else %}
+    enabled: true
+{% endif %}
+  containerSecurityContext:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "512m"
+    limits:
+      memory: "128Mi"
+      cpu: "1"
+
+shmVolume:
+  chmod:
+    enabled: false
+
+auth:
+  username: superset
+  password: superset
+  database: superset

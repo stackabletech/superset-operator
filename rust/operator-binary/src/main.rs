@@ -1,14 +1,4 @@
-mod config;
-mod controller_commons;
-mod druid_connection_controller;
-mod operations;
-mod product_logging;
-mod rbac;
-mod superset_controller;
-mod util;
-
-use crate::druid_connection_controller::DRUID_CONNECTION_CONTROLLER_NAME;
-use crate::superset_controller::SUPERSET_CONTROLLER_NAME;
+use std::sync::Arc;
 
 use clap::{crate_description, crate_version, Parser};
 use futures::StreamExt;
@@ -27,11 +17,20 @@ use stackable_operator::{
     logging::controller::report_controller_reconciled,
     CustomResourceExt,
 };
-use stackable_superset_crd::{
-    authentication::SupersetAuthentication, druidconnection::DruidConnection, SupersetCluster,
-    APP_NAME,
-};
-use std::sync::Arc;
+use stackable_superset_crd::{druidconnection::DruidConnection, SupersetCluster, APP_NAME};
+
+use crate::druid_connection_controller::DRUID_CONNECTION_CONTROLLER_NAME;
+use crate::superset_controller::SUPERSET_CONTROLLER_NAME;
+
+mod commands;
+mod config;
+mod controller_commons;
+mod druid_connection_controller;
+mod operations;
+mod product_logging;
+mod rbac;
+mod superset_controller;
+mod util;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -107,10 +106,7 @@ async fn main() -> anyhow::Result<()> {
                             .state()
                             .into_iter()
                             .filter(move |superset: &Arc<SupersetCluster>| {
-                                references_authentication_class(
-                                    &superset.spec.cluster_config.authentication,
-                                    &authentication_class,
-                                )
+                                references_authentication_class(superset, &authentication_class)
                             })
                             .map(|superset| ObjectRef::from_obj(&*superset))
                     },
@@ -210,15 +206,14 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn references_authentication_class(
-    authentication_config: &SupersetAuthentication,
+    superset: &SupersetCluster,
     authentication_class: &AuthenticationClass,
 ) -> bool {
-    assert!(authentication_class.metadata.name.is_some());
-
-    authentication_config
-        .authentication_class_names()
-        .into_iter()
-        .filter(|c| *c == authentication_class.name_any())
-        .count()
-        > 0
+    let authentication_class_name = authentication_class.name_any();
+    superset
+        .spec
+        .cluster_config
+        .authentication
+        .iter()
+        .any(|c| c.common.authentication_class_name() == &authentication_class_name)
 }

@@ -1,7 +1,7 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 use std::{
     borrow::Cow,
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     sync::Arc,
 };
 
@@ -19,13 +19,15 @@ use stackable_operator::{
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
-        authentication::AuthenticationClassProvider, product_image_selection::ResolvedProductImage,
+        authentication::oidc, product_image_selection::ResolvedProductImage,
         rbac::build_rbac_resources,
     },
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{ConfigMap, HTTPGetAction, Probe, Service, ServicePort, ServiceSpec},
+            core::v1::{
+                ConfigMap, EnvVar, HTTPGetAction, Probe, Service, ServicePort, ServiceSpec,
+            },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
         DeepMerge,
@@ -47,8 +49,9 @@ use stackable_operator::{
     time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
+use stackable_superset_crd::authentication::SupersetAuthenticationClassResolved;
 use stackable_superset_crd::{
-    authentication::SuperSetAuthenticationConfigResolved, Container, SupersetCluster,
+    authentication::SupersetClientAuthenticationDetailsResolved, Container, SupersetCluster,
     SupersetClusterStatus, SupersetConfig, SupersetConfigOptions, SupersetRole, APP_NAME,
     PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
     SUPERSET_CONFIG_FILENAME,
@@ -56,6 +59,7 @@ use stackable_superset_crd::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
+    commands::add_cert_to_python_certifi_command,
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
@@ -237,6 +241,11 @@ pub enum Error {
     AddLdapVolumesAndVolumeMounts {
         source: stackable_operator::commons::authentication::ldap::Error,
     },
+
+    #[snafu(display("failed to add TLS Volumes and VolumeMounts"))]
+    AddTlsVolumesAndVolumeMounts {
+        source: stackable_operator::commons::authentication::tls::TlsClientDetailsError,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -272,13 +281,12 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     .await
     .context(ResolveVectorAggregatorAddressSnafu)?;
 
-    let authentication_config = superset
-        .spec
-        .cluster_config
-        .authentication
-        .resolve(client)
-        .await
-        .context(InvalidAuthenticationConfigSnafu)?;
+    let auth_config = SupersetClientAuthenticationDetailsResolved::from(
+        &superset.spec.cluster_config.authentication,
+        client,
+    )
+    .await
+    .context(InvalidAuthenticationConfigSnafu)?;
 
     let validated_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
@@ -357,7 +365,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             &resolved_product_image,
             &rolegroup,
             rolegroup_config,
-            &authentication_config,
+            &auth_config,
             &config.logging,
             vector_aggregator_address.as_deref(),
         )?;
@@ -367,7 +375,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             &superset_role,
             &rolegroup,
             rolegroup_config,
-            &authentication_config,
+            &auth_config,
             &rbac_sa.name_any(),
             &config,
         )?;
@@ -484,7 +492,7 @@ fn build_rolegroup_config_map(
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<SupersetCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
+    authentication_config: &SupersetClientAuthenticationDetailsResolved,
     logging: &Logging<Container>,
     vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
@@ -632,7 +640,7 @@ fn build_server_rolegroup_statefulset(
     superset_role: &SupersetRole,
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
-    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
+    authentication_config: &SupersetClientAuthenticationDetailsResolved,
     sa_name: &str,
     merged_config: &SupersetConfig,
 ) -> Result<StatefulSet> {
@@ -717,6 +725,8 @@ fn build_server_rolegroup_statefulset(
         .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
         .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
         .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
+        .add_env_var("SSL_CERT_DIR", "/stackable/certs/")
+        .add_env_vars(authentication_env_vars(authentication_config))
         .command(vec![
             "/bin/bash".to_string(),
             "-x".to_string(),
@@ -727,6 +737,7 @@ fn build_server_rolegroup_statefulset(
                 mkdir --parents {PYTHONPATH} && \
                 cp {STACKABLE_CONFIG_DIR}/* {PYTHONPATH} && \
                 cp {STACKABLE_LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH} && \
+                {auth_commands}
                 superset db upgrade && \
                 superset fab create-admin \
                     --username \"$ADMIN_USERNAME\" \
@@ -748,6 +759,7 @@ fn build_server_rolegroup_statefulset(
                 'superset.app:create_app()' &
                 wait_for_termination $!
                 {create_vector_shutdown_file_command}",
+            auth_commands = authentication_start_commands(authentication_config),
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             create_vector_shutdown_file_command =
@@ -871,28 +883,98 @@ fn build_server_rolegroup_statefulset(
 }
 
 fn add_authentication_volumes_and_volume_mounts(
-    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
+    auth_config: &SupersetClientAuthenticationDetailsResolved,
     cb: &mut ContainerBuilder,
     pb: &mut PodBuilder,
 ) -> Result<()> {
-    // TODO: Currently there can be only one AuthenticationClass due to FlaskAppBuilder restrictions.
-    //    Needs adaptation once FAB and superset support multiple auth methods.
-    // The checks for max one AuthenticationClass and the provider are done in crd/src/authentication.rs
-    for config in authentication_config {
-        if let Some(auth_class) = &config.authentication_class {
-            match &auth_class.spec.provider {
-                AuthenticationClassProvider::Ldap(ldap) => {
-                    ldap.add_volumes_and_mounts(pb, vec![cb])
-                        .context(AddLdapVolumesAndVolumeMountsSnafu)?;
-                }
-                AuthenticationClassProvider::Oidc(_)
-                | AuthenticationClassProvider::Tls(_)
-                | AuthenticationClassProvider::Static(_) => {}
+    // Different authentication entries can reference the same secret
+    // class or TLS certificate. It must be ensured that the volumes
+    // and volume mounts are only added once in such a case.
+
+    let mut ldap_authentication_providers = BTreeSet::new();
+    let mut tls_client_credentials = BTreeSet::new();
+
+    for auth_class_resolved in &auth_config.authentication_classes_resolved {
+        match auth_class_resolved {
+            SupersetAuthenticationClassResolved::Ldap { provider } => {
+                ldap_authentication_providers.insert(provider);
+            }
+            SupersetAuthenticationClassResolved::Oidc { provider, .. } => {
+                tls_client_credentials.insert(&provider.tls);
             }
         }
     }
 
+    for provider in ldap_authentication_providers {
+        provider
+            .add_volumes_and_mounts(pb, vec![cb])
+            .context(AddLdapVolumesAndVolumeMountsSnafu)?;
+    }
+
+    for tls in tls_client_credentials {
+        tls.add_volumes_and_mounts(pb, vec![cb])
+            .context(AddTlsVolumesAndVolumeMountsSnafu)?;
+    }
+
     Ok(())
+}
+
+fn authentication_env_vars(
+    auth_config: &SupersetClientAuthenticationDetailsResolved,
+) -> Vec<EnvVar> {
+    // Different OIDC authentication entries can reference the same
+    // client secret. It must be ensured that the env variables are only
+    // added once in such a case.
+
+    let mut oidc_client_credentials_secrets = BTreeSet::new();
+
+    for auth_class_resolved in &auth_config.authentication_classes_resolved {
+        match auth_class_resolved {
+            SupersetAuthenticationClassResolved::Ldap { .. } => {}
+            SupersetAuthenticationClassResolved::Oidc { oidc, .. } => {
+                oidc_client_credentials_secrets
+                    .insert(oidc.client_credentials_secret_ref.to_owned());
+            }
+        }
+    }
+
+    oidc_client_credentials_secrets
+        .iter()
+        .cloned()
+        .flat_map(oidc::AuthenticationProvider::client_credentials_env_var_mounts)
+        .collect()
+}
+
+fn authentication_start_commands(
+    auth_config: &SupersetClientAuthenticationDetailsResolved,
+) -> String {
+    let mut commands = Vec::new();
+
+    let mut tls_client_credentials = BTreeSet::new();
+
+    for auth_class_resolved in &auth_config.authentication_classes_resolved {
+        match auth_class_resolved {
+            SupersetAuthenticationClassResolved::Oidc { provider, .. } => {
+                tls_client_credentials.insert(&provider.tls);
+
+                // WebPKI will be handled implicitly
+            }
+            SupersetAuthenticationClassResolved::Ldap { .. } => {}
+        }
+    }
+
+    for tls in tls_client_credentials {
+        commands.push(tls.tls_ca_cert_mount_path().map(|tls_ca_cert_mount_path| {
+            add_cert_to_python_certifi_command(&tls_ca_cert_mount_path)
+        }));
+    }
+
+    commands
+        .iter()
+        .flatten()
+        .cloned()
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 pub fn error_policy(_obj: Arc<SupersetCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {

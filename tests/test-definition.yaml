@@ -38,6 +38,10 @@ tests:
       - superset
       - ldap-authentication
       - openshift
+  - name: oidc
+    dimensions:
+      - superset
+      - openshift
   - name: resources
     dimensions:
       - superset-latest

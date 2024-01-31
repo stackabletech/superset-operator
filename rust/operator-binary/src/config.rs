@@ -1,7 +1,13 @@
+use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
-use stackable_operator::commons::authentication::{ldap, AuthenticationClassProvider};
-use stackable_superset_crd::authentication::SuperSetAuthenticationConfigResolved;
-use stackable_superset_crd::{authentication::FlaskRolesSyncMoment, SupersetConfigOptions};
+use stackable_operator::commons::authentication::{ldap, oidc};
+use stackable_superset_crd::{
+    authentication::{
+        FlaskRolesSyncMoment, SupersetAuthenticationClassResolved,
+        SupersetClientAuthenticationDetailsResolved, DEFAULT_OIDC_PROVIDER,
+    },
+    SupersetConfigOptions,
+};
 use std::collections::BTreeMap;
 
 #[derive(Snafu, Debug)]
@@ -21,7 +27,7 @@ pub const PYTHON_IMPORTS: &[&str] = &[
 
 pub fn add_superset_config(
     config: &mut BTreeMap<String, String>,
-    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
+    authentication_config: &SupersetClientAuthenticationDetailsResolved,
 ) -> Result<(), Error> {
     config.insert(
         SupersetConfigOptions::SecretKey.to_string(),
@@ -51,31 +57,56 @@ pub fn add_superset_config(
 
 fn append_authentication_config(
     config: &mut BTreeMap<String, String>,
-    authentication_config: &Vec<SuperSetAuthenticationConfigResolved>,
+    auth_config: &SupersetClientAuthenticationDetailsResolved,
 ) -> Result<(), Error> {
-    // TODO: we make sure in crd/src/authentication.rs that currently there is only one
-    //    AuthenticationClass provided. If the FlaskAppBuilder ever supports this we have
-    //    to adapt the config here accordingly
-    for auth_config in authentication_config {
-        if let Some(auth_class) = &auth_config.authentication_class {
-            if let AuthenticationClassProvider::Ldap(ldap) = &auth_class.spec.provider {
-                append_ldap_config(config, ldap)?;
-            }
-        }
+    // SupersetClientAuthenticationDetailsResolved ensures that there
+    // are either only LDAP or OIDC providers configured. It is not
+    // necessary to check this here again.
 
-        config.insert(
-            SupersetConfigOptions::AuthUserRegistration.to_string(),
-            auth_config.user_registration.to_string(),
-        );
-        config.insert(
-            SupersetConfigOptions::AuthUserRegistrationRole.to_string(),
-            auth_config.user_registration_role.to_string(),
-        );
-        config.insert(
-            SupersetConfigOptions::AuthRolesSyncAtLogin.to_string(),
-            (auth_config.sync_roles_at == FlaskRolesSyncMoment::Login).to_string(),
-        );
+    let ldap_providers = auth_config
+        .authentication_classes_resolved
+        .iter()
+        .filter_map(|auth_class| {
+            if let SupersetAuthenticationClassResolved::Ldap { provider } = auth_class {
+                Some(provider)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let oidc_providers = auth_config
+        .authentication_classes_resolved
+        .iter()
+        .filter_map(|auth_class| {
+            if let SupersetAuthenticationClassResolved::Oidc { provider, oidc } = auth_class {
+                Some((provider, oidc))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if let Some(ldap_provider) = ldap_providers.first() {
+        append_ldap_config(config, ldap_provider)?;
     }
+
+    if !oidc_providers.is_empty() {
+        append_oidc_config(config, &oidc_providers);
+    }
+
+    config.insert(
+        SupersetConfigOptions::AuthUserRegistration.to_string(),
+        auth_config.user_registration.to_string(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthUserRegistrationRole.to_string(),
+        auth_config.user_registration_role.to_string(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthRolesSyncAtLogin.to_string(),
+        (auth_config.sync_roles_at == FlaskRolesSyncMoment::Login).to_string(),
+    );
 
     Ok(())
 }
@@ -152,4 +183,69 @@ fn append_ldap_config(
     }
 
     Ok(())
+}
+
+fn append_oidc_config(
+    config: &mut BTreeMap<String, String>,
+    providers: &[(
+        &oidc::AuthenticationProvider,
+        &oidc::ClientAuthenticationOptions<()>,
+    )],
+) {
+    config.insert(
+        SupersetConfigOptions::AuthType.to_string(),
+        "AUTH_OAUTH".into(),
+    );
+
+    let mut oauth_providers_config = Vec::new();
+
+    for (oidc, client_options) in providers {
+        let (env_client_id, env_client_secret) =
+            oidc::AuthenticationProvider::client_credentials_env_names(
+                &client_options.client_credentials_secret_ref,
+            );
+        let mut scopes = oidc.scopes.clone();
+        scopes.extend_from_slice(&client_options.extra_scopes);
+
+        let oidc_provider = oidc
+            .provider_hint
+            .as_ref()
+            .unwrap_or(&DEFAULT_OIDC_PROVIDER);
+
+        let oauth_providers_config_entry = match oidc_provider {
+            oidc::IdentityProviderHint::Keycloak => {
+                formatdoc!(
+                    "
+                      {{ 'name': 'keycloak',
+                        'icon': 'fa-key',
+                        'token_key': 'access_token',
+                        'remote_app': {{
+                          'client_id': os.environ.get('{env_client_id}'),
+                          'client_secret': os.environ.get('{env_client_secret}'),
+                          'client_kwargs': {{
+                            'scope': '{scopes}'
+                          }},
+                          'api_base_url': '{url}/protocol/',
+                          'server_metadata_url': '{url}/.well-known/openid-configuration',
+                        }},
+                      }}",
+                    url = oidc.endpoint_url().unwrap(),
+                    scopes = scopes.join(" "),
+                )
+            }
+        };
+
+        oauth_providers_config.push(oauth_providers_config_entry);
+    }
+
+    config.insert(
+        SupersetConfigOptions::OauthProviders.to_string(),
+        formatdoc!(
+            "[
+             {joined_oauth_providers_config}
+             ]
+             ",
+            joined_oauth_providers_config = oauth_providers_config.join(",\n")
+        ),
+    );
 }

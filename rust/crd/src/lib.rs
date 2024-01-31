@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use authentication::SupersetClientAuthenticationDetails;
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -26,7 +27,7 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
-use crate::{affinity::get_affinity, authentication::SupersetAuthentication};
+use crate::affinity::get_affinity;
 
 pub mod affinity;
 pub mod authentication;
@@ -62,6 +63,7 @@ pub enum SupersetConfigOptions {
     StatsLogger,
     RowLimit,
     MapboxApiKey,
+    OauthProviders,
     SupersetWebserverTimeout,
     LoggingConfigurator,
     AuthType,
@@ -108,6 +110,7 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::StatsLogger => PythonType::Expression,
             SupersetConfigOptions::RowLimit => PythonType::IntLiteral,
             SupersetConfigOptions::MapboxApiKey => PythonType::Expression,
+            SupersetConfigOptions::OauthProviders => PythonType::Expression,
             SupersetConfigOptions::SupersetWebserverTimeout => PythonType::IntLiteral,
             SupersetConfigOptions::LoggingConfigurator => PythonType::Expression,
             SupersetConfigOptions::AuthType => PythonType::Expression,
@@ -168,8 +171,9 @@ pub struct SupersetClusterSpec {
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClusterConfig {
-    #[serde(default, flatten)]
-    pub authentication: SupersetAuthentication,
+    /// List of AuthenticationClasses used to authenticate users.
+    #[serde(default)]
+    pub authentication: Vec<SupersetClientAuthenticationDetails>,
 
     /// The name of the Secret object containing the admin user credentials and database connection details.
     /// Read the
@@ -177,7 +181,7 @@ pub struct SupersetClusterConfig {
     /// to find out more.
     pub credentials_secret: String,
 
-    // no doc - docs in the struct.
+    /// Cluster operations like pause reconciliation or cluster stop.
     #[serde(default)]
     pub cluster_operation: ClusterOperation,
 
