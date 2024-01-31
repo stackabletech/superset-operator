@@ -17,13 +17,13 @@ spec:
     name: superset
     namespace: default
   druid:  # <2>
-    name: my-druid-cluster
+    name: druid
     namespace: default
 
 ----
 
 <1> The `name` and `namespace` in `spec.superset` refer to the Superset cluster that you want to connect. Following our example above, the name is `superset`.
-<2> In `spec.druid` you specify the `name` and `namespace` of your Druid cluster. Following our example above, the name is `my-druid-cluster`.
+<2> In `spec.druid` you specify the `name` and `namespace` of your Druid cluster. Following our example above, the name is `druid`.
 
 The `namespace` part is optional in both cases; if it is omitted it will default to the namespace of the DruidConnection.
 
