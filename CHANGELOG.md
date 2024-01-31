@@ -6,11 +6,13 @@
 
 - Improved CRD docs ([#431]).
 - Helm: support labels in values.yaml ([#448]).
+- Add support for OpenID Connect ([#423]).
 
 ### Fixed
 
 - BREAKING: Fixed various issues in the CRD structure. `clusterConfig.credentialsSecret` is now mandatory ([#429]).
 
+[#423]: https://github.com/stackabletech/superset-operator/pull/423
 [#429]: https://github.com/stackabletech/superset-operator/pull/429
 [#431]: https://github.com/stackabletech/superset-operator/pull/431
 [#448]: https://github.com/stackabletech/superset-operator/pull/448
