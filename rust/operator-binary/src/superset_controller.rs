@@ -25,7 +25,9 @@ use stackable_operator::{
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{ConfigMap, HTTPGetAction, Probe, Service, ServicePort, ServiceSpec},
+            core::v1::{
+                ConfigMap, EnvVar, HTTPGetAction, Probe, Service, ServicePort, ServiceSpec,
+            },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
         DeepMerge,
@@ -724,6 +726,7 @@ fn build_server_rolegroup_statefulset(
         .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
         .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
         .add_env_var("SSL_CERT_DIR", "/stackable/certs/")
+        .add_env_vars(authentication_env_vars(authentication_config))
         .command(vec![
             "/bin/bash".to_string(),
             "-x".to_string(),
@@ -889,7 +892,6 @@ fn add_authentication_volumes_and_volume_mounts(
     // and volume mounts are only added once in such a case.
 
     let mut ldap_authentication_providers = BTreeSet::new();
-    let mut oidc_client_credentials_secrets = BTreeSet::new();
     let mut tls_client_credentials = BTreeSet::new();
 
     for auth_class_resolved in &auth_config.authentication_classes_resolved {
@@ -897,8 +899,7 @@ fn add_authentication_volumes_and_volume_mounts(
             SupersetAuthenticationClassResolved::Ldap { provider } => {
                 ldap_authentication_providers.insert(provider);
             }
-            SupersetAuthenticationClassResolved::Oidc { oidc, provider, .. } => {
-                oidc_client_credentials_secrets.insert(&oidc.client_credentials_secret_ref);
+            SupersetAuthenticationClassResolved::Oidc { provider, .. } => {
                 tls_client_credentials.insert(&provider.tls);
             }
         }
@@ -910,18 +911,38 @@ fn add_authentication_volumes_and_volume_mounts(
             .context(AddLdapVolumesAndVolumeMountsSnafu)?;
     }
 
-    for secret in oidc_client_credentials_secrets {
-        cb.add_env_vars(
-            oidc::AuthenticationProvider::client_credentials_env_var_mounts(secret.to_owned()),
-        );
-    }
-
     for tls in tls_client_credentials {
         tls.add_volumes_and_mounts(pb, vec![cb])
             .context(AddTlsVolumesAndVolumeMountsSnafu)?;
     }
 
     Ok(())
+}
+
+fn authentication_env_vars(
+    auth_config: &SupersetClientAuthenticationDetailsResolved,
+) -> Vec<EnvVar> {
+    // Different OIDC authentication entries can reference the same
+    // client secret. It must be ensured that the env variables are only
+    // added once in such a case.
+
+    let mut oidc_client_credentials_secrets = BTreeSet::new();
+
+    for auth_class_resolved in &auth_config.authentication_classes_resolved {
+        match auth_class_resolved {
+            SupersetAuthenticationClassResolved::Ldap { .. } => {}
+            SupersetAuthenticationClassResolved::Oidc { oidc, .. } => {
+                oidc_client_credentials_secrets
+                    .insert(oidc.client_credentials_secret_ref.to_owned());
+            }
+        }
+    }
+
+    oidc_client_credentials_secrets
+        .iter()
+        .cloned()
+        .flat_map(oidc::AuthenticationProvider::client_credentials_env_var_mounts)
+        .collect()
 }
 
 fn authentication_start_commands(
