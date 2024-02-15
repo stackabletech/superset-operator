@@ -43,7 +43,7 @@ mod tests {
           name: simple-superset
         spec:
           image:
-            productVersion: 3.0.1
+            productVersion: 3.1.0
           clusterConfig:
             credentialsSecret: superset-db-credentials
           nodes:
