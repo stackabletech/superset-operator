@@ -9,19 +9,24 @@
 - Add support for OpenID Connect ([#423]).
 - Support versions `2.1.3`, `3.0.3`, `3.1.0` ([#457]).
 
+### Changed
+
+- Raise memory requests and limits for Superset pods to 2Gi ([#468]).
+
 ### Fixed
 
 - BREAKING: Fixed various issues in the CRD structure. `clusterConfig.credentialsSecret` is now mandatory ([#429]).
 
 ### Removed
 
-- Rmoved support for version `2.1.0` ([#457]).
+- Removed support for version `2.1.0` ([#457]).
 
 [#423]: https://github.com/stackabletech/superset-operator/pull/423
 [#429]: https://github.com/stackabletech/superset-operator/pull/429
 [#431]: https://github.com/stackabletech/superset-operator/pull/431
 [#448]: https://github.com/stackabletech/superset-operator/pull/448
 [#457]: https://github.com/stackabletech/superset-operator/pull/457
+[#468]: https://github.com/stackabletech/superset-operator/pull/468
 
 ## [23.11.0] - 2023-11-24
 
