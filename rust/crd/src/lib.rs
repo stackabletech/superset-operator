@@ -361,7 +361,7 @@ impl SupersetConfig {
                     max: Some(Quantity("1200m".to_owned())),
                 },
                 memory: MemoryLimitsFragment {
-                    limit: Some(Quantity("1000Mi".to_owned())),
+                    limit: Some(Quantity("2Gi".to_owned())),
                     runtime_limits: NoRuntimeLimitsFragment {},
                 },
                 storage: SupersetStorageConfigFragment {},
