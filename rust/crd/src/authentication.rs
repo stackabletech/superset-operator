@@ -78,7 +78,7 @@ pub enum Error {
     TlsVerificationCannotBeDisabled { auth_class_name: String },
 
     #[snafu(display(
-        "{configured:?} is not a supported principalClaim in Superset for the Keycloak OIDC provider. Please use {supported:?} in the AuthenticationClass {auth_class_name:?}"
+        "invalid principalClaim {configured:?} in the {auth_class_name:?} AuthenticationClass. Superset hard-codes the claim name to {supported:?} for the Keycloak OIDC provider"
     ))]
     OidcPrincipalClaimNotSupported {
         configured: String,
