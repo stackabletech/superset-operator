@@ -23,57 +23,57 @@ const SUPPORTED_OIDC_PROVIDERS: &[IdentityProviderHint] = &[IdentityProviderHint
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display(
-        "The AuthenticationClass {auth_class_name:?} is referenced several times which is not allowed."
+        "the AuthenticationClass {auth_class_name:?} is referenced several times which is not allowed"
     ))]
     DuplicateAuthenticationClassReferencesNotAllowed { auth_class_name: String },
 
-    #[snafu(display("Failed to retrieve AuthenticationClass"))]
+    #[snafu(display("failed to retrieve AuthenticationClass"))]
     AuthenticationClassRetrievalFailed {
         source: stackable_operator::error::Error,
     },
 
-    #[snafu(display("Only one authentication type at a time is supported by Superset, see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924."))]
+    #[snafu(display("only one authentication type at a time is supported by Superset, see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924"))]
     MultipleAuthenticationTypesNotSupported,
 
-    #[snafu(display("Only one LDAP provider at a time is supported by Superset."))]
+    #[snafu(display("only one LDAP provider at a time is supported by Superset"))]
     MultipleLdapProvidersNotSupported,
 
     #[snafu(display(
-        "The userRegistration settings must not differ between the authentication entries.",
+        "the userRegistration settings must not differ between the authentication entries",
     ))]
     DifferentUserRegistrationSettingsNotAllowed,
 
     #[snafu(display(
-        "The userRegistrationRole settings must not differ between the authentication entries.",
+        "the userRegistrationRole settings must not differ between the authentication entries",
     ))]
     DifferentUserRegistrationRoleSettingsNotAllowed,
 
     #[snafu(display(
-        "The syncRolesAt settings must not differ between the authentication entries.",
+        "the syncRolesAt settings must not differ between the authentication entries",
     ))]
     DifferentSyncRolesAtSettingsNotAllowed,
 
     #[snafu(display(
-        "Failed to use authentication provider {provider:?} for authentication class {auth_class_name:?} - supported providers: {SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS:?}",
+        "failed to use authentication provider {provider:?} for authentication class {auth_class_name:?} - supported providers: {SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS:?}",
     ))]
     AuthenticationProviderNotSupported {
         auth_class_name: String,
         provider: String,
     },
 
-    #[snafu(display("Invalid OIDC configuration"))]
+    #[snafu(display("invalid OIDC configuration"))]
     OidcConfigurationInvalid {
         source: stackable_operator::error::Error,
     },
 
-    #[snafu(display("The OIDC provider {oidc_provider:?} is not yet supported (AuthenticationClass {auth_class_name:?})."))]
+    #[snafu(display("the OIDC provider {oidc_provider:?} is not yet supported (AuthenticationClass {auth_class_name:?})"))]
     OidcProviderNotSupported {
         auth_class_name: String,
         oidc_provider: String,
     },
 
     #[snafu(display(
-        "TLS verification cannot be disabled in Superset (AuthenticationClass {auth_class_name:?})."
+        "tLS verification cannot be disabled in Superset (AuthenticationClass {auth_class_name:?})"
     ))]
     TlsVerificationCannotBeDisabled { auth_class_name: String },
 
