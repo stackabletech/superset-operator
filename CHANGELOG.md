@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [24.3.0] - 2024-03-20
+
 ### Added
 
 - Improved CRD docs ([#431]).
