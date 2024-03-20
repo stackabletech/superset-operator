@@ -73,7 +73,7 @@ pub enum Error {
     },
 
     #[snafu(display(
-        "tLS verification cannot be disabled in Superset (AuthenticationClass {auth_class_name:?})"
+        "TLS verification cannot be disabled in Superset (AuthenticationClass {auth_class_name:?})"
     ))]
     TlsVerificationCannotBeDisabled { auth_class_name: String },
 
@@ -527,7 +527,7 @@ mod tests {
         .await;
 
         assert_eq!(
-            r#"The AuthenticationClass "oidc" is referenced several times which is not allowed."#,
+            r#"the AuthenticationClass "oidc" is referenced several times which is not allowed"#,
             error_message
         );
     }
@@ -567,7 +567,7 @@ mod tests {
         .await;
 
         assert_eq!(
-            "Only one authentication type at a time is supported by Superset, see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924.",
+            "only one authentication type at a time is supported by Superset, see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924",
             error_message
         );
     }
@@ -603,7 +603,7 @@ mod tests {
         .await;
 
         assert_eq!(
-            "Only one LDAP provider at a time is supported by Superset.",
+            "only one LDAP provider at a time is supported by Superset",
             error_message
         );
     }
@@ -648,7 +648,7 @@ mod tests {
         .await;
 
         assert_eq!(
-            "The userRegistration settings must not differ between the authentication entries.",
+            "the userRegistration settings must not differ between the authentication entries",
             error_message
         );
     }
@@ -693,7 +693,7 @@ mod tests {
         .await;
 
         assert_eq!(
-            "The userRegistrationRole settings must not differ between the authentication entries.",
+            "the userRegistrationRole settings must not differ between the authentication entries",
             error_message
         );
     }
@@ -738,7 +738,7 @@ mod tests {
         .await;
 
         assert_eq!(
-            "The syncRolesAt settings must not differ between the authentication entries.",
+            "the syncRolesAt settings must not differ between the authentication entries",
             error_message
         );
     }
@@ -767,7 +767,7 @@ mod tests {
 
         assert_eq!(
             indoc! { r#"
-                Invalid OIDC configuration
+                invalid OIDC configuration
 
                 Caused by this error:
                   1: OIDC authentication details not specified. The AuthenticationClass "oidc" uses an OIDC provider, you need to specify OIDC authentication details (such as client credentials) as well"#
@@ -801,7 +801,7 @@ mod tests {
         .await;
 
         assert_eq!(
-            r#""sub" is not a supported principalClaim in Superset for the Keycloak OIDC provider. Please use "preferred_username" in the AuthenticationClass "oidc""#,
+            r#"invalid principalClaim "sub" in the "oidc" AuthenticationClass. Superset hard-codes the claim name to "preferred_username" for the Keycloak OIDC provider"#,
             error_message
         );
     }
@@ -834,7 +834,7 @@ mod tests {
         .await;
 
         assert_eq!(
-            r#"TLS verification cannot be disabled in Superset (AuthenticationClass "oidc")."#,
+            r#"TLS verification cannot be disabled in Superset (AuthenticationClass "oidc")"#,
             error_message
         );
     }
