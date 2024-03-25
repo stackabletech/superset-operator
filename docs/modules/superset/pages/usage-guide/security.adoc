@@ -32,7 +32,7 @@ spec:
 
 Users that log in with LDAP are assigned to a default https://superset.apache.org/docs/security/#roles[Role] which is specified with the `userRegistrationRole` property.
 
-You can follow the xref:home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:home:reference:authenticationclass.adoc[] reference.
+You can follow the xref:home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:reference:authenticationclass.adoc[] reference.
 
 == [[authorization]]Authorization
 Superset has a concept called `Roles` which allows you to grant user permissions based on roles.
