@@ -1,6 +1,6 @@
 = Stackable Operator for Apache Superset
 :description: The Stackable Operator for Apache Superset is a Kubernetes operator that can manage Apache Superset clusters. Learn about its features, resources, dependencies and demos, and see the list of supported Superset versions.
-:keywords: Stackable Operator, Apache Superset, Kubernetes, operator, data science, data exploration, SQL, engineer, big data, CRD, StatefulSet, ConfigMap, Service, Druid, Trino, S3, demo, version
+:keywords: Stackable Operator, Apache Superset, Kubernetes, operator, data science, data exploration
 
 The Stackable Operator for Apache Superset is an operator that can deploy and manage https://superset.apache.org/[Apache
 Superset] clusters on Kubernetes. Superset is a data exploration and visualization tool that connects to data sources
@@ -81,8 +81,10 @@ xref:demos:trino-iceberg.adoc[] and xref:demos:data-lakehouse-iceberg-trino-spar
 xref:trino:index.adoc[Trino] instance on top of S3 storage that hold data to analyze. Superset is connected to Trino to
 analyze a variety of different datasets.
 
-== Supported Versions
+== Supported versions
 
-The Stackable Operator for Apache Superset currently supports the following versions of Superset:
+The Stackable Operator for Apache Superset currently supports the Superset versions listed below.
+To use a specific Superset version in your SupersetCluster, you have to specify an image - this is explained in the xref:concepts:product-image-selection.adoc[] documentation.
+The operator also supports running images from a custom registry or running entirely customized images; both of these cases are explained under xref:concepts:product-image-selection.adoc[] as well.
 
 include::partial$supported-versions.adoc[]
