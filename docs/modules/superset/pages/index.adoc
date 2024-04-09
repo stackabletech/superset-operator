@@ -3,6 +3,14 @@
 :keywords: Stackable operator, Apache Superset, Kubernetes, operator, data science, data exploration
 :superset: https://superset.apache.org/
 :crs: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
+:github: https://github.com/stackabletech/nifi-operator/
+:crd: {crd-docs}/nifi.stackable.tech/nificluster/v1alpha1/
+:feature-tracker: https://features.stackable.tech/unified
+
+[.link-bar]
+* {github}[GitHub {external-link-icon}^]
+* {feature-tracker}[Feature Tracker {external-link-icon}^]
+* {crd}[CRD documentation {external-link-icon}^]
 
 The Stackable operator for {superset}[Apache Superset] is an operator that can deploy and manage Apache Superset clusters on Kubernetes.
 Superset is a data exploration and visualization tool that connects to data sources via SQL.
@@ -81,3 +89,9 @@ To use a specific Superset version in your SupersetCluster, you have to specify 
 The operator also supports running images from a custom registry or running entirely customized images; both of these cases are explained under xref:concepts:product-image-selection.adoc[] as well.
 
 include::partial$supported-versions.adoc[]
+
+== Useful links
+
+* The {github}[superset-operator {external-link-icon}^] GitHub repository
+* The operator feature overview in the {feature-tracker}[feature tracker {external-link-icon}^]
+* The {crd}[SupersetCluster {external-link-icon}^] CRD documentation
