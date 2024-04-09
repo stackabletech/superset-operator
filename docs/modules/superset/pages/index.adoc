@@ -3,8 +3,8 @@
 :keywords: Stackable operator, Apache Superset, Kubernetes, operator, data science, data exploration
 :superset: https://superset.apache.org/
 :crs: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
-:github: https://github.com/stackabletech/nifi-operator/
-:crd: {crd-docs}/nifi.stackable.tech/nificluster/v1alpha1/
+:github: https://github.com/stackabletech/superset-operator/
+:crd: {crd-docs}/superset.stackable.tech/supersetcluster/v1alpha1/
 :feature-tracker: https://features.stackable.tech/unified
 
 [.link-bar]
@@ -22,7 +22,7 @@ This operator helps you manage your Superset instances on Kubernetes efficiently
 Get started using Superset with Stackable operator by following the xref:getting_started/index.adoc[].
 It guides you through installing the operator alongside a PostgreSQL database, connecting to your Superset instance and analyzing some preloaded example data.
 
-== Resources
+== Operator model
 
 The operator manages two {crs}[custom resources]: The _SupersetCluster_ and _DruidConnection_.
 It creates a number of different Kubernetes resources based on the custom resources.
