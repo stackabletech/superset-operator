@@ -4,7 +4,8 @@
 :superset: https://superset.apache.org/
 :crs: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
 :github: https://github.com/stackabletech/superset-operator/
-:crd: {crd-docs}/superset.stackable.tech/supersetcluster/v1alpha1/
+:crd: {crd-docs-base-url}/superset-operator/{crd-docs-version}/
+:crd-supersetcluster: {crd-docs}/superset.stackable.tech/supersetcluster/v1alpha1/
 :feature-tracker: https://features.stackable.tech/unified
 
 [.link-bar]
@@ -94,4 +95,4 @@ include::partial$supported-versions.adoc[]
 
 * The {github}[superset-operator {external-link-icon}^] GitHub repository
 * The operator feature overview in the {feature-tracker}[feature tracker {external-link-icon}^]
-* The {crd}[SupersetCluster {external-link-icon}^] CRD documentation
+* The {crd-supersetcluster}[SupersetCluster {external-link-icon}^] CRD documentation
