@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Don't print Superset admin credentials during startup ([#483]).
+
+[#483]: https://github.com/stackabletech/superset-operator/pull/483
+
 ## [24.3.0] - 2024-03-20
 
 ### Added
