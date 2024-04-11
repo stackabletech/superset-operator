@@ -742,8 +742,8 @@ fn build_server_rolegroup_statefulset(
             {auth_commands}
 
             superset db upgrade
-            # Don't print the following statement, as it contains credentials
             set +x
+            echo 'Running \"superset fab create-admin [...]\", which is not shown as it leaks the Superset admin credentials'
             superset fab create-admin --username \"$ADMIN_USERNAME\" --firstname \"$ADMIN_FIRSTNAME\" --lastname \"$ADMIN_LASTNAME\" --email \"$ADMIN_EMAIL\" --password \"$ADMIN_PASSWORD\"
             set -x
             superset init
