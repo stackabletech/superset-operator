@@ -733,39 +733,35 @@ fn build_server_rolegroup_statefulset(
             "-euo".to_string(),
             "pipefail".to_string(),
             "-c".to_string(),
-            formatdoc! {"
-                mkdir --parents {PYTHONPATH} && \
-                cp {STACKABLE_CONFIG_DIR}/* {PYTHONPATH} && \
-                cp {STACKABLE_LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH} && \
-                {auth_commands}
-                superset db upgrade && \
-                superset fab create-admin \
-                    --username \"$ADMIN_USERNAME\" \
-                    --firstname \"$ADMIN_FIRSTNAME\" \
-                    --lastname \"$ADMIN_LASTNAME\" \
-                    --email \"$ADMIN_EMAIL\" \
-                    --password \"$ADMIN_PASSWORD\" && \
-                superset init && \
-                {COMMON_BASH_TRAP_FUNCTIONS}
-                {remove_vector_shutdown_file_command}
-                prepare_signal_handlers
-                gunicorn \
-                --bind 0.0.0.0:${{SUPERSET_PORT}} \
-                --worker-class gthread \
-                --threads 20 \
-                --timeout {webserver_timeout} \
-                --limit-request-line 0 \
-                --limit-request-field_size 0 \
-                'superset.app:create_app()' &
-                wait_for_termination $!
-                {create_vector_shutdown_file_command}",
+        ])
+        .args(vec![formatdoc! {"
+            mkdir --parents {PYTHONPATH}
+            cp {STACKABLE_CONFIG_DIR}/* {PYTHONPATH}
+            cp {STACKABLE_LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH}
+
+            {auth_commands}
+
+            superset db upgrade
+            set +x
+            echo 'Running \"superset fab create-admin [...]\", which is not shown as it leaks the Superset admin credentials'
+            superset fab create-admin --username \"$ADMIN_USERNAME\" --firstname \"$ADMIN_FIRSTNAME\" --lastname \"$ADMIN_LASTNAME\" --email \"$ADMIN_EMAIL\" --password \"$ADMIN_PASSWORD\"
+            set -x
+            superset init
+            {COMMON_BASH_TRAP_FUNCTIONS}
+
+            {remove_vector_shutdown_file_command}
+            prepare_signal_handlers
+            gunicorn --bind 0.0.0.0:${{SUPERSET_PORT}} --worker-class gthread --threads 20 --timeout {webserver_timeout} --limit-request-line 0 --limit-request-field_size 0 'superset.app:create_app()' &
+            wait_for_termination $!
+
+            {create_vector_shutdown_file_command}
+        ",
             auth_commands = authentication_start_commands(authentication_config),
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             create_vector_shutdown_file_command =
                 create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
-            },
-        ])
+        }])
         .resources(merged_config.resources.clone().into());
     let probe = Probe {
         http_get: Some(HTTPGetAction {
