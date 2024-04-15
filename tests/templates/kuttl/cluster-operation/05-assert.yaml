@@ -2,14 +2,13 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
-  name: install-superset
-timeout: 300
-commands:
-  - script: kubectl -n $NAMESPACE wait --for=condition=available=true supersetclusters.superset.stackable.tech/superset --timeout 301s
+  name: test-superset-postgresql
+timeout: 480
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: superset-node-default
+  name: superset-postgresql
 status:
-  replicas: 2
+  readyReplicas: 1
+  replicas: 1
