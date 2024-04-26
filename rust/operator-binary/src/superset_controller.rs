@@ -735,6 +735,8 @@ fn build_server_rolegroup_statefulset(
             "-c".to_string(),
         ])
         .args(vec![formatdoc! {"
+            {COMMON_BASH_TRAP_FUNCTIONS}
+
             mkdir --parents {PYTHONPATH}
             cp {STACKABLE_CONFIG_DIR}/* {PYTHONPATH}
             cp {STACKABLE_LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH}
@@ -747,7 +749,6 @@ fn build_server_rolegroup_statefulset(
             superset fab create-admin --username \"$ADMIN_USERNAME\" --firstname \"$ADMIN_FIRSTNAME\" --lastname \"$ADMIN_LASTNAME\" --email \"$ADMIN_EMAIL\" --password \"$ADMIN_PASSWORD\"
             set -x
             superset init
-            {COMMON_BASH_TRAP_FUNCTIONS}
 
             {remove_vector_shutdown_file_command}
             prepare_signal_handlers
@@ -794,6 +795,7 @@ fn build_server_rolegroup_statefulset(
         ])
         .args(vec![formatdoc! {"
             {COMMON_BASH_TRAP_FUNCTIONS}
+
             prepare_signal_handlers
             /stackable/statsd_exporter &
             wait_for_termination $!
