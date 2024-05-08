@@ -9,7 +9,6 @@ use stackable_operator::{
         oidc::{self, IdentityProviderHint},
         AuthenticationClass, AuthenticationClassProvider, ClientAuthenticationDetails,
     },
-    error::OperatorResult,
     schemars::{self, JsonSchema},
 };
 use tracing::info;
@@ -29,7 +28,7 @@ pub enum Error {
 
     #[snafu(display("failed to retrieve AuthenticationClass"))]
     AuthenticationClassRetrievalFailed {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
     },
 
     #[snafu(display("only one authentication type at a time is supported by Superset, see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924"))]
@@ -63,7 +62,7 @@ pub enum Error {
 
     #[snafu(display("invalid OIDC configuration"))]
     OidcConfigurationInvalid {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::commons::authentication::Error,
     },
 
     #[snafu(display("the OIDC provider {oidc_provider:?} is not yet supported (AuthenticationClass {auth_class_name:?})"))]
@@ -162,7 +161,7 @@ impl SupersetClientAuthenticationDetailsResolved {
         resolve_auth_class: impl Fn(ClientAuthenticationDetails) -> R,
     ) -> Result<SupersetClientAuthenticationDetailsResolved>
     where
-        R: Future<Output = OperatorResult<AuthenticationClass>>,
+        R: Future<Output = Result<AuthenticationClass, stackable_operator::client::Error>>,
     {
         let mut resolved_auth_classes = Vec::new();
         let mut user_registration = None;
@@ -325,13 +324,11 @@ mod tests {
     use std::pin::Pin;
 
     use indoc::indoc;
-    use stackable_operator::{
-        commons::authentication::{
-            oidc,
-            tls::{CaCert, Tls, TlsClientDetails, TlsServerVerification, TlsVerification},
-        },
-        kube,
+    use stackable_operator::commons::authentication::{
+        oidc,
+        tls::{CaCert, Tls, TlsClientDetails, TlsServerVerification, TlsVerification},
     };
+    use stackable_operator::kube;
 
     use super::*;
 
@@ -770,7 +767,7 @@ mod tests {
                 invalid OIDC configuration
 
                 Caused by this error:
-                  1: OIDC authentication details not specified. The AuthenticationClass "oidc" uses an OIDC provider, you need to specify OIDC authentication details (such as client credentials) as well"#
+                  1: authentication details for OIDC were not specified. The AuthenticationClass "oidc" uses an OIDC provider, you need to specify OIDC authentication details (such as client credentials) as well"#
             },
             error_message
         );
@@ -931,7 +928,9 @@ mod tests {
         auth_classes: Vec<AuthenticationClass>,
     ) -> impl Fn(
         ClientAuthenticationDetails,
-    ) -> Pin<Box<dyn Future<Output = OperatorResult<AuthenticationClass>>>> {
+    ) -> Pin<
+        Box<dyn Future<Output = Result<AuthenticationClass, stackable_operator::client::Error>>>,
+    > {
         move |auth_details: ClientAuthenticationDetails| {
             let auth_classes = auth_classes.clone();
             Box::pin(async move {
@@ -942,7 +941,7 @@ mod tests {
                             == Some(auth_details.authentication_class_name())
                     })
                     .cloned()
-                    .ok_or_else(|| stackable_operator::error::Error::KubeError {
+                    .ok_or_else(|| stackable_operator::client::Error::ListResources {
                         source: kube::Error::Api(kube::error::ErrorResponse {
                             code: 404,
                             message: "AuthenticationClass not found".into(),

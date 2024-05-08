@@ -1,8 +1,8 @@
 use std::fmt::{Display, Write};
 
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::builder::configmap::ConfigMapBuilder;
 use stackable_operator::{
-    builder::ConfigMapBuilder,
     client::Client,
     k8s_openapi::api::core::v1::ConfigMap,
     kube::Resource,
@@ -22,7 +22,7 @@ pub enum Error {
     ObjectHasNoNamespace,
     #[snafu(display("failed to retrieve the ConfigMap [{cm_name}]"))]
     ConfigMapNotFound {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         cm_name: String,
     },
     #[snafu(display("failed to retrieve the entry [{entry}] for ConfigMap [{cm_name}]"))]

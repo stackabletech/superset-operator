@@ -1,4 +1,4 @@
-use stackable_operator::builder::ObjectMetaBuilder;
+use stackable_operator::builder::meta::ObjectMetaBuilder;
 use stackable_operator::k8s_openapi::api::core::v1::ServiceAccount;
 use stackable_operator::k8s_openapi::api::rbac::v1::{RoleBinding, RoleRef, Subject};
 use stackable_operator::kube::{Resource, ResourceExt};

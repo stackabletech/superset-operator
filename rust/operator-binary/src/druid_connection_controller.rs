@@ -2,8 +2,10 @@ use crate::util::{get_job_state, JobState};
 
 use crate::{rbac, superset_controller::DOCKER_IMAGE_BASE_NAME, APP_NAME};
 use snafu::{OptionExt, ResultExt, Snafu};
+use stackable_operator::builder::meta::ObjectMetaBuilder;
+use stackable_operator::builder::pod::container::ContainerBuilder;
+use stackable_operator::builder::pod::security::PodSecurityContextBuilder;
 use stackable_operator::{
-    builder::{ContainerBuilder, ObjectMetaBuilder, PodSecurityContextBuilder},
     client::Client,
     commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::{
@@ -38,31 +40,31 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("failed to apply Job for Druid Connection"))]
     ApplyJob {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
     },
     #[snafu(display("failed to update status"))]
     ApplyStatus {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
     },
     #[snafu(display("object is missing metadata to build owner reference"))]
     ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::builder::meta::Error,
     },
     #[snafu(display("failed to get Druid connection string from config map {config_map}"))]
     GetDruidConnStringConfigMap {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         config_map: ObjectRef<ConfigMap>,
     },
     #[snafu(display("failed to get Druid connection string from config map"))]
     MissingDruidConnString,
     #[snafu(display("druid connection state is 'importing' but failed to find job {import_job}"))]
     GetImportJob {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
         import_job: ObjectRef<Job>,
     },
     #[snafu(display("failed to check if druid discovery map exists"))]
     DruidDiscoveryCheck {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
     },
     #[snafu(display("namespace missing on DruidConnection {druid_connection}"))]
     DruidConnectionNoNamespace {
@@ -71,15 +73,15 @@ pub enum Error {
     },
     #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
     },
     #[snafu(display("failed to patch role binding"))]
     ApplyRoleBinding {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
     },
     #[snafu(display("failed to retrieve superset cluster"))]
     SupersetClusterRetrieval {
-        source: stackable_operator::error::Error,
+        source: stackable_operator::client::Error,
     },
 }
 
