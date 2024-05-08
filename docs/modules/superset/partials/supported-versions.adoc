@@ -7,4 +7,3 @@
 - 3.0.1 (deprecated)
 - 2.1.3 (LTS)
 - 2.1.1 (deprecated)
-
