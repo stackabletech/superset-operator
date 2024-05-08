@@ -2,10 +2,11 @@ use crate::util::{get_job_state, JobState};
 
 use crate::{rbac, superset_controller::DOCKER_IMAGE_BASE_NAME, APP_NAME};
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::builder::meta::ObjectMetaBuilder;
-use stackable_operator::builder::pod::container::ContainerBuilder;
-use stackable_operator::builder::pod::security::PodSecurityContextBuilder;
 use stackable_operator::{
+    builder::{
+        meta::ObjectMetaBuilder,
+        pod::{container::ContainerBuilder, security::PodSecurityContextBuilder},
+    },
     client::Client,
     commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::{
@@ -31,7 +32,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 pub const DRUID_CONNECTION_CONTROLLER_NAME: &str = "druid-connection";
 
 pub struct Ctx {
-    pub client: stackable_operator::client::Client,
+    pub client: Client,
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]

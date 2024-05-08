@@ -12,13 +12,15 @@ use product_config::{
     ProductConfigManager,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::builder::configmap::ConfigMapBuilder;
-use stackable_operator::builder::meta::ObjectMetaBuilder;
-use stackable_operator::builder::pod::container::ContainerBuilder;
-use stackable_operator::builder::pod::resources::ResourceRequirementsBuilder;
-use stackable_operator::builder::pod::security::PodSecurityContextBuilder;
-use stackable_operator::builder::pod::PodBuilder;
 use stackable_operator::{
+    builder::{
+        configmap::ConfigMapBuilder,
+        meta::ObjectMetaBuilder,
+        pod::{
+            container::ContainerBuilder, resources::ResourceRequirementsBuilder,
+            security::PodSecurityContextBuilder, PodBuilder,
+        },
+    },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
         authentication::oidc, product_image_selection::ResolvedProductImage,
