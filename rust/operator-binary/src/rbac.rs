@@ -1,7 +1,11 @@
-use stackable_operator::builder::ObjectMetaBuilder;
-use stackable_operator::k8s_openapi::api::core::v1::ServiceAccount;
-use stackable_operator::k8s_openapi::api::rbac::v1::{RoleBinding, RoleRef, Subject};
-use stackable_operator::kube::{Resource, ResourceExt};
+use stackable_operator::{
+    builder::meta::ObjectMetaBuilder,
+    k8s_openapi::api::{
+        core::v1::ServiceAccount,
+        rbac::v1::{RoleBinding, RoleRef, Subject},
+    },
+    kube::{Resource, ResourceExt},
+};
 
 /// Obsolete: only used in the DB controller for historical reasons. Scheduled for deletion
 /// once the entire DB controller is deleted as discused here: <https://github.com/stackabletech/superset-operator/issues/351>

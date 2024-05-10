@@ -1,5 +1,5 @@
 use stackable_operator::{
-    builder::VolumeBuilder,
+    builder::pod::volume::VolumeBuilder,
     k8s_openapi::api::core::v1::{ConfigMapVolumeSource, EmptyDirVolumeSource, Volume},
     product_logging::{
         self,

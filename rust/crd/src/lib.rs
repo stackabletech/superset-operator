@@ -18,7 +18,7 @@ use stackable_operator::{
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config_utils::{ConfigError, Configuration},
+    product_config_utils::{self, Configuration},
     product_logging::{self, spec::Logging},
     role_utils::{GenericRoleConfig, Role, RoleGroupRef},
     schemars::{self, JsonSchema},
@@ -381,7 +381,7 @@ impl Configuration for SupersetConfigFragment {
         &self,
         cluster: &Self::Configurable,
         _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
+    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
         let mut result = BTreeMap::new();
         result.insert(
             SupersetConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
@@ -401,7 +401,7 @@ impl Configuration for SupersetConfigFragment {
         &self,
         _cluster: &Self::Configurable,
         _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
+    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
         Ok(BTreeMap::new())
     }
 
@@ -410,7 +410,7 @@ impl Configuration for SupersetConfigFragment {
         _cluster: &Self::Configurable,
         _role_name: &str,
         file: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, ConfigError> {
+    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
         let mut result = BTreeMap::new();
 
         if file == SUPERSET_CONFIG_FILENAME {

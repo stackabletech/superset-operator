@@ -81,9 +81,8 @@ mod tests {
                                         )
                                     ]))
                                 }),
-                                namespace_selector: None,
-                                namespaces: None,
                                 topology_key: "kubernetes.io/hostname".to_string(),
+                                ..PodAffinityTerm::default()
                             },
                             weight: 70
                         }
