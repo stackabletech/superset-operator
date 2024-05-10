@@ -192,7 +192,7 @@ pub async fn reconcile_druid_connection(
                     let resolved_product_image: ResolvedProductImage = superset_cluster
                         .spec
                         .image
-                        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::CARGO_PKG_VERSION);
+                        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION);
                     let job = build_import_job(
                         &superset_cluster,
                         &druid_connection,
