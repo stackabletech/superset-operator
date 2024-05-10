@@ -324,11 +324,13 @@ mod tests {
     use std::pin::Pin;
 
     use indoc::indoc;
-    use stackable_operator::commons::authentication::{
-        oidc,
-        tls::{CaCert, Tls, TlsClientDetails, TlsServerVerification, TlsVerification},
+    use stackable_operator::{
+        commons::authentication::{
+            oidc,
+            tls::{CaCert, Tls, TlsClientDetails, TlsServerVerification, TlsVerification},
+        },
+        kube,
     };
-    use stackable_operator::kube;
 
     use super::*;
 
