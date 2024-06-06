@@ -1,0 +1,12 @@
+{"asctime": "2024-01-01 00:00:00,000", "levelname": "DEBUG", "name": "TestLogger", "message": "Valid log event with log level DEBUG"}
+{"asctime": "2024-01-01 00:00:00,000", "levelname": "INFO", "name": "TestLogger", "message": "Valid log event with log level INFO"}
+{"asctime": "2024-01-01 00:00:00,000", "levelname": "WARNING", "name": "TestLogger", "message": "Valid log event with log level WARNING"}
+{"asctime": "2024-01-01 00:00:00,000", "levelname": "ERROR", "name": "TestLogger", "message": "Valid log event with log level ERROR"}
+{"asctime": "2024-01-01 00:00:00,000", "levelname": "CRITICAL", "name": "TestLogger", "message": "Valid log event with log level CRITICAL"}
+{"levelname": "INFO", "name": "TestLogger", "message": "Invalid log event without a timestamp"}
+{"asctime": "unparsable timestamp", "levelname": "INFO", "name": "TestLogger", "message": "Invalid log event with an unparsable timestamp"}
+{"asctime": "2024-01-01 00:00:00,000", "levelname": "INFO", "message": "Invalid log event without a logger"}
+{"asctime": "2024-01-01 00:00:00,000", "name": "TestLogger", "message": "Invalid log event without a level"}
+{"asctime": "2024-01-01 00:00:00,000", "levelname": "FATAL", "name": "TestLogger", "message": "Invalid log event with an unknown level"}
+{"asctime": "2024-01-01 00:00:00,000", "levelname": "INFO", "name": "TestLogger"}
+"true"
