@@ -6,9 +6,12 @@
 
 - Don't print Superset admin credentials during startup ([#483]).
 - Fix entrypoint to not throw `prepare_signal_handlers: command not found` in case DB initialization fails ([#485]).
+- Processing of corrupted log events fixed; If errors occur, the error
+  messages are added to the log event ([#502]).
 
 [#483]: https://github.com/stackabletech/superset-operator/pull/483
 [#485]: https://github.com/stackabletech/superset-operator/pull/485
+[#502]: https://github.com/stackabletech/superset-operator/pull/502
 
 ## [24.3.0] - 2024-03-20
 
