@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support for versions `3.1.3` and `4.0.2` ([#509]).
+
 ### Changed
 
 - Bump `stackable-operator` to 1.7.0, `product-config` to 0.6.0, and other dependencies ([#511]).
@@ -13,9 +17,14 @@
 - Processing of corrupted log events fixed; If errors occur, the error
   messages are added to the log event ([#502]).
 
+### Removed
+
+- Removed unsupported versions `2.1.1`, `3.0.1` and `3.0.3` ([#509]).
+
 [#483]: https://github.com/stackabletech/superset-operator/pull/483
 [#485]: https://github.com/stackabletech/superset-operator/pull/485
 [#502]: https://github.com/stackabletech/superset-operator/pull/502
+[#509]: https://github.com/stackabletech/superset-operator/pull/509
 [#511]: https://github.com/stackabletech/superset-operator/pull/511
 
 ## [24.3.0] - 2024-03-20
