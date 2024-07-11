@@ -8,7 +8,7 @@
 
 ### Changed
 
-- Bump `stackable-operator` to 1.7.0, `product-config` to 0.6.0, and other dependencies ([#511]).
+- Bump `stackable-operator` to 0.70.0, `product-config` to 0.7.0, and other dependencies ([#511]).
 
 ### Fixed
 
