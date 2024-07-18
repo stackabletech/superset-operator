@@ -5,7 +5,7 @@ commands:
   - script: >-
       helm install superset-vector-aggregator vector
       --namespace $NAMESPACE
-      --version 0.30.0
+      --version 0.34.0
       --repo https://helm.vector.dev
       --values superset-vector-aggregator-values.yaml
 ---
