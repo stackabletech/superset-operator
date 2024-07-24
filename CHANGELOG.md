@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [24.7.0] - 2024-07-24
+
 ### Added
 
 - Support for versions `3.1.3` and `4.0.2` ([#509]).
