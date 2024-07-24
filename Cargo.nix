@@ -6458,7 +6458,7 @@ rec {
       };
       "stackable-superset-crd" = rec {
         crateName = "stackable-superset-crd";
-        version = "0.0.0-dev";
+        version = "24.7.0";
         edition = "2021";
         # We can't filter paths with references in Nix 2.4
         # See https://github.com/NixOS/nix/issues/5410
@@ -6520,7 +6520,7 @@ rec {
       };
       "stackable-superset-operator" = rec {
         crateName = "stackable-superset-operator";
-        version = "0.0.0-dev";
+        version = "24.7.0";
         edition = "2021";
         crateBin = [
           {
