@@ -18,7 +18,7 @@ The default setting is to manually set up users via the web interface where they
 
 === LDAP
 
-Superset supports xref:home:concepts:authentication.adoc[authentication] of users against a single LDAP server.
+Superset supports xref:concepts:authentication.adoc[authentication] of users against a single LDAP server.
 This requires setting up an AuthenticationClass for the LDAP server.
 The AuthenticationClass is then referenced in the SupersetCluster resource as follows:
 
@@ -42,7 +42,7 @@ spec:
 
 Users that log in with LDAP are assigned to a default https://superset.apache.org/docs/security/#roles[Role^{external-link-icon}^] which is specified with the `userRegistrationRole` property.
 
-You can follow the xref:home:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:home:concepts:authentication.adoc#_ldap[AuthenticationClass concepts page].
+You can follow the xref:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:concepts:authentication.adoc#_ldap[AuthenticationClass concepts page].
 
 === [[oidc]]OpenID Connect
 
@@ -115,7 +115,7 @@ A minimum client configuration in Keycloak for this example looks like this:
 <2> Enables the OAuth2 "Authorization Code Flow".
 <3> Enables OpenID Connect and OAuth2 support.
 
-Further information for specifying an AuthenticationClass for an OIDC provider can be found at the xref:home:concepts:authentication.adoc#_oidc[concepts page].
+Further information for specifying an AuthenticationClass for an OIDC provider can be found at the xref:concepts:authentication.adoc#_oidc[concepts page].
 
 == [[authorization]]Authorization
 
