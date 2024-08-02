@@ -25,6 +25,7 @@ pub const PYTHON_IMPORTS: &[&str] = &[
     "from log_config import StackableLoggingConfigurator",
     // Custom logout manager to securely logout while using Keycloak SSO. Issue: https://github.com/apache/superset/issues/24713
     "from superset.security.CustomKeycloakSecurityManager import CustomSsoSecurityManager",
+    "from flask_appbuilder.security.manager import AUTH_OAUTH"
     ];
 
 pub fn add_superset_config(
