@@ -24,9 +24,8 @@ pub const PYTHON_IMPORTS: &[&str] = &[
     "from flask_appbuilder.security.manager import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_OID, AUTH_REMOTE_USER)",
     "from log_config import StackableLoggingConfigurator",
     // Custom logout manager to securely logout while using Keycloak SSO. Issue: https://github.com/apache/superset/issues/24713
-    "from superset.security.CustomKeycloakSecurityManager import CustomSsoSecurityManager",
+    "from superset.security.CustomKeycloakSecurityManager import OIDCSecurityManager",
     // "from flask_appbuilder.security.manager import AUTH_OAUTH"
-    "from flask_appbuilder.security.manager import AUTH_OID, AUTH_REMOTE_USER, AUTH_DB, AUTH_LDAP, AUTH_OAUTH",
     "import os"
     ];
 
