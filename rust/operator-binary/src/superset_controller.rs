@@ -64,7 +64,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     commands::add_cert_to_python_certifi_command,
-    config::{self, PYTHON_IMPORTS},
+    config::{self, PYTHON_IMPORTS, PYTHON_IMPORTS_OIDC},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{
@@ -521,16 +521,28 @@ fn build_rolegroup_config_map(
             .cloned()
             .unwrap_or_default(),
     );
-
     let mut config_file = Vec::new();
-    flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
-        &mut config_file,
-        config_properties.iter(),
-        PYTHON_IMPORTS,
-    )
-    .with_context(|_| BuildRoleGroupConfigFileSnafu {
-        rolegroup: rolegroup.clone(),
-    })?;
+    // For superset OIDC logout, we need to import the custom security manager containing the login and logout functions
+    // therefore we need another import if we have version 4.0.2 ( This can change )
+    if resolved_product_image.product_version != "4.0.2" {
+        flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
+            &mut config_file,
+            config_properties.iter(),
+            PYTHON_IMPORTS,
+        )
+        .with_context(|_| BuildRoleGroupConfigFileSnafu {
+            rolegroup: rolegroup.clone(),
+        })?;
+    } else {
+        flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
+            &mut config_file,
+            config_properties.iter(),
+            PYTHON_IMPORTS_OIDC,
+        )
+        .with_context(|_| BuildRoleGroupConfigFileSnafu {
+            rolegroup: rolegroup.clone(),
+        })?;
+    }
 
     let mut cm_builder = ConfigMapBuilder::new();
 
