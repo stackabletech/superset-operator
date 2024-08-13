@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Reduce CRD size from `472KB` to `45KB` by accepting arbitrary YAML input instead of the underlying schema for the following fields ([#528]):
+  - `podOverrides`
+  - `affinity`
+
+[#528]: https://github.com/stackabletech/superset-operator/pull/528
+
 ## [24.7.0] - 2024-07-24
 
 ### Added
