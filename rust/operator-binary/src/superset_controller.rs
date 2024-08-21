@@ -240,7 +240,9 @@ pub enum Error {
     },
 
     #[snafu(display("failed to add Superset config settings"))]
-    AddSupersetConfig { source: crate::config::Error },
+    AddSupersetConfig {
+        source: crate::config::Error,
+    },
 
     #[snafu(display("failed to add LDAP Volumes and VolumeMounts"))]
     AddLdapVolumesAndVolumeMounts {
@@ -250,6 +252,10 @@ pub enum Error {
     #[snafu(display("failed to add TLS Volumes and VolumeMounts"))]
     AddTlsVolumesAndVolumeMounts {
         source: stackable_operator::commons::authentication::tls::TlsClientDetailsError,
+    },
+
+    WriteToConfigFileString {
+        source: std::io::Error,
     },
 }
 
@@ -525,9 +531,10 @@ fn build_rolegroup_config_map(
 
     let mut config_file = Vec::new();
 
-    if let Some(prefix) = config_properties.remove("EXPERIMENTAL_FILE_HEADER") {
-        writeln!(config_file, "{}", prefix).unwrap();
+    if let Some(header) = config_properties.remove("EXPERIMENTAL_FILE_HEADER") {
+        writeln!(config_file, "{}", header).context(WriteToConfigFileStringSnafu)?;
     }
+
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
         &mut config_file,
         config_properties.iter(),
@@ -536,9 +543,11 @@ fn build_rolegroup_config_map(
     .with_context(|_| BuildRoleGroupConfigFileSnafu {
         rolegroup: rolegroup.clone(),
     })?;
-    if let Some(prefix) = config_properties.remove("EXPERIMENTAL_FOOTER") {
-        writeln!(config_file, "{}", prefix).unwrap();
+
+    if let Some(footer) = config_properties.remove("EXPERIMENTAL_FILE_FOOTER") {
+        writeln!(config_file, "{}", footer).context(WriteToConfigFileStringSnafu)?;
     }
+
     let mut cm_builder = ConfigMapBuilder::new();
 
     cm_builder
