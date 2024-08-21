@@ -530,8 +530,6 @@ fn build_rolegroup_config_map(
 
     let mut config_file = Vec::new();
 
-    // By removing the key from `config_properties`, we avoid pasting the Python code into a Python variable as well
-    // (which would be bad)
     // TODO: Use public constants in operator-rs to reference `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER`
     if let Some(header) = config_properties.remove("EXPERIMENTAL_FILE_HEADER") {
         writeln!(config_file, "{}", header).context(WriteToConfigFileStringSnafu)?;
@@ -548,8 +546,6 @@ fn build_rolegroup_config_map(
         rolegroup: rolegroup.clone(),
     })?;
 
-    // By removing the key from `config_properties`, we avoid pasting the Python code into a Python variable as well
-    // (which would be bad)
     // TODO: Use public constants in operator-rs to reference `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER`
     if let Some(footer) = temp_file_footer {
         writeln!(config_file, "{}", footer).context(WriteToConfigFileStringSnafu)?;
