@@ -240,9 +240,7 @@ pub enum Error {
     },
 
     #[snafu(display("failed to add Superset config settings"))]
-    AddSupersetConfig {
-        source: crate::config::Error,
-    },
+    AddSupersetConfig { source: crate::config::Error },
 
     #[snafu(display("failed to add LDAP Volumes and VolumeMounts"))]
     AddLdapVolumesAndVolumeMounts {
@@ -254,9 +252,10 @@ pub enum Error {
         source: stackable_operator::commons::authentication::tls::TlsClientDetailsError,
     },
 
-    WriteToConfigFileString {
-        source: std::io::Error,
-    },
+    #[snafu(display(
+        "failed to write to String (Vec<u8> to be precise) containing superset config"
+    ))]
+    WriteToConfigFileString { source: std::io::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
