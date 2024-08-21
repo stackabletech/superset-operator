@@ -530,6 +530,8 @@ fn build_rolegroup_config_map(
 
     let mut config_file = Vec::new();
 
+    // By removing the key from `config_properties`, we avoid pasting the Python code into a Python variable as well
+    // (which would be bad)
     if let Some(header) = config_properties.remove("EXPERIMENTAL_FILE_HEADER") {
         writeln!(config_file, "{}", header).context(WriteToConfigFileStringSnafu)?;
     }
@@ -543,6 +545,8 @@ fn build_rolegroup_config_map(
         rolegroup: rolegroup.clone(),
     })?;
 
+    // By removing the key from `config_properties`, we avoid pasting the Python code into a Python variable as well
+    // (which would be bad)
     if let Some(footer) = config_properties.remove("EXPERIMENTAL_FILE_FOOTER") {
         writeln!(config_file, "{}", footer).context(WriteToConfigFileStringSnafu)?;
     }
