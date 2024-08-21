@@ -535,6 +535,7 @@ fn build_rolegroup_config_map(
     if let Some(header) = config_properties.remove("EXPERIMENTAL_FILE_HEADER") {
         writeln!(config_file, "{}", header).context(WriteToConfigFileStringSnafu)?;
     }
+    let temp_file_footer = config_properties.remove("EXPERIMENTAL_FILE_FOOTER");
 
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
         &mut config_file,
@@ -547,7 +548,7 @@ fn build_rolegroup_config_map(
 
     // By removing the key from `config_properties`, we avoid pasting the Python code into a Python variable as well
     // (which would be bad)
-    if let Some(footer) = config_properties.remove("EXPERIMENTAL_FILE_FOOTER") {
+    if let Some(footer) = temp_file_footer {
         writeln!(config_file, "{}", footer).context(WriteToConfigFileStringSnafu)?;
     }
 
