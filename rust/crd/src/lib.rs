@@ -347,6 +347,28 @@ pub struct SupersetConfig {
     /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
     #[fragment_attrs(serde(default))]
     pub graceful_shutdown_timeout: Option<Duration>,
+
+    #[fragment_attrs(serde(default))]
+    pub unsafe_python_customizations: PythonCustomizations,
+}
+
+#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+#[fragment_attrs(
+    derive(
+        Clone,
+        Debug,
+        Default,
+        Deserialize,
+        Merge,
+        JsonSchema,
+        PartialEq,
+        Serialize
+    ),
+    serde(rename_all = "camelCase")
+)]
+pub struct PythonCustomizations {
+    prefix: Option<String>,
+    suffix: Option<String>,
 }
 
 impl SupersetConfig {
@@ -369,7 +391,9 @@ impl SupersetConfig {
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, role),
             graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
-            ..Default::default()
+            row_limit: None,
+            webserver_timeout: None,
+            unsafe_python_customizations: Default::default(),
         }
     }
 }

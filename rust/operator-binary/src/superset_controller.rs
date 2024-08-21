@@ -2,6 +2,7 @@
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet, HashMap},
+    io::Write,
     sync::Arc,
 };
 
@@ -523,6 +524,10 @@ fn build_rolegroup_config_map(
     );
 
     let mut config_file = Vec::new();
+
+    if let Some(prefix) = config_properties.remove("EXPERIMENTAL_FILE_HEADER") {
+        writeln!(config_file, "{}", prefix).unwrap();
+    }
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
         &mut config_file,
         config_properties.iter(),
@@ -531,7 +536,9 @@ fn build_rolegroup_config_map(
     .with_context(|_| BuildRoleGroupConfigFileSnafu {
         rolegroup: rolegroup.clone(),
     })?;
-
+    if let Some(prefix) = config_properties.remove("EXPERIMENTAL_FOOTER") {
+        writeln!(config_file, "{}", prefix).unwrap();
+    }
     let mut cm_builder = ConfigMapBuilder::new();
 
     cm_builder
