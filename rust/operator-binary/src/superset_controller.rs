@@ -533,7 +533,6 @@ fn build_rolegroup_config_map(
 
     let mut config_file = Vec::new();
 
-    // TODO: Use public constants in operator-rs to reference `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER`
     if let Some(header) = config_properties.remove(CONFIG_OVERRIDE_FILE_HEADER_KEY) {
         writeln!(config_file, "{}", header).context(WriteToConfigFileStringSnafu)?;
     }
@@ -549,7 +548,6 @@ fn build_rolegroup_config_map(
         rolegroup: rolegroup.clone(),
     })?;
 
-    // TODO: Use public constants in operator-rs to reference `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER`
     if let Some(footer) = temp_file_footer {
         writeln!(config_file, "{}", footer).context(WriteToConfigFileStringSnafu)?;
     }
