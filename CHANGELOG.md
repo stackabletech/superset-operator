@@ -11,7 +11,6 @@
 - Reduce CRD size from `472KB` to `45KB` by accepting arbitrary YAML input instead of the underlying schema for the following fields ([#528]):
   - `podOverrides`
   - `affinity`
-- Bumping stackable-operator from 0.73.0 to 0.74.0 ([#530])
 
 [#528]: https://github.com/stackabletech/superset-operator/pull/528
 [#530]: https://github.com/stackabletech/superset-operator/pull/530
