@@ -533,10 +533,11 @@ fn build_rolegroup_config_map(
 
     let mut config_file = Vec::new();
 
+    // By removing the keys from `config_properties`, we avoid pasting the Python code into a Python variable as well
+    // (which would be bad)
     if let Some(header) = config_properties.remove(CONFIG_OVERRIDE_FILE_HEADER_KEY) {
         writeln!(config_file, "{}", header).context(WriteToConfigFileStringSnafu)?;
     }
-    // removing key from `config_properties` to avoid key value match. Append it later.
     let temp_file_footer = config_properties.remove(CONFIG_OVERRIDE_FILE_FOOTER_KEY);
 
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
