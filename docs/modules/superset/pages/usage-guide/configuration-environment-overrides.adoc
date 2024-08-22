@@ -59,6 +59,33 @@ be taken to produce a valid configuration.
 For a full list of configuration options we refer to the
 https://github.com/apache/superset/blob/master/superset/config.py[main config file for Superset].
 
+As Superset can be configured with python code too, arbitrary code can be added to the `superset_conf.py`.
+You can use either `EXPERIMENTAL_FILE_HEADER` to add code to the top or `EXPERIMENTAL_FILE_FOOTER` to add to the bottom.
+
+IMPORTANT: This is an experimental feature
+
+[source,yaml]
+----
+nodes:
+  configOverrides:
+    superset_config.py:
+      CSV_EXPORT: "{'encoding': 'utf-8'}"
+      EXPERIMENTAL_FILE_HEADER: |
+        from modules.my_module import my_class
+      EXPERIMENTAL_FILE_FOOTER: |
+        import logging
+        from superset.security import SupersetSecurityManager
+
+        class myCustomSecurityManger(SupersetSecurityManager):
+          def __init__():
+            init()
+
+        CUSTOM_SECURITY_MANAGER = myCustomSecurityManger
+  roleGroups:
+    default:
+      config: {}
+----
+
 == Environment Variables
 
 In a similar fashion, environment variables can be (over)written. For example per role group:
