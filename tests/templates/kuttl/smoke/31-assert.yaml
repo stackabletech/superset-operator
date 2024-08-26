@@ -1,0 +1,11 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+commands:
+  #
+  # Test envOverrides
+  #
+  - script: |
+      kubectl -n $NAMESPACE get cm superset-node-default -o yaml | yq -e '.data."superset_config.py"' | grep "COMMON_HEADER_VAR = "group-value""
+      kubectl -n $NAMESPACE get cm superset-node-default -o yaml | yq -e '.data."superset_config.py"' | grep "ROLE_FOOTER_VAR = "role-value""
