@@ -1,0 +1,12 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+commands:
+  #
+  # Test confOverrides
+  #
+  - script: |
+      kubectl -n $NAMESPACE get cm superset-node-default -o yaml | yq -e '.data."superset_config.py"' | grep "COMMON_CONF_VAR = \"group-value\""
+      kubectl -n $NAMESPACE get cm superset-node-default -o yaml | yq -e '.data."superset_config.py"' | grep "ROLE_CONF_VAR = \"role-value\""
+      kubectl -n $NAMESPACE get cm superset-node-default -o yaml | yq -e '.data."superset_config.py"' | grep "GROUP_CONF_VAR = \"group-value\""

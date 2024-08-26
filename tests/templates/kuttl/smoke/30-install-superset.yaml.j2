@@ -36,6 +36,14 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    configOverrides:
+      superset_config.py:
+        COMMON_CONF_VAR: '"role-value"' # overridden by role group below
+        ROLE_CONF_VAR: '"role-value"'   # only defined here at role level
     roleGroups:
       default:
+        configOverrides:
+          superset_config.py:
+            COMMON_CONF_VAR: '"group-value"' # overrides role value
+            GROUP_CONF_VAR: '"group-value"' # only defined here at group level
         replicas: 1
