@@ -369,7 +369,8 @@ impl SupersetConfig {
             logging: product_logging::spec::default_logging(),
             affinity: get_affinity(cluster_name, role),
             graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
-            ..Default::default()
+            row_limit: None,
+            webserver_timeout: None,
         }
     }
 }

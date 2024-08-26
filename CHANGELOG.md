@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Allowing arbitrary python code as EXPERIMENTAL_FILE_HEADER and EXPERIMENTAL_FILE_FOOTER in superset_config.py ([#530])
+
 ### Changed
 
 - Reduce CRD size from `472KB` to `45KB` by accepting arbitrary YAML input instead of the underlying schema for the following fields ([#528]):
@@ -9,6 +13,7 @@
   - `affinity`
 
 [#528]: https://github.com/stackabletech/superset-operator/pull/528
+[#530]: https://github.com/stackabletech/superset-operator/pull/530
 
 ## [24.7.0] - 2024-07-24
 

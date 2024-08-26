@@ -2,6 +2,7 @@
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet, HashMap},
+    io::Write,
     sync::Arc,
 };
 
@@ -39,7 +40,10 @@ use stackable_operator::{
     kube::{runtime::controller::Action, Resource, ResourceExt},
     kvp::{Label, Labels},
     logging::controller::ReconcilerError,
-    product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
+    product_config_utils::{
+        transform_all_roles_to_config, validate_all_roles_and_groups_config,
+        CONFIG_OVERRIDE_FILE_FOOTER_KEY, CONFIG_OVERRIDE_FILE_HEADER_KEY,
+    },
     product_logging::{
         self,
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
@@ -250,6 +254,11 @@ pub enum Error {
     AddTlsVolumesAndVolumeMounts {
         source: stackable_operator::commons::authentication::tls::TlsClientDetailsError,
     },
+
+    #[snafu(display(
+        "failed to write to String (Vec<u8> to be precise) containing superset config"
+    ))]
+    WriteToConfigFileString { source: std::io::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -523,6 +532,14 @@ fn build_rolegroup_config_map(
     );
 
     let mut config_file = Vec::new();
+
+    // By removing the keys from `config_properties`, we avoid pasting the Python code into a Python variable as well
+    // (which would be bad)
+    if let Some(header) = config_properties.remove(CONFIG_OVERRIDE_FILE_HEADER_KEY) {
+        writeln!(config_file, "{}", header).context(WriteToConfigFileStringSnafu)?;
+    }
+    let temp_file_footer = config_properties.remove(CONFIG_OVERRIDE_FILE_FOOTER_KEY);
+
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
         &mut config_file,
         config_properties.iter(),
@@ -531,6 +548,10 @@ fn build_rolegroup_config_map(
     .with_context(|_| BuildRoleGroupConfigFileSnafu {
         rolegroup: rolegroup.clone(),
     })?;
+
+    if let Some(footer) = temp_file_footer {
+        writeln!(config_file, "{}", footer).context(WriteToConfigFileStringSnafu)?;
+    }
 
     let mut cm_builder = ConfigMapBuilder::new();
 
