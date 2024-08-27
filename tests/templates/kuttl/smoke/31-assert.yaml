@@ -9,6 +9,7 @@ commands:
   - script: |
       kubectl -n $NAMESPACE get cm superset-node-default -o yaml | yq -e '.data."superset_config.py"' | grep "COMMON_HEADER_VAR = "group-value""
       kubectl -n $NAMESPACE get cm superset-node-default -o yaml | yq -e '.data."superset_config.py"' | grep "ROLE_FOOTER_VAR = "role-value""
+      if [ -z "$(kubectl -n $NAMESPACE get cm superset-node-default -o yaml | yq -e '.data."superset_config.py"' | grep "ROLE_HEADER_VAR = \"role-value\"")" ]; then (echo "Success, ROLE_HEADER_VAR not present") else { echo "Failure, ROLE_HEADER_VAR present"; exit 1; } fi
       kubectl -n $NAMESPACE get sts superset-node-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "superset") | .env[] | select (.name == "COMMON_VAR" and .value == "group-value")'
       kubectl -n $NAMESPACE get sts superset-node-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "superset") | .env[] | select (.name == "GROUP_VAR" and .value == "group-value")'
       kubectl -n $NAMESPACE get sts superset-node-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "superset") | .env[] | select (.name == "ROLE_VAR" and .value == "role-value")'
