@@ -7,8 +7,7 @@ commands:
   # Test envOverrides
   #
   - script: |
-      #!/usr/bin/env bash
-      set -euo pipefail
+      set -eu
 
       # Config Test Data
       SUPERSET_CONFIG=$(
