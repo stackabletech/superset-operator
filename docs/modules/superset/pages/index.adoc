@@ -1,5 +1,5 @@
 = Stackable Operator for Apache Superset
-:description: The Stackable operator for Apache Superset is a Kubernetes operator that can manage Apache Superset clusters. Learn about its features, resources, dependencies and demos, and see the list of supported Superset versions.
+:description: Stackable Operator for Apache Superset manages Superset clusters on Kubernetes for data exploration, SQL connections, and visualization.
 :keywords: Stackable operator, Apache Superset, Kubernetes, operator, data science, data exploration
 :superset: https://superset.apache.org/
 :crs: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/

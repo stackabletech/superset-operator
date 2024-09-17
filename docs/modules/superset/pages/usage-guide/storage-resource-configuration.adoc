@@ -1,4 +1,5 @@
 = Storage and resource configuration
+:description: Superset resource configuration: default CPU and memory requests for HA setup with guidance for adapting production resource needs.
 
 == Resource Requests
 

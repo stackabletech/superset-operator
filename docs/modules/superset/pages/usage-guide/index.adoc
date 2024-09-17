@@ -1,5 +1,6 @@
 = Usage guide
 :page-aliases: usage.doc
+:description: Superset usage guide: configure resources, connect to Apache Druid, set up authentication, logging, and monitoring.
 
 The usage guide covers various aspects of configuring Superset and interconnection with other tools.
 
