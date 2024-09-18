@@ -1,4 +1,8 @@
 = Security
+:description: Superset security: configure authentication via database, LDAP, or OpenID Connect with roles-based authorization for user access control.
+:superset-roles: https://superset.apache.org/docs/security/#roles
+:superset-security: https://superset.apache.org/docs/security
+:keycloak: https://www.keycloak.org/
 
 == [[authentication]]Authentication
 
@@ -40,7 +44,7 @@ spec:
 <1> The reference to an AuthenticationClass called `ldap`
 <2> The default role to which all users are assigned
 
-Users that log in with LDAP are assigned to a default https://superset.apache.org/docs/security/#roles[Role^{external-link-icon}^] which is specified with the `userRegistrationRole` property.
+Users that log in with LDAP are assigned to a default {superset-roles}[Role^{external-link-icon}^] which is specified with the `userRegistrationRole` property.
 
 You can follow the xref:tutorials:authentication_with_openldap.adoc[] tutorial to learn how to set up an AuthenticationClass for an LDAP server, as well as consulting the xref:concepts:authentication.adoc#_ldap[AuthenticationClass concepts page].
 
@@ -50,7 +54,7 @@ An OpenID Connect provider can be used for authentication.
 Unfortunately, there is no generic support for OpenID Connect built into Superset.
 This means that only specific OpenID Connect providers can be configured.
 
-IMPORTANT: Superset deployments on the Stackable Data Platform only support https://www.keycloak.org/[Keycloak^{external-link-icon}^].
+IMPORTANT: Superset deployments on the Stackable Data Platform only support {keycloak}[Keycloak^{external-link-icon}^].
 
 [source,yaml]
 ----
@@ -73,7 +77,7 @@ spec:
 <2> The reference to the Secret containing the Superset client credentials
 <3> The default role to which all users are assigned
 
-Users that log in with OpenID Connect are assigned to a default https://superset.apache.org/docs/security/#roles[Role^{external-link-icon}^] which is specified with the `userRegistrationRole` property.
+Users that log in with OpenID Connect are assigned to a default {superset-roles}[Role^{external-link-icon}^] which is specified with the `userRegistrationRole` property.
 
 The Secret containing the Superset client credentials:
 
@@ -120,7 +124,7 @@ Further information for specifying an AuthenticationClass for an OIDC provider c
 == [[authorization]]Authorization
 
 Superset has a concept called `Roles` which allows you to grant user permissions based on roles.
-Have a look at the https://superset.apache.org/docs/security[Superset documentation on Security^{external-link-icon}^].
+Have a look at the {superset-security}[Superset documentation on Security^{external-link-icon}^].
 
 === Superset database
 
@@ -128,7 +132,7 @@ You can view all the available roles in the web interface of Superset and can al
 
 === LDAP
 
-Superset supports assigning https://superset.apache.org/docs/security/#roles[Roles^{external-link-icon}^] to users based on their LDAP group membership, though this is not yet supported by the Stackable operator.
+Superset supports assigning {superset-roles}[Roles^{external-link-icon}^] to users based on their LDAP group membership, though this is not yet supported by the Stackable operator.
 All the users logging in via LDAP get assigned to the same role which you can configure via the attribute `authentication[*].userRegistrationRole` on the `SupersetCluster` object:
 
 [source,yaml]
@@ -149,7 +153,7 @@ spec:
 === OpenID Connect
 
 The mechanism for assigning roles to users described in the LDAP section also applies to OpenID Connect.
-Superset supports assigning https://superset.apache.org/docs/security/#roles[Roles^{external-link-icon}^] to users based on their OpenID Connect scopes, though this is not yet supported by the Stackable operator.
+Superset supports assigning {superset-roles}[Roles^{external-link-icon}^] to users based on their OpenID Connect scopes, though this is not yet supported by the Stackable operator.
 All the users logging in via OpenID Connect get assigned to the same role which you can configure via the attribute `authentication[*].userRegistrationRole` on the `SupersetCluster` object:
 
 [source,yaml]

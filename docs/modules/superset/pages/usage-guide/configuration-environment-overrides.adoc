@@ -4,14 +4,12 @@ The cluster definition also supports overriding configuration properties and env
 either per role or per role group, where the more specific override (role group) has precedence over
 the less specific one (role).
 
-IMPORTANT: Overriding certain properties which are set by the operator (such as the `STATS_LOGGER`)
-can interfere with the operator and can lead to problems.
+IMPORTANT: Overriding certain properties which are set by the operator (such as the `STATS_LOGGER`) can interfere with the operator and can lead to problems.
 
 == Configuration Properties
 
-For a role or role group, at the same level of `config`, you can specify `configOverrides` for the
-`superset_config.py`. For example, if you want to set the CSV export encoding and the preferred
-databases adapt the `nodes` section of the cluster resource as follows:
+For a role or role group, at the same level of `config`, you can specify `configOverrides` for the `superset_config.py`.
+For example, if you want to set the CSV export encoding and the preferred databases adapt the `nodes` section of the cluster resource as follows:
 
 [source,yaml]
 ----
@@ -53,8 +51,9 @@ nodes:
       config: {}
 ----
 
-All override property values must be strings. They are treated as Python expressions. So care must
-be taken to produce a valid configuration.
+All override property values must be strings.
+They are treated as Python expressions.
+So care must be taken to produce a valid configuration.
 
 For a full list of configuration options we refer to the
 https://github.com/apache/superset/blob/master/superset/config.py[main config file for Superset].
@@ -88,7 +87,8 @@ nodes:
 
 == Environment Variables
 
-In a similar fashion, environment variables can be (over)written. For example per role group:
+In a similar fashion, environment variables can be (over)written.
+For example per role group:
 
 [source,yaml]
 ----
