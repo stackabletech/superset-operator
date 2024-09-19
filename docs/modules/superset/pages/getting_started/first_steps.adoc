@@ -6,7 +6,7 @@ Once you have followed the steps in  xref:getting_started/installation.adoc[] fo
 
 Superset metadata (slices, connections, tables, dashboards etc.) is stored in an SQL database.
 
-For testing purposes, you can spin up a PostgreSQL database with the following commands:
+For testing, you can set up a PostgreSQL database with these commands:
 
 [source,bash]
 include::example$getting_started/getting_started.sh[tag=add-bitnami-repo]
@@ -14,28 +14,29 @@ include::example$getting_started/getting_started.sh[tag=add-bitnami-repo]
 [source,bash]
 include::example$getting_started/getting_started.sh[tag=install-bitnami-psql]
 
-WARNING: This setup is unsuitable for production use! Follow the specific production setup instructions for one of the xref:required-external-components[supported databases] to get a production-ready database.
+WARNING: This setup is not suitable for production use.
+Refer to the xref:required-external-components[supported databases] for production-ready database setup instructions.
 
 == Secret with Superset credentials
 
-A secret with the necessary credentials must be created: this contains database connection credentials as well as an admin account for Superset itself. Create a file called `superset-credentials.yaml`:
+You need to create a secret with the required credentials (database connection credentials and an admin account for Superset).
+Create a file called `superset-credentials.yaml`:
 
 [source,yaml]
 include::example$getting_started/superset-credentials.yaml[]
 
-And apply it:
+Apply the Secret:
 
 [source,bash]
 include::example$getting_started/getting_started.sh[tag=apply-superset-credentials]
 
-The `connections.secretKey` will be used for securely signing the session cookies and can be used
-for any other security related needs by extensions. It should be a long random string of bytes.
+The `connections.secretKey` will be used for securely signing the session cookies and can be used for any other security-related needs by extensions.
+It should be a long, random string.
 
-`connections.sqlalchemyDatabaseUri` must contain the connection string to the SQL database storing
-the Superset metadata.
+`connections.sqlalchemyDatabaseUri` must contain the connection string to the SQL database storing the Superset metadata.
 
 The `adminUser` fields are used to create an admin user.
-Please note that the admin user will be disabled if you use a non-default authentication mechanism like LDAP.
+If using non-default authentication (e.g., LDAP), the admin user is disabled.
 
 == Creation of a Superset node
 
@@ -67,40 +68,43 @@ include::example$getting_started/getting_started.sh[tag=wait-superset]
 
 == Connecting to the web interface
 
-When the Superset node is created and the database is initialized, Superset can be opened in the
-browser.
+Once the Superset node is created and the database is initialized, you can open Superset in your browser.
 
-The Superset port which defaults to `8088` can be forwarded to the local host:
+To forward the Superset port (`8088`) to localhost, run:
 
 [source,bash]
 include::example$getting_started/getting_started.sh[tag=port-forwarding]
 
-Then it can be opened in the browser with `http://localhost:8088`.
-
-Enter the admin credentials from the Kubernetes secret:
+Then, open `http://localhost:8088` in your browser and log in with the admin credentials from the Kubernetes secret.
 
 image::getting_started/superset-login.png[Login screen of Superset]
 
-Great! Now the Superset is already ready to use, but if you also want some sample data and dashboards to explore the functionalities Superset has to offer, continue with the next step.
+Superset is now ready for use.
+If you want to load sample data and dashboards and explore its Superset's functionality, proceed to the next step.
 
 == Loading examples and accessing example dashboards
 
-To have some data to play with and some dashboards to explore, Superset comes with some example data that you can load. To do so, create a file `superset-load-examples-job.yaml` with this content:
+To have some data to play with and some dashboards to explore, Superset comes with some example data that you can load.
+To do so, create a file `superset-load-examples-job.yaml` with this content:
 
 [source,bash]
 include::example$getting_started/superset-load-examples-job.yaml[]
 
-This is a Kubernetes Job. The same connection information and credentials are loaded that are also used by the Superset instance. The Job will load the example data. Execute it and await its termination like so:
+This Kubernetes Job uses the same connection information and credentials as the Superset instance to load the example data.
+Run the Job and wait for it to finish with the following command:
 
 [source,bash]
 include::example$getting_started/getting_started.sh[tag=load-examples]
 
-The Job will take a few minutes to terminate. Afterwards, check back again on the web interface. New dashboards should be available:
+The Job will take a few minutes to terminate.
+Afterwards, check back again on the web interface.
+New dashboards should be available:
 
 image::getting_started/superset-dashboard.png[Superset dashboard showing birth names]
 
-Great! Now you can explore this sample data, run queries on it or create your own dashboards.
+Great!
+Now you can explore this sample data, run queries on it or create your own dashboards.
 
 == What's next
 
-Look at the xref:usage-guide/index.adoc[] to find out more about configuring your Superset instance or have a look at the Superset documentation to https://superset.apache.org/docs/creating-charts-dashboards/creating-your-first-dashboard[create your first dashboard].
+Check the xref:usage-guide/index.adoc[] to find out more about configuring your Superset instance or have a look at the Superset documentation to https://superset.apache.org/docs/creating-charts-dashboards/creating-your-first-dashboard[create your first dashboard].

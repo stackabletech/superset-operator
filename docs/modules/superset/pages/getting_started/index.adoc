@@ -1,6 +1,7 @@
 = Getting started
 
-This guide will get you started with Superset using the Stackable Operator. It will guide you through the installation of the Operator and its dependencies, setting up your first Superset instance, connecting to it and looking at some sample data.
+This guide will get you started with Superset using the Stackable Operator.
+It will guide you through the installation of the Operator and its dependencies, setting up your first Superset instance, connecting to it and looking at some sample data.
 
 == Prerequisites
 
@@ -17,7 +18,7 @@ Resource sizing depends on cluster type(s), usage and scope, but as a starting p
 
 == What's next
 
-The Guide is divided into two steps:
+The guide is divided into two steps:
 
 * xref:getting_started/installation.adoc[Installing the Operators].
 * xref:getting_started/first_steps.adoc[Setting up the Superset instance and connecting to it].
