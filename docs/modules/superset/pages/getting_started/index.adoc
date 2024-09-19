@@ -1,11 +1,11 @@
 = Getting started
 
-This guide will get you started with Superset using the Stackable Operator.
-It will guide you through the installation of the Operator and its dependencies, setting up your first Superset instance, connecting to it and looking at some sample data.
+This guide helps you get started with Superset using the Stackable Operator.
+It covers the installation of the Operator and its dependencies, setting up your first Superset instance, connecting to it, and exploring sample data.
 
 == Prerequisites
 
-You will need:
+You’ll need the following:
 
 * a Kubernetes cluster
 * kubectl
