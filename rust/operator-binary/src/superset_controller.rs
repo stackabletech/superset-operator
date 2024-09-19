@@ -252,7 +252,7 @@ pub enum Error {
 
     #[snafu(display("failed to add TLS Volumes and VolumeMounts"))]
     AddTlsVolumesAndVolumeMounts {
-        source: stackable_operator::commons::authentication::tls::TlsClientDetailsError,
+        source: stackable_operator::commons::tls_verification::TlsClientDetailsError,
     },
 
     #[snafu(display(
@@ -607,7 +607,7 @@ fn build_node_rolegroup_service(
     Ok(Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(superset)
-            .name(&rolegroup.object_name())
+            .name(rolegroup.object_name())
             .ownerreference_from_resource(superset, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(build_recommended_labels(
@@ -864,7 +864,7 @@ fn build_server_rolegroup_statefulset(
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(superset)
-            .name(&rolegroup_ref.object_name())
+            .name(rolegroup_ref.object_name())
             .ownerreference_from_resource(superset, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(build_recommended_labels(

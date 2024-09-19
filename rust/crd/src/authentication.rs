@@ -324,13 +324,11 @@ mod tests {
     use std::pin::Pin;
 
     use indoc::indoc;
-    use stackable_operator::{
-        commons::authentication::{
-            oidc,
-            tls::{CaCert, Tls, TlsClientDetails, TlsServerVerification, TlsVerification},
-        },
-        kube,
+    use stackable_operator::commons::networking::HostName;
+    use stackable_operator::commons::tls_verification::{
+        CaCert, Tls, TlsClientDetails, TlsServerVerification, TlsVerification,
     };
+    use stackable_operator::{commons::authentication::oidc, kube};
 
     use super::*;
 
@@ -453,7 +451,7 @@ mod tests {
                 authentication_classes_resolved: vec![
                     SupersetAuthenticationClassResolved::Oidc {
                         provider: oidc::AuthenticationProvider::new(
-                            "first.oidc.server".into(),
+                            HostName::try_from("first.oidc.server".to_string()).unwrap(),
                             Some(443),
                             "/realms/main".into(),
                             TlsClientDetails {
@@ -475,7 +473,7 @@ mod tests {
                     },
                     SupersetAuthenticationClassResolved::Oidc {
                         provider: oidc::AuthenticationProvider::new(
-                            "second.oidc.server".into(),
+                            HostName::try_from("second.oidc.server".to_string()).unwrap(),
                             None,
                             "/realms/test".into(),
                             TlsClientDetails { tls: None },
