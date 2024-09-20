@@ -12,13 +12,8 @@
   - `podOverrides`
   - `affinity`
 
-### Fixed
-
-- BREAKING: The fields `connection` and `host` on `S3Connection` as well as `bucketName` on `S3Bucket`are now mandatory. Previously operators errored out in case these fields where missing ([#544]).
-
 [#528]: https://github.com/stackabletech/superset-operator/pull/528
 [#530]: https://github.com/stackabletech/superset-operator/pull/530
-[#544]: https://github.com/stackabletech/superset-operator/pull/544
 
 ## [24.7.0] - 2024-07-24
 
