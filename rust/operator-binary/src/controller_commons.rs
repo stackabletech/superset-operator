@@ -47,7 +47,7 @@ pub fn create_volumes(
         volumes.push(Volume {
             name: LOG_CONFIG_VOLUME_NAME.into(),
             config_map: Some(ConfigMapVolumeSource {
-                name: Some(config_map.into()),
+                name: config_map.into(),
                 ..ConfigMapVolumeSource::default()
             }),
             ..Volume::default()
@@ -56,7 +56,7 @@ pub fn create_volumes(
         volumes.push(Volume {
             name: LOG_CONFIG_VOLUME_NAME.into(),
             config_map: Some(ConfigMapVolumeSource {
-                name: Some(config_map_name.into()),
+                name: config_map_name.into(),
                 ..ConfigMapVolumeSource::default()
             }),
             ..Volume::default()
