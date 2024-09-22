@@ -14,7 +14,7 @@ include::example$getting_started/getting_started.sh[tag=add-bitnami-repo]
 [source,bash]
 include::example$getting_started/getting_started.sh[tag=install-bitnami-psql]
 
-WARNING: This setup is not suitable for production use.
+WARNING: This setup is not suitable for use in production.
 Refer to the xref:required-external-components[supported databases] for production-ready database setup instructions.
 
 == Secret with Superset credentials
