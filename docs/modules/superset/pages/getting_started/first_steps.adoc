@@ -30,7 +30,7 @@ Apply the Secret:
 [source,bash]
 include::example$getting_started/getting_started.sh[tag=apply-superset-credentials]
 
-The `connections.secretKey` will be used for securely signing the session cookies and can be used for any other security-related needs by extensions.
+The `connections.secretKey` will be used for securely signing the session cookies and can be used by the extensions for any other security-related needs.
 It should be a long, random string.
 
 `connections.sqlalchemyDatabaseUri` must contain the connection string to the SQL database storing the Superset metadata.
