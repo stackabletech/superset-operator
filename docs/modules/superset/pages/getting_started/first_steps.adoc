@@ -80,7 +80,7 @@ Then, open `http://localhost:8088` in your browser and log in with the admin cre
 image::getting_started/superset-login.png[Login screen of Superset]
 
 Superset is now ready for use.
-If you want to load sample data and dashboards and explore its Superset's functionality, proceed to the next step.
+If you want to load sample data and dashboards and explore Superset's functionality, proceed to the next step.
 
 == Loading examples and accessing example dashboards
 
