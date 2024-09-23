@@ -13,8 +13,8 @@
 * {feature-tracker}[Feature Tracker {external-link-icon}^]
 * {crd}[CRD documentation {external-link-icon}^]
 
-The Stackable operator for {superset}[Apache Superset] is an operator that can deploy and manage Apache Superset clusters on Kubernetes.
-Superset is a data exploration and visualization tool that connects to data sources via SQL.
+The Stackable operator for {superset}[Apache Superset] deploys and manages Superset clusters on Kubernetes.
+Superset is a data exploration and visualization tool that connects to SQL-based data sources.
 Store your data in Apache Druid or Trino, and manage your Druid and Trino instances with the Stackable operators for xref:druid:index.adoc[Apache Druid] or xref:trino:index.adoc[Trino].
 This operator helps you manage your Superset instances on Kubernetes efficiently.
 

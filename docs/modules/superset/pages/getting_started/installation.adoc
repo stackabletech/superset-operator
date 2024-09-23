@@ -1,17 +1,18 @@
 = Installation
 
-On this page you will install the Stackable Superset Operator as well as the commons, secret and listener Operator which are
-required by all Stackable Operators.
+On this page you will install the Stackable Superset Operator as well as the commons, secret and listener operators which are required by all Stackable Operators.
 
 == Stackable Operators
 
-There are 2 ways to run Stackable Operators
+There are multiple ways to install the Stackable Operator for Apache Zookeeper.
+`stackablectl` is the preferred way but Helm is also supported.
+OpenShift users may prefer installing the operator from the RedHat Certified Operator catalog using the OpenShift web console.
 
-. Using xref:management:stackablectl:index.adoc[]
-. Using Helm
-
-=== stackablectl
-
+[tabs]
+====
+stackablectl (recommended)::
++
+--
 `stackablectl` is the command line tool to interact with Stackable operators and our recommended way to install
 Operators. Follow the xref:management:stackablectl:installation.adoc[installation steps] for your platform.
 
@@ -27,12 +28,15 @@ The tool will show
 [source]
 include::example$getting_started/install_output.txt[]
 
-TIP: Consult the xref:management:stackablectl:quickstart.adoc[] to learn more about how to use `stackablectl`. For
-example, you can use the `--cluster kind` flag to create a Kubernetes cluster with link:https://kind.sigs.k8s.io/[kind].
+TIP: Consult the xref:management:stackablectl:quickstart.adoc[] to learn more about how to use `stackablectl`.
+For example, you can use the `--cluster kind` flag to create a Kubernetes cluster with link:https://kind.sigs.k8s.io/[kind].
+--
 
-=== Helm
-
-You can also use Helm to install the Operators. Add the Stackable Helm repository:
+Helm::
++
+--
+You can also use Helm to install the Operators.
+Add the Stackable Helm repository:
 [source,bash]
 ----
 include::example$getting_started/getting_started.sh[tag=helm-add-repo]
@@ -44,8 +48,10 @@ Then install the Stackable Operators:
 include::example$getting_started/getting_started.sh[tag=helm-install-operators]
 ----
 
-Helm will deploy the Operators in a Kubernetes Deployment and apply the CRDs for the Superset service (as well as the
-CRDs for the required operators). You are now ready to deploy Superset in Kubernetes.
+Helm will deploy the operators in a Kubernetes Deployment and apply the CRDs for the Superset service (as well as the CRDs for the required operators).
+You are now ready to deploy Superset in Kubernetes.
+--
+====
 
 == What's next
 
