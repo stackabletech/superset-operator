@@ -4,7 +4,9 @@
 
 ### Added
 
-- Allowing arbitrary python code as EXPERIMENTAL_FILE_HEADER and EXPERIMENTAL_FILE_FOOTER in superset_config.py ([#530])
+- Allowing arbitrary python code as EXPERIMENTAL_FILE_HEADER and EXPERIMENTAL_FILE_FOOTER in superset_config.py ([#530]).
+- The operator can now run on Kubernetes clusters using a non-default cluster domain.
+  Use the env var `KUBERNETES_CLUSTER_DOMAIN` or the operator Helm chart property `kubernetesClusterDomain` to set a non-default cluster domain ([#549]).
 
 ### Changed
 
@@ -14,6 +16,7 @@
 
 [#528]: https://github.com/stackabletech/superset-operator/pull/528
 [#530]: https://github.com/stackabletech/superset-operator/pull/530
+[#549]: https://github.com/stackabletech/superset-operator/pull/549
 
 ## [24.7.0] - 2024-07-24
 

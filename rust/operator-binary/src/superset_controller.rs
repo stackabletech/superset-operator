@@ -15,6 +15,7 @@ use product_config::{
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
+        self,
         configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
         pod::{
@@ -46,7 +47,9 @@ use stackable_operator::{
     },
     product_logging::{
         self,
-        framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
+        framework::{
+            create_vector_shutdown_file_command, remove_vector_shutdown_file_command, LoggingError,
+        },
         spec::Logging,
     },
     role_utils::{GenericRoleConfig, RoleGroupRef},
@@ -57,12 +60,13 @@ use stackable_operator::{
     time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
-use stackable_superset_crd::authentication::SupersetAuthenticationClassResolved;
 use stackable_superset_crd::{
-    authentication::SupersetClientAuthenticationDetailsResolved, Container, SupersetCluster,
-    SupersetClusterStatus, SupersetConfig, SupersetConfigOptions, SupersetRole, APP_NAME,
-    PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
-    SUPERSET_CONFIG_FILENAME,
+    authentication::{
+        SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
+    },
+    Container, SupersetCluster, SupersetClusterStatus, SupersetConfig, SupersetConfigOptions,
+    SupersetRole, APP_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR,
+    STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -259,6 +263,17 @@ pub enum Error {
         "failed to write to String (Vec<u8> to be precise) containing superset config"
     ))]
     WriteToConfigFileString { source: std::io::Error },
+
+    #[snafu(display("failed to configure logging"))]
+    ConfigureLogging { source: LoggingError },
+
+    #[snafu(display("failed to add needed volume"))]
+    AddVolume { source: builder::pod::Error },
+
+    #[snafu(display("failed to add needed volumeMount"))]
+    AddVolumeMount {
+        source: builder::pod::container::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -742,9 +757,9 @@ fn build_server_rolegroup_statefulset(
     superset_cb
         .image_from_product_image(resolved_product_image)
         .add_container_port("http", APP_PORT.into())
-        .add_volume_mount(CONFIG_VOLUME_NAME, STACKABLE_CONFIG_DIR)
-        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, STACKABLE_LOG_CONFIG_DIR)
-        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
+        .add_volume_mount(CONFIG_VOLUME_NAME, STACKABLE_CONFIG_DIR).context(AddVolumeMountSnafu)?
+        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, STACKABLE_LOG_CONFIG_DIR).context(AddVolumeMountSnafu)?
+        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR).context(AddVolumeMountSnafu)?
         .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
         .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
         .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
@@ -839,22 +854,26 @@ fn build_server_rolegroup_statefulset(
     pb.add_volumes(controller_commons::create_volumes(
         &rolegroup_ref.object_name(),
         merged_config.logging.containers.get(&Container::Superset),
-    ));
+    ))
+    .context(AddVolumeSnafu)?;
     pb.add_container(metrics_container);
 
     if merged_config.logging.enable_vector_agent {
-        pb.add_container(product_logging::framework::vector_container(
-            resolved_product_image,
-            CONFIG_VOLUME_NAME,
-            LOG_VOLUME_NAME,
-            merged_config.logging.containers.get(&Container::Vector),
-            ResourceRequirementsBuilder::new()
-                .with_cpu_request("250m")
-                .with_cpu_limit("500m")
-                .with_memory_request("128Mi")
-                .with_memory_limit("128Mi")
-                .build(),
-        ));
+        pb.add_container(
+            product_logging::framework::vector_container(
+                resolved_product_image,
+                CONFIG_VOLUME_NAME,
+                LOG_VOLUME_NAME,
+                merged_config.logging.containers.get(&Container::Vector),
+                ResourceRequirementsBuilder::new()
+                    .with_cpu_request("250m")
+                    .with_cpu_limit("500m")
+                    .with_memory_request("128Mi")
+                    .with_memory_limit("128Mi")
+                    .build(),
+            )
+            .context(ConfigureLoggingSnafu)?,
+        );
     }
 
     let mut pod_template = pb.build_template();
