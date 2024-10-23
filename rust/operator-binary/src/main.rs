@@ -11,6 +11,7 @@ use stackable_operator::{
         core::v1::{ConfigMap, Service},
     },
     kube::{
+        core::DeserializeGuard,
         runtime::{reflector::ObjectRef, watcher, Controller},
         ResourceExt,
     },
@@ -86,28 +87,28 @@ async fn main() -> anyhow::Result<()> {
             .await?;
 
             let superset_controller_builder = Controller::new(
-                watch_namespace.get_api::<SupersetCluster>(&client),
+                watch_namespace.get_api::<DeserializeGuard<SupersetCluster>>(&client),
                 watcher::Config::default(),
             );
             let superset_store_1 = superset_controller_builder.store();
             let superset_controller = superset_controller_builder
                 .owns(
-                    watch_namespace.get_api::<Service>(&client),
+                    watch_namespace.get_api::<DeserializeGuard<Service>>(&client),
                     watcher::Config::default(),
                 )
                 .owns(
-                    watch_namespace.get_api::<StatefulSet>(&client),
+                    watch_namespace.get_api::<DeserializeGuard<StatefulSet>>(&client),
                     watcher::Config::default(),
                 )
                 .shutdown_on_signal()
                 .watches(
-                    client.get_api::<AuthenticationClass>(&()),
+                    client.get_api::<DeserializeGuard<AuthenticationClass>>(&()),
                     watcher::Config::default(),
                     move |authentication_class| {
                         superset_store_1
                             .state()
                             .into_iter()
-                            .filter(move |superset: &Arc<SupersetCluster>| {
+                            .filter(move |superset| {
                                 references_authentication_class(superset, &authentication_class)
                             })
                             .map(|superset| ObjectRef::from_obj(&*superset))
@@ -130,7 +131,7 @@ async fn main() -> anyhow::Result<()> {
                 });
 
             let druid_connection_controller_builder = Controller::new(
-                watch_namespace.get_api::<DruidConnection>(&client),
+                watch_namespace.get_api::<DeserializeGuard<DruidConnection>>(&client),
                 watcher::Config::default(),
             );
             let druid_connection_store_1 = druid_connection_controller_builder.store();
@@ -139,46 +140,38 @@ async fn main() -> anyhow::Result<()> {
             let druid_connection_controller = druid_connection_controller_builder
                 .shutdown_on_signal()
                 .watches(
-                    watch_namespace.get_api::<SupersetCluster>(&client),
+                    watch_namespace.get_api::<DeserializeGuard<SupersetCluster>>(&client),
                     watcher::Config::default(),
                     move |superset_cluster| {
                         druid_connection_store_1
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                druid_connection.superset_name() == superset_cluster.name_any()
-                                    && druid_connection.superset_namespace().ok()
-                                        == superset_cluster.namespace()
+                                valid_druid_connection(&superset_cluster, druid_connection)
                             })
                             .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
                 )
                 .watches(
-                    watch_namespace.get_api::<Job>(&client),
+                    watch_namespace.get_api::<DeserializeGuard<Job>>(&client),
                     watcher::Config::default(),
                     move |job| {
                         druid_connection_store_2
                             .state()
                             .into_iter()
-                            .filter(move |druid_connection| {
-                                druid_connection.metadata.namespace == job.metadata.namespace
-                                    && Some(druid_connection.job_name()) == job.metadata.name
-                            })
+                            .filter(move |druid_connection| valid_druid_job(druid_connection, &job))
                             .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
                 )
                 .watches(
-                    watch_namespace.get_api::<ConfigMap>(&client),
+                    watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
                     watcher::Config::default(),
                     move |config_map| {
                         druid_connection_store_3
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
-                                druid_connection.druid_namespace().ok()
-                                    == config_map.metadata.namespace
-                                    && Some(druid_connection.druid_name())
-                                        == config_map.metadata.name
+                                valid_druid_connection_namespace(druid_connection, &config_map)
                             })
                             .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
@@ -208,9 +201,16 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn references_authentication_class(
-    superset: &SupersetCluster,
-    authentication_class: &AuthenticationClass,
+    superset: &DeserializeGuard<SupersetCluster>,
+    authentication_class: &DeserializeGuard<AuthenticationClass>,
 ) -> bool {
+    let Ok(superset) = &superset.0 else {
+        return false;
+    };
+    let Ok(authentication_class) = &authentication_class.0 else {
+        return false;
+    };
+
     let authentication_class_name = authentication_class.name_any();
     superset
         .spec
@@ -218,4 +218,47 @@ fn references_authentication_class(
         .authentication
         .iter()
         .any(|c| c.common.authentication_class_name() == &authentication_class_name)
+}
+
+fn valid_druid_connection(
+    superset_cluster: &DeserializeGuard<SupersetCluster>,
+    druid_connection: &DeserializeGuard<DruidConnection>,
+) -> bool {
+    let Ok(superset_cluster) = &superset_cluster.0 else {
+        return false;
+    };
+    let Ok(druid_connection) = &druid_connection.0 else {
+        return false;
+    };
+    druid_connection.superset_name() == superset_cluster.name_any()
+        && druid_connection.superset_namespace().ok() == superset_cluster.namespace()
+}
+
+fn valid_druid_connection_namespace(
+    druid_connection: &DeserializeGuard<DruidConnection>,
+    config_map: &DeserializeGuard<ConfigMap>,
+) -> bool {
+    let Ok(druid_connection) = &druid_connection.0 else {
+        return false;
+    };
+    let Ok(config_map) = &config_map.0 else {
+        return false;
+    };
+    druid_connection.druid_namespace().ok() == config_map.metadata.namespace
+        && Some(druid_connection.druid_name()) == config_map.metadata.name
+}
+
+fn valid_druid_job(
+    druid_connection: &DeserializeGuard<DruidConnection>,
+    job: &DeserializeGuard<Job>,
+) -> bool {
+    let Ok(druid_connection) = &druid_connection.0 else {
+        return false;
+    };
+    let Ok(job) = &job.0 else {
+        return false;
+    };
+
+    druid_connection.metadata.namespace == job.metadata.namespace
+        && Some(druid_connection.job_name()) == job.metadata.name
 }
