@@ -58,6 +58,7 @@ async fn main() -> anyhow::Result<()> {
             product_config,
             watch_namespace,
             tracing_target,
+            cluster_info_opts,
         }) => {
             stackable_operator::logging::initialize_logging(
                 "SUPERSET_OPERATOR_LOG",
@@ -78,9 +79,11 @@ async fn main() -> anyhow::Result<()> {
                 "/etc/stackable/superset-operator/config-spec/properties.yaml",
             ])?;
 
-            let client =
-                stackable_operator::client::initialize_operator(Some(OPERATOR_NAME.to_string()))
-                    .await?;
+            let client = stackable_operator::client::initialize_operator(
+                Some(OPERATOR_NAME.to_string()),
+                &cluster_info_opts,
+            )
+            .await?;
 
             let superset_controller_builder = Controller::new(
                 watch_namespace.get_api::<SupersetCluster>(&client),
