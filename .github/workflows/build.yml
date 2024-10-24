@@ -154,7 +154,7 @@ jobs:
       - uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84 # v2.7.3
         with:
           key: clippy
-          # cache-all-crates: "true"
+          cache-all-crates: "true"
       - name: Run clippy action to produce annotations
         uses: giraffate/clippy-action@13b9d32482f25d29ead141b79e7e04e7900281e0 # v1.0.1
         env:
@@ -163,6 +163,8 @@ jobs:
         with:
           clippy_flags: --all-targets -- -D warnings
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_error: true
+          filter_mode: nofilter
       - name: Run clippy manually without annotations
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
