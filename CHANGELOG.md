@@ -14,9 +14,14 @@
   - `podOverrides`
   - `affinity`
 
+### Fixed
+
+- Invalid `SupersetCluster`, `DruidConnection` or `AuthenticationClass` objects don't stop the operator from reconciling ([#551]).
+
 [#528]: https://github.com/stackabletech/superset-operator/pull/528
 [#530]: https://github.com/stackabletech/superset-operator/pull/530
 [#549]: https://github.com/stackabletech/superset-operator/pull/549
+[#551]: https://github.com/stackabletech/superset-operator/pull/551
 
 ## [24.7.0] - 2024-07-24
 

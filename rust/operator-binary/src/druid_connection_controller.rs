@@ -15,6 +15,7 @@ use stackable_operator::{
     },
     kube::{
         core::DynamicObject,
+        core::{error_boundary, DeserializeGuard},
         runtime::{controller::Action, reflector::ObjectRef},
         ResourceExt,
     },
@@ -84,6 +85,11 @@ pub enum Error {
     SupersetClusterRetrieval {
         source: stackable_operator::client::Error,
     },
+
+    #[snafu(display("DruidConnection object is invalid"))]
+    InvalidDruidConnection {
+        source: error_boundary::InvalidObject,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -110,20 +116,25 @@ impl ReconcilerError for Error {
             Error::ApplyServiceAccount { .. } => None,
             Error::ApplyRoleBinding { .. } => None,
             Error::SupersetClusterRetrieval { .. } => None,
+            Error::InvalidDruidConnection { .. } => None,
         }
     }
 }
 
 pub async fn reconcile_druid_connection(
-    druid_connection: Arc<DruidConnection>,
+    druid_connection: Arc<DeserializeGuard<DruidConnection>>,
     ctx: Arc<Ctx>,
 ) -> Result<Action> {
     tracing::info!("Starting reconciling DruidConnections");
 
+    let druid_connection = druid_connection
+        .0
+        .as_ref()
+        .map_err(error_boundary::InvalidObject::clone)
+        .context(InvalidDruidConnectionSnafu)?;
     let client = &ctx.client;
 
-    let (rbac_sa, rbac_rolebinding) =
-        rbac::build_rbac_resources(druid_connection.as_ref(), APP_NAME);
+    let (rbac_sa, rbac_rolebinding) = rbac::build_rbac_resources(druid_connection, APP_NAME);
     client
         .apply_patch(DRUID_CONNECTION_CONTROLLER_NAME, &rbac_sa, &rbac_sa)
         .await
@@ -146,7 +157,7 @@ pub async fn reconcile_druid_connection(
                         &druid_connection.druid_name(),
                         &druid_connection.druid_namespace().context(
                             DruidConnectionNoNamespaceSnafu {
-                                druid_connection: ObjectRef::from_obj(&*druid_connection),
+                                druid_connection: ObjectRef::from_obj(druid_connection),
                             },
                         )?,
                     )
@@ -159,7 +170,7 @@ pub async fn reconcile_druid_connection(
                         &druid_connection.superset_name(),
                         &druid_connection.superset_namespace().context(
                             DruidConnectionNoNamespaceSnafu {
-                                druid_connection: ObjectRef::from_obj(&*druid_connection),
+                                druid_connection: ObjectRef::from_obj(druid_connection),
                             },
                         )?,
                     )
@@ -183,7 +194,7 @@ pub async fn reconcile_druid_connection(
                         &druid_connection.druid_name(),
                         &druid_connection.druid_namespace().context(
                             DruidConnectionNoNamespaceSnafu {
-                                druid_connection: ObjectRef::from_obj(&*druid_connection),
+                                druid_connection: ObjectRef::from_obj(druid_connection),
                             },
                         )?,
                         client,
@@ -195,7 +206,7 @@ pub async fn reconcile_druid_connection(
                         .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION);
                     let job = build_import_job(
                         &superset_cluster,
-                        &druid_connection,
+                        druid_connection,
                         &resolved_product_image,
                         &sqlalchemy_str,
                         &rbac_sa.name_any(),
@@ -209,7 +220,7 @@ pub async fn reconcile_druid_connection(
                     client
                         .apply_patch_status(
                             DRUID_CONNECTION_CONTROLLER_NAME,
-                            &*druid_connection,
+                            druid_connection,
                             &s.importing(),
                         )
                         .await
@@ -236,11 +247,7 @@ pub async fn reconcile_druid_connection(
 
                 if let Some(ns) = new_status {
                     client
-                        .apply_patch_status(
-                            DRUID_CONNECTION_CONTROLLER_NAME,
-                            &*druid_connection,
-                            &ns,
-                        )
+                        .apply_patch_status(DRUID_CONNECTION_CONTROLLER_NAME, druid_connection, &ns)
                         .await
                         .context(ApplyStatusSnafu)?;
                 }
@@ -253,7 +260,7 @@ pub async fn reconcile_druid_connection(
         client
             .apply_patch_status(
                 DRUID_CONNECTION_CONTROLLER_NAME,
-                &*druid_connection,
+                druid_connection,
                 &DruidConnectionStatus::new(),
             )
             .await
@@ -360,6 +367,13 @@ async fn build_import_job(
     Ok(job)
 }
 
-pub fn error_policy(_obj: Arc<DruidConnection>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
-    Action::requeue(*Duration::from_secs(5))
+pub fn error_policy(
+    _obj: Arc<DeserializeGuard<DruidConnection>>,
+    error: &Error,
+    _ctx: Arc<Ctx>,
+) -> Action {
+    match error {
+        Error::InvalidDruidConnection { .. } => Action::await_change(),
+        _ => Action::requeue(*Duration::from_secs(5)),
+    }
 }

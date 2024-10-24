@@ -38,7 +38,11 @@ use stackable_operator::{
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
         DeepMerge,
     },
-    kube::{runtime::controller::Action, Resource, ResourceExt},
+    kube::{
+        core::{error_boundary, DeserializeGuard},
+        runtime::controller::Action,
+        Resource, ResourceExt,
+    },
     kvp::{Label, Labels},
     logging::controller::ReconcilerError,
     product_config_utils::{
@@ -274,6 +278,11 @@ pub enum Error {
     AddVolumeMount {
         source: builder::pod::container::Error,
     },
+
+    #[snafu(display("SupersetCluster object is invalid"))]
+    InvalidSupersetCluster {
+        source: error_boundary::InvalidObject,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -284,8 +293,17 @@ impl ReconcilerError for Error {
     }
 }
 
-pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -> Result<Action> {
+pub async fn reconcile_superset(
+    superset: Arc<DeserializeGuard<SupersetCluster>>,
+    ctx: Arc<Ctx>,
+) -> Result<Action> {
     tracing::info!("Starting reconcile");
+
+    let superset = superset
+        .0
+        .as_ref()
+        .map_err(error_boundary::InvalidObject::clone)
+        .context(InvalidSupersetClusterSnafu)?;
 
     let client = &ctx.client;
     let resolved_product_image: ResolvedProductImage = superset
@@ -299,7 +317,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
 
     let vector_aggregator_address = resolve_vector_aggregator_address(
         client,
-        superset.as_ref(),
+        superset,
         superset
             .spec
             .cluster_config
@@ -319,7 +337,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     let validated_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
         &transform_all_roles_to_config(
-            superset.as_ref(),
+            superset,
             [(
                 superset_role.to_string(),
                 (
@@ -354,7 +372,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     .context(CreateClusterResourcesSnafu)?;
 
     let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
-        superset.as_ref(),
+        superset,
         APP_NAME,
         cluster_resources
             .get_required_labels()
@@ -371,7 +389,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
         .await
         .context(ApplyRoleBindingSnafu)?;
 
-    let node_role_service = build_node_role_service(&superset, &resolved_product_image)?;
+    let node_role_service = build_node_role_service(superset, &resolved_product_image)?;
     cluster_resources
         .add(client, node_role_service)
         .await
@@ -387,9 +405,9 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             .context(FailedToResolveConfigSnafu)?;
 
         let rg_service =
-            build_node_rolegroup_service(&superset, &resolved_product_image, &rolegroup)?;
+            build_node_rolegroup_service(superset, &resolved_product_image, &rolegroup)?;
         let rg_configmap = build_rolegroup_config_map(
-            &superset,
+            superset,
             &resolved_product_image,
             &rolegroup,
             rolegroup_config,
@@ -398,7 +416,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
             vector_aggregator_address.as_deref(),
         )?;
         let rg_statefulset = build_server_rolegroup_statefulset(
-            &superset,
+            superset,
             &resolved_product_image,
             &superset_role,
             &rolegroup,
@@ -436,7 +454,7 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
     {
         add_pdbs(
             pdb,
-            &superset,
+            superset,
             &superset_role,
             client,
             &mut cluster_resources,
@@ -452,12 +470,12 @@ pub async fn reconcile_superset(superset: Arc<SupersetCluster>, ctx: Arc<Ctx>) -
 
     let status = SupersetClusterStatus {
         conditions: compute_conditions(
-            superset.as_ref(),
+            superset,
             &[&ss_cond_builder, &cluster_operation_cond_builder],
         ),
     };
     client
-        .apply_patch_status(OPERATOR_NAME, &*superset, &status)
+        .apply_patch_status(OPERATOR_NAME, superset, &status)
         .await
         .context(ApplyStatusSnafu)?;
 
@@ -1019,6 +1037,13 @@ fn authentication_start_commands(
         .join("\n")
 }
 
-pub fn error_policy(_obj: Arc<SupersetCluster>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
-    Action::requeue(*Duration::from_secs(5))
+pub fn error_policy(
+    _obj: Arc<DeserializeGuard<SupersetCluster>>,
+    error: &Error,
+    _ctx: Arc<Ctx>,
+) -> Action {
+    match error {
+        Error::InvalidSupersetCluster { .. } => Action::await_change(),
+        _ => Action::requeue(*Duration::from_secs(5)),
+    }
 }
