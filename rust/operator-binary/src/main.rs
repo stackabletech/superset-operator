@@ -249,10 +249,6 @@ fn valid_druid_job(
     let Ok(druid_connection) = &druid_connection.0 else {
         return false;
     };
-    let Ok(job) = &job.0 else {
-        return false;
-    };
-
-    druid_connection.metadata.namespace == job.metadata.namespace
-        && Some(druid_connection.job_name()) == job.metadata.name
+    druid_connection.metadata.namespace == job.meta().namespace
+        && Some(druid_connection.job_name()) == job.meta().name
 }
