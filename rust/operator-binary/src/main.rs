@@ -221,9 +221,6 @@ fn valid_druid_connection(
     superset_cluster: &DeserializeGuard<SupersetCluster>,
     druid_connection: &DeserializeGuard<DruidConnection>,
 ) -> bool {
-    let Ok(superset_cluster) = &superset_cluster.0 else {
-        return false;
-    };
     let Ok(druid_connection) = &druid_connection.0 else {
         return false;
     };
