@@ -235,11 +235,8 @@ fn valid_druid_connection_namespace(
     let Ok(druid_connection) = &druid_connection.0 else {
         return false;
     };
-    let Ok(config_map) = &config_map.0 else {
-        return false;
-    };
-    druid_connection.druid_namespace().ok() == config_map.metadata.namespace
-        && Some(druid_connection.druid_name()) == config_map.metadata.name
+    druid_connection.druid_namespace().ok() == config_map.meta().namespace
+        && Some(druid_connection.druid_name()) == config_map.meta().name
 }
 
 fn valid_druid_job(
