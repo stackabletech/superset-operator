@@ -207,9 +207,6 @@ fn references_authentication_class(
     let Ok(superset) = &superset.0 else {
         return false;
     };
-    let Ok(authentication_class) = &authentication_class.0 else {
-        return false;
-    };
 
     let authentication_class_name = authentication_class.name_any();
     superset
