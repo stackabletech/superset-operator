@@ -235,8 +235,8 @@ fn valid_druid_connection_namespace(
     let Ok(druid_connection) = &druid_connection.0 else {
         return false;
     };
-    druid_connection.druid_namespace().ok() == config_map.meta().namespace
-        && Some(druid_connection.druid_name()) == config_map.meta().name
+    druid_connection.druid_namespace().ok() == config_map.namespace()
+        && druid_connection.druid_name() == config_map.name_any()
 }
 
 fn valid_druid_job(
@@ -246,6 +246,6 @@ fn valid_druid_job(
     let Ok(druid_connection) = &druid_connection.0 else {
         return false;
     };
-    druid_connection.metadata.namespace == job.meta().namespace
-        && Some(druid_connection.job_name()) == job.meta().name
+    druid_connection.metadata.namespace == job.namespace()
+        && druid_connection.job_name() == job.name_any()
 }
