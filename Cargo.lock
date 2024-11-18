@@ -2173,7 +2173,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-superset-crd"
-version = "0.0.0-dev"
+version = "24.11.0"
 dependencies = [
  "indoc",
  "product-config",
@@ -2189,7 +2189,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-superset-operator"
-version = "0.0.0-dev"
+version = "24.11.0"
 dependencies = [
  "anyhow",
  "built",
