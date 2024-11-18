@@ -2,17 +2,7 @@
 set -euo pipefail
 
 # DO NOT EDIT THE SCRIPT
-# Instead, update the j2 template, and regenerate it for dev:
-# cat <<EOF | jinja2 --format yaml getting_started.sh.j2 -o getting_started.sh
-# helm:
-#   repo_name: stackable-dev
-#   repo_url: https://repo.stackable.tech/repository/helm-dev/
-# versions:
-#   commons: 0.0.0-dev
-#   listener: 0.0.0-dev
-#   secret: 0.0.0-dev
-#   superset: 0.0.0-dev
-# EOF
+# Instead, update the j2 template, and regenerate it for dev with `make render-docs`.
 
 # TODO (@NickLarsenNZ): Use bitnami/postgres chart, and add version var to the above list
 # See similar changes in: https://github.com/stackabletech/hive-operator/pull/489/commits/8189f196f018c009370ae9b07a3f9609ee2e8681
