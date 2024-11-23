@@ -19,11 +19,15 @@
 ### Fixed
 
 - Invalid `SupersetCluster`, `DruidConnection` or `AuthenticationClass` objects don't stop the operator from reconciling ([#551]).
+- BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
+  deployed in one namespace. Existing Stacklets will use the newly created ServiceAccounts after
+  restart ([#568]).
 
 [#528]: https://github.com/stackabletech/superset-operator/pull/528
 [#530]: https://github.com/stackabletech/superset-operator/pull/530
 [#549]: https://github.com/stackabletech/superset-operator/pull/549
 [#551]: https://github.com/stackabletech/superset-operator/pull/551
+[#568]: https://github.com/stackabletech/superset-operator/pull/568
 
 ## [24.7.0] - 2024-07-24
 
