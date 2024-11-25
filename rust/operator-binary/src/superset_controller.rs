@@ -991,7 +991,10 @@ fn authentication_env_vars(
     for auth_class_resolved in &auth_config.authentication_classes_resolved {
         match auth_class_resolved {
             SupersetAuthenticationClassResolved::Ldap { .. } => {}
-            SupersetAuthenticationClassResolved::Oidc { client_auth_options: oidc, .. } => {
+            SupersetAuthenticationClassResolved::Oidc {
+                client_auth_options: oidc,
+                ..
+            } => {
                 oidc_client_credentials_secrets
                     .insert(oidc.client_credentials_secret_ref.to_owned());
             }
