@@ -141,7 +141,7 @@ pub enum SupersetAuthenticationClassResolved {
     },
     Oidc {
         provider: oidc::AuthenticationProvider,
-        oidc: oidc::ClientAuthenticationOptions<()>,
+        client_auth_options: oidc::ClientAuthenticationOptions<()>,
     },
 }
 
@@ -310,7 +310,7 @@ impl SupersetClientAuthenticationDetailsResolved {
 
         Ok(SupersetAuthenticationClassResolved::Oidc {
             provider: provider.to_owned(),
-            oidc: auth_details
+            client_auth_options: auth_details
                 .common
                 .oidc_or_error(auth_class_name)
                 .context(OidcConfigurationInvalidSnafu)?
@@ -465,7 +465,7 @@ mod tests {
                             vec!["openid".into(), "email".into(), "profile".into()],
                             Some(IdentityProviderHint::Keycloak)
                         ),
-                        oidc: oidc::ClientAuthenticationOptions {
+                        client_auth_options: oidc::ClientAuthenticationOptions {
                             client_credentials_secret_ref: "superset-oidc-client1".into(),
                             extra_scopes: vec!["groups".into()],
                             product_specific_fields: ()
@@ -481,7 +481,7 @@ mod tests {
                             vec!["openid".into(), "email".into(), "profile".into()],
                             None
                         ),
-                        oidc: oidc::ClientAuthenticationOptions {
+                        client_auth_options: oidc::ClientAuthenticationOptions {
                             client_credentials_secret_ref: "superset-oidc-client2".into(),
                             extra_scopes: Vec::new(),
                             product_specific_fields: ()

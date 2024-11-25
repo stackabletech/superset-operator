@@ -22,8 +22,8 @@ pub enum Error {
         source: stackable_operator::commons::authentication::oidc::Error,
     },
 
-    #[snafu(display("invalid OIDC well known URL"))]
-    InvalidOidcWellKnownUrl {
+    #[snafu(display("invalid well-known OIDC configuration URL"))]
+    InvalidWellKnownConfigUrl {
         source: stackable_operator::commons::authentication::oidc::Error,
     },
 }
@@ -89,7 +89,11 @@ fn append_authentication_config(
         .authentication_classes_resolved
         .iter()
         .filter_map(|auth_class| {
-            if let SupersetAuthenticationClassResolved::Oidc { provider, oidc } = auth_class {
+            if let SupersetAuthenticationClassResolved::Oidc {
+                provider,
+                client_auth_options: oidc,
+            } = auth_class
+            {
                 Some((provider, oidc))
             } else {
                 None
@@ -229,7 +233,7 @@ fn append_oidc_config(
                 api_base_url.push_str("/protocol/");
                 let known_config_url = oidc
                     .well_known_config_url()
-                    .context(InvalidOidcWellKnownUrlSnafu)?;
+                    .context(InvalidWellKnownConfigUrlSnafu)?;
                 formatdoc!(
                     "
                       {{ 'name': 'keycloak',

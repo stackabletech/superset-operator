@@ -19,7 +19,7 @@
 ### Fixed
 
 - Invalid `SupersetCluster`, `DruidConnection` or `AuthenticationClass` objects don't stop the operator from reconciling ([#551]).
-- Fix OIDC endpoint calculation in case the `rootPath` does have a trailing slash ([#569]).
+- Fix OIDC endpoint construction in case the `rootPath` does have a trailing slash ([#569]).
 
 [#528]: https://github.com/stackabletech/superset-operator/pull/528
 [#530]: https://github.com/stackabletech/superset-operator/pull/530
