@@ -415,7 +415,7 @@ mod tests {
                     oidc:
                       hostname: first.oidc.server
                       port: 443
-                      rootPath: /realms/main
+                      rootPath: /realms/main/
                       principalClaim: preferred_username
                       scopes:
                         - openid
@@ -436,7 +436,7 @@ mod tests {
                   provider:
                     oidc:
                       hostname: second.oidc.server
-                      rootPath: /realms/test
+                      rootPath: /realms/test/
                       principalClaim: preferred_username
                       scopes:
                         - openid
@@ -453,7 +453,7 @@ mod tests {
                         provider: oidc::AuthenticationProvider::new(
                             HostName::try_from("first.oidc.server".to_string()).unwrap(),
                             Some(443),
-                            "/realms/main".into(),
+                            "/realms/main/".into(),
                             TlsClientDetails {
                                 tls: Some(Tls {
                                     verification: TlsVerification::Server(TlsServerVerification {
@@ -475,7 +475,7 @@ mod tests {
                         provider: oidc::AuthenticationProvider::new(
                             HostName::try_from("second.oidc.server".to_string()).unwrap(),
                             None,
-                            "/realms/test".into(),
+                            "/realms/test/".into(),
                             TlsClientDetails { tls: None },
                             "preferred_username".into(),
                             vec!["openid".into(), "email".into(), "profile".into()],

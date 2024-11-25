@@ -24,5 +24,8 @@ strum.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 
+[dev-dependencies]
+rstest.workspace = true
+
 [build-dependencies]
 built.workspace = true
