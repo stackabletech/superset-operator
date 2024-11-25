@@ -11,6 +11,6 @@ metadata:
   name: superset-druid-connection
 spec:
   superset:
-    name: superset
+    name: test-superset
   druid:
     name: derby-druid

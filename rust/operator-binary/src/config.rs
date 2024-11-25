@@ -16,6 +16,16 @@ pub enum Error {
     FailedToCreateLdapEndpointUrl {
         source: stackable_operator::commons::authentication::ldap::Error,
     },
+
+    #[snafu(display("invalid OIDC endpoint"))]
+    InvalidOidcEndpoint {
+        source: stackable_operator::commons::authentication::oidc::Error,
+    },
+
+    #[snafu(display("invalid well-known OIDC configuration URL"))]
+    InvalidWellKnownConfigUrl {
+        source: stackable_operator::commons::authentication::oidc::Error,
+    },
 }
 
 pub const PYTHON_IMPORTS: &[&str] = &[
@@ -79,7 +89,11 @@ fn append_authentication_config(
         .authentication_classes_resolved
         .iter()
         .filter_map(|auth_class| {
-            if let SupersetAuthenticationClassResolved::Oidc { provider, oidc } = auth_class {
+            if let SupersetAuthenticationClassResolved::Oidc {
+                provider,
+                client_auth_options: oidc,
+            } = auth_class
+            {
                 Some((provider, oidc))
             } else {
                 None
@@ -92,7 +106,7 @@ fn append_authentication_config(
     }
 
     if !oidc_providers.is_empty() {
-        append_oidc_config(config, &oidc_providers);
+        append_oidc_config(config, &oidc_providers)?;
     }
 
     config.insert(
@@ -191,7 +205,7 @@ fn append_oidc_config(
         &oidc::AuthenticationProvider,
         &oidc::ClientAuthenticationOptions<()>,
     )],
-) {
+) -> Result<(), Error> {
     config.insert(
         SupersetConfigOptions::AuthType.to_string(),
         "AUTH_OAUTH".into(),
@@ -214,6 +228,12 @@ fn append_oidc_config(
 
         let oauth_providers_config_entry = match oidc_provider {
             oidc::IdentityProviderHint::Keycloak => {
+                let endpoint_url = oidc.endpoint_url().context(InvalidOidcEndpointSnafu)?;
+                let mut api_base_url = endpoint_url.as_str().trim_end_matches('/').to_owned();
+                api_base_url.push_str("/protocol/");
+                let well_known_config_url = oidc
+                    .well_known_config_url()
+                    .context(InvalidWellKnownConfigUrlSnafu)?;
                 formatdoc!(
                     "
                       {{ 'name': 'keycloak',
@@ -225,11 +245,10 @@ fn append_oidc_config(
                           'client_kwargs': {{
                             'scope': '{scopes}'
                           }},
-                          'api_base_url': '{url}/protocol/',
-                          'server_metadata_url': '{url}/.well-known/openid-configuration',
+                          'api_base_url': '{api_base_url}',
+                          'server_metadata_url': '{well_known_config_url}',
                         }},
                       }}",
-                    url = oidc.endpoint_url().unwrap(),
                     scopes = scopes.join(" "),
                 )
             }
@@ -248,4 +267,89 @@ fn append_oidc_config(
             joined_oauth_providers_config = oauth_providers_config.join(",\n")
         ),
     );
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+    use stackable_operator::commons::tls_verification::{TlsClientDetails, TlsVerification};
+
+    use super::*;
+
+    #[rstest]
+    #[case(
+        "/",
+        "https://keycloak.mycorp.org/protocol/",
+        "https://keycloak.mycorp.org/.well-known/openid-configuration"
+    )]
+    #[case(
+        "",
+        "https://keycloak.mycorp.org/protocol/",
+        "https://keycloak.mycorp.org/.well-known/openid-configuration"
+    )]
+    #[case(
+        "/realms/sdp",
+        "https://keycloak.mycorp.org/realms/sdp/protocol/",
+        "https://keycloak.mycorp.org/realms/sdp/.well-known/openid-configuration"
+    )]
+    #[case(
+        "/realms/sdp/",
+        "https://keycloak.mycorp.org/realms/sdp/protocol/",
+        "https://keycloak.mycorp.org/realms/sdp/.well-known/openid-configuration"
+    )]
+    #[case(
+        "/realms/sdp/////",
+        "https://keycloak.mycorp.org/realms/sdp/protocol/",
+        "https://keycloak.mycorp.org/realms/sdp/.well-known/openid-configuration"
+    )]
+    fn test_append_oidc_config(
+        #[case] root_path: String,
+        #[case] expected_api_base_url: &str,
+        #[case] expected_server_metadata_url: &str,
+    ) {
+        use stackable_operator::commons::tls_verification::{CaCert, Tls, TlsServerVerification};
+
+        let mut properties = BTreeMap::new();
+        let provider = oidc::AuthenticationProvider::new(
+            "keycloak.mycorp.org".to_owned().try_into().unwrap(),
+            Some(443),
+            root_path,
+            TlsClientDetails {
+                tls: Some(Tls {
+                    verification: TlsVerification::Server(TlsServerVerification {
+                        ca_cert: CaCert::WebPki {},
+                    }),
+                }),
+            },
+            "preferred_username".to_owned(),
+            vec!["openid".to_owned()],
+            None,
+        );
+        let oidc = oidc::ClientAuthenticationOptions {
+            client_credentials_secret_ref: "nifi-keycloak-client".to_owned(),
+            extra_scopes: vec![],
+            product_specific_fields: (),
+        };
+
+        append_oidc_config(&mut properties, &[(&provider, &oidc)])
+            .expect("OIDC config adding failed");
+
+        assert_eq!(properties.get("AUTH_TYPE"), Some(&"AUTH_OAUTH".to_owned()));
+        let oauth_providers = properties
+            .get("OAUTH_PROVIDERS")
+            .expect("OAUTH_PROVIDERS missing");
+
+        // This is neither valid yaml or json (it's Python code), so we can not easily parse it and have nice assertions.
+        // As we don't want to have a Python runtime just for this test, let's grep a bit...
+        assert!(oauth_providers.contains("'name': 'keycloak'"));
+        assert!(oauth_providers.contains("client_id': os.environ.get("));
+        assert!(oauth_providers.contains("client_secret': os.environ.get("));
+        assert!(oauth_providers.contains("'scope': 'openid'"));
+        assert!(oauth_providers.contains(&format!("'api_base_url': '{expected_api_base_url}'")));
+        assert!(oauth_providers.contains(&format!(
+            "'server_metadata_url': '{expected_server_metadata_url}'"
+        )));
+    }
 }
