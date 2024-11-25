@@ -225,8 +225,8 @@ fn append_oidc_config(
         let oauth_providers_config_entry = match oidc_provider {
             oidc::IdentityProviderHint::Keycloak => {
                 let endpoint_url = oidc.endpoint_url().context(InvalidOidcEndpointSnafu)?;
-                let api_base_url = endpoint_url.as_str().trim_end_matches('/');
-                let api_base_url = format!("{api_base_url}/protocol/");
+                let mut api_base_url = endpoint_url.as_str().trim_end_matches('/').to_owned();
+                api_base_url.push_str("/protocol/");
                 let known_config_url = oidc
                     .well_known_config_url()
                     .context(InvalidOidcWellKnownUrlSnafu)?;
