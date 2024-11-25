@@ -231,7 +231,7 @@ fn append_oidc_config(
                 let endpoint_url = oidc.endpoint_url().context(InvalidOidcEndpointSnafu)?;
                 let mut api_base_url = endpoint_url.as_str().trim_end_matches('/').to_owned();
                 api_base_url.push_str("/protocol/");
-                let known_config_url = oidc
+                let well_known_config_url = oidc
                     .well_known_config_url()
                     .context(InvalidWellKnownConfigUrlSnafu)?;
                 formatdoc!(
@@ -246,7 +246,7 @@ fn append_oidc_config(
                             'scope': '{scopes}'
                           }},
                           'api_base_url': '{api_base_url}',
-                          'server_metadata_url': '{known_config_url}',
+                          'server_metadata_url': '{well_known_config_url}',
                         }},
                       }}",
                     scopes = scopes.join(" "),
