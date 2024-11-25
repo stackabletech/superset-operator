@@ -19,6 +19,7 @@
 ### Fixed
 
 - Invalid `SupersetCluster`, `DruidConnection` or `AuthenticationClass` objects don't stop the operator from reconciling ([#551]).
+- Fix OIDC endpoint construction in case the `rootPath` does have a trailing slash ([#569]).
 - BREAKING: Use distinct ServiceAccounts for the Stacklets, so that multiple Stacklets can be
   deployed in one namespace. Existing Stacklets will use the newly created ServiceAccounts after
   restart ([#568]).
@@ -28,6 +29,7 @@
 [#549]: https://github.com/stackabletech/superset-operator/pull/549
 [#551]: https://github.com/stackabletech/superset-operator/pull/551
 [#568]: https://github.com/stackabletech/superset-operator/pull/568
+[#569]: https://github.com/stackabletech/superset-operator/pull/569
 
 ## [24.7.0] - 2024-07-24
 

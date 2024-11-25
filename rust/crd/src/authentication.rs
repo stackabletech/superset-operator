@@ -141,7 +141,7 @@ pub enum SupersetAuthenticationClassResolved {
     },
     Oidc {
         provider: oidc::AuthenticationProvider,
-        oidc: oidc::ClientAuthenticationOptions<()>,
+        client_auth_options: oidc::ClientAuthenticationOptions<()>,
     },
 }
 
@@ -310,7 +310,7 @@ impl SupersetClientAuthenticationDetailsResolved {
 
         Ok(SupersetAuthenticationClassResolved::Oidc {
             provider: provider.to_owned(),
-            oidc: auth_details
+            client_auth_options: auth_details
                 .common
                 .oidc_or_error(auth_class_name)
                 .context(OidcConfigurationInvalidSnafu)?
@@ -415,7 +415,7 @@ mod tests {
                     oidc:
                       hostname: first.oidc.server
                       port: 443
-                      rootPath: /realms/main
+                      rootPath: /realms/main/
                       principalClaim: preferred_username
                       scopes:
                         - openid
@@ -436,7 +436,7 @@ mod tests {
                   provider:
                     oidc:
                       hostname: second.oidc.server
-                      rootPath: /realms/test
+                      rootPath: /realms/test/
                       principalClaim: preferred_username
                       scopes:
                         - openid
@@ -453,7 +453,7 @@ mod tests {
                         provider: oidc::AuthenticationProvider::new(
                             HostName::try_from("first.oidc.server".to_string()).unwrap(),
                             Some(443),
-                            "/realms/main".into(),
+                            "/realms/main/".into(),
                             TlsClientDetails {
                                 tls: Some(Tls {
                                     verification: TlsVerification::Server(TlsServerVerification {
@@ -465,7 +465,7 @@ mod tests {
                             vec!["openid".into(), "email".into(), "profile".into()],
                             Some(IdentityProviderHint::Keycloak)
                         ),
-                        oidc: oidc::ClientAuthenticationOptions {
+                        client_auth_options: oidc::ClientAuthenticationOptions {
                             client_credentials_secret_ref: "superset-oidc-client1".into(),
                             extra_scopes: vec!["groups".into()],
                             product_specific_fields: ()
@@ -475,13 +475,13 @@ mod tests {
                         provider: oidc::AuthenticationProvider::new(
                             HostName::try_from("second.oidc.server".to_string()).unwrap(),
                             None,
-                            "/realms/test".into(),
+                            "/realms/test/".into(),
                             TlsClientDetails { tls: None },
                             "preferred_username".into(),
                             vec!["openid".into(), "email".into(), "profile".into()],
                             None
                         ),
-                        oidc: oidc::ClientAuthenticationOptions {
+                        client_auth_options: oidc::ClientAuthenticationOptions {
                             client_credentials_secret_ref: "superset-oidc-client2".into(),
                             extra_scopes: Vec::new(),
                             product_specific_fields: ()
