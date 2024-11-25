@@ -17,6 +17,11 @@ pub enum Error {
         source: stackable_operator::commons::authentication::ldap::Error,
     },
 
+    #[snafu(display("invalid OIDC endpoint"))]
+    InvalidOidcEndpoint {
+        source: stackable_operator::commons::authentication::oidc::Error,
+    },
+
     #[snafu(display("invalid OIDC well known URL"))]
     InvalidOidcWellKnownUrl {
         source: stackable_operator::commons::authentication::oidc::Error,
@@ -219,6 +224,12 @@ fn append_oidc_config(
 
         let oauth_providers_config_entry = match oidc_provider {
             oidc::IdentityProviderHint::Keycloak => {
+                let endpoint_url = oidc.endpoint_url().context(InvalidOidcEndpointSnafu)?;
+                let api_base_url = endpoint_url.as_str().trim_end_matches('/');
+                let api_base_url = format!("{api_base_url}/protocol/");
+                let known_config_url = oidc
+                    .well_known_config_url()
+                    .context(InvalidOidcWellKnownUrlSnafu)?;
                 formatdoc!(
                     "
                       {{ 'name': 'keycloak',
@@ -230,11 +241,10 @@ fn append_oidc_config(
                           'client_kwargs': {{
                             'scope': '{scopes}'
                           }},
-                          'api_base_url': '{url}/protocol/',
-                          'server_metadata_url': '{url}/.well-known/openid-configuration',
+                          'api_base_url': '{api_base_url}',
+                          'server_metadata_url': '{known_config_url}',
                         }},
                       }}",
-                    url = oidc.endpoint_url().context(InvalidOidcWellKnownUrlSnafu)?,
                     scopes = scopes.join(" "),
                 )
             }
@@ -265,10 +275,36 @@ mod tests {
     use super::*;
 
     #[rstest]
-    #[case("/realms/sdp")]
-    #[case("/realms/sdp/")]
-    #[case("/realms/sdp/////")]
-    fn test_append_oidc_config(#[case] root_path: String) {
+    #[case(
+        "/",
+        "https://keycloak.mycorp.org/protocol/",
+        "https://keycloak.mycorp.org/.well-known/openid-configuration"
+    )]
+    #[case(
+        "",
+        "https://keycloak.mycorp.org/protocol/",
+        "https://keycloak.mycorp.org/.well-known/openid-configuration"
+    )]
+    #[case(
+        "/realms/sdp",
+        "https://keycloak.mycorp.org/realms/sdp/protocol/",
+        "https://keycloak.mycorp.org/realms/sdp/.well-known/openid-configuration"
+    )]
+    #[case(
+        "/realms/sdp/",
+        "https://keycloak.mycorp.org/realms/sdp/protocol/",
+        "https://keycloak.mycorp.org/realms/sdp/.well-known/openid-configuration"
+    )]
+    #[case(
+        "/realms/sdp/////",
+        "https://keycloak.mycorp.org/realms/sdp/protocol/",
+        "https://keycloak.mycorp.org/realms/sdp/.well-known/openid-configuration"
+    )]
+    fn test_append_oidc_config(
+        #[case] root_path: String,
+        #[case] expected_api_base_url: &str,
+        #[case] expected_server_metadata_url: &str,
+    ) {
         use stackable_operator::commons::tls_verification::{CaCert, Tls, TlsServerVerification};
 
         let mut properties = BTreeMap::new();
@@ -300,15 +336,16 @@ mod tests {
         let oauth_providers = properties
             .get("OAUTH_PROVIDERS")
             .expect("OAUTH_PROVIDERS missing");
+
         // This is neither valid yaml or json (it's Python code), so we can not easily parse it and have nice assertions.
         // As we don't want to have a Python runtime just for this test, let's grep a bit...
         assert!(oauth_providers.contains("'name': 'keycloak'"));
         assert!(oauth_providers.contains("client_id': os.environ.get("));
         assert!(oauth_providers.contains("client_secret': os.environ.get("));
         assert!(oauth_providers.contains("'scope': 'openid'"));
-        assert!(oauth_providers
-            .contains("'api_base_url': 'https://keycloak.mycorp.org/realms/sdp/protocol/'"));
-        assert!(oauth_providers
-            .contains("'server_metadata_url': 'https://keycloak.mycorp.org/realms/sdp/.well-known/openid-configuration'"));
+        assert!(oauth_providers.contains(&format!("'api_base_url': '{expected_api_base_url}'")));
+        assert!(oauth_providers.contains(&format!(
+            "'server_metadata_url': '{expected_server_metadata_url}'"
+        )));
     }
 }
