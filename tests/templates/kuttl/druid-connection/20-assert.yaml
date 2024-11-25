@@ -8,7 +8,26 @@ timeout: 300
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: superset-node-default
+  name: test-superset-node-default
 status:
   readyReplicas: 1
   replicas: 1
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-superset-serviceaccount
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: test-superset-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: superset-clusterrole
+subjects:
+- kind: ServiceAccount
+  name: test-superset-serviceaccount
+- kind: ServiceAccount
+  name: superset-serviceaccount
