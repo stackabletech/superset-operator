@@ -7,12 +7,12 @@ releases:
     description: Integration test
     products:
       commons:
-        operatorVersion: 24.11.0
+        operatorVersion: 24.11.1-rc1
       secret:
-        operatorVersion: 24.11.0
+        operatorVersion: 24.11.1-rc1
       listener:
-        operatorVersion: 24.11.0
+        operatorVersion: 24.11.1-rc1
       druid:
-        operatorVersion: 24.11.0
+        operatorVersion: 24.11.1-rc1
       superset:
-        operatorVersion: 24.11.0
+        operatorVersion: 24.11.1-rc1

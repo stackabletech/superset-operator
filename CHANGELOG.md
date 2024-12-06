@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [24.11.1-rc1] - 2024-12-06
+
 ### Fixed
 
 - Fix OIDC endpoint construction in case the `rootPath` does have a trailing slash ([#569]).
