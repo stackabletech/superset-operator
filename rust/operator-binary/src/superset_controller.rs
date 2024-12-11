@@ -810,7 +810,7 @@ fn build_server_rolegroup_statefulset(
 
             {remove_vector_shutdown_file_command}
             prepare_signal_handlers
-            CONTAINERDEBUG_LOG_DIRECTORY={STACKABLE_LOG_DIR}/containerdebug containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &
+            containerdebug --output={STACKABLE_LOG_DIR}/containerdebug/containerdebug-state.json --loop &
             gunicorn --bind 0.0.0.0:${{SUPERSET_PORT}} --worker-class gthread --threads 20 --timeout {webserver_timeout} --limit-request-line 0 --limit-request-field_size 0 'superset.app:create_app()' &
             wait_for_termination $!
 
