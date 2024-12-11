@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Run a `containerdebug` process in the background of each Superset container to collect debugging information ([#578]).
+
 ### Fixed
 
 - Fix OIDC endpoint construction in case the `rootPath` does have a trailing slash ([#569]).
@@ -11,6 +15,7 @@
 
 [#568]: https://github.com/stackabletech/superset-operator/pull/568
 [#569]: https://github.com/stackabletech/superset-operator/pull/569
+[#578]: https://github.com/stackabletech/superset-operator/pull/578
 
 ## [24.11.0] - 2024-11-18
 
