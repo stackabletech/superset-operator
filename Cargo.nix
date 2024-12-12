@@ -6912,7 +6912,7 @@ rec {
       };
       "stackable-superset-crd" = rec {
         crateName = "stackable-superset-crd";
-        version = "24.11.1-rc1";
+        version = "24.11.1-rc2";
         edition = "2021";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/crd; };
         libName = "stackable_superset_crd";
@@ -6970,7 +6970,7 @@ rec {
       };
       "stackable-superset-operator" = rec {
         crateName = "stackable-superset-operator";
-        version = "24.11.1-rc1";
+        version = "24.11.1-rc2";
         edition = "2021";
         crateBin = [
           {
