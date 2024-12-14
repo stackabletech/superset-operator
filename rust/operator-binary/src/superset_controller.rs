@@ -783,6 +783,8 @@ fn build_server_rolegroup_statefulset(
         .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
         .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
         .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
+        // Needed by the `containerdebug` process to log it's tracing information to.
+        .add_env_var("CONTAINERDEBUG_LOG_DIRECTORY", format!("{STACKABLE_LOG_DIR}/containerdebug"))
         .add_env_var("SSL_CERT_DIR", "/stackable/certs/")
         .add_env_vars(authentication_env_vars(authentication_config))
         .command(vec![
