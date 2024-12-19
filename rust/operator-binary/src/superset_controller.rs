@@ -75,6 +75,7 @@ use stackable_superset_crd::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
+    authorization::opa::SupersetOpaConfig,
     commands::add_cert_to_python_certifi_command,
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
@@ -283,6 +284,10 @@ pub enum Error {
     InvalidSupersetCluster {
         source: error_boundary::InvalidObject,
     },
+    #[snafu(display("invalid OpaConfig"))]
+    InvalidOpaConfig {
+        source: stackable_operator::commons::opa::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -370,6 +375,15 @@ pub async fn reconcile_superset(
         ClusterResourceApplyStrategy::from(&superset.spec.cluster_config.cluster_operation),
     )
     .context(CreateClusterResourcesSnafu)?;
+
+    let superset_opa_config = match superset.get_opa_config() {
+        Some(opa_config) => Some(
+            SupersetOpaConfig::from_opa_config(client, superset, opa_config)
+                .await
+                .context(InvalidOpaConfigSnafu)?,
+        ),
+        None => None,
+    };
 
     let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
         superset,

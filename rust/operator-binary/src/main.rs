@@ -23,6 +23,7 @@ use stackable_superset_crd::{druidconnection::DruidConnection, SupersetCluster, 
 use crate::druid_connection_controller::DRUID_CONNECTION_CONTROLLER_NAME;
 use crate::superset_controller::SUPERSET_CONTROLLER_NAME;
 
+mod authorization;
 mod commands;
 mod config;
 mod controller_commons;
