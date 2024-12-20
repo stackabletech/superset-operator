@@ -775,9 +775,9 @@ rec {
       };
       "cc" = rec {
         crateName = "cc";
-        version = "1.2.3";
+        version = "1.2.4";
         edition = "2018";
-        sha256 = "0bcga5xf5fgvddfamsjhg89hlydzbdk1fwvcym5kkxfggdj5gxi7";
+        sha256 = "1bqw7559dq0by6dq5k38rijz5p0wr5sa94s2gb180n0ndfmbnmwi";
         authors = [
           "Alex Crichton <alex@alexcrichton.com>"
         ];
@@ -1206,9 +1206,9 @@ rec {
       };
       "crossbeam-channel" = rec {
         crateName = "crossbeam-channel";
-        version = "0.5.13";
+        version = "0.5.14";
         edition = "2021";
-        sha256 = "1wkx45r34v7g3wyi3lg2wz536lrrrab4h4hh741shfhr8rlhsj1k";
+        sha256 = "0wa41qybq5w8s70anb472myh4fid4aw6v65vws6wn528w9l6vfh6";
         libName = "crossbeam_channel";
         dependencies = [
           {
@@ -1225,9 +1225,9 @@ rec {
       };
       "crossbeam-utils" = rec {
         crateName = "crossbeam-utils";
-        version = "0.8.20";
+        version = "0.8.21";
         edition = "2021";
-        sha256 = "100fksq5mm1n7zj242cclkw6yf7a4a8ix3lvpfkhxvdhbda9kv12";
+        sha256 = "0a3aa2bmc8q35fb67432w16wvi54sfmb69rk9h5bhd18vw0c99fh";
         libName = "crossbeam_utils";
         features = {
           "default" = [ "std" ];
@@ -1407,33 +1407,6 @@ rec {
         };
         resolvedDefaultFeatures = [ "alloc" "powerfmt" "std" ];
       };
-      "derivative" = rec {
-        crateName = "derivative";
-        version = "2.2.0";
-        edition = "2015";
-        sha256 = "02vpb81wisk2zh1d5f44szzxamzinqgq2k8ydrfjj2wwkrgdvhzw";
-        procMacro = true;
-        authors = [
-          "mcarton <cartonmartin+git@gmail.com>"
-        ];
-        dependencies = [
-          {
-            name = "proc-macro2";
-            packageId = "proc-macro2";
-          }
-          {
-            name = "quote";
-            packageId = "quote";
-          }
-          {
-            name = "syn";
-            packageId = "syn 1.0.109";
-            features = [ "visit" "extra-traits" ];
-          }
-        ];
-        features = {
-        };
-      };
       "digest" = rec {
         crateName = "digest";
         version = "0.10.7";
@@ -1595,7 +1568,7 @@ rec {
           "default" = [ "Debug" "Clone" "Copy" "PartialEq" "Eq" "PartialOrd" "Ord" "Hash" "Default" "Deref" "DerefMut" "Into" ];
           "full" = [ "syn/full" ];
         };
-        resolvedDefaultFeatures = [ "Clone" "Debug" "Hash" "PartialEq" ];
+        resolvedDefaultFeatures = [ "Clone" "Debug" "Default" "Hash" "PartialEq" ];
       };
       "either" = rec {
         crateName = "either";
@@ -2450,16 +2423,16 @@ rec {
       };
       "home" = rec {
         crateName = "home";
-        version = "0.5.9";
+        version = "0.5.11";
         edition = "2021";
-        sha256 = "19grxyg35rqfd802pcc9ys1q3lafzlcjcv2pl2s5q8xpyr5kblg3";
+        sha256 = "1kxb4k87a9sayr8jipr7nq9wpgmjk4hk4047hmf9kc24692k75aq";
         authors = [
           "Brian Anderson <andersrb@gmail.com>"
         ];
         dependencies = [
           {
             name = "windows-sys";
-            packageId = "windows-sys 0.52.0";
+            packageId = "windows-sys 0.59.0";
             target = { target, features }: (target."windows" or false);
             features = [ "Win32_Foundation" "Win32_UI_Shell" "Win32_System_Com" ];
           }
@@ -2579,9 +2552,9 @@ rec {
       };
       "hyper" = rec {
         crateName = "hyper";
-        version = "1.5.1";
+        version = "1.5.2";
         edition = "2021";
-        sha256 = "07s87id0566m2p5dc5q6nqmxz5r8drqd81b7w4q44djgxwkqi0cp";
+        sha256 = "1q7akfb443yrjzkmnnbp2vs8zi15hgbk466rr4y144v4ppabhvr5";
         authors = [
           "Sean McArthur <sean@seanmonstar.com>"
         ];
@@ -2652,6 +2625,10 @@ rec {
             packageId = "futures-util";
             usesDefaultFeatures = false;
             features = [ "alloc" "sink" ];
+          }
+          {
+            name = "pin-project-lite";
+            packageId = "pin-project-lite";
           }
           {
             name = "tokio";
@@ -2770,9 +2747,9 @@ rec {
       };
       "hyper-rustls" = rec {
         crateName = "hyper-rustls";
-        version = "0.27.3";
+        version = "0.27.4";
         edition = "2021";
-        sha256 = "0cxkph8hsmbz693a8ih2ciy7h0xbac844rpm981y6c0iqfsxpbq8";
+        sha256 = "0ry73hvh1wdlghq5wywdl5arxgnfcfqmcx2ca97w8vl2qr44m27n";
         libName = "hyper_rustls";
         dependencies = [
           {
@@ -4451,9 +4428,9 @@ rec {
       };
       "libc" = rec {
         crateName = "libc";
-        version = "0.2.168";
+        version = "0.2.169";
         edition = "2021";
-        sha256 = "0vab4inpw0dz78nii02hsxp1skqn06xzh64psw8wl1h63scb5bjs";
+        sha256 = "02m253hs8gw0m1n8iyrsc4n15yzbqwhddi7w1l0ds7i92kdsiaxm";
         authors = [
           "The Rust Project Developers"
         ];
@@ -4668,9 +4645,9 @@ rec {
       };
       "miniz_oxide" = rec {
         crateName = "miniz_oxide";
-        version = "0.8.0";
+        version = "0.8.2";
         edition = "2021";
-        sha256 = "1wadxkg6a6z4lr7kskapj5d8pxlx7cp1ifw4daqnkzqjxych5n72";
+        sha256 = "1543asrvhla92sby4z6m9ilkg2cmmq8ja6bj84k1vp6f48qfiysg";
         authors = [
           "Frommi <daniil.liferenko@gmail.com>"
           "oyvindln <oyvindln@users.noreply.github.com>"
@@ -5349,7 +5326,7 @@ rec {
           }
           {
             name = "thiserror";
-            packageId = "thiserror 2.0.6";
+            packageId = "thiserror 2.0.8";
             optional = true;
           }
           {
@@ -5783,9 +5760,9 @@ rec {
       };
       "redox_syscall" = rec {
         crateName = "redox_syscall";
-        version = "0.5.7";
+        version = "0.5.8";
         edition = "2021";
-        sha256 = "07vpgfr6a04k0x19zqr1xdlqm6fncik3zydbdi3f5g3l5k7zwvcv";
+        sha256 = "0d48ylyd6gsamynyp257p6n2zl4dw2fhnn5z9y3nhgpri6rn5a03";
         libName = "syscall";
         authors = [
           "Jeremy Soller <jackpot51@gmail.com>"
@@ -6187,9 +6164,9 @@ rec {
       };
       "rustls" = rec {
         crateName = "rustls";
-        version = "0.23.19";
+        version = "0.23.20";
         edition = "2021";
-        sha256 = "1lgqjf1vh09kghyj34a4svn1max18pmhka6bwbxb61mv61240jwk";
+        sha256 = "06rvj13ia4hx0kba454vcm3p4f2jz907rrabi76k5lyba3rc6rah";
         dependencies = [
           {
             name = "log";
@@ -6312,7 +6289,7 @@ rec {
           }
           {
             name = "security-framework";
-            packageId = "security-framework 3.0.1";
+            packageId = "security-framework 3.1.0";
             target = { target, features }: ("macos" == target."os" or null);
           }
         ];
@@ -6339,9 +6316,9 @@ rec {
       };
       "rustls-pki-types" = rec {
         crateName = "rustls-pki-types";
-        version = "1.10.0";
+        version = "1.10.1";
         edition = "2021";
-        sha256 = "0jv78c32pgf1i0bn7rzf4xdr9qh5wsvigp6akc1yhzls7hdj1w8n";
+        sha256 = "0dqb3d0cbld1yrp084wyzgw6yk3qzzic8l5pbs1b6bcjzzk4ggyj";
         libName = "rustls_pki_types";
         features = {
           "default" = [ "alloc" ];
@@ -6608,11 +6585,11 @@ rec {
         };
         resolvedDefaultFeatures = [ "OSX_10_10" "OSX_10_11" "OSX_10_12" "OSX_10_9" "default" ];
       };
-      "security-framework 3.0.1" = rec {
+      "security-framework 3.1.0" = rec {
         crateName = "security-framework";
-        version = "3.0.1";
+        version = "3.1.0";
         edition = "2021";
-        sha256 = "1j1rpyiwq698dyyq2lnnws8hzknw8r32dy9cx9jc7gljgrh5lhg1";
+        sha256 = "1g1wq04rb6gsyfawphv5vhmmicbm5l25gsvr05mvng6cpz4zilw1";
         libName = "security_framework";
         authors = [
           "Steven Fackler <sfackler@gmail.com>"
@@ -6653,9 +6630,9 @@ rec {
       };
       "security-framework-sys" = rec {
         crateName = "security-framework-sys";
-        version = "2.12.1";
+        version = "2.13.0";
         edition = "2021";
-        sha256 = "18pafp0bn41bcbm66qrhb3pg4c8dddvc28jdr51mb2y57lqcffgs";
+        sha256 = "1mbhagj98y2byhjkr353y1nings01pfa9yk0gxmcb0ydd0vzsqqq";
         libName = "security_framework_sys";
         authors = [
           "Steven Fackler <sfackler@gmail.com>"
@@ -6684,9 +6661,9 @@ rec {
       };
       "semver" = rec {
         crateName = "semver";
-        version = "1.0.23";
+        version = "1.0.24";
         edition = "2018";
-        sha256 = "12wqpxfflclbq4dv8sa6gchdh92ahhwn4ci1ls22wlby3h57wsb1";
+        sha256 = "1fmvjjkd3f64y5fqr1nakkq371mnwzv09fbz5mbmdxril63ypdiw";
         authors = [
           "David Tolnay <dtolnay@gmail.com>"
         ];
@@ -7255,13 +7232,13 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.82.0";
+        version = "0.83.0";
         edition = "2021";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "415bbd031bd52e9c0c5392060235030e9930b46b";
-          sha256 = "0phasjwb64rxgn5hs8vks92icmx9255bd5v9dms280clrfpcg4hy";
+          rev = "3ce7bcbdb58097cde0c0f19488a104c96f69dbc3";
+          sha256 = "1443vhsanfl2vxp6x6zpylfln682g0y8bxbk4sknycsg009mbkwm";
         };
         libName = "stackable_operator";
         authors = [
@@ -7287,12 +7264,14 @@ rec {
             packageId = "delegate";
           }
           {
-            name = "derivative";
-            packageId = "derivative";
-          }
-          {
             name = "dockerfile-parser";
             packageId = "dockerfile-parser";
+          }
+          {
+            name = "educe";
+            packageId = "educe";
+            usesDefaultFeatures = false;
+            features = [ "Clone" "Debug" "Default" "PartialEq" ];
           }
           {
             name = "either";
@@ -7418,8 +7397,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "415bbd031bd52e9c0c5392060235030e9930b46b";
-          sha256 = "0phasjwb64rxgn5hs8vks92icmx9255bd5v9dms280clrfpcg4hy";
+          rev = "3ce7bcbdb58097cde0c0f19488a104c96f69dbc3";
+          sha256 = "1443vhsanfl2vxp6x6zpylfln682g0y8bxbk4sknycsg009mbkwm";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
@@ -7453,8 +7432,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "415bbd031bd52e9c0c5392060235030e9930b46b";
-          sha256 = "0phasjwb64rxgn5hs8vks92icmx9255bd5v9dms280clrfpcg4hy";
+          rev = "3ce7bcbdb58097cde0c0f19488a104c96f69dbc3";
+          sha256 = "1443vhsanfl2vxp6x6zpylfln682g0y8bxbk4sknycsg009mbkwm";
         };
         libName = "stackable_shared";
         authors = [
@@ -7752,7 +7731,7 @@ rec {
           "quote" = [ "dep:quote" ];
           "test" = [ "syn-test-suite/all-features" ];
         };
-        resolvedDefaultFeatures = [ "clone-impls" "default" "derive" "extra-traits" "full" "parsing" "printing" "proc-macro" "quote" "visit" ];
+        resolvedDefaultFeatures = [ "clone-impls" "default" "derive" "full" "parsing" "printing" "proc-macro" "quote" ];
       };
       "syn 2.0.90" = rec {
         crateName = "syn";
@@ -7789,9 +7768,9 @@ rec {
       };
       "sync_wrapper" = rec {
         crateName = "sync_wrapper";
-        version = "0.1.2";
-        edition = "2018";
-        sha256 = "0q01lyj0gr9a93n10nxsn8lwbzq97jqd6b768x17c8f7v7gccir0";
+        version = "1.0.2";
+        edition = "2021";
+        sha256 = "0qvjyasd6w18mjg5xlaq5jgy84jsjfsvmnn12c13gypxbv75dwhb";
         authors = [
           "Actyx AG <developer@actyx.io>"
         ];
@@ -7848,18 +7827,18 @@ rec {
         ];
 
       };
-      "thiserror 2.0.6" = rec {
+      "thiserror 2.0.8" = rec {
         crateName = "thiserror";
-        version = "2.0.6";
+        version = "2.0.8";
         edition = "2021";
-        sha256 = "0izahgy0lzcmcg2i72h9jk9lqd5zpq3z0k8cp7i7gl7b40c2mv4g";
+        sha256 = "06hlnvfcvgbw0q9r9pfyx5mr69idnncyxd9sz4mp0w807qzkix88";
         authors = [
           "David Tolnay <dtolnay@gmail.com>"
         ];
         dependencies = [
           {
             name = "thiserror-impl";
-            packageId = "thiserror-impl 2.0.6";
+            packageId = "thiserror-impl 2.0.8";
           }
         ];
         features = {
@@ -7893,11 +7872,11 @@ rec {
         ];
 
       };
-      "thiserror-impl 2.0.6" = rec {
+      "thiserror-impl 2.0.8" = rec {
         crateName = "thiserror-impl";
-        version = "2.0.6";
+        version = "2.0.8";
         edition = "2021";
-        sha256 = "04k3dz901mymm06j3x6f65hpbsqlk6g51fmiky9g2kqgnk550myn";
+        sha256 = "0hy9l1pxwsiabp4ql18anhrx0xp63dlrk813cvpwmcwhxky5gwzj";
         procMacro = true;
         libName = "thiserror_impl";
         authors = [
@@ -8462,9 +8441,9 @@ rec {
       };
       "tower" = rec {
         crateName = "tower";
-        version = "0.5.1";
+        version = "0.5.2";
         edition = "2018";
-        sha256 = "0kvbp97bhb4sk24vhihcz74ngn0i4ygxqikmxndgng3w926r6wr8";
+        sha256 = "1ybmd59nm4abl9bsvy6rx31m4zvzp5rja2slzpn712y9b68ssffh";
         authors = [
           "Tower Maintainers <team@tower-rs.com>"
         ];
@@ -9859,7 +9838,7 @@ rec {
           "Win32_Web" = [ "Win32" ];
           "Win32_Web_InternetExplorer" = [ "Win32_Web" ];
         };
-        resolvedDefaultFeatures = [ "Wdk" "Wdk_Foundation" "Wdk_Storage" "Wdk_Storage_FileSystem" "Wdk_System" "Wdk_System_IO" "Win32" "Win32_Foundation" "Win32_Networking" "Win32_Networking_WinSock" "Win32_Security" "Win32_Storage" "Win32_Storage_FileSystem" "Win32_System" "Win32_System_Com" "Win32_System_Console" "Win32_System_IO" "Win32_System_Pipes" "Win32_System_SystemServices" "Win32_System_Threading" "Win32_System_WindowsProgramming" "Win32_UI" "Win32_UI_Shell" "default" ];
+        resolvedDefaultFeatures = [ "Wdk" "Wdk_Foundation" "Wdk_Storage" "Wdk_Storage_FileSystem" "Wdk_System" "Wdk_System_IO" "Win32" "Win32_Foundation" "Win32_Networking" "Win32_Networking_WinSock" "Win32_Security" "Win32_Storage" "Win32_Storage_FileSystem" "Win32_System" "Win32_System_Console" "Win32_System_IO" "Win32_System_Pipes" "Win32_System_SystemServices" "Win32_System_Threading" "Win32_System_WindowsProgramming" "default" ];
       };
       "windows-sys 0.59.0" = rec {
         crateName = "windows-sys";
@@ -10118,7 +10097,7 @@ rec {
           "Win32_Web" = [ "Win32" ];
           "Win32_Web_InternetExplorer" = [ "Win32_Web" ];
         };
-        resolvedDefaultFeatures = [ "Win32" "Win32_Foundation" "Win32_Security" "Win32_Security_Authentication" "Win32_Security_Authentication_Identity" "Win32_Security_Credentials" "Win32_Security_Cryptography" "Win32_System" "Win32_System_Console" "Win32_System_LibraryLoader" "Win32_System_Memory" "Win32_System_SystemInformation" "default" ];
+        resolvedDefaultFeatures = [ "Win32" "Win32_Foundation" "Win32_Security" "Win32_Security_Authentication" "Win32_Security_Authentication_Identity" "Win32_Security_Credentials" "Win32_Security_Cryptography" "Win32_System" "Win32_System_Com" "Win32_System_Console" "Win32_System_LibraryLoader" "Win32_System_Memory" "Win32_System_SystemInformation" "Win32_UI" "Win32_UI_Shell" "default" ];
       };
       "windows-targets" = rec {
         crateName = "windows-targets";
