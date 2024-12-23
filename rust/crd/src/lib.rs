@@ -86,6 +86,9 @@ pub enum SupersetConfigOptions {
     AuthLdapTlsCertfile,
     AuthLdapTlsKeyfile,
     AuthLdapTlsCacertfile,
+    CustomSecurityManager,
+    StackableOpaEndpoint,
+    OpaPackageName,
 }
 
 impl SupersetConfigOptions {
@@ -133,6 +136,10 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::AuthLdapTlsCertfile => PythonType::StringLiteral,
             SupersetConfigOptions::AuthLdapTlsKeyfile => PythonType::StringLiteral,
             SupersetConfigOptions::AuthLdapTlsCacertfile => PythonType::StringLiteral,
+            SupersetConfigOptions::CustomSecurityManager => PythonType::StringLiteral,
+            SupersetConfigOptions::StackableOpaEndpoint => PythonType::StringLiteral,
+            SupersetConfigOptions::OpaPackageName => PythonType::StringLiteral,
+            // TODO: Set new options for OpaSecurityManager like:
         }
     }
 }
