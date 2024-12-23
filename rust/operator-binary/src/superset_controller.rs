@@ -576,9 +576,7 @@ fn build_rolegroup_config_map(
             config_properties.insert(k, v.unwrap_or_default());
         }
         // If opa role mapping is configured, insert CustomOpaSecurityManager import
-        for opa_import in OPA_IMPORTS {
-            imports.push(&opa_import);
-        }
+        imports.append(&mut (*OPA_IMPORTS).to_vec())
     }
 
     // The order here should be kept in order to preserve overrides.
