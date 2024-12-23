@@ -548,6 +548,7 @@ fn build_node_role_service(
 }
 
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
+#[allow(clippy::too_many_arguments)]
 fn build_rolegroup_config_map(
     superset: &SupersetCluster,
     resolved_product_image: &ResolvedProductImage,
