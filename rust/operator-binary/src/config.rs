@@ -35,7 +35,6 @@ pub const PYTHON_IMPORTS: &[&str] = &[
     "from log_config import StackableLoggingConfigurator",
     ];
 
-// TODO: Eihter use or remove this
 pub const OPA_IMPORTS: &[&str] =
     &["from superset.security.manager import OpaSupersetSecurityManager"];
 

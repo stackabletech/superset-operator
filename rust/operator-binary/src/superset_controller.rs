@@ -559,7 +559,7 @@ fn build_rolegroup_config_map(
     vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
     let mut config_properties = BTreeMap::new();
-    let imports = PYTHON_IMPORTS;
+    let mut imports = PYTHON_IMPORTS.to_vec();
     // TODO: this is true per default for versions 3.0.0 and up.
     //    We deactivate it here to keep existing functionality.
     //    However this is a security issue and should be configured properly
@@ -577,7 +577,7 @@ fn build_rolegroup_config_map(
         }
         // If opa role mapping is configured, insert CustomOpaSecurityManager import
         for opa_import in OPA_IMPORTS {
-            imports.to_vec().push(&opa_import);
+            imports.push(&opa_import);
         }
     }
 
@@ -604,7 +604,7 @@ fn build_rolegroup_config_map(
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
         &mut config_file,
         config_properties.iter(),
-        imports,
+        &imports,
     )
     .with_context(|_| BuildRoleGroupConfigFileSnafu {
         rolegroup: rolegroup.clone(),
