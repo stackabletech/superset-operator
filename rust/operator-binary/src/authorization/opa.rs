@@ -30,12 +30,16 @@ impl SupersetOpaConfig {
     }
 
     // Adding necessary configurations. Imports are solved in config.rs
+    // TODO: Currently: .unwrap_or_default() which ends in e.g. :
+    // CUSTOM_SECURITY_MANAGER = None => CUSTOM_SECURITY_MANAGER = ""
+    // Could be better if not set.
     pub fn as_config(&self) -> BTreeMap<String, Option<String>> {
         let config = BTreeMap::from([
             (
                 "CUSTOM_SECURITY_MANAGER".to_string(),
                 Some("OpaSupersetSecurityManager".to_string()),
             ),
+            // TODO: Make this more smart.
             (
                 "AUTH_USER_REGISTRATION_ROLE".to_string(),
                 Some("os.getenv('AUTH_USER_REGISTRATION_ROLE', 'Public')".to_string()),

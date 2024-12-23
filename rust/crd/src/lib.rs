@@ -136,7 +136,7 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::AuthLdapTlsCertfile => PythonType::StringLiteral,
             SupersetConfigOptions::AuthLdapTlsKeyfile => PythonType::StringLiteral,
             SupersetConfigOptions::AuthLdapTlsCacertfile => PythonType::StringLiteral,
-            SupersetConfigOptions::CustomSecurityManager => PythonType::StringLiteral,
+            SupersetConfigOptions::CustomSecurityManager => PythonType::Expression,
             SupersetConfigOptions::StackableOpaEndpoint => PythonType::StringLiteral,
             SupersetConfigOptions::StackableOpaPackage => PythonType::StringLiteral,
             // TODO: Set new options for OpaSecurityManager like:
