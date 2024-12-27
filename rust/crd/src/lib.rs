@@ -89,6 +89,7 @@ pub enum SupersetConfigOptions {
     CustomSecurityManager,
     StackableOpaEndpoint,
     StackableOpaPackage,
+    StackableOpaRule,
 }
 
 impl SupersetConfigOptions {
@@ -140,6 +141,7 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::CustomSecurityManager => PythonType::Expression,
             SupersetConfigOptions::StackableOpaEndpoint => PythonType::StringLiteral,
             SupersetConfigOptions::StackableOpaPackage => PythonType::StringLiteral,
+            SupersetConfigOptions::StackableOpaRule => PythonType::Expression,
             // TODO: Set new options for OpaSecurityManager like:
         }
     }

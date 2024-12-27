@@ -52,11 +52,11 @@ impl SupersetOpaConfig {
                 "AUTH_USER_REGISTRATION_ROLE".to_string(),
                 Some("os.getenv('AUTH_USER_REGISTRATION_ROLE', 'Public')".to_string()),
             ),
-            // TODO: Figure out how to tell a what are the
-            // rule names used.
+            // There is no proper way to interfere this without changing e.g. CRD's.
+            // Thus, we go for an default and make it accessible through envoverrides.
             (
                 "STACKABLE_OPA_RULE".to_string(),
-                Some("os.getenv('STACKABLE_OPA_RULE', 'user_roles')".to_string()),
+                Some("os.getenv('OPA_RULE', 'user_roles')".to_string()),
             ),
             (
                 "STACKABLE_OPA_ENDPOINT".to_string(),
