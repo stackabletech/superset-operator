@@ -119,7 +119,8 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::LoggingConfigurator => PythonType::Expression,
             SupersetConfigOptions::AuthType => PythonType::Expression,
             SupersetConfigOptions::AuthUserRegistration => PythonType::BoolLiteral,
-            SupersetConfigOptions::AuthUserRegistrationRole => PythonType::StringLiteral,
+            // Going to be an expression as we default it from env, if and only if opa is used
+            SupersetConfigOptions::AuthUserRegistrationRole => PythonType::Expression,
             SupersetConfigOptions::AuthRolesSyncAtLogin => PythonType::BoolLiteral,
             SupersetConfigOptions::AuthLdapServer => PythonType::StringLiteral,
             SupersetConfigOptions::AuthLdapBindUser => PythonType::Expression,

@@ -20,9 +20,15 @@ impl SupersetOpaConfig {
         // Get opa_base_url for later use in CustomOpaSecurityManager
         let opa_endpoint = opa_config
             .full_document_url_from_config_map(client, superset, None, OpaApiVersion::V1)
-            .await?;
+            .await?
+            // Not pretty.
+            // Need to remove the resource name. Appended by default.
+            // TODO: Decide where to handle this
+            // could be better in security manager!
+            .replace("/v1/data/superset", "");
 
         let opa_package = opa_config.package.clone();
+
         Ok(SupersetOpaConfig {
             opa_endpoint,
             opa_package,
@@ -39,7 +45,9 @@ impl SupersetOpaConfig {
                 "CUSTOM_SECURITY_MANAGER".to_string(),
                 Some("OpaSupersetSecurityManager".to_string()),
             ),
-            // TODO: Make this more smart.
+            // This is now a PythonType::Expression. Makes it easy to find a default.
+            // only necessary when opa role mapping is activated, as the user
+            // has to have a role to be valid.
             (
                 "AUTH_USER_REGISTRATION_ROLE".to_string(),
                 Some("os.getenv('AUTH_USER_REGISTRATION_ROLE', 'Public')".to_string()),
