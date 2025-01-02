@@ -35,6 +35,9 @@ pub const PYTHON_IMPORTS: &[&str] = &[
     "from log_config import StackableLoggingConfigurator",
     ];
 
+pub const OPA_IMPORTS: &[&str] =
+    &["from superset.security.OpaSupersetSecurityManager import OpaSupersetSecurityManager"];
+
 pub fn add_superset_config(
     config: &mut BTreeMap<String, String>,
     authentication_config: &SupersetClientAuthenticationDetailsResolved,

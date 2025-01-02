@@ -71,6 +71,25 @@ spec:
                           - authenticationClass
                         type: object
                       type: array
+                    authorization:
+                      description: 'Authorziation options for Superset. Currently only role mapping is enabled. This means if a user logs in and Opa authorization is enabled user roles got synced from opa into superset roles. Roles get created automated. Warning: This will discard all roles managed by the superset administrator.'
+                      nullable: true
+                      properties:
+                        opa:
+                          description: Configure the OPA stacklet [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) and the name of the Rego package containing your authorization rules. Consult the [OPA authorization documentation](https://docs.stackable.tech/home/nightly/concepts/opa) to learn how to deploy Rego authorization rules with OPA.
+                          nullable: true
+                          properties:
+                            configMapName:
+                              description: The [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) for the OPA stacklet that should be used for authorization requests.
+                              type: string
+                            package:
+                              description: The name of the Rego package containing the Rego rules for the product.
+                              nullable: true
+                              type: string
+                          required:
+                            - configMapName
+                          type: object
+                      type: object
                     clusterOperation:
                       default:
                         reconciliationPaused: false

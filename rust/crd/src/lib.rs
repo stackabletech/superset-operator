@@ -8,6 +8,7 @@ use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
         cluster_operation::ClusterOperation,
+        opa::OpaConfig,
         product_image_selection::ProductImage,
         resources::{
             CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
@@ -85,6 +86,10 @@ pub enum SupersetConfigOptions {
     AuthLdapTlsCertfile,
     AuthLdapTlsKeyfile,
     AuthLdapTlsCacertfile,
+    CustomSecurityManager,
+    StackableOpaBaseUrl,
+    StackableOpaPackage,
+    StackableOpaRule,
 }
 
 impl SupersetConfigOptions {
@@ -115,7 +120,8 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::LoggingConfigurator => PythonType::Expression,
             SupersetConfigOptions::AuthType => PythonType::Expression,
             SupersetConfigOptions::AuthUserRegistration => PythonType::BoolLiteral,
-            SupersetConfigOptions::AuthUserRegistrationRole => PythonType::StringLiteral,
+            // Going to be an expression as we default it from env, if and only if opa is used
+            SupersetConfigOptions::AuthUserRegistrationRole => PythonType::Expression,
             SupersetConfigOptions::AuthRolesSyncAtLogin => PythonType::BoolLiteral,
             SupersetConfigOptions::AuthLdapServer => PythonType::StringLiteral,
             SupersetConfigOptions::AuthLdapBindUser => PythonType::Expression,
@@ -132,6 +138,11 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::AuthLdapTlsCertfile => PythonType::StringLiteral,
             SupersetConfigOptions::AuthLdapTlsKeyfile => PythonType::StringLiteral,
             SupersetConfigOptions::AuthLdapTlsCacertfile => PythonType::StringLiteral,
+            SupersetConfigOptions::CustomSecurityManager => PythonType::Expression,
+            SupersetConfigOptions::StackableOpaBaseUrl => PythonType::StringLiteral,
+            SupersetConfigOptions::StackableOpaPackage => PythonType::StringLiteral,
+            SupersetConfigOptions::StackableOpaRule => PythonType::Expression,
+            // TODO: Set new options for OpaSecurityManager like:
         }
     }
 }
@@ -174,6 +185,13 @@ pub struct SupersetClusterConfig {
     /// List of AuthenticationClasses used to authenticate users.
     #[serde(default)]
     pub authentication: Vec<SupersetClientAuthenticationDetails>,
+
+    /// Authorziation options for Superset.
+    /// Currently only role mapping is enabled. This means if a user logs in and Opa authorization is enabled
+    /// user roles got synced from opa into superset roles. Roles get created automated.
+    /// Warning: This will discard all roles managed by the superset administrator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authorization: Option<SupersetAuthorization>,
 
     /// The name of the Secret object containing the admin user credentials and database connection details.
     /// Read the
@@ -237,6 +255,12 @@ impl CurrentlySupportedListenerClasses {
             CurrentlySupportedListenerClasses::ExternalStable => "LoadBalancer".to_string(),
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetAuthorization {
+    pub opa: Option<OpaConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -470,6 +494,14 @@ impl SupersetCluster {
         match role {
             SupersetRole::Node => self.spec.nodes.as_ref().map(|n| &n.role_config),
         }
+    }
+
+    pub fn get_opa_config(&self) -> Option<&OpaConfig> {
+        self.spec
+            .cluster_config
+            .authorization
+            .as_ref()
+            .and_then(|a| a.opa.as_ref())
     }
 
     /// Retrieve and merge resource configs for role and role groups
