@@ -7,7 +7,7 @@ use stackable_operator::{
 use stackable_superset_crd::SupersetCluster;
 
 pub struct SupersetOpaConfig {
-    opa_endpoint: String,
+    opa_base_url: String,
     opa_package: Option<String>,
 }
 
@@ -20,18 +20,20 @@ impl SupersetOpaConfig {
         // Get opa_base_url for later use in CustomOpaSecurityManager
         let opa_endpoint = opa_config
             .full_document_url_from_config_map(client, superset, None, OpaApiVersion::V1)
-            .await?
-            // Not pretty.
-            // Need to remove the resource name. Appended by default.
-            // TODO: Decide where to handle this
-            // could be better in security manager!
-            .replace("/v1/data/superset", "");
+            .await?;
 
-        let opa_package = opa_config.package.clone();
+        // striping package path from base url. Needed by CustomOpaSecurityManager. TODO: <Path/to/manager.py>
+        let opa_base_url = match opa_config.package.clone() {
+            Some(opa_package_name) => {
+                let opa_path = format!("/v1/data/{opa_package_name}");
+                opa_endpoint.replace(&opa_path, "")
+            }
+            None => opa_endpoint.replace("/v1/data/", ""),
+        };
 
         Ok(SupersetOpaConfig {
-            opa_endpoint,
-            opa_package,
+            opa_base_url,
+            opa_package: opa_config.package.clone(),
         })
     }
 
@@ -53,14 +55,14 @@ impl SupersetOpaConfig {
                 Some("os.getenv('AUTH_USER_REGISTRATION_ROLE', 'Public')".to_string()),
             ),
             // There is no proper way to interfere this without changing e.g. CRD's.
-            // Thus, we go for an default and make it accessible through envoverrides.
+            // Thus, we go for an default and make it accessible through envOverrides.
             (
                 "STACKABLE_OPA_RULE".to_string(),
                 Some("os.getenv('STACKABLE_OPA_RULE', 'user_roles')".to_string()),
             ),
             (
-                "STACKABLE_OPA_ENDPOINT".to_string(),
-                Some(self.opa_endpoint.clone()),
+                "STACKABLE_OPA_BASE_URL".to_string(),
+                Some(self.opa_base_url.clone()),
             ),
             (
                 "STACKABLE_OPA_PACKAGE".to_string(),
