@@ -42,7 +42,7 @@ impl SupersetOpaConfig {
     // CUSTOM_SECURITY_MANAGER = None => CUSTOM_SECURITY_MANAGER = ""
     // Could be better if not set.
     pub fn as_config(&self) -> BTreeMap<String, Option<String>> {
-        let config = BTreeMap::from([
+        BTreeMap::from([
             (
                 "CUSTOM_SECURITY_MANAGER".to_string(),
                 Some("OpaSupersetSecurityManager".to_string()),
@@ -56,6 +56,7 @@ impl SupersetOpaConfig {
             ),
             // There is no proper way to interfere this without changing e.g. CRD's.
             // Thus, we go for an default and make it accessible through envOverrides.
+            // TODO: Documentation
             (
                 "STACKABLE_OPA_RULE".to_string(),
                 Some("os.getenv('STACKABLE_OPA_RULE', 'user_roles')".to_string()),
@@ -68,7 +69,6 @@ impl SupersetOpaConfig {
                 "STACKABLE_OPA_PACKAGE".to_string(),
                 self.opa_package.clone(),
             ),
-        ]);
-        config
+        ])
     }
 }
