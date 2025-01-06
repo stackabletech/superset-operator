@@ -36,7 +36,7 @@ pub const PYTHON_IMPORTS: &[&str] = &[
     ];
 
 pub const OPA_IMPORTS: &[&str] =
-    &["from superset.security.OpaSupersetSecurityManager import OpaSupersetSecurityManager"];
+    &["from superset.security.opa_manager import OpaSupersetSecurityManager"];
 
 pub fn add_superset_config(
     config: &mut BTreeMap<String, String>,
