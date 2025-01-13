@@ -22,7 +22,7 @@ impl SupersetOpaConfig {
             .full_document_url_from_config_map(client, superset, None, OpaApiVersion::V1)
             .await?;
 
-        // striping package path from base url. Needed by CustomOpaSecurityManager. TODO: <Path/to/manager.py>
+        // striping package path from base url. Needed by CustomOpaSecurityManager.
         let opa_base_url = match opa_config.package.clone() {
             Some(opa_package_name) => {
                 let opa_path = format!("/v1/data/{opa_package_name}");
@@ -38,9 +38,6 @@ impl SupersetOpaConfig {
     }
 
     // Adding necessary configurations. Imports are solved in config.rs
-    // TODO: Currently: .unwrap_or_default() which ends in e.g. :
-    // CUSTOM_SECURITY_MANAGER = None => CUSTOM_SECURITY_MANAGER = ""
-    // Could be better if not set.
     pub fn as_config(&self) -> BTreeMap<String, Option<String>> {
         BTreeMap::from([
             (
@@ -48,14 +45,13 @@ impl SupersetOpaConfig {
                 Some("OpaSupersetSecurityManager".to_string()),
             ),
             // This is now a PythonType::Expression. Makes it easy to find a default.
-            // only necessary when opa role mapping is activated, as the user
-            // has to have a role to be valid.
+            // EnvOverrides are supported.
             (
                 "AUTH_USER_REGISTRATION_ROLE".to_string(),
                 Some("os.getenv('AUTH_USER_REGISTRATION_ROLE', 'Public')".to_string()),
             ),
             // There is no proper way to interfere this without changing e.g. CRD's.
-            // Thus, we go for an default and make it accessible through envOverrides.
+            // EnvOverrides are supported.
             // TODO: Documentation
             (
                 "STACKABLE_OPA_RULE".to_string(),
