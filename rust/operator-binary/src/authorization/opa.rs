@@ -65,6 +65,10 @@ impl SupersetOpaConfig {
                 "STACKABLE_OPA_PACKAGE".to_string(),
                 self.opa_package.clone(),
             ),
+            (
+                "OPA_ROLES_CACHE".to_string(),
+                Some("os.getenv('OPA_ROLES_CACHE', '10')".to_string()),
+            ),
         ])
     }
 }

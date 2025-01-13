@@ -90,6 +90,7 @@ pub enum SupersetConfigOptions {
     StackableOpaBaseUrl,
     StackableOpaPackage,
     StackableOpaRule,
+    OpaRolesCache,
 }
 
 impl SupersetConfigOptions {
@@ -143,6 +144,7 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::StackableOpaBaseUrl => PythonType::StringLiteral,
             SupersetConfigOptions::StackableOpaPackage => PythonType::StringLiteral,
             SupersetConfigOptions::StackableOpaRule => PythonType::Expression,
+            SupersetConfigOptions::OpaRolesCache => PythonType::Expression,
         }
     }
 }
