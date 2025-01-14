@@ -9,7 +9,7 @@ data:
   roles.rego: |
     package superset
 
-    import rego.v1  
+    import rego.v1
 
     default user_roles := []
 
