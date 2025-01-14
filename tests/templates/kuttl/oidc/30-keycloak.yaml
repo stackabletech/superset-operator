@@ -12,7 +12,7 @@ commands:
       PASSWORD=T8mn72D9 \
       CLIENT_ID=superset1 \
       CLIENT_SECRET=R1bxHUD569vHeQdw \
-      envsubst < install-keycloak.yaml | kubectl apply -n $NAMESPACE -f -
+      envsubst < 30_install-keycloak.yaml | kubectl apply -n $NAMESPACE -f -
 
       INSTANCE_NAME=keycloak2 \
       REALM=test2 \
@@ -23,4 +23,4 @@ commands:
       PASSWORD=NvfpU518 \
       CLIENT_ID=superset2 \
       CLIENT_SECRET=scWzh0D4v0GN8NrN \
-      envsubst < install-keycloak.yaml | kubectl apply -n $NAMESPACE -f -
+      envsubst < 30_install-keycloak.yaml | kubectl apply -n $NAMESPACE -f -

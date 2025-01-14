@@ -1,0 +1,40 @@
+# $NAMESPACE will be replaced with the namespace of the test case.
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-credentials
+type: Opaque
+stringData:
+  adminUser.username: admin
+  adminUser.firstname: Superset
+  adminUser.lastname: Admin
+  adminUser.email: admin@superset.com
+  adminUser.password: admin
+  connections.secretKey: aQC11KVUJ3yTVcy2
+  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql/superset
+---
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: superset
+spec:
+  image:
+    productVersion: "{{ test_scenario['values']['superset'] }}"
+    pullPolicy: IfNotPresent
+  clusterConfig:
+    authorization:
+      opa:
+        configMapName: simple-opa
+        package: superset
+    credentialsSecret: superset-credentials
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+  nodes:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleGroups:
+      default:
+        replicas: 1

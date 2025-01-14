@@ -40,6 +40,9 @@ tests:
     dimensions:
       - superset
       - openshift
+  - name: opa
+      - superset
+      - openshift
   - name: resources
     dimensions:
       - superset-latest
