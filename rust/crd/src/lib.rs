@@ -143,7 +143,7 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::CustomSecurityManager => PythonType::Expression,
             SupersetConfigOptions::StackableOpaBaseUrl => PythonType::StringLiteral,
             SupersetConfigOptions::StackableOpaPackage => PythonType::StringLiteral,
-            SupersetConfigOptions::StackableOpaRule => PythonType::Expression,
+            SupersetConfigOptions::StackableOpaRule => PythonType::StringLiteral,
             SupersetConfigOptions::OpaRolesCache => PythonType::Expression,
         }
     }
