@@ -15,6 +15,9 @@ dimensions:
       - no-tls
       - insecure-tls
       - server-verification-tls
+  - name: opa
+    values:
+      - 0.66.0
   - name: openshift
     values:
       - "false"
@@ -43,6 +46,7 @@ tests:
   - name: opa
     dimensions:
       - superset
+      - opa
       - openshift
   - name: resources
     dimensions:

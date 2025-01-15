@@ -20,12 +20,13 @@ metadata:
   name: superset
 spec:
   image:
+    custom: docker.stackable.tech/stackable/superset:4.0.2-stackable0.0.0-dev-opa
     productVersion: "{{ test_scenario['values']['superset'] }}"
     pullPolicy: IfNotPresent
   clusterConfig:
     authorization:
       opa:
-        configMapName: simple-opa
+        configMapName: opa
         package: superset
     credentialsSecret: superset-credentials
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
