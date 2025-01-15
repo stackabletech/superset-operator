@@ -89,6 +89,10 @@ spec:
                             rule_name:
                               default: user_rules
                               type: string
+                            ttl:
+                              default: 10
+                              format: int8
+                              type: integer
                           required:
                             - configMapName
                           type: object

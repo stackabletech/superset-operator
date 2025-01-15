@@ -7,6 +7,7 @@ pub struct SupersetOpaConfigResolved {
     opa_base_url: String,
     opa_package: Option<String>,
     rule_name: String,
+    ttl: i8,
 }
 
 impl SupersetOpaConfigResolved {
@@ -34,6 +35,7 @@ impl SupersetOpaConfigResolved {
             opa_base_url,
             opa_package: opa_config.opa.package.to_owned(),
             rule_name: opa_config.rule_name.to_owned(),
+            ttl: opa_config.ttl.to_owned(),
         })
     }
 
@@ -64,8 +66,8 @@ impl SupersetOpaConfigResolved {
                 self.opa_package.clone(),
             ),
             (
-                "OPA_ROLES_CACHE".to_string(),
-                Some("os.getenv('OPA_ROLES_CACHE', '10')".to_string()),
+                "OPA_ROLES_CACHE_TTL".to_string(),
+                Some(self.ttl.to_string().clone()),
             ),
         ])
     }

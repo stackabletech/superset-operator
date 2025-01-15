@@ -90,7 +90,7 @@ pub enum SupersetConfigOptions {
     StackableOpaBaseUrl,
     StackableOpaPackage,
     StackableOpaRule,
-    OpaRolesCache,
+    OpaRolesCacheTTL,
 }
 
 impl SupersetConfigOptions {
@@ -144,7 +144,7 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::StackableOpaBaseUrl => PythonType::StringLiteral,
             SupersetConfigOptions::StackableOpaPackage => PythonType::StringLiteral,
             SupersetConfigOptions::StackableOpaRule => PythonType::StringLiteral,
-            SupersetConfigOptions::OpaRolesCache => PythonType::Expression,
+            SupersetConfigOptions::OpaRolesCacheTTL => PythonType::IntLiteral,
         }
     }
 }
@@ -264,8 +264,13 @@ pub struct SupersetOpaConfig {
     pub opa: OpaConfig,
     #[serde(default = "opa_rule_name_default")]
     pub rule_name: String,
+    #[serde(default = "ttl_default_time")]
+    pub ttl: i8,
 }
 
+fn ttl_default_time() -> i8 {
+    10
+}
 fn opa_rule_name_default() -> String {
     "user_rules".to_string()
 }
