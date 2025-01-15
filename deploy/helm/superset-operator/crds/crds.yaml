@@ -87,7 +87,7 @@ spec:
                               nullable: true
                               type: string
                             rule_name:
-                              default: ''
+                              default: user_rules
                               type: string
                           required:
                             - configMapName

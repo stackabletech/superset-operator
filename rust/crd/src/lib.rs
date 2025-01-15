@@ -262,8 +262,12 @@ impl CurrentlySupportedListenerClasses {
 pub struct SupersetOpaConfig {
     #[serde(flatten)]
     pub opa: OpaConfig,
-    #[serde(default)]
+    #[serde(default = "opa_rule_name_default")]
     pub rule_name: String,
+}
+
+fn opa_rule_name_default() -> String {
+    "user_rules".to_string()
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
