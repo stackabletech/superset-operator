@@ -75,7 +75,7 @@ use stackable_superset_crd::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    authorization::opa::SupersetOpaConfig,
+    authorization::opa::SupersetOpaConfigResolved,
     commands::add_cert_to_python_certifi_command,
     config::{self, OPA_IMPORTS, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
@@ -378,7 +378,7 @@ pub async fn reconcile_superset(
 
     let superset_opa_config = match superset.get_opa_config() {
         Some(opa_config) => Some(
-            SupersetOpaConfig::from_opa_config(client, superset, opa_config)
+            SupersetOpaConfigResolved::from_opa_config(client, superset, opa_config)
                 .await
                 .context(InvalidOpaConfigSnafu)?,
         ),
@@ -555,7 +555,7 @@ fn build_rolegroup_config_map(
     rolegroup: &RoleGroupRef<SupersetCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_config: &SupersetClientAuthenticationDetailsResolved,
-    superset_opa_config: &Option<SupersetOpaConfig>,
+    superset_opa_config: &Option<SupersetOpaConfigResolved>,
     logging: &Logging<Container>,
     vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {

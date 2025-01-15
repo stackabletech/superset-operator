@@ -86,6 +86,9 @@ spec:
                               description: The name of the Rego package containing the Rego rules for the product.
                               nullable: true
                               type: string
+                            rule_name:
+                              default: ''
+                              type: string
                           required:
                             - configMapName
                           type: object

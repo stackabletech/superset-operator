@@ -258,11 +258,18 @@ impl CurrentlySupportedListenerClasses {
         }
     }
 }
+#[derive(Clone, Deserialize, Serialize, Eq, JsonSchema, Debug, PartialEq)]
+pub struct SupersetOpaConfig {
+    #[serde(flatten)]
+    pub opa: OpaConfig,
+    #[serde(default)]
+    pub rule_name: String,
+}
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetAuthorization {
-    pub opa: Option<OpaConfig>,
+    pub opa: Option<SupersetOpaConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -498,7 +505,7 @@ impl SupersetCluster {
         }
     }
 
-    pub fn get_opa_config(&self) -> Option<&OpaConfig> {
+    pub fn get_opa_config(&self) -> Option<&SupersetOpaConfig> {
         self.spec
             .cluster_config
             .authorization

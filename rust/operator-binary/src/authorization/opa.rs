@@ -1,29 +1,28 @@
 use std::collections::BTreeMap;
 
-use stackable_operator::{
-    client::Client,
-    commons::opa::{OpaApiVersion, OpaConfig},
-};
-use stackable_superset_crd::SupersetCluster;
+use stackable_operator::{client::Client, commons::opa::OpaApiVersion};
+use stackable_superset_crd::{SupersetCluster, SupersetOpaConfig};
 
-pub struct SupersetOpaConfig {
+pub struct SupersetOpaConfigResolved {
     opa_base_url: String,
     opa_package: Option<String>,
+    rule_name: String,
 }
 
-impl SupersetOpaConfig {
+impl SupersetOpaConfigResolved {
     pub async fn from_opa_config(
         client: &Client,
         superset: &SupersetCluster,
-        opa_config: &OpaConfig,
+        opa_config: &SupersetOpaConfig,
     ) -> Result<Self, stackable_operator::commons::opa::Error> {
         // Get opa_base_url for later use in CustomOpaSecurityManager
         let opa_endpoint = opa_config
+            .opa
             .full_document_url_from_config_map(client, superset, None, OpaApiVersion::V1)
             .await?;
 
         // striping package path from base url. Needed by CustomOpaSecurityManager.
-        let opa_base_url = match opa_config.package.clone() {
+        let opa_base_url = match opa_config.opa.package.clone() {
             Some(opa_package_name) => {
                 let opa_path = format!("/v1/data/{opa_package_name}");
                 opa_endpoint.replace(&opa_path, "")
@@ -31,9 +30,10 @@ impl SupersetOpaConfig {
             None => opa_endpoint.replace("/v1/data/", ""),
         };
 
-        Ok(SupersetOpaConfig {
+        Ok(SupersetOpaConfigResolved {
             opa_base_url,
-            opa_package: opa_config.package.clone(),
+            opa_package: opa_config.opa.package.to_owned(),
+            rule_name: opa_config.rule_name.to_owned(),
         })
     }
 
@@ -50,12 +50,10 @@ impl SupersetOpaConfig {
                 "AUTH_USER_REGISTRATION_ROLE".to_string(),
                 Some("os.getenv('AUTH_USER_REGISTRATION_ROLE', 'Public')".to_string()),
             ),
-            // There is no proper way to interfere this without changing e.g. CRD's.
-            // EnvOverrides are supported.
             // TODO: Documentation
             (
                 "STACKABLE_OPA_RULE".to_string(),
-                Some("os.getenv('STACKABLE_OPA_RULE', 'user_roles')".to_string()),
+                Some(self.rule_name.clone()),
             ),
             (
                 "STACKABLE_OPA_BASE_URL".to_string(),
