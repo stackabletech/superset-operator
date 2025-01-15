@@ -1,3 +1,4 @@
+use stackable_operator::time::Duration;
 use std::collections::BTreeMap;
 
 use stackable_operator::{client::Client, commons::opa::OpaApiVersion};
@@ -7,7 +8,7 @@ pub struct SupersetOpaConfigResolved {
     opa_base_url: String,
     opa_package: Option<String>,
     rule_name: String,
-    ttl: i8,
+    ttl: Duration,
 }
 
 impl SupersetOpaConfigResolved {
@@ -35,7 +36,7 @@ impl SupersetOpaConfigResolved {
             opa_base_url,
             opa_package: opa_config.opa.package.to_owned(),
             rule_name: opa_config.rule_name.to_owned(),
-            ttl: opa_config.ttl.to_owned(),
+            ttl: opa_config.cache_ttl.to_owned(),
         })
     }
 
@@ -67,7 +68,7 @@ impl SupersetOpaConfigResolved {
             ),
             (
                 "OPA_ROLES_CACHE_TTL".to_string(),
-                Some(self.ttl.to_string().clone()),
+                Some(self.ttl.as_secs().to_string()),
             ),
         ])
     }

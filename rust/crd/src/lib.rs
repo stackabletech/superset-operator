@@ -259,17 +259,20 @@ impl CurrentlySupportedListenerClasses {
     }
 }
 #[derive(Clone, Deserialize, Serialize, Eq, JsonSchema, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct SupersetOpaConfig {
     #[serde(flatten)]
     pub opa: OpaConfig,
+    /// Name of the rule where roles should be mapped from
     #[serde(default = "opa_rule_name_default")]
     pub rule_name: String,
+    /// Retention time of the opa roles. e.g. `30m`, `1h` or `2d`
     #[serde(default = "ttl_default_time")]
-    pub ttl: i8,
+    pub cache_ttl: Duration,
 }
 
-fn ttl_default_time() -> i8 {
-    10
+fn ttl_default_time() -> Duration {
+    Duration::from_secs(10)
 }
 fn opa_rule_name_default() -> String {
     "user_rules".to_string()
