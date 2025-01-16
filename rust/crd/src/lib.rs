@@ -90,7 +90,8 @@ pub enum SupersetConfigOptions {
     StackableOpaBaseUrl,
     StackableOpaPackage,
     StackableOpaRule,
-    OpaRolesCacheTTL,
+    StackableOpaCacheMaxEntries,
+    StackableOpaCacheEntryTTL,
 }
 
 impl SupersetConfigOptions {
@@ -122,7 +123,7 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::AuthType => PythonType::Expression,
             SupersetConfigOptions::AuthUserRegistration => PythonType::BoolLiteral,
             // Going to be an expression as we default it from env, if and only if opa is used
-            SupersetConfigOptions::AuthUserRegistrationRole => PythonType::Expression,
+            SupersetConfigOptions::AuthUserRegistrationRole => PythonType::StringLiteral,
             SupersetConfigOptions::AuthRolesSyncAtLogin => PythonType::BoolLiteral,
             SupersetConfigOptions::AuthLdapServer => PythonType::StringLiteral,
             SupersetConfigOptions::AuthLdapBindUser => PythonType::Expression,
@@ -144,7 +145,8 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::StackableOpaBaseUrl => PythonType::StringLiteral,
             SupersetConfigOptions::StackableOpaPackage => PythonType::StringLiteral,
             SupersetConfigOptions::StackableOpaRule => PythonType::StringLiteral,
-            SupersetConfigOptions::OpaRolesCacheTTL => PythonType::IntLiteral,
+            SupersetConfigOptions::StackableOpaCacheMaxEntries => PythonType::IntLiteral,
+            SupersetConfigOptions::StackableOpaCacheEntryTTL => PythonType::IntLiteral,
         }
     }
 }
@@ -263,19 +265,29 @@ impl CurrentlySupportedListenerClasses {
 pub struct SupersetOpaConfig {
     #[serde(flatten)]
     pub opa: OpaConfig,
-    /// Name of the rule where roles should be mapped from
-    #[serde(default = "opa_rule_name_default")]
-    pub rule_name: String,
-    /// Retention time of the opa roles. e.g. `30m`, `1h` or `2d`
-    #[serde(default = "ttl_default_time")]
-    pub cache_ttl: Duration,
+
+    /// Configuration for an superset-internal cache for calls to OPA
+    pub cache: SupersetOpaCacheConfig,
 }
 
-fn ttl_default_time() -> Duration {
-    Duration::from_secs(10)
+#[derive(Clone, Deserialize, Serialize, Eq, JsonSchema, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetOpaCacheConfig {
+    /// Cache duration , e.g. `30m`, `1h` or `2d`
+    #[serde(default = "cache_ttl_default")]
+    pub entry_time_to_live: Duration,
+
+    /// Number of maximum user-role mappings cached concurrently
+    #[serde(default = "cache_max_entries_default")]
+    pub max_entries: u32,
 }
-fn opa_rule_name_default() -> String {
-    "user_rules".to_string()
+
+fn cache_max_entries_default() -> u32 {
+    128
+}
+
+fn cache_ttl_default() -> Duration {
+    Duration::from_secs(30)
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]

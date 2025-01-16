@@ -7,8 +7,8 @@ use stackable_superset_crd::{SupersetCluster, SupersetOpaConfig};
 pub struct SupersetOpaConfigResolved {
     opa_base_url: String,
     opa_package: Option<String>,
-    rule_name: String,
-    ttl: Duration,
+    cache_max_entries: u32,
+    cache_ttl: Duration,
 }
 
 impl SupersetOpaConfigResolved {
@@ -35,8 +35,8 @@ impl SupersetOpaConfigResolved {
         Ok(SupersetOpaConfigResolved {
             opa_base_url,
             opa_package: opa_config.opa.package.to_owned(),
-            rule_name: opa_config.rule_name.to_owned(),
-            ttl: opa_config.cache_ttl.to_owned(),
+            cache_max_entries: opa_config.cache.max_entries.to_owned(),
+            cache_ttl: opa_config.cache.entry_time_to_live.to_owned(),
         })
     }
 
@@ -47,29 +47,26 @@ impl SupersetOpaConfigResolved {
                 "CUSTOM_SECURITY_MANAGER".to_string(),
                 Some("OpaSupersetSecurityManager".to_string()),
             ),
-            // This is now a PythonType::Expression. Makes it easy to find a default.
-            // EnvOverrides are supported.
-            (
-                "AUTH_USER_REGISTRATION_ROLE".to_string(),
-                Some("os.getenv('AUTH_USER_REGISTRATION_ROLE', 'Public')".to_string()),
-            ),
-            // TODO: Documentation
             (
                 "STACKABLE_OPA_RULE".to_string(),
-                Some(self.rule_name.clone()),
+                Some("user_roles".to_string()),
             ),
             (
                 "STACKABLE_OPA_BASE_URL".to_string(),
-                Some(self.opa_base_url.clone()),
+                Some(self.opa_base_url.to_owned()),
             ),
             (
                 "STACKABLE_OPA_PACKAGE".to_string(),
-                self.opa_package.clone(),
+                self.opa_package.to_owned(),
             ),
             (
-                "OPA_ROLES_CACHE_TTL".to_string(),
-                Some(self.ttl.as_secs().to_string()),
+                "STACKABLE_OPA_CACHE_MAX_ENTRIES".to_string(),
+                Some(self.cache_max_entries.to_string()),
             ),
+            (
+                "STACKABLE_OPA_CACHE_ENTRY_TTL".to_string(),
+                Some(self.cache_ttl.as_secs().to_string())
+            )
         ])
     }
 }
