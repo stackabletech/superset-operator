@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use clap::{crate_description, crate_version, Parser};
-use futures::StreamExt;
+use futures::{pin_mut, StreamExt};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     commons::authentication::AuthenticationClass,
@@ -231,9 +231,9 @@ async fn main() -> anyhow::Result<()> {
                     },
                 );
 
-            // Let's run them in parallel instead of only concurrently
-            tokio::spawn(druid_connection_controller);
-            superset_controller.await;
+            pin_mut!(superset_controller, druid_connection_controller);
+            // kube-runtime's Controller will tokio::spawn each reconciliation, so this only concerns the internal watch machinery
+            futures::future::select(superset_controller, druid_connection_controller).await;
         }
     }
 
