@@ -1,6 +1,8 @@
 use crate::util::{get_job_state, JobState};
 
-use crate::{rbac, superset_controller::DOCKER_IMAGE_BASE_NAME, APP_NAME};
+use std::sync::Arc;
+
+use const_format::concatcp;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
@@ -27,10 +29,13 @@ use stackable_superset_crd::{
     druidconnection::{DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition},
     SupersetCluster, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
 };
-use std::sync::Arc;
 use strum::{EnumDiscriminants, IntoStaticStr};
 
+use crate::{rbac, superset_controller::DOCKER_IMAGE_BASE_NAME, APP_NAME, OPERATOR_NAME};
+
 pub const DRUID_CONNECTION_CONTROLLER_NAME: &str = "druid-connection";
+pub const DRUID_CONNECTION_FULL_CONTROLLER_NAME: &str =
+    concatcp!(DRUID_CONNECTION_CONTROLLER_NAME, '.', OPERATOR_NAME);
 
 pub struct Ctx {
     pub client: Client,
