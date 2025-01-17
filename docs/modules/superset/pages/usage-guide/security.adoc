@@ -126,6 +126,66 @@ Further information for specifying an AuthenticationClass for an OIDC provider c
 Superset has a concept called `Roles` which allows you to grant user permissions based on roles.
 Have a look at the {superset-security}[Superset documentation on Security^{external-link-icon}^].
 
+=== [[Opa]] Opa Roles Mapping
+
+Superset can sync roles from open policy agent. Currently only mapping is enabled as a larger refactoring of the upstream superset concerning their security management is announced.
+
+In order to map roles from Opa into superset, we expect rego rules with a rule name `user_roles`. In the below example two users `admin` and `testuser` have roles defined as rego rule in Rego V1 to be complient with OPA v1.0.0 release.
+
+IMPORTANT: Only role mapping is enabled. Permissions can only be added through the Superset UI. RBAC through OPA is not implemented.
+
+[source,yaml]
+----
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: superset-opa-regorules
+  labels:
+    opa.stackable.tech/bundle: "true"
+data:
+  roles.rego: |
+    package superset
+
+    import rego.v1
+
+    default user_roles := []
+
+    user_roles := roles if {
+        some user in users
+        roles := user.roles
+        user.username == input.username
+    }
+
+    users := [
+        {"username": "admin", "roles": ["Admin", "Test"]},
+        {"username": "testuser", "roles": ["El_Testos", "Custom2"]}
+    ]
+----
+
+Mounting this `configMap` in superset as follows:
+
+[source,yaml]
+----
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: superset-with-opa-role-mapping
+spec:
+  clusterConfig:
+    authorization:
+      roleMappingFromOpa:
+        configMapName: superset-opa-regorules # <1>
+        package: superset
+        cache: # <2>
+          entryTimeToLive: 10s # <3>
+          maxEntries: 5 # <4>
+----
+
+<1> ConfigMap name containing rego rules
+<2> Mandatory Opa caching. Reduces calls to OPA API.
+<3> Time for cached entries per user can live. Defaults to 30s.
+<4> Number of maximum entries, defaults to 1000. Cache will be disabled for maxEntries: 0.
+
 === Superset database
 
 You can view all the available roles in the web interface of Superset and can also assign users to these roles.
