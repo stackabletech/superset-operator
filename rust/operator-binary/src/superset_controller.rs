@@ -6,6 +6,7 @@ use std::{
     sync::Arc,
 };
 
+use const_format::concatcp;
 use indoc::formatdoc;
 use product_config::{
     flask_app_config_writer::{self, FlaskAppConfigWriterError},
@@ -87,6 +88,8 @@ use crate::{
 };
 
 pub const SUPERSET_CONTROLLER_NAME: &str = "supersetcluster";
+pub const SUPERSET_FULL_CONTROLLER_NAME: &str =
+    concatcp!(SUPERSET_CONTROLLER_NAME, '.', OPERATOR_NAME);
 pub const DOCKER_IMAGE_BASE_NAME: &str = "superset";
 
 const METRICS_PORT_NAME: &str = "metrics";
