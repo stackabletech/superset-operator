@@ -68,9 +68,13 @@ spec:
           volumeMounts:
             - name: tls
               mountPath: /stackable/tls
+            - name: get-user-roles-script
+              mountPath: /tmp/scripts
           env:
             - name: REQUESTS_CA_BUNDLE
               value: /stackable/tls/ca.crt
+            - name: SUPERSET_BASE_URL
+              value: superset-external.$NAMESPACE.svc.cluster.local:8088
       volumes:
         - name: tls
           csi:
@@ -78,3 +82,6 @@ spec:
             volumeAttributes:
               secrets.stackable.tech/class: tls
               secrets.stackable.tech/scope: pod
+        - name: get-user-roles-script
+          configMap:
+            name: get-user-roles-script

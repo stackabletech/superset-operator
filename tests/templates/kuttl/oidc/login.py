@@ -2,8 +2,8 @@
 
 import json
 import logging
-import requests
 import sys
+import requests
 from bs4 import BeautifulSoup
 
 logging.basicConfig(

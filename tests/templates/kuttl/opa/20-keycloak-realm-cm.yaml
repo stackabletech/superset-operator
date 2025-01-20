@@ -16,11 +16,17 @@ data:
     {
       "realm" : "my-dataspace",
       "enabled" : true,
-      "groups" : [ {
-        "name" : "group-user",
-        "path" : "/group-user"
-      } ],
-      "users" : [ {
+      "groups" : [
+      {
+        "name" : "Admin",
+        "path" : "/Admin"
+      },
+      {
+        "name": "Test",
+        "path": "/Test"
+      }],
+      "users" : [
+      {
         "username" : "service-account-user-info-fetcher",
         "enabled" : true,
         "totp" : false,
@@ -39,33 +45,22 @@ data:
         "groups" : [ ]
       },
       {
-          "enabled": true,
-          "username": "alice",
-          "email" : "alice@stackable.tech",
-          "credentials": [
-            {
-              "type": "password",
-              "value": "aj238dSbs72k"
-            }
-          ],
-          "realmRoles": [
-            "Test1",
-            "Test2"
-          ]
-        }
+        "username" : "admin",
+        "enabled" : true,
+        "emailVerified" : true,
+        "firstName" : "admin",
+        "lastName" : "admin",
+        "email" : "admin@example.com",
+        "credentials" : [ {
+          "type" : "password",
+          "userLabel" : "My password",
+          "secretData" : "{\"value\":\"JxIyEshkBUrhZX1BEN9JO8EM3ue5/SnGHDfuyTqOH6A=\",\"salt\":\"f6iCn2rWqZQaRnCCsKAoQQ==\",\"additionalParameters\":{}}",
+          "credentialData" : "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}"
+        } ],
+        "realmRoles" : [ ],
+        "groups" : [ "/Admin", "/Test" ]
+      }
       ],
-      "roles": {
-        "realm": [
-          {
-            "name": "Test1",
-            "description": "Test1"
-          },
-          {
-            "name": "Test2",
-            "description": "Test2"
-          }
-        ]
-      },
       "clients" : [ {
         "clientId" : "${USER_INFO_FETCHER_CLIENT_ID}",
         "surrogateAuthRequired" : false,

@@ -1,0 +1,7 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 300
+commands:
+  - script: >
+      kubectl create cm get-user-roles-script -n $NAMESPACE --from-file get_user_roles.py
