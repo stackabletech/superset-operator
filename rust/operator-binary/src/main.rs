@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use clap::{crate_description, crate_version, Parser};
-use futures::StreamExt;
+use futures::{pin_mut, StreamExt};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
     commons::authentication::AuthenticationClass,
@@ -12,7 +12,11 @@ use stackable_operator::{
     },
     kube::{
         core::DeserializeGuard,
-        runtime::{reflector::ObjectRef, watcher, Controller},
+        runtime::{
+            events::{Recorder, Reporter},
+            reflector::ObjectRef,
+            watcher, Controller,
+        },
         ResourceExt,
     },
     logging::controller::report_controller_reconciled,
@@ -20,8 +24,10 @@ use stackable_operator::{
 };
 use stackable_superset_crd::{druidconnection::DruidConnection, SupersetCluster, APP_NAME};
 
-use crate::druid_connection_controller::DRUID_CONNECTION_CONTROLLER_NAME;
-use crate::superset_controller::SUPERSET_CONTROLLER_NAME;
+use crate::{
+    druid_connection_controller::DRUID_CONNECTION_FULL_CONTROLLER_NAME,
+    superset_controller::SUPERSET_FULL_CONTROLLER_NAME,
+};
 
 mod authorization;
 mod commands;
@@ -87,12 +93,19 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
 
-            let superset_controller_builder = Controller::new(
+            let superset_event_recorder = Arc::new(Recorder::new(
+                client.as_kube_client(),
+                Reporter {
+                    controller: SUPERSET_FULL_CONTROLLER_NAME.to_string(),
+                    instance: None,
+                },
+            ));
+            let superset_controller = Controller::new(
                 watch_namespace.get_api::<DeserializeGuard<SupersetCluster>>(&client),
                 watcher::Config::default(),
             );
-            let superset_store_1 = superset_controller_builder.store();
-            let superset_controller = superset_controller_builder
+            let superset_store_1 = superset_controller.store();
+            let superset_controller = superset_controller
                 .owns(
                     watch_namespace.get_api::<DeserializeGuard<Service>>(&client),
                     watcher::Config::default(),
@@ -123,22 +136,39 @@ async fn main() -> anyhow::Result<()> {
                         product_config,
                     }),
                 )
-                .map(|res| {
-                    report_controller_reconciled(
-                        &client,
-                        &format!("{SUPERSET_CONTROLLER_NAME}.{OPERATOR_NAME}"),
-                        &res,
-                    )
-                });
+                // We can let the reporting happen in the background
+                .for_each_concurrent(
+                    16, // concurrency limit
+                    |result| {
+                        // The event_recorder needs to be shared across all invocations, so that
+                        // events are correctly aggregated
+                        let event_recorder = superset_event_recorder.clone();
+                        async move {
+                            report_controller_reconciled(
+                                &event_recorder,
+                                SUPERSET_FULL_CONTROLLER_NAME,
+                                &result,
+                            )
+                            .await;
+                        }
+                    },
+                );
 
-            let druid_connection_controller_builder = Controller::new(
+            let druid_connection_event_recorder = Arc::new(Recorder::new(
+                client.as_kube_client(),
+                Reporter {
+                    controller: DRUID_CONNECTION_FULL_CONTROLLER_NAME.to_string(),
+                    instance: None,
+                },
+            ));
+            let druid_connection_controller = Controller::new(
                 watch_namespace.get_api::<DeserializeGuard<DruidConnection>>(&client),
                 watcher::Config::default(),
             );
-            let druid_connection_store_1 = druid_connection_controller_builder.store();
-            let druid_connection_store_2 = druid_connection_controller_builder.store();
-            let druid_connection_store_3 = druid_connection_controller_builder.store();
-            let druid_connection_controller = druid_connection_controller_builder
+            let druid_connection_store_1 = druid_connection_controller.store();
+            let druid_connection_store_2 = druid_connection_controller.store();
+            let druid_connection_store_3 = druid_connection_controller.store();
+            let druid_connection_controller = druid_connection_controller
                 .shutdown_on_signal()
                 .watches(
                     watch_namespace.get_api::<DeserializeGuard<SupersetCluster>>(&client),
@@ -184,17 +214,27 @@ async fn main() -> anyhow::Result<()> {
                         client: client.clone(),
                     }),
                 )
-                .map(|res| {
-                    report_controller_reconciled(
-                        &client,
-                        &format!("{DRUID_CONNECTION_CONTROLLER_NAME}.{OPERATOR_NAME}"),
-                        &res,
-                    )
-                });
+                // We can let the reporting happen in the background
+                .for_each_concurrent(
+                    16, // concurrency limit
+                    move |result| {
+                        // The event_recorder needs to be shared across all invocations, so that
+                        // events are correctly aggregated
+                        let event_recorder = druid_connection_event_recorder.clone();
+                        async move {
+                            report_controller_reconciled(
+                                &event_recorder,
+                                DRUID_CONNECTION_FULL_CONTROLLER_NAME,
+                                &result,
+                            )
+                            .await;
+                        }
+                    },
+                );
 
-            futures::stream::select(superset_controller, druid_connection_controller)
-                .collect::<()>()
-                .await;
+            pin_mut!(superset_controller, druid_connection_controller);
+            // kube-runtime's Controller will tokio::spawn each reconciliation, so this only concerns the internal watch machinery
+            futures::future::select(superset_controller, druid_connection_controller).await;
         }
     }
 
