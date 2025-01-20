@@ -6,6 +6,7 @@
 
 - Run a `containerdebug` process in the background of each Superset container to collect debugging information ([#578]).
 - Aggregate emitted Kubernetes events on the CustomResources ([#585]).
+- Opa Role mapping as optional custom manager for superset ([#582]).
 
 ### Changed
 
@@ -21,6 +22,7 @@
 [#568]: https://github.com/stackabletech/superset-operator/pull/568
 [#569]: https://github.com/stackabletech/superset-operator/pull/569
 [#578]: https://github.com/stackabletech/superset-operator/pull/578
+[#582]: https://github.com/stackabletech/superset-operator/pull/582
 [#585]: https://github.com/stackabletech/superset-operator/pull/585
 
 ## [24.11.0] - 2024-11-18
