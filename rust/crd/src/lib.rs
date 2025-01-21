@@ -7,6 +7,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
+        cache::TtlCache,
         cluster_operation::ClusterOperation,
         opa::OpaConfig,
         product_image_selection::ProductImage,
@@ -15,7 +16,10 @@ use stackable_operator::{
             Resources, ResourcesFragment,
         },
     },
-    config::{fragment, fragment::Fragment, fragment::ValidationError, merge::Merge},
+    config::{
+        fragment::{self, Fragment, ValidationError},
+        merge::Merge,
+    },
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
     memory::{BinaryMultiple, MemoryQuantity},
@@ -267,7 +271,7 @@ pub struct SupersetOpaConfig {
     pub opa: OpaConfig,
 
     /// Configuration for an superset-internal cache for calls to OPA
-    pub cache: SupersetOpaCacheConfig,
+    pub cache: TtlCache<30, 1000>,
 }
 
 #[derive(Clone, Deserialize, Serialize, Eq, JsonSchema, Debug, PartialEq)]
