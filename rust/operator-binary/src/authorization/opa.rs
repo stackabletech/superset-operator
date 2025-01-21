@@ -65,8 +65,8 @@ impl SupersetOpaConfigResolved {
             ),
             (
                 "STACKABLE_OPA_CACHE_ENTRY_TTL".to_string(),
-                Some(self.cache_ttl.as_secs().to_string())
-            )
+                Some(self.cache_ttl.as_secs().to_string()),
+            ),
         ])
     }
 }
