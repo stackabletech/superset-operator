@@ -13,5 +13,5 @@ data:
 
     user_roles := roles if {
       group_paths := data.stackable.opa.userinfo.v1.userInfoByUsername(input.username).groups
-      roles := [ trim(group,"/") | group := group_paths[_]]
+      roles := [ trim(group,"/") | group := group_paths[_] ]
     }
