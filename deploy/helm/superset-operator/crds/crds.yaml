@@ -84,11 +84,11 @@ spec:
                               properties:
                                 entryTimeToLive:
                                   default: 30s
-                                  description: Cache duration , e.g. `30m`, `1h` or `2d`
+                                  description: Time to live per entry; Entries which were not queried within the given duration, are removed.
                                   type: string
                                 maxEntries:
-                                  default: 128
-                                  description: Number of maximum user-role mappings cached concurrently
+                                  default: 1000
+                                  description: Maximum number of entries in the cache; If this threshold is reached then the least recently used item is removed.
                                   format: uint32
                                   minimum: 0.0
                                   type: integer
