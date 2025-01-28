@@ -287,6 +287,7 @@ pub enum Error {
     InvalidSupersetCluster {
         source: error_boundary::InvalidObject,
     },
+
     #[snafu(display("invalid OpaConfig"))]
     InvalidOpaConfig {
         source: stackable_operator::commons::opa::Error,

@@ -194,10 +194,11 @@ pub struct SupersetClusterConfig {
     #[serde(default)]
     pub authentication: Vec<SupersetClientAuthenticationDetails>,
 
-    /// Authorziation options for Superset.
-    /// Currently only role mapping is enabled. This means if a user logs in and Opa authorization is enabled
-    /// user roles got synced from opa into superset roles. Roles get created automated.
-    /// Warning: This will discard all roles managed by the superset administrator.
+    /// Authorization options for Superset.
+    ///
+    /// Currently only role mapping is supported. This means if a user logs in and OPA role mapping is enabled,
+    /// user roles got synced from OPA into Superset. Roles in Superset get created automatically.
+    /// Warning: This will discard all roles previously assigned to the user.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authorization: Option<SupersetAuthorization>,
 
@@ -270,7 +271,7 @@ pub struct SupersetOpaConfig {
     #[serde(flatten)]
     pub opa: OpaConfig,
 
-    /// Configuration for an superset-internal cache for calls to OPA
+    /// Configuration for an Superset internal cache for calls to OPA
     pub cache: TtlCache<30, 1000>,
 }
 

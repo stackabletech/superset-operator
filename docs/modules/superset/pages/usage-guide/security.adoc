@@ -126,13 +126,17 @@ Further information for specifying an AuthenticationClass for an OIDC provider c
 Superset has a concept called `Roles` which allows you to grant user permissions based on roles.
 Have a look at the {superset-security}[Superset documentation on Security^{external-link-icon}^].
 
-=== [[Opa]] Opa Roles Mapping
+=== [[OPA]] OPA role mapping
 
-Superset can sync roles from open policy agent. Currently only mapping is enabled as a larger refactoring of the upstream superset concerning their security management is announced.
+Superset can sync roles from OpenPolicyAgent.
+Currently only mapping is enabled as a larger refactoring of the upstream Superset concerning their security management is announced.
 
-In order to map roles from Opa into superset, we expect rego rules with a rule name `user_roles`. In the below example two users `admin` and `testuser` have roles defined as rego rule in Rego V1 to be complient with OPA v1.0.0 release.
+In order to map roles from OPA into Superset, we expect rego rules with a rule name `user_roles`.
+In the below example two users `admin` and `testuser` have roles defined as rego rule in Rego v1 to be compliant with OPA v1.0.0 release.
 
-IMPORTANT: Only role mapping is enabled. Permissions can only be added through the Superset UI. RBAC through OPA is not implemented.
+IMPORTANT: Only role mapping is enabled!
+Permissions of these roles can only be managed through the Superset UI.
+RBAC through OPA is not implemented.
 
 OPA rules can be synced using the xref:opa:usage-guide:user-info-fetcher[user-info-fetcher].
 
@@ -157,7 +161,6 @@ data:
         roles := user.roles
         user.username == input.username
     }
-# TODO: User opainfofetcher()
     users := [
         {"username": "admin", "roles": ["Admin", "Test"]},
         {"username": "testuser", "roles": ["El_Testos", "Custom2"]}
