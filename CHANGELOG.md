@@ -2,10 +2,11 @@
 
 ## [Unreleased]
 
-### Added
+## [24.11.1] - 2025-01-10
 
-- Run a `containerdebug` process in the background of each Superset container to collect debugging information ([#578]).
-- Aggregate emitted Kubernetes events on the CustomResources ([#585]).
+## [24.11.1-rc2] - 2024-12-12
+
+## [24.11.1-rc1] - 2024-12-06
 
 ### Fixed
 
@@ -16,7 +17,6 @@
 
 [#568]: https://github.com/stackabletech/superset-operator/pull/568
 [#569]: https://github.com/stackabletech/superset-operator/pull/569
-[#578]: https://github.com/stackabletech/superset-operator/pull/578
 
 ## [24.11.0] - 2024-11-18
 
