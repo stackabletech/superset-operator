@@ -8,8 +8,13 @@
 - Aggregate emitted Kubernetes events on the CustomResources ([#585]).
 - Support OPA role mapping as optional custom security manager for Superset ([#582]).
 
+### Changed
+
+- Default to OCI for image metadata and product image selection ([#586]).
+
 [#578]: https://github.com/stackabletech/superset-operator/pull/578
 [#585]: https://github.com/stackabletech/superset-operator/pull/585
+[#586]: https://github.com/stackabletech/superset-operator/pull/586
 
 ## [24.11.1] - 2025-01-10
 
