@@ -8,9 +8,10 @@
 - Aggregate emitted Kubernetes events on the CustomResources ([#585]).
 - Support OPA role mapping as optional custom security manager for Superset ([#582]).
 
-### Changed
+[#578]: https://github.com/stackabletech/superset-operator/pull/578
+[#585]: https://github.com/stackabletech/superset-operator/pull/585
 
-- Append a dot (`.`) to the default cluster domain to reduce DNS requests ([#585]).
+## [24.11.1] - 2025-01-10
 
 ### Fixed
 
