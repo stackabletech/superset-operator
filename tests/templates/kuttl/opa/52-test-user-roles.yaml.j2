@@ -4,4 +4,4 @@ commands:
   # Need to wait until the superset API is ready before running the script
   - script: |
       sleep 30
-      kubectl exec -n $NAMESPACE python-0 -i -- python /tmp/scripts/get_user_roles.py $NAMESPACE Admin,Test
+      kubectl exec -n $NAMESPACE python-0 -i -- python /tmp/scripts/50_get_user_roles.py $NAMESPACE Admin,Test

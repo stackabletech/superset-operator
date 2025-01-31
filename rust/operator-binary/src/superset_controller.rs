@@ -577,11 +577,10 @@ fn build_rolegroup_config_map(
     // Adding opa configuration properties to config_properties.
     // This will be injected as key/value pair in superset_config.py
     if let Some(opa_config) = superset_opa_config {
-        for (k, v) in opa_config.as_config() {
-            config_properties.insert(k, v.unwrap_or_default());
-        }
         // If opa role mapping is configured, insert CustomOpaSecurityManager import
-        imports.append(&mut (*OPA_IMPORTS).to_vec())
+        imports.extend(OPA_IMPORTS);
+
+        config_properties.extend(opa_config.as_config());
     }
 
     // The order here should be kept in order to preserve overrides.

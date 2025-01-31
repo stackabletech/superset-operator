@@ -6,4 +6,4 @@ metadata:
 commands:
   - script: >
       envsubst '$NAMESPACE' < login.py |
-      kubectl exec -n $NAMESPACE -i python-0 -- tee /stackable/login.py > /dev/null
+      kubectl exec -n $NAMESPACE -i python-0 -- tee /stackable/60_login.py > /dev/null

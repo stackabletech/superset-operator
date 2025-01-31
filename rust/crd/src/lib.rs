@@ -7,7 +7,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
-        cache::TtlCache,
+        cache::UserInformationCache,
         cluster_operation::ClusterOperation,
         opa::OpaConfig,
         product_image_selection::ProductImage,
@@ -91,11 +91,11 @@ pub enum SupersetConfigOptions {
     AuthLdapTlsKeyfile,
     AuthLdapTlsCacertfile,
     CustomSecurityManager,
-    StackableOpaBaseUrl,
-    StackableOpaPackage,
-    StackableOpaRule,
-    StackableOpaCacheMaxEntries,
-    StackableOpaCacheEntryTTL,
+    AuthOpaRequestUrl,
+    AuthOpaPackage,
+    AuthOpaRule,
+    AuthOpaCacheMaxEntries,
+    AuthOpaCacheTtlInSec,
 }
 
 impl SupersetConfigOptions {
@@ -146,11 +146,11 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::AuthLdapTlsCacertfile => PythonType::StringLiteral,
             // Configuration options used by CustomOpaSecurityManager
             SupersetConfigOptions::CustomSecurityManager => PythonType::Expression,
-            SupersetConfigOptions::StackableOpaBaseUrl => PythonType::StringLiteral,
-            SupersetConfigOptions::StackableOpaPackage => PythonType::StringLiteral,
-            SupersetConfigOptions::StackableOpaRule => PythonType::StringLiteral,
-            SupersetConfigOptions::StackableOpaCacheMaxEntries => PythonType::IntLiteral,
-            SupersetConfigOptions::StackableOpaCacheEntryTTL => PythonType::IntLiteral,
+            SupersetConfigOptions::AuthOpaRequestUrl => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthOpaPackage => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthOpaRule => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthOpaCacheMaxEntries => PythonType::IntLiteral,
+            SupersetConfigOptions::AuthOpaCacheTtlInSec => PythonType::IntLiteral,
         }
     }
 }
@@ -272,7 +272,7 @@ pub struct SupersetOpaConfig {
     pub opa: OpaConfig,
 
     /// Configuration for an Superset internal cache for calls to OPA
-    pub cache: TtlCache<30, 1000>,
+    pub cache: UserInformationCache,
 }
 
 #[derive(Clone, Deserialize, Serialize, Eq, JsonSchema, Debug, PartialEq)]

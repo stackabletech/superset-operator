@@ -72,7 +72,10 @@ spec:
                         type: object
                       type: array
                     authorization:
-                      description: 'Authorziation options for Superset. Currently only role mapping is enabled. This means if a user logs in and Opa authorization is enabled user roles got synced from opa into superset roles. Roles get created automated. Warning: This will discard all roles managed by the superset administrator.'
+                      description: |-
+                        Authorization options for Superset.
+
+                        Currently only role mapping is supported. This means if a user logs in and OPA role mapping is enabled, user roles got synced from OPA into Superset. Roles in Superset get created automatically. Warning: This will discard all roles previously assigned to the user.
                       nullable: true
                       properties:
                         opa:
@@ -80,14 +83,14 @@ spec:
                           nullable: true
                           properties:
                             cache:
-                              description: Configuration for an superset-internal cache for calls to OPA
+                              description: Configuration for an Superset internal cache for calls to OPA
                               properties:
                                 entryTimeToLive:
                                   default: 30s
-                                  description: Time to live per entry; Entries which were not queried within the given duration, are removed.
+                                  description: Time to live per entry
                                   type: string
                                 maxEntries:
-                                  default: 1000
+                                  default: 10000
                                   description: Maximum number of entries in the cache; If this threshold is reached then the least recently used item is removed.
                                   format: uint32
                                   minimum: 0.0
@@ -164,7 +167,7 @@ spec:
                     Consult the [Product image selection documentation](https://docs.stackable.tech/home/nightly/concepts/product_image_selection) for details.
                   properties:
                     custom:
-                      description: Overwrite the docker image. Specify the full docker image name, e.g. `docker.stackable.tech/stackable/superset:1.4.1-stackable2.1.0`
+                      description: Overwrite the docker image. Specify the full docker image name, e.g. `oci.stackable.tech/sdp/superset:1.4.1-stackable2.1.0`
                       type: string
                     productVersion:
                       description: Version of the product, e.g. `1.4.1`.
@@ -191,7 +194,7 @@ spec:
                       nullable: true
                       type: array
                     repo:
-                      description: Name of the docker repo, e.g. `docker.stackable.tech/stackable`
+                      description: Name of the docker repo, e.g. `oci.stackable.tech/sdp`
                       nullable: true
                       type: string
                     stackableVersion:

@@ -6,7 +6,7 @@
 
 - Run a `containerdebug` process in the background of each Superset container to collect debugging information ([#578]).
 - Aggregate emitted Kubernetes events on the CustomResources ([#585]).
-- Support OPA role mapping as optional custom manager for Superset ([#582]).
+- Support OPA role mapping as optional custom security manager for Superset ([#582]).
 
 ### Changed
 

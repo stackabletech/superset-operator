@@ -41,32 +41,31 @@ impl SupersetOpaConfigResolved {
     }
 
     // Adding necessary configurations. Imports are solved in config.rs
-    pub fn as_config(&self) -> BTreeMap<String, Option<String>> {
-        BTreeMap::from([
+    pub fn as_config(&self) -> BTreeMap<String, String> {
+        let mut config = BTreeMap::from([
             (
                 "CUSTOM_SECURITY_MANAGER".to_string(),
-                Some("OpaSupersetSecurityManager".to_string()),
+                "OpaSupersetSecurityManager".to_string(),
             ),
             (
-                "STACKABLE_OPA_RULE".to_string(),
-                Some("user_roles".to_string()),
+                "AUTH_OPA_REQUEST_URL".to_string(),
+                self.opa_base_url.to_owned(),
             ),
             (
-                "STACKABLE_OPA_BASE_URL".to_string(),
-                Some(self.opa_base_url.to_owned()),
+                "AUTH_OPA_CACHE_MAX_ENTRIES".to_string(),
+                self.cache_max_entries.to_string(),
             ),
             (
-                "STACKABLE_OPA_PACKAGE".to_string(),
-                self.opa_package.to_owned(),
+                "AUTH_OPA_CACHE_TTL_IN_SEC".to_string(),
+                self.cache_ttl.as_secs().to_string(),
             ),
-            (
-                "STACKABLE_OPA_CACHE_MAX_ENTRIES".to_string(),
-                Some(self.cache_max_entries.to_string()),
-            ),
-            (
-                "STACKABLE_OPA_CACHE_ENTRY_TTL".to_string(),
-                Some(self.cache_ttl.as_secs().to_string()),
-            ),
-        ])
+            ("AUTH_OPA_RULE".to_string(), "user_roles".to_string()),
+        ]);
+
+        if let Some(opa_package) = &self.opa_package {
+            config.insert("AUTH_OPA_PACKAGE".to_string(), opa_package.to_owned());
+        }
+
+        config
     }
 }
