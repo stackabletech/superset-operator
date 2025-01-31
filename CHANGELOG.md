@@ -12,10 +12,6 @@
 
 - Default to OCI for image metadata and product image selection ([#586]).
 
-[#578]: https://github.com/stackabletech/superset-operator/pull/578
-[#585]: https://github.com/stackabletech/superset-operator/pull/585
-[#586]: https://github.com/stackabletech/superset-operator/pull/586
-
 ## [24.11.1] - 2025-01-10
 
 ### Fixed
@@ -30,6 +26,7 @@
 [#578]: https://github.com/stackabletech/superset-operator/pull/578
 [#582]: https://github.com/stackabletech/superset-operator/pull/582
 [#585]: https://github.com/stackabletech/superset-operator/pull/585
+[#586]: https://github.com/stackabletech/superset-operator/pull/586
 
 ## [24.11.0] - 2024-11-18
 
