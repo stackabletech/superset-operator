@@ -3,3 +3,4 @@
 // Stackable Platform documentation.
 
 - 4.0.2 (LTS)
+- 4.1.1
