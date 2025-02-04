@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use stackable_operator::k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
-use stackable_operator::k8s_openapi::chrono::Utc;
-use stackable_operator::kube::CustomResource;
-use stackable_operator::kube::ResourceExt;
-use stackable_operator::schemars::{self, JsonSchema};
+use stackable_operator::{
+    k8s_openapi::{apimachinery::pkg::apis::meta::v1::Time, chrono::Utc},
+    kube::{CustomResource, ResourceExt},
+    schemars::{self, JsonSchema},
+};
 
 #[derive(Snafu, Debug)]
 #[allow(clippy::enum_variant_names)]
