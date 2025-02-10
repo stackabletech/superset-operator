@@ -7,9 +7,10 @@ dimensions:
   - name: superset
     values:
       - 4.0.2
+      - 4.1.1
   - name: superset-latest
     values:
-      - 4.0.2
+      - 4.1.1
   - name: ldap-authentication
     values:
       - no-tls
