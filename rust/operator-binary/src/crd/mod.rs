@@ -91,55 +91,6 @@ pub enum SupersetConfigOptions {
     AuthLdapTlsCacertfile,
 }
 
-impl SupersetConfigOptions {
-    /// Mapping from `SupersetConfigOptions` to the values set in `SupersetConfigFragment`.
-    /// `None` is returned if either the according option is not set or is not exposed in the
-    /// `SupersetConfig`.
-    fn config_type_to_string(&self, superset_config: &SupersetConfigFragment) -> Option<String> {
-        match self {
-            SupersetConfigOptions::RowLimit => superset_config.row_limit.map(|v| v.to_string()),
-            SupersetConfigOptions::SupersetWebserverTimeout => {
-                superset_config.webserver_timeout.map(|v| v.to_string())
-            }
-            _ => None,
-        }
-    }
-}
-
-impl FlaskAppConfigOptions for SupersetConfigOptions {
-    fn python_type(&self) -> PythonType {
-        match self {
-            SupersetConfigOptions::SecretKey => PythonType::Expression,
-            SupersetConfigOptions::SqlalchemyDatabaseUri => PythonType::Expression,
-            SupersetConfigOptions::StatsLogger => PythonType::Expression,
-            SupersetConfigOptions::RowLimit => PythonType::IntLiteral,
-            SupersetConfigOptions::MapboxApiKey => PythonType::Expression,
-            SupersetConfigOptions::OauthProviders => PythonType::Expression,
-            SupersetConfigOptions::SupersetWebserverTimeout => PythonType::IntLiteral,
-            SupersetConfigOptions::LoggingConfigurator => PythonType::Expression,
-            SupersetConfigOptions::AuthType => PythonType::Expression,
-            SupersetConfigOptions::AuthUserRegistration => PythonType::BoolLiteral,
-            SupersetConfigOptions::AuthUserRegistrationRole => PythonType::StringLiteral,
-            SupersetConfigOptions::AuthRolesSyncAtLogin => PythonType::BoolLiteral,
-            SupersetConfigOptions::AuthLdapServer => PythonType::StringLiteral,
-            SupersetConfigOptions::AuthLdapBindUser => PythonType::Expression,
-            SupersetConfigOptions::AuthLdapBindPassword => PythonType::Expression,
-            SupersetConfigOptions::AuthLdapSearch => PythonType::StringLiteral,
-            SupersetConfigOptions::AuthLdapSearchFilter => PythonType::StringLiteral,
-            SupersetConfigOptions::AuthLdapUidField => PythonType::StringLiteral,
-            SupersetConfigOptions::AuthLdapGroupField => PythonType::StringLiteral,
-            SupersetConfigOptions::AuthLdapFirstnameField => PythonType::StringLiteral,
-            SupersetConfigOptions::AuthLdapLastnameField => PythonType::StringLiteral,
-            SupersetConfigOptions::AuthLdapEmailField => PythonType::StringLiteral,
-            SupersetConfigOptions::AuthLdapAllowSelfSigned => PythonType::BoolLiteral,
-            SupersetConfigOptions::AuthLdapTlsDemand => PythonType::BoolLiteral,
-            SupersetConfigOptions::AuthLdapTlsCertfile => PythonType::StringLiteral,
-            SupersetConfigOptions::AuthLdapTlsKeyfile => PythonType::StringLiteral,
-            SupersetConfigOptions::AuthLdapTlsCacertfile => PythonType::StringLiteral,
-        }
-    }
-}
-
 /// A Superset cluster stacklet. This resource is managed by the Stackable operator for Apache Superset.
 /// Find more information on how to use it and the resources that the operator generates in the
 /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/superset/).
@@ -231,16 +182,6 @@ pub enum CurrentlySupportedListenerClasses {
 
     #[serde(rename = "external-stable")]
     ExternalStable,
-}
-
-impl CurrentlySupportedListenerClasses {
-    pub fn k8s_service_type(&self) -> String {
-        match self {
-            CurrentlySupportedListenerClasses::ClusterInternal => "ClusterIP".to_string(),
-            CurrentlySupportedListenerClasses::ExternalUnstable => "NodePort".to_string(),
-            CurrentlySupportedListenerClasses::ExternalStable => "LoadBalancer".to_string(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -353,6 +294,82 @@ pub struct SupersetConfig {
     pub graceful_shutdown_timeout: Option<Duration>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetClusterStatus {
+    #[serde(default)]
+    pub conditions: Vec<ClusterCondition>,
+}
+
+/// A reference to a [`SupersetCluster`]
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetClusterRef {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub namespace: Option<String>,
+}
+
+impl SupersetConfigOptions {
+    /// Mapping from `SupersetConfigOptions` to the values set in `SupersetConfigFragment`.
+    /// `None` is returned if either the according option is not set or is not exposed in the
+    /// `SupersetConfig`.
+    fn config_type_to_string(&self, superset_config: &SupersetConfigFragment) -> Option<String> {
+        match self {
+            SupersetConfigOptions::RowLimit => superset_config.row_limit.map(|v| v.to_string()),
+            SupersetConfigOptions::SupersetWebserverTimeout => {
+                superset_config.webserver_timeout.map(|v| v.to_string())
+            }
+            _ => None,
+        }
+    }
+}
+
+impl FlaskAppConfigOptions for SupersetConfigOptions {
+    fn python_type(&self) -> PythonType {
+        match self {
+            SupersetConfigOptions::SecretKey => PythonType::Expression,
+            SupersetConfigOptions::SqlalchemyDatabaseUri => PythonType::Expression,
+            SupersetConfigOptions::StatsLogger => PythonType::Expression,
+            SupersetConfigOptions::RowLimit => PythonType::IntLiteral,
+            SupersetConfigOptions::MapboxApiKey => PythonType::Expression,
+            SupersetConfigOptions::OauthProviders => PythonType::Expression,
+            SupersetConfigOptions::SupersetWebserverTimeout => PythonType::IntLiteral,
+            SupersetConfigOptions::LoggingConfigurator => PythonType::Expression,
+            SupersetConfigOptions::AuthType => PythonType::Expression,
+            SupersetConfigOptions::AuthUserRegistration => PythonType::BoolLiteral,
+            SupersetConfigOptions::AuthUserRegistrationRole => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthRolesSyncAtLogin => PythonType::BoolLiteral,
+            SupersetConfigOptions::AuthLdapServer => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapBindUser => PythonType::Expression,
+            SupersetConfigOptions::AuthLdapBindPassword => PythonType::Expression,
+            SupersetConfigOptions::AuthLdapSearch => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapSearchFilter => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapUidField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapGroupField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapFirstnameField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapLastnameField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapEmailField => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapAllowSelfSigned => PythonType::BoolLiteral,
+            SupersetConfigOptions::AuthLdapTlsDemand => PythonType::BoolLiteral,
+            SupersetConfigOptions::AuthLdapTlsCertfile => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapTlsKeyfile => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthLdapTlsCacertfile => PythonType::StringLiteral,
+        }
+    }
+}
+
+impl CurrentlySupportedListenerClasses {
+    pub fn k8s_service_type(&self) -> String {
+        match self {
+            CurrentlySupportedListenerClasses::ClusterInternal => "ClusterIP".to_string(),
+            CurrentlySupportedListenerClasses::ExternalUnstable => "NodePort".to_string(),
+            CurrentlySupportedListenerClasses::ExternalStable => "LoadBalancer".to_string(),
+        }
+    }
+}
+
 impl SupersetConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
     pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
@@ -428,13 +445,6 @@ impl Configuration for SupersetConfigFragment {
 
         Ok(result)
     }
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetClusterStatus {
-    #[serde(default)]
-    pub conditions: Vec<ClusterCondition>,
 }
 
 impl HasStatusCondition for SupersetCluster {
@@ -513,14 +523,4 @@ impl SupersetCluster {
         tracing::debug!("Merged config: {:?}", conf_rolegroup);
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
-}
-
-/// A reference to a [`SupersetCluster`]
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetClusterRef {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub namespace: Option<String>,
 }

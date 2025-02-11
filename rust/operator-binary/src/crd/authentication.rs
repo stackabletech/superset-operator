@@ -110,14 +110,6 @@ pub struct SupersetClientAuthenticationDetails {
     pub sync_roles_at: FlaskRolesSyncMoment,
 }
 
-pub fn default_user_registration() -> bool {
-    true
-}
-
-pub fn default_user_registration_role() -> String {
-    "Public".to_string()
-}
-
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 pub enum FlaskRolesSyncMoment {
     #[default]
@@ -143,6 +135,14 @@ pub enum SupersetAuthenticationClassResolved {
         provider: oidc::AuthenticationProvider,
         client_auth_options: oidc::ClientAuthenticationOptions<()>,
     },
+}
+
+pub fn default_user_registration() -> bool {
+    true
+}
+
+pub fn default_user_registration_role() -> String {
+    "Public".to_string()
 }
 
 impl SupersetClientAuthenticationDetailsResolved {
