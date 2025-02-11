@@ -22,13 +22,13 @@ use stackable_operator::{
     status::condition::{ClusterConditionStatus, ClusterConditionType},
     time::Duration,
 };
-use stackable_superset_crd::{
-    druidconnection::{DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition},
-    SupersetCluster, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
-};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
+    crd::{
+        druidconnection::{DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition},
+        SupersetCluster, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
+    },
     rbac,
     superset_controller::DOCKER_IMAGE_BASE_NAME,
     util::{get_job_state, JobState},
@@ -77,7 +77,7 @@ pub enum Error {
     },
     #[snafu(display("namespace missing on DruidConnection {druid_connection}"))]
     DruidConnectionNoNamespace {
-        source: stackable_superset_crd::druidconnection::Error,
+        source: crate::crd::druidconnection::Error,
         druid_connection: ObjectRef<DruidConnection>,
     },
     #[snafu(display("failed to patch service account"))]

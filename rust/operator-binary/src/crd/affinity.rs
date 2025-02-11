@@ -3,7 +3,7 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::PodAntiAffinity,
 };
 
-use crate::{SupersetRole, APP_NAME};
+use crate::crd::{SupersetRole, APP_NAME};
 
 pub fn get_affinity(cluster_name: &str, role: &SupersetRole) -> StackableAffinityFragment {
     StackableAffinityFragment {
@@ -32,7 +32,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::SupersetCluster;
+    use crate::crd::SupersetCluster;
 
     #[test]
     fn test_affinity_defaults() {

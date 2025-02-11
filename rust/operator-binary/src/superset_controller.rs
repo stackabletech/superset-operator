@@ -65,20 +65,20 @@ use stackable_operator::{
     time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
-use stackable_superset_crd::{
-    authentication::{
-        SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
-    },
-    Container, SupersetCluster, SupersetClusterStatus, SupersetConfig, SupersetConfigOptions,
-    SupersetRole, APP_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR,
-    STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
-};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     commands::add_cert_to_python_certifi_command,
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
+    crd::{
+        authentication::{
+            SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
+        },
+        Container, SupersetCluster, SupersetClusterStatus, SupersetConfig, SupersetConfigOptions,
+        SupersetRole, APP_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR,
+        STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
+    },
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{
         extend_config_map_with_log_config, resolve_vector_aggregator_address, LOG_CONFIG_FILE,
@@ -180,7 +180,7 @@ pub enum Error {
 
     #[snafu(display("failed to apply authentication configuration"))]
     InvalidAuthenticationConfig {
-        source: stackable_superset_crd::authentication::Error,
+        source: crate::crd::authentication::Error,
     },
 
     #[snafu(display(
@@ -192,9 +192,7 @@ pub enum Error {
     MissingWebServerTimeoutInSupersetConfig,
 
     #[snafu(display("failed to resolve and merge config for role and role group"))]
-    FailedToResolveConfig {
-        source: stackable_superset_crd::Error,
-    },
+    FailedToResolveConfig { source: crate::crd::Error },
 
     #[snafu(display("failed to resolve the Vector aggregator address"))]
     ResolveVectorAggregatorAddress {

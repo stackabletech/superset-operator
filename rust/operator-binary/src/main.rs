@@ -22,9 +22,9 @@ use stackable_operator::{
     logging::controller::report_controller_reconciled,
     CustomResourceExt,
 };
-use stackable_superset_crd::{druidconnection::DruidConnection, SupersetCluster, APP_NAME};
 
 use crate::{
+    crd::{druidconnection::DruidConnection, SupersetCluster, APP_NAME},
     druid_connection_controller::DRUID_CONNECTION_FULL_CONTROLLER_NAME,
     superset_controller::SUPERSET_FULL_CONTROLLER_NAME,
 };
@@ -32,6 +32,7 @@ use crate::{
 mod commands;
 mod config;
 mod controller_commons;
+mod crd;
 mod druid_connection_controller;
 mod operations;
 mod product_logging;

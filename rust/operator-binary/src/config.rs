@@ -3,7 +3,8 @@ use std::collections::BTreeMap;
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::commons::authentication::{ldap, oidc};
-use stackable_superset_crd::{
+
+use crate::crd::{
     authentication::{
         FlaskRolesSyncMoment, SupersetAuthenticationClassResolved,
         SupersetClientAuthenticationDetailsResolved, DEFAULT_OIDC_PROVIDER,

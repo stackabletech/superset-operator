@@ -31,7 +31,7 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
-use crate::affinity::get_affinity;
+use crate::crd::affinity::get_affinity;
 
 pub mod affinity;
 pub mod authentication;

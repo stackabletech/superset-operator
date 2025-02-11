@@ -9,8 +9,6 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-stackable-superset-crd = { path = "../crd" }
-
 anyhow.workspace = true
 clap.workspace = true
 const_format.workspace = true
@@ -18,6 +16,7 @@ fnv.workspace = true
 futures.workspace = true
 indoc.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 snafu.workspace = true
 stackable-operator.workspace = true
 product-config.workspace = true
@@ -26,7 +25,10 @@ tokio.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+indoc.workspace = true
 rstest.workspace = true
+serde_yaml.workspace = true
+tokio.workspace = true
 
 [build-dependencies]
 built.workspace = true

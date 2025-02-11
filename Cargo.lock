@@ -2391,22 +2391,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "stackable-superset-crd"
-version = "0.0.0-dev"
-dependencies = [
- "indoc",
- "product-config",
- "serde",
- "serde_json",
- "serde_yaml",
- "snafu 0.8.5",
- "stackable-operator",
- "strum",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "stackable-superset-operator"
 version = "0.0.0-dev"
 dependencies = [
@@ -2420,9 +2404,10 @@ dependencies = [
  "product-config",
  "rstest",
  "serde",
+ "serde_json",
+ "serde_yaml",
  "snafu 0.8.5",
  "stackable-operator",
- "stackable-superset-crd",
  "strum",
  "tokio",
  "tracing",
