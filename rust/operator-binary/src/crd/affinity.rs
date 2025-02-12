@@ -32,7 +32,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::crd::SupersetCluster;
+    use crate::crd::v1alpha1::SupersetCluster;
 
     #[test]
     fn test_affinity_defaults() {

@@ -6,7 +6,7 @@ use stackable_operator::commons::authentication::{ldap, oidc};
 
 use crate::crd::{
     authentication::{
-        FlaskRolesSyncMoment, SupersetAuthenticationClassResolved,
+        v1alpha1::FlaskRolesSyncMoment, SupersetAuthenticationClassResolved,
         SupersetClientAuthenticationDetailsResolved, DEFAULT_OIDC_PROVIDER,
     },
     SupersetConfigOptions,

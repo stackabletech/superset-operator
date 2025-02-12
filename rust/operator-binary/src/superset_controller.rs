@@ -75,9 +75,9 @@ use crate::{
         authentication::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
         },
-        Container, SupersetCluster, SupersetClusterStatus, SupersetConfig, SupersetConfigOptions,
-        SupersetRole, APP_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR,
-        STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
+        v1alpha1::{Container, SupersetCluster, SupersetClusterStatus, SupersetConfig},
+        SupersetConfigOptions, SupersetRole, APP_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
+        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
     },
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{

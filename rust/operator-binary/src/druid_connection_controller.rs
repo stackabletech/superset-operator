@@ -26,8 +26,11 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     crd::{
-        druidconnection::{DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition},
-        SupersetCluster, PYTHONPATH, SUPERSET_CONFIG_FILENAME,
+        druidconnection::v1alpha1::{
+            DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition,
+        },
+        v1alpha1::SupersetCluster,
+        PYTHONPATH, SUPERSET_CONFIG_FILENAME,
     },
     rbac,
     superset_controller::DOCKER_IMAGE_BASE_NAME,

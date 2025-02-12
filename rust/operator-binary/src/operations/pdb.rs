@@ -5,7 +5,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    crd::{SupersetCluster, SupersetRole, APP_NAME},
+    crd::{v1alpha1::SupersetCluster, SupersetRole, APP_NAME},
     superset_controller::SUPERSET_CONTROLLER_NAME,
     OPERATOR_NAME,
 };

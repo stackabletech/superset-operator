@@ -24,7 +24,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    crd::{druidconnection::DruidConnection, SupersetCluster, APP_NAME},
+    crd::{druidconnection::v1alpha1::DruidConnection, v1alpha1::SupersetCluster, APP_NAME},
     druid_connection_controller::DRUID_CONNECTION_FULL_CONTROLLER_NAME,
     superset_controller::SUPERSET_FULL_CONTROLLER_NAME,
 };

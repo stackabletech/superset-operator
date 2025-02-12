@@ -1,7 +1,7 @@
 use snafu::{ResultExt, Snafu};
 use stackable_operator::builder::pod::PodBuilder;
 
-use crate::crd::SupersetConfig;
+use crate::crd::v1alpha1::SupersetConfig;
 
 #[derive(Debug, Snafu)]
 pub enum Error {

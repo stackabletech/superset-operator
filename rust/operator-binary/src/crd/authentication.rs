@@ -11,6 +11,7 @@ use stackable_operator::{
     },
     schemars::{self, JsonSchema},
 };
+use stackable_versioned::versioned;
 use tracing::info;
 
 // The assumed OIDC provider if no hint is given in the AuthClass
@@ -88,33 +89,36 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetClientAuthenticationDetails {
-    #[serde(flatten)]
-    pub common: ClientAuthenticationDetails<()>,
+#[versioned(version(name = "v1alpha1"))]
+pub mod versioned {
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SupersetClientAuthenticationDetails {
+        #[serde(flatten)]
+        pub common: ClientAuthenticationDetails<()>,
 
-    /// Allow users who are not already in the FAB DB.
-    /// Gets mapped to `AUTH_USER_REGISTRATION`
-    #[serde(default = "default_user_registration")]
-    pub user_registration: bool,
+        /// Allow users who are not already in the FAB DB.
+        /// Gets mapped to `AUTH_USER_REGISTRATION`
+        #[serde(default = "default_user_registration")]
+        pub user_registration: bool,
 
-    /// This role will be given in addition to any AUTH_ROLES_MAPPING.
-    /// Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
-    #[serde(default = "default_user_registration_role")]
-    pub user_registration_role: String,
+        /// This role will be given in addition to any AUTH_ROLES_MAPPING.
+        /// Gets mapped to `AUTH_USER_REGISTRATION_ROLE`
+        #[serde(default = "default_user_registration_role")]
+        pub user_registration_role: String,
 
-    /// If we should replace ALL the user's roles each login, or only on registration.
-    /// Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
-    #[serde(default)]
-    pub sync_roles_at: FlaskRolesSyncMoment,
-}
+        /// If we should replace ALL the user's roles each login, or only on registration.
+        /// Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
+        #[serde(default)]
+        pub sync_roles_at: FlaskRolesSyncMoment,
+    }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-pub enum FlaskRolesSyncMoment {
-    #[default]
-    Registration,
-    Login,
+    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    pub enum FlaskRolesSyncMoment {
+        #[default]
+        Registration,
+        Login,
+    }
 }
 
 /// Resolved and validated counter part for `SupersetClientAuthenticationDetails`.
@@ -123,7 +127,7 @@ pub struct SupersetClientAuthenticationDetailsResolved {
     pub authentication_classes_resolved: Vec<SupersetAuthenticationClassResolved>,
     pub user_registration: bool,
     pub user_registration_role: String,
-    pub sync_roles_at: FlaskRolesSyncMoment,
+    pub sync_roles_at: v1alpha1::FlaskRolesSyncMoment,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -147,7 +151,7 @@ pub fn default_user_registration_role() -> String {
 
 impl SupersetClientAuthenticationDetailsResolved {
     pub async fn from(
-        auth_details: &[SupersetClientAuthenticationDetails],
+        auth_details: &[v1alpha1::SupersetClientAuthenticationDetails],
         client: &Client,
     ) -> Result<SupersetClientAuthenticationDetailsResolved> {
         let resolve_auth_class = |auth_details: ClientAuthenticationDetails| async move {
@@ -157,7 +161,7 @@ impl SupersetClientAuthenticationDetailsResolved {
     }
 
     pub async fn resolve<R>(
-        auth_details: &[SupersetClientAuthenticationDetails],
+        auth_details: &[v1alpha1::SupersetClientAuthenticationDetails],
         resolve_auth_class: impl Fn(ClientAuthenticationDetails) -> R,
     ) -> Result<SupersetClientAuthenticationDetailsResolved>
     where
@@ -264,14 +268,14 @@ impl SupersetClientAuthenticationDetailsResolved {
             user_registration: user_registration.unwrap_or_else(default_user_registration),
             user_registration_role: user_registration_role
                 .unwrap_or_else(default_user_registration_role),
-            sync_roles_at: sync_roles_at.unwrap_or_else(FlaskRolesSyncMoment::default),
+            sync_roles_at: sync_roles_at.unwrap_or_else(v1alpha1::FlaskRolesSyncMoment::default),
         })
     }
 
     fn from_oidc(
         auth_class_name: &str,
         provider: &oidc::AuthenticationProvider,
-        auth_details: &SupersetClientAuthenticationDetails,
+        auth_details: &v1alpha1::SupersetClientAuthenticationDetails,
     ) -> Result<SupersetAuthenticationClassResolved> {
         let oidc_provider = match &provider.provider_hint {
             None => {
@@ -346,7 +350,7 @@ mod tests {
                 authentication_classes_resolved: Vec::default(),
                 user_registration: default_user_registration(),
                 user_registration_role: default_user_registration_role(),
-                sync_roles_at: FlaskRolesSyncMoment::default()
+                sync_roles_at: v1alpha1::FlaskRolesSyncMoment::default()
             },
             auth_details_resolved
         );
@@ -383,7 +387,7 @@ mod tests {
                 }],
                 user_registration: false,
                 user_registration_role: "Gamma".into(),
-                sync_roles_at: FlaskRolesSyncMoment::Login
+                sync_roles_at: v1alpha1::FlaskRolesSyncMoment::Login
             },
             auth_details_resolved
         );
@@ -495,7 +499,7 @@ mod tests {
                 ],
                 user_registration: false,
                 user_registration_role: "Gamma".into(),
-                sync_roles_at: FlaskRolesSyncMoment::Login
+                sync_roles_at: v1alpha1::FlaskRolesSyncMoment::Login
             },
             auth_details_resolved
         );
@@ -901,7 +905,7 @@ mod tests {
     /// Fail if the given string cannot be deserialized.
     fn deserialize_superset_client_authentication_details(
         input: &str,
-    ) -> Vec<SupersetClientAuthenticationDetails> {
+    ) -> Vec<v1alpha1::SupersetClientAuthenticationDetails> {
         serde_yaml::from_str(input)
             .expect("The definition of the authentication configuration should be valid.")
     }
