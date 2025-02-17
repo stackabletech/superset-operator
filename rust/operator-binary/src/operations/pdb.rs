@@ -5,7 +5,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    crd::{v1alpha1::SupersetCluster, SupersetRole, APP_NAME},
+    crd::{v1alpha1, SupersetRole, APP_NAME},
     superset_controller::SUPERSET_CONTROLLER_NAME,
     OPERATOR_NAME,
 };
@@ -26,7 +26,7 @@ pub enum Error {
 
 pub async fn add_pdbs(
     pdb: &PdbConfig,
-    superset: &SupersetCluster,
+    superset: &v1alpha1::SupersetCluster,
     role: &SupersetRole,
     client: &Client,
     cluster_resources: &mut ClusterResources,

@@ -24,7 +24,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    crd::{druidconnection::v1alpha1::DruidConnection, v1alpha1::SupersetCluster, APP_NAME},
+    crd::{druidconnection, v1alpha1, APP_NAME},
     druid_connection_controller::DRUID_CONNECTION_FULL_CONTROLLER_NAME,
     superset_controller::SUPERSET_FULL_CONTROLLER_NAME,
 };
@@ -59,8 +59,8 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => {
-            SupersetCluster::print_yaml_schema(built_info::PKG_VERSION)?;
-            DruidConnection::print_yaml_schema(built_info::PKG_VERSION)?;
+            v1alpha1::SupersetCluster::print_yaml_schema(built_info::PKG_VERSION)?;
+            druidconnection::v1alpha1::DruidConnection::print_yaml_schema(built_info::PKG_VERSION)?;
         }
         Command::Run(ProductOperatorRun {
             product_config,
@@ -101,7 +101,7 @@ async fn main() -> anyhow::Result<()> {
                 },
             ));
             let superset_controller = Controller::new(
-                watch_namespace.get_api::<DeserializeGuard<SupersetCluster>>(&client),
+                watch_namespace.get_api::<DeserializeGuard<v1alpha1::SupersetCluster>>(&client),
                 watcher::Config::default(),
             );
             let superset_store_1 = superset_controller.store();
@@ -162,7 +162,10 @@ async fn main() -> anyhow::Result<()> {
                 },
             ));
             let druid_connection_controller = Controller::new(
-                watch_namespace.get_api::<DeserializeGuard<DruidConnection>>(&client),
+                watch_namespace
+                    .get_api::<DeserializeGuard<druidconnection::v1alpha1::DruidConnection>>(
+                        &client,
+                    ),
                 watcher::Config::default(),
             );
             let druid_connection_store_1 = druid_connection_controller.store();
@@ -171,7 +174,7 @@ async fn main() -> anyhow::Result<()> {
             let druid_connection_controller = druid_connection_controller
                 .shutdown_on_signal()
                 .watches(
-                    watch_namespace.get_api::<DeserializeGuard<SupersetCluster>>(&client),
+                    watch_namespace.get_api::<DeserializeGuard<v1alpha1::SupersetCluster>>(&client),
                     watcher::Config::default(),
                     move |superset_cluster| {
                         druid_connection_store_1
@@ -242,7 +245,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn references_authentication_class(
-    superset: &DeserializeGuard<SupersetCluster>,
+    superset: &DeserializeGuard<v1alpha1::SupersetCluster>,
     authentication_class: &DeserializeGuard<AuthenticationClass>,
 ) -> bool {
     let Ok(superset) = &superset.0 else {
@@ -259,8 +262,8 @@ fn references_authentication_class(
 }
 
 fn valid_druid_connection(
-    superset_cluster: &DeserializeGuard<SupersetCluster>,
-    druid_connection: &DeserializeGuard<DruidConnection>,
+    superset_cluster: &DeserializeGuard<v1alpha1::SupersetCluster>,
+    druid_connection: &DeserializeGuard<druidconnection::v1alpha1::DruidConnection>,
 ) -> bool {
     let Ok(druid_connection) = &druid_connection.0 else {
         return false;
@@ -270,7 +273,7 @@ fn valid_druid_connection(
 }
 
 fn valid_druid_connection_namespace(
-    druid_connection: &DeserializeGuard<DruidConnection>,
+    druid_connection: &DeserializeGuard<druidconnection::v1alpha1::DruidConnection>,
     config_map: &DeserializeGuard<ConfigMap>,
 ) -> bool {
     let Ok(druid_connection) = &druid_connection.0 else {
@@ -281,7 +284,7 @@ fn valid_druid_connection_namespace(
 }
 
 fn valid_druid_job(
-    druid_connection: &DeserializeGuard<DruidConnection>,
+    druid_connection: &DeserializeGuard<druidconnection::v1alpha1::DruidConnection>,
     job: &DeserializeGuard<Job>,
 ) -> bool {
     let Ok(druid_connection) = &druid_connection.0 else {

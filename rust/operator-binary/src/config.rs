@@ -6,8 +6,8 @@ use stackable_operator::commons::authentication::{ldap, oidc};
 
 use crate::crd::{
     authentication::{
-        v1alpha1::FlaskRolesSyncMoment, SupersetAuthenticationClassResolved,
-        SupersetClientAuthenticationDetailsResolved, DEFAULT_OIDC_PROVIDER,
+        self, SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
+        DEFAULT_OIDC_PROVIDER,
     },
     SupersetConfigOptions,
 };
@@ -121,7 +121,8 @@ fn append_authentication_config(
     );
     config.insert(
         SupersetConfigOptions::AuthRolesSyncAtLogin.to_string(),
-        (auth_config.sync_roles_at == FlaskRolesSyncMoment::Login).to_string(),
+        (auth_config.sync_roles_at == authentication::v1alpha1::FlaskRolesSyncMoment::Login)
+            .to_string(),
     );
 
     Ok(())

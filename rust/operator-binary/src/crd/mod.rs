@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use authentication::v1alpha1::SupersetClientAuthenticationDetails;
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -31,8 +30,6 @@ use stackable_operator::{
 };
 use stackable_versioned::versioned;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
-
-use crate::crd::affinity::get_affinity;
 
 pub mod affinity;
 pub mod authentication;
@@ -130,7 +127,7 @@ pub mod versioned {
     pub struct SupersetClusterConfig {
         /// List of AuthenticationClasses used to authenticate users.
         #[serde(default)]
-        pub authentication: Vec<SupersetClientAuthenticationDetails>,
+        pub authentication: Vec<authentication::v1alpha1::SupersetClientAuthenticationDetails>,
 
         /// The name of the Secret object containing the admin user credentials and database connection details.
         /// Read the
@@ -304,7 +301,7 @@ pub enum SupersetRole {
     Node,
 }
 
-/// A reference to a [`SupersetCluster`]
+/// A reference to a [`v1alpha1::SupersetCluster`]
 #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetClusterRef {
@@ -396,7 +393,7 @@ impl v1alpha1::SupersetConfig {
                 storage: v1alpha1::SupersetStorageConfigFragment {},
             },
             logging: product_logging::spec::default_logging(),
-            affinity: get_affinity(cluster_name, role),
+            affinity: affinity::get_affinity(cluster_name, role),
             graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
             row_limit: None,
             webserver_timeout: None,
