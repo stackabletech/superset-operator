@@ -7,10 +7,17 @@
 - Run a `containerdebug` process in the background of each Superset container to collect debugging information ([#578]).
 - Aggregate emitted Kubernetes events on the CustomResources ([#585]).
 - Support OPA role mapping as optional custom security manager for Superset ([#582]).
+- Support for version `4.1.1` ([#595]).
 
 ### Changed
 
 - Default to OCI for image metadata and product image selection ([#586]).
+
+[#578]: https://github.com/stackabletech/superset-operator/pull/578
+[#582]: https://github.com/stackabletech/superset-operator/pull/582
+[#585]: https://github.com/stackabletech/superset-operator/pull/585
+[#586]: https://github.com/stackabletech/superset-operator/pull/586
+[#595]: https://github.com/stackabletech/superset-operator/pull/595
 
 ## [24.11.1] - 2025-01-10
 
@@ -23,10 +30,6 @@
 
 [#568]: https://github.com/stackabletech/superset-operator/pull/568
 [#569]: https://github.com/stackabletech/superset-operator/pull/569
-[#578]: https://github.com/stackabletech/superset-operator/pull/578
-[#582]: https://github.com/stackabletech/superset-operator/pull/582
-[#585]: https://github.com/stackabletech/superset-operator/pull/585
-[#586]: https://github.com/stackabletech/superset-operator/pull/586
 
 ## [24.11.0] - 2024-11-18
 

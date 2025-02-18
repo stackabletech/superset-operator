@@ -1,7 +1,6 @@
-use stackable_operator::time::Duration;
 use std::collections::BTreeMap;
 
-use stackable_operator::{client::Client, commons::opa::OpaApiVersion};
+use stackable_operator::{client::Client, commons::opa::OpaApiVersion, time::Duration};
 use stackable_superset_crd::{SupersetCluster, SupersetOpaConfig};
 
 pub struct SupersetOpaConfigResolved {

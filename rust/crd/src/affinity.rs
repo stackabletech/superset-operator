@@ -21,11 +21,8 @@ pub fn get_affinity(cluster_name: &str, role: &SupersetRole) -> StackableAffinit
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use std::collections::BTreeMap;
 
-    use crate::SupersetCluster;
     use stackable_operator::{
         commons::affinity::StackableAffinity,
         k8s_openapi::{
@@ -33,6 +30,9 @@ mod tests {
             apimachinery::pkg::apis::meta::v1::LabelSelector,
         },
     };
+
+    use super::*;
+    use crate::SupersetCluster;
 
     #[test]
     fn test_affinity_defaults() {
@@ -43,7 +43,7 @@ mod tests {
           name: simple-superset
         spec:
           image:
-            productVersion: 4.0.2
+            productVersion: 4.1.1
           clusterConfig:
             credentialsSecret: superset-db-credentials
           nodes:

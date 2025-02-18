@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::commons::authentication::{ldap, oidc};
@@ -8,7 +10,6 @@ use stackable_superset_crd::{
     },
     SupersetConfigOptions,
 };
-use std::collections::BTreeMap;
 
 #[derive(Snafu, Debug)]
 pub enum Error {

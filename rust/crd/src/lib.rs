@@ -17,7 +17,8 @@ use stackable_operator::{
         },
     },
     config::{
-        fragment::{self, Fragment, ValidationError},
+        fragment,
+        fragment::{Fragment, ValidationError},
         merge::Merge,
     },
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,

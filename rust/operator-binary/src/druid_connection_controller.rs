@@ -1,5 +1,3 @@
-use crate::util::{get_job_state, JobState};
-
 use std::sync::Arc;
 
 use const_format::concatcp;
@@ -16,8 +14,7 @@ use stackable_operator::{
         core::v1::{ConfigMap, PodSpec, PodTemplateSpec},
     },
     kube::{
-        core::DynamicObject,
-        core::{error_boundary, DeserializeGuard},
+        core::{error_boundary, DeserializeGuard, DynamicObject},
         runtime::{controller::Action, reflector::ObjectRef},
         ResourceExt,
     },
@@ -31,7 +28,12 @@ use stackable_superset_crd::{
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-use crate::{rbac, superset_controller::DOCKER_IMAGE_BASE_NAME, APP_NAME, OPERATOR_NAME};
+use crate::{
+    rbac,
+    superset_controller::DOCKER_IMAGE_BASE_NAME,
+    util::{get_job_state, JobState},
+    APP_NAME, OPERATOR_NAME,
+};
 
 pub const DRUID_CONNECTION_CONTROLLER_NAME: &str = "druid-connection";
 pub const DRUID_CONNECTION_FULL_CONTROLLER_NAME: &str =
