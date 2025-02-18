@@ -9,8 +9,6 @@ data:
   roles.rego: |
     package superset
 
-    import rego.v1
-
     user_roles := roles if {
       group_paths := data.stackable.opa.userinfo.v1.userInfoByUsername(input.username).groups
       roles := [ trim(group,"/") | group := group_paths[_] ]
