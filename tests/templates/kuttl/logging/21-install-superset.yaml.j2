@@ -53,7 +53,12 @@ metadata:
   name: superset
 spec:
   image:
+{% if test_scenario['values']['superset'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['superset'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['superset'].split(',')[0] }}"
+{% else %}
     productVersion: "{{ test_scenario['values']['superset'] }}"
+{% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
     credentialsSecret: superset-credentials
