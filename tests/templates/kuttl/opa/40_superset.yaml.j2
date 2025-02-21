@@ -39,9 +39,28 @@ spec:
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
   nodes:
+    configOverrides:
+      superset_config.py:
+        # Enable the security API to be able to create roles from the test
+        FAB_ADD_SECURITY_API: "True"
+        # Enable FAB logging
+        SILENCE_FAB: "False"
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+        containers:
+          superset:
+            console:
+              level: DEBUG
+            file:
+              level: DEBUG
+            loggers:
+              ROOT:
+                level: DEBUG
+              flask_appbuilder.security:
+                level: DEBUG
+              opa_authorizer:
+                level: DEBUG
     roleGroups:
       default:
         replicas: 1
