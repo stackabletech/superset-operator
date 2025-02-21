@@ -96,7 +96,9 @@ def get_ui_roles() -> list[str]:
     assert welcome_page.status_code == 200
     logging.debug(welcome_page.url)
 
-    return session.get(f"{base_api_url}/me/roles/").json()["result"]["roles"].keys()
+    return list(
+        session.get(f"{base_api_url}/me/roles/").json()["result"]["roles"].keys()
+    )
 
 
 def main():
@@ -125,9 +127,9 @@ def main():
     ui_user_roles = get_ui_roles()
 
     expected_roles = ["Admin", "Test"]
-    logging.debug("Expected roles: {expected_roles}")
-    logging.debug("Got API user roles: {api_user_roles}")
-    logging.debug("Got UI user roles: {ui_user_roles}")
+    logging.debug(f"Expected roles: {expected_roles}")
+    logging.debug(f"Got API user roles: {api_user_roles}")
+    logging.debug(f"Got UI user roles: {ui_user_roles}")
     assert api_user_roles == ui_user_roles
     assert expected_roles == ui_user_roles
 
