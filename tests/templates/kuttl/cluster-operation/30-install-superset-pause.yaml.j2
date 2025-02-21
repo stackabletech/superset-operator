@@ -25,7 +25,12 @@ metadata:
   name: superset
 spec:
   image:
+{% if test_scenario['values']['superset-latest'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['superset-latest'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['superset-latest'].split(',')[0] }}"
+{% else %}
     productVersion: "{{ test_scenario['values']['superset-latest'] }}"
+{% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
     clusterOperation:

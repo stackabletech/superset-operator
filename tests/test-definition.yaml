@@ -8,6 +8,8 @@ dimensions:
     values:
       - 4.0.2
       - 4.1.1
+      # Or use a custom image:
+      # - 4.1.1,oci.stackable.tech/razvan/superset:4.1.1-stackable0.0.0-dev
   - name: superset-latest
     values:
       - 4.1.1
