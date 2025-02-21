@@ -21,7 +21,12 @@ metadata:
 spec:
   image:
     custom: docker.stackable.tech/stackable/superset:4.0.2-stackable0.0.0-dev-opa
+{% if test_scenario['values']['superset'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['superset'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['superset'].split(',')[0] }}"
+{% else %}
     productVersion: "{{ test_scenario['values']['superset'] }}"
+{% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
     authorization:
