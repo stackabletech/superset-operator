@@ -1,3 +1,10 @@
+#
+# Use the FAB security API to create a new role named "Test" and assign it to the "admin" user.
+#
+# Use the UI to login and fetch all roles assigned to the user that is logged in (admin).
+#
+# Compare that the FAB API roles and the UI roles (that are resolved from OPA) are the same.
+#
 import logging
 import sys
 
@@ -120,9 +127,15 @@ def main():
     bearer_token = get_bearer_token()
     csrf_token = get_csrf_token()
 
+    # Create a new role and assign some permissions to it
     add_role("Test")
     add_permissions_to_role(6, list(range(3)))
+
+    # Add the new role to the admin user.
+    # "1" is the existing "Admin" role id.
+    # "6" is the id of the new "Test" role.
     set_user_roles([1, 6])
+
     api_user_roles = [role["name"] for role in get_roles()]
     ui_user_roles = get_ui_roles()
 
