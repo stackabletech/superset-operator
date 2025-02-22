@@ -103,6 +103,9 @@ def get_ui_roles() -> list[str]:
     assert welcome_page.status_code == 200
     logging.debug(welcome_page.url)
 
+    # Force roles to be loaded by the OPA security manager
+    session.get(f"{base_api_url}/dashboard/")
+
     return list(
         session.get(f"{base_api_url}/me/roles/").json()["result"]["roles"].keys()
     )
@@ -131,19 +134,11 @@ def main():
     add_role("Test")
     add_permissions_to_role(6, list(range(3)))
 
-    # Add the new role to the admin user.
-    # "1" is the existing "Admin" role id.
-    # "6" is the id of the new "Test" role.
-    set_user_roles([1, 6])
-
-    api_user_roles = [role["name"] for role in get_roles()]
     ui_user_roles = get_ui_roles()
 
     expected_roles = ["Admin", "Test"]
     logging.debug(f"Expected roles: {expected_roles}")
-    logging.debug(f"Got API user roles: {api_user_roles}")
     logging.debug(f"Got UI user roles: {ui_user_roles}")
-    assert api_user_roles == ui_user_roles
     assert expected_roles == ui_user_roles
 
 
