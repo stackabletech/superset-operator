@@ -32,7 +32,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::crd::v1alpha1::SupersetCluster;
+    use crate::crd::v1alpha1;
 
     #[test]
     fn test_affinity_defaults() {
@@ -51,7 +51,8 @@ mod tests {
               default:
                 replicas: 1
         "#;
-        let superset: SupersetCluster = serde_yaml::from_str(input).expect("illegal test input");
+        let superset: v1alpha1::SupersetCluster =
+            serde_yaml::from_str(input).expect("illegal test input");
         let merged_config = superset
             .merged_config(&SupersetRole::Node, &superset.node_rolegroup_ref("default"))
             .unwrap();

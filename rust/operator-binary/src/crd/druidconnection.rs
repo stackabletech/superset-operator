@@ -22,7 +22,6 @@ pub mod versioned {
     #[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[versioned(k8s(
         group = "superset.stackable.tech",
-        kind = "DruidConnection",
         plural = "druidconnections",
         status = "DruidConnectionStatus",
         namespaced,
@@ -35,9 +34,9 @@ pub mod versioned {
     #[serde(rename_all = "camelCase")]
     pub struct DruidConnectionSpec {
         /// The Superset to connect.
-        pub superset: ClusterRef,
+        pub superset: v1alpha1::ClusterRef,
         /// The Druid to connect.
-        pub druid: ClusterRef,
+        pub druid: v1alpha1::ClusterRef,
     }
 
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -54,7 +53,7 @@ pub mod versioned {
     pub struct DruidConnectionStatus {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub started_at: Option<Time>,
-        pub condition: DruidConnectionStatusCondition,
+        pub condition: v1alpha1::DruidConnectionStatusCondition,
     }
 
     #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, JsonSchema, PartialEq, Serialize)]

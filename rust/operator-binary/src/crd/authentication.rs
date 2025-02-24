@@ -110,7 +110,7 @@ pub mod versioned {
         /// If we should replace ALL the user's roles each login, or only on registration.
         /// Gets mapped to `AUTH_ROLES_SYNC_AT_LOGIN`
         #[serde(default)]
-        pub sync_roles_at: FlaskRolesSyncMoment,
+        pub sync_roles_at: v1alpha1::FlaskRolesSyncMoment,
     }
 
     #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]

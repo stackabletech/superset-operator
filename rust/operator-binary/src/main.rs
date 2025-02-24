@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use clap::{crate_description, crate_version, Parser};
+use crd::druidconnection::DruidConnection;
 use futures::{pin_mut, StreamExt};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
@@ -20,11 +21,12 @@ use stackable_operator::{
         ResourceExt,
     },
     logging::controller::report_controller_reconciled,
-    CustomResourceExt,
+    shared::yaml::SerializeOptions,
+    YamlSchema,
 };
 
 use crate::{
-    crd::{druidconnection, v1alpha1, APP_NAME},
+    crd::{druidconnection, v1alpha1, SupersetCluster, APP_NAME},
     druid_connection_controller::DRUID_CONNECTION_FULL_CONTROLLER_NAME,
     superset_controller::SUPERSET_FULL_CONTROLLER_NAME,
 };
@@ -59,8 +61,10 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => {
-            v1alpha1::SupersetCluster::print_yaml_schema(built_info::PKG_VERSION)?;
-            druidconnection::v1alpha1::DruidConnection::print_yaml_schema(built_info::PKG_VERSION)?;
+            SupersetCluster::merged_crd(SupersetCluster::V1Alpha1)?
+                .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
+            DruidConnection::merged_crd(DruidConnection::V1Alpha1)?
+                .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         Command::Run(ProductOperatorRun {
             product_config,

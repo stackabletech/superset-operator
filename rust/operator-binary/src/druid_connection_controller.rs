@@ -25,13 +25,7 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    crd::{
-        druidconnection::v1alpha1::{
-            DruidConnection, DruidConnectionStatus, DruidConnectionStatusCondition,
-        },
-        v1alpha1::SupersetCluster,
-        PYTHONPATH, SUPERSET_CONFIG_FILENAME,
-    },
+    crd::{druidconnection, v1alpha1, PYTHONPATH, SUPERSET_CONFIG_FILENAME},
     rbac,
     superset_controller::DOCKER_IMAGE_BASE_NAME,
     util::{get_job_state, JobState},
@@ -81,7 +75,7 @@ pub enum Error {
     #[snafu(display("namespace missing on DruidConnection {druid_connection}"))]
     DruidConnectionNoNamespace {
         source: crate::crd::druidconnection::Error,
-        druid_connection: ObjectRef<DruidConnection>,
+        druid_connection: ObjectRef<druidconnection::v1alpha1::DruidConnection>,
     },
     #[snafu(display("failed to patch service account"))]
     ApplyServiceAccount {
@@ -132,7 +126,7 @@ impl ReconcilerError for Error {
 }
 
 pub async fn reconcile_druid_connection(
-    druid_connection: Arc<DeserializeGuard<DruidConnection>>,
+    druid_connection: Arc<DeserializeGuard<druidconnection::v1alpha1::DruidConnection>>,
     ctx: Arc<Ctx>,
 ) -> Result<Action> {
     tracing::info!("Starting reconciling DruidConnections");
@@ -160,7 +154,7 @@ pub async fn reconcile_druid_connection(
 
     if let Some(ref s) = druid_connection.status {
         match s.condition {
-            DruidConnectionStatusCondition::Pending => {
+            druidconnection::v1alpha1::DruidConnectionStatusCondition::Pending => {
                 // Is the referenced druid discovery configmap there?
                 let druid_discovery_cm_exists = client
                     .get_opt::<ConfigMap>(
@@ -176,7 +170,7 @@ pub async fn reconcile_druid_connection(
                     .is_some();
 
                 let superset_cluster = client
-                    .get::<SupersetCluster>(
+                    .get::<v1alpha1::SupersetCluster>(
                         &druid_connection.superset_name(),
                         &druid_connection.superset_namespace().context(
                             DruidConnectionNoNamespaceSnafu {
@@ -237,7 +231,7 @@ pub async fn reconcile_druid_connection(
                         .context(ApplyStatusSnafu)?;
                 }
             }
-            DruidConnectionStatusCondition::Importing => {
+            druidconnection::v1alpha1::DruidConnectionStatusCondition::Importing => {
                 let ns = druid_connection
                     .namespace()
                     .unwrap_or_else(|| "default".to_string());
@@ -262,8 +256,8 @@ pub async fn reconcile_druid_connection(
                         .context(ApplyStatusSnafu)?;
                 }
             }
-            DruidConnectionStatusCondition::Ready => (),
-            DruidConnectionStatusCondition::Failed => (),
+            druidconnection::v1alpha1::DruidConnectionStatusCondition::Ready => (),
+            druidconnection::v1alpha1::DruidConnectionStatusCondition::Failed => (),
         }
     } else {
         // Status not set yet, initialize
@@ -271,7 +265,7 @@ pub async fn reconcile_druid_connection(
             .apply_patch_status(
                 DRUID_CONNECTION_CONTROLLER_NAME,
                 druid_connection,
-                &DruidConnectionStatus::new(),
+                &druidconnection::v1alpha1::DruidConnectionStatus::new(),
             )
             .await
             .context(ApplyStatusSnafu)?;
@@ -306,8 +300,8 @@ fn build_druid_db_yaml(druid_cluster_name: &str, sqlalchemy_str: &str) -> Result
 
 /// Builds the import job.  When run it will import the druid connection into the database.
 async fn build_import_job(
-    superset_cluster: &SupersetCluster,
-    druid_connection: &DruidConnection,
+    superset_cluster: &v1alpha1::SupersetCluster,
+    druid_connection: &druidconnection::v1alpha1::DruidConnection,
     resolved_product_image: &ResolvedProductImage,
     sqlalchemy_str: &str,
     sa_name: &str,
@@ -378,7 +372,7 @@ async fn build_import_job(
 }
 
 pub fn error_policy(
-    _obj: Arc<DeserializeGuard<DruidConnection>>,
+    _obj: Arc<DeserializeGuard<druidconnection::v1alpha1::DruidConnection>>,
     error: &Error,
     _ctx: Arc<Ctx>,
 ) -> Action {

@@ -97,7 +97,6 @@ pub mod versioned {
     #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
     #[versioned(k8s(
         group = "superset.stackable.tech",
-        kind = "SupersetCluster",
         plural = "supersetclusters",
         shortname = "superset",
         status = "SupersetClusterStatus",
@@ -115,11 +114,11 @@ pub mod versioned {
 
         /// Settings that affect all roles and role groups.
         /// The settings in the `clusterConfig` are cluster wide settings that do not need to be configurable at role or role group level.
-        pub cluster_config: SupersetClusterConfig,
+        pub cluster_config: v1alpha1::SupersetClusterConfig,
 
         // no doc - docs in the struct.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub nodes: Option<Role<SupersetConfigFragment>>,
+        pub nodes: Option<Role<v1alpha1::SupersetConfigFragment>>,
     }
 
     #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -151,7 +150,7 @@ pub mod versioned {
         /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
         /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
         #[serde(default)]
-        pub listener_class: CurrentlySupportedListenerClasses,
+        pub listener_class: v1alpha1::CurrentlySupportedListenerClasses,
 
         /// The name of a Secret object.
         /// The Secret should contain a key `connections.mapboxApiKey`.
@@ -195,10 +194,10 @@ pub mod versioned {
 
         /// CPU and memory limits for Superset pods
         #[fragment_attrs(serde(default))]
-        pub resources: Resources<SupersetStorageConfig, NoRuntimeLimits>,
+        pub resources: Resources<v1alpha1::SupersetStorageConfig, NoRuntimeLimits>,
 
         #[fragment_attrs(serde(default))]
-        pub logging: Logging<Container>,
+        pub logging: Logging<v1alpha1::Container>,
 
         #[fragment_attrs(serde(default))]
         pub affinity: StackableAffinity,
