@@ -3,10 +3,11 @@ use std::collections::BTreeMap;
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::commons::authentication::{ldap, oidc};
-use stackable_superset_crd::{
+
+use crate::crd::{
     authentication::{
-        FlaskRolesSyncMoment, SupersetAuthenticationClassResolved,
-        SupersetClientAuthenticationDetailsResolved, DEFAULT_OIDC_PROVIDER,
+        self, SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
+        DEFAULT_OIDC_PROVIDER,
     },
     SupersetConfigOptions,
 };
@@ -120,7 +121,8 @@ fn append_authentication_config(
     );
     config.insert(
         SupersetConfigOptions::AuthRolesSyncAtLogin.to_string(),
-        (auth_config.sync_roles_at == FlaskRolesSyncMoment::Login).to_string(),
+        (auth_config.sync_roles_at == authentication::v1alpha1::FlaskRolesSyncMoment::Login)
+            .to_string(),
     );
 
     Ok(())

@@ -32,21 +32,23 @@ rec {
   # "public" attributes that we attempt to keep stable with new versions of crate2nix.
   #
 
+  rootCrate = rec {
+    packageId = "stackable-superset-operator";
 
+    # Use this attribute to refer to the derivation building your root crate package.
+    # You can override the features with rootCrate.build.override { features = [ "default" "feature1" ... ]; }.
+    build = internal.buildRustCrateWithFeatures {
+      inherit packageId;
+    };
+
+    # Debug support which might change between releases.
+    # File a bug if you depend on any for non-debug work!
+    debug = internal.debugCrate { inherit packageId; };
+  };
   # Refer your crate build derivation by name here.
   # You can override the features with
   # workspaceMembers."${crateName}".build.override { features = [ "default" "feature1" ... ]; }.
   workspaceMembers = {
-    "stackable-superset-crd" = rec {
-      packageId = "stackable-superset-crd";
-      build = internal.buildRustCrateWithFeatures {
-        packageId = "stackable-superset-crd";
-      };
-
-      # Debug support which might change between releases.
-      # File a bug if you depend on any for non-debug work!
-      debug = internal.debugCrate { inherit packageId; };
-    };
     "stackable-superset-operator" = rec {
       packageId = "stackable-superset-operator";
       build = internal.buildRustCrateWithFeatures {
@@ -1085,6 +1087,25 @@ rec {
           "syn" = [ "dep:syn" ];
         };
         resolvedDefaultFeatures = [ "default" ];
+      };
+      "convert_case" = rec {
+        crateName = "convert_case";
+        version = "0.7.1";
+        edition = "2021";
+        sha256 = "1rzih8qbd3xh87wp76nkjvnrimn7vlzcwl2n88898ml59j6jnh5v";
+        authors = [
+          "rutrum <dave@rutrum.net>"
+        ];
+        dependencies = [
+          {
+            name = "unicode-segmentation";
+            packageId = "unicode-segmentation";
+          }
+        ];
+        features = {
+          "rand" = [ "dep:rand" ];
+          "random" = [ "rand" ];
+        };
       };
       "core-foundation 0.10.0" = rec {
         crateName = "core-foundation";
@@ -3605,6 +3626,27 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" ];
       };
+      "itertools" = rec {
+        crateName = "itertools";
+        version = "0.14.0";
+        edition = "2018";
+        sha256 = "118j6l1vs2mx65dqhwyssbrxpawa90886m3mzafdvyip41w2q69b";
+        authors = [
+          "bluss"
+        ];
+        dependencies = [
+          {
+            name = "either";
+            packageId = "either";
+            usesDefaultFeatures = false;
+          }
+        ];
+        features = {
+          "default" = [ "use_std" ];
+          "use_std" = [ "use_alloc" "either/use_std" ];
+        };
+        resolvedDefaultFeatures = [ "default" "use_alloc" "use_std" ];
+      };
       "itoa" = rec {
         crateName = "itoa";
         version = "1.0.14";
@@ -3846,6 +3888,40 @@ rec {
           "schemars" = [ "dep:schemars" ];
         };
         resolvedDefaultFeatures = [ "schemars" "v1_32" ];
+      };
+      "k8s-version" = rec {
+        crateName = "k8s-version";
+        version = "0.1.2";
+        edition = "2021";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "c07fd5d7237b0774b6bf4c8f3878df3b59b4ec07";
+          sha256 = "1l574x35z5ylidbc3qm0crp9qravhyry8i07ww3b1kpcr4w7dd53";
+        };
+        libName = "k8s_version";
+        authors = [
+          "Stackable GmbH <info@stackable.de>"
+        ];
+        dependencies = [
+          {
+            name = "darling";
+            packageId = "darling";
+            optional = true;
+          }
+          {
+            name = "regex";
+            packageId = "regex";
+          }
+          {
+            name = "snafu";
+            packageId = "snafu 0.8.5";
+          }
+        ];
+        features = {
+          "darling" = [ "dep:darling" ];
+        };
+        resolvedDefaultFeatures = [ "darling" ];
       };
       "kube" = rec {
         crateName = "kube";
@@ -7463,64 +7539,6 @@ rec {
         ];
 
       };
-      "stackable-superset-crd" = rec {
-        crateName = "stackable-superset-crd";
-        version = "0.0.0-dev";
-        edition = "2021";
-        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./rust/crd; };
-        libName = "stackable_superset_crd";
-        authors = [
-          "Stackable GmbH <info@stackable.tech>"
-        ];
-        dependencies = [
-          {
-            name = "product-config";
-            packageId = "product-config";
-          }
-          {
-            name = "serde";
-            packageId = "serde";
-            features = [ "derive" ];
-          }
-          {
-            name = "serde_json";
-            packageId = "serde_json";
-          }
-          {
-            name = "snafu";
-            packageId = "snafu 0.8.5";
-          }
-          {
-            name = "stackable-operator";
-            packageId = "stackable-operator";
-          }
-          {
-            name = "strum";
-            packageId = "strum";
-            features = [ "derive" ];
-          }
-          {
-            name = "tracing";
-            packageId = "tracing";
-          }
-        ];
-        devDependencies = [
-          {
-            name = "indoc";
-            packageId = "indoc";
-          }
-          {
-            name = "serde_yaml";
-            packageId = "serde_yaml";
-          }
-          {
-            name = "tokio";
-            packageId = "tokio";
-            features = [ "full" ];
-          }
-        ];
-
-      };
       "stackable-superset-operator" = rec {
         crateName = "stackable-superset-operator";
         version = "0.0.0-dev";
@@ -7572,6 +7590,10 @@ rec {
             features = [ "derive" ];
           }
           {
+            name = "serde_json";
+            packageId = "serde_json";
+          }
+          {
             name = "snafu";
             packageId = "snafu 0.8.5";
           }
@@ -7580,8 +7602,9 @@ rec {
             packageId = "stackable-operator";
           }
           {
-            name = "stackable-superset-crd";
-            packageId = "stackable-superset-crd";
+            name = "stackable-versioned";
+            packageId = "stackable-versioned";
+            features = [ "k8s" ];
           }
           {
             name = "strum";
@@ -7607,11 +7630,124 @@ rec {
         ];
         devDependencies = [
           {
+            name = "indoc";
+            packageId = "indoc";
+          }
+          {
             name = "rstest";
             packageId = "rstest";
           }
+          {
+            name = "serde_yaml";
+            packageId = "serde_yaml";
+          }
+          {
+            name = "tokio";
+            packageId = "tokio";
+            features = [ "full" ];
+          }
         ];
 
+      };
+      "stackable-versioned" = rec {
+        crateName = "stackable-versioned";
+        version = "0.5.1";
+        edition = "2021";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "c07fd5d7237b0774b6bf4c8f3878df3b59b4ec07";
+          sha256 = "1l574x35z5ylidbc3qm0crp9qravhyry8i07ww3b1kpcr4w7dd53";
+        };
+        libName = "stackable_versioned";
+        authors = [
+          "Stackable GmbH <info@stackable.de>"
+        ];
+        dependencies = [
+          {
+            name = "stackable-versioned-macros";
+            packageId = "stackable-versioned-macros";
+          }
+        ];
+        features = {
+          "full" = [ "k8s" ];
+          "k8s" = [ "stackable-versioned-macros/k8s" ];
+        };
+        resolvedDefaultFeatures = [ "k8s" ];
+      };
+      "stackable-versioned-macros" = rec {
+        crateName = "stackable-versioned-macros";
+        version = "0.5.1";
+        edition = "2021";
+        workspace_member = null;
+        src = pkgs.fetchgit {
+          url = "https://github.com/stackabletech/operator-rs.git";
+          rev = "c07fd5d7237b0774b6bf4c8f3878df3b59b4ec07";
+          sha256 = "1l574x35z5ylidbc3qm0crp9qravhyry8i07ww3b1kpcr4w7dd53";
+        };
+        procMacro = true;
+        libName = "stackable_versioned_macros";
+        authors = [
+          "Stackable GmbH <info@stackable.de>"
+        ];
+        dependencies = [
+          {
+            name = "convert_case";
+            packageId = "convert_case";
+          }
+          {
+            name = "darling";
+            packageId = "darling";
+          }
+          {
+            name = "itertools";
+            packageId = "itertools";
+          }
+          {
+            name = "k8s-openapi";
+            packageId = "k8s-openapi";
+            optional = true;
+            usesDefaultFeatures = false;
+            features = [ "schemars" "v1_32" ];
+          }
+          {
+            name = "k8s-version";
+            packageId = "k8s-version";
+            features = [ "darling" ];
+          }
+          {
+            name = "kube";
+            packageId = "kube";
+            optional = true;
+            usesDefaultFeatures = false;
+            features = [ "client" "jsonpatch" "runtime" "derive" "rustls-tls" ];
+          }
+          {
+            name = "proc-macro2";
+            packageId = "proc-macro2";
+          }
+          {
+            name = "quote";
+            packageId = "quote";
+          }
+          {
+            name = "syn";
+            packageId = "syn 2.0.96";
+          }
+        ];
+        devDependencies = [
+          {
+            name = "k8s-openapi";
+            packageId = "k8s-openapi";
+            usesDefaultFeatures = false;
+            features = [ "schemars" "v1_32" ];
+          }
+        ];
+        features = {
+          "full" = [ "k8s" ];
+          "k8s" = [ "dep:kube" "dep:k8s-openapi" ];
+        };
+        resolvedDefaultFeatures = [ "k8s" ];
       };
       "strsim" = rec {
         crateName = "strsim";
@@ -9157,6 +9293,19 @@ rec {
           "David Tolnay <dtolnay@gmail.com>"
         ];
 
+      };
+      "unicode-segmentation" = rec {
+        crateName = "unicode-segmentation";
+        version = "1.12.0";
+        edition = "2018";
+        sha256 = "14qla2jfx74yyb9ds3d2mpwpa4l4lzb9z57c6d2ba511458z5k7n";
+        libName = "unicode_segmentation";
+        authors = [
+          "kwantam <kwantam@gmail.com>"
+          "Manish Goregaokar <manishsmail@gmail.com>"
+        ];
+        features = {
+        };
       };
       "unicode-xid" = rec {
         crateName = "unicode-xid";

@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use authentication::SupersetClientAuthenticationDetails;
 use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -29,9 +28,8 @@ use stackable_operator::{
     status::condition::{ClusterCondition, HasStatusCondition},
     time::Duration,
 };
+use stackable_versioned::versioned;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
-
-use crate::affinity::get_affinity;
 
 pub mod affinity;
 pub mod authentication;
@@ -91,11 +89,235 @@ pub enum SupersetConfigOptions {
     AuthLdapTlsCacertfile,
 }
 
+#[versioned(version(name = "v1alpha1"))]
+pub mod versioned {
+    /// A Superset cluster stacklet. This resource is managed by the Stackable operator for Apache Superset.
+    /// Find more information on how to use it and the resources that the operator generates in the
+    /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/superset/).
+    #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+    #[versioned(k8s(
+        group = "superset.stackable.tech",
+        plural = "supersetclusters",
+        shortname = "superset",
+        status = "SupersetClusterStatus",
+        namespaced,
+        crates(
+            kube_core = "stackable_operator::kube::core",
+            k8s_openapi = "stackable_operator::k8s_openapi",
+            schemars = "stackable_operator::schemars"
+        )
+    ))]
+    #[serde(rename_all = "camelCase")]
+    pub struct SupersetClusterSpec {
+        // no doc - docs in the struct.
+        pub image: ProductImage,
+
+        /// Settings that affect all roles and role groups.
+        /// The settings in the `clusterConfig` are cluster wide settings that do not need to be configurable at role or role group level.
+        pub cluster_config: v1alpha1::SupersetClusterConfig,
+
+        // no doc - docs in the struct.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub nodes: Option<Role<v1alpha1::SupersetConfigFragment>>,
+    }
+
+    #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SupersetClusterConfig {
+        /// List of AuthenticationClasses used to authenticate users.
+        #[serde(default)]
+        pub authentication: Vec<authentication::v1alpha1::SupersetClientAuthenticationDetails>,
+
+        /// The name of the Secret object containing the admin user credentials and database connection details.
+        /// Read the
+        /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/superset/getting_started/first_steps)
+        /// to find out more.
+        pub credentials_secret: String,
+
+        /// Cluster operations like pause reconciliation or cluster stop.
+        #[serde(default)]
+        pub cluster_operation: ClusterOperation,
+
+        /// This field controls which type of Service the Operator creates for this SupersetCluster:
+        ///
+        /// * cluster-internal: Use a ClusterIP service
+        ///
+        /// * external-unstable: Use a NodePort service
+        ///
+        /// * external-stable: Use a LoadBalancer service
+        ///
+        /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
+        /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
+        /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
+        #[serde(default)]
+        pub listener_class: v1alpha1::CurrentlySupportedListenerClasses,
+
+        /// The name of a Secret object.
+        /// The Secret should contain a key `connections.mapboxApiKey`.
+        /// This is the API key required for map charts to work that use mapbox.
+        /// The token should be in the JWT format.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub mapbox_secret: Option<String>,
+
+        /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
+        /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+        /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
+        /// to learn how to configure log aggregation with Vector.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub vector_aggregator_config_map_name: Option<String>,
+    }
+
+    #[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+    #[fragment_attrs(
+        derive(
+            Clone,
+            Debug,
+            Default,
+            Deserialize,
+            Merge,
+            JsonSchema,
+            PartialEq,
+            Serialize
+        ),
+        serde(rename_all = "camelCase")
+    )]
+    pub struct SupersetConfig {
+        /// Row limit when requesting chart data. Corresponds to ROW_LIMIT.
+        pub row_limit: Option<i32>,
+
+        /// Maximum time period a Superset request can take before timing out. This
+        /// setting affects the maximum duration a query to an underlying datasource
+        /// can take. If you get timeout errors before your query returns the result
+        /// you may need to increase this timeout. Corresponds to
+        /// SUPERSET_WEBSERVER_TIMEOUT.
+        pub webserver_timeout: Option<u32>,
+
+        /// CPU and memory limits for Superset pods
+        #[fragment_attrs(serde(default))]
+        pub resources: Resources<v1alpha1::SupersetStorageConfig, NoRuntimeLimits>,
+
+        #[fragment_attrs(serde(default))]
+        pub logging: Logging<v1alpha1::Container>,
+
+        #[fragment_attrs(serde(default))]
+        pub affinity: StackableAffinity,
+
+        /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
+        #[fragment_attrs(serde(default))]
+        pub graceful_shutdown_timeout: Option<Duration>,
+    }
+
+    // TODO: Temporary solution until listener-operator is finished
+    #[derive(Clone, Debug, Default, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub enum CurrentlySupportedListenerClasses {
+        #[default]
+        #[serde(rename = "cluster-internal")]
+        ClusterInternal,
+
+        #[serde(rename = "external-unstable")]
+        ExternalUnstable,
+
+        #[serde(rename = "external-stable")]
+        ExternalStable,
+    }
+
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
+    #[fragment_attrs(
+        allow(clippy::derive_partial_eq_without_eq),
+        derive(
+            Clone,
+            Debug,
+            Default,
+            Deserialize,
+            Merge,
+            JsonSchema,
+            PartialEq,
+            Serialize
+        ),
+        serde(rename_all = "camelCase")
+    )]
+    pub struct SupersetStorageConfig {}
+
+    #[derive(
+        Clone,
+        Debug,
+        Deserialize,
+        Display,
+        Eq,
+        EnumIter,
+        JsonSchema,
+        Ord,
+        PartialEq,
+        PartialOrd,
+        Serialize,
+    )]
+    #[serde(rename_all = "kebab-case")]
+    #[strum(serialize_all = "kebab-case")]
+    pub enum Container {
+        Superset,
+        Vector,
+    }
+
+    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SupersetClusterStatus {
+        #[serde(default)]
+        pub conditions: Vec<ClusterCondition>,
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetCredentials {
+    pub admin_user: AdminUserCredentials,
+    pub connections: Connections,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminUserCredentials {
+    pub username: String,
+    pub firstname: String,
+    pub lastname: String,
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Connections {
+    pub secret_key: String,
+    pub sqlalchemy_database_uri: String,
+}
+
+#[derive(
+    Clone, Debug, Deserialize, Display, EnumIter, Eq, Hash, JsonSchema, PartialEq, Serialize,
+)]
+pub enum SupersetRole {
+    #[strum(serialize = "node")]
+    Node,
+}
+
+/// A reference to a [`v1alpha1::SupersetCluster`]
+#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupersetClusterRef {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub namespace: Option<String>,
+}
+
 impl SupersetConfigOptions {
     /// Mapping from `SupersetConfigOptions` to the values set in `SupersetConfigFragment`.
     /// `None` is returned if either the according option is not set or is not exposed in the
     /// `SupersetConfig`.
-    fn config_type_to_string(&self, superset_config: &SupersetConfigFragment) -> Option<String> {
+    fn config_type_to_string(
+        &self,
+        superset_config: &v1alpha1::SupersetConfigFragment,
+    ) -> Option<String> {
         match self {
             SupersetConfigOptions::RowLimit => superset_config.row_limit.map(|v| v.to_string()),
             SupersetConfigOptions::SupersetWebserverTimeout => {
@@ -140,225 +362,24 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
     }
 }
 
-/// A Superset cluster stacklet. This resource is managed by the Stackable operator for Apache Superset.
-/// Find more information on how to use it and the resources that the operator generates in the
-/// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/superset/).
-#[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[kube(
-    group = "superset.stackable.tech",
-    version = "v1alpha1",
-    kind = "SupersetCluster",
-    plural = "supersetclusters",
-    shortname = "superset",
-    status = "SupersetClusterStatus",
-    namespaced,
-    crates(
-        kube_core = "stackable_operator::kube::core",
-        k8s_openapi = "stackable_operator::k8s_openapi",
-        schemars = "stackable_operator::schemars"
-    )
-)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetClusterSpec {
-    // no doc - docs in the struct.
-    pub image: ProductImage,
-
-    /// Settings that affect all roles and role groups.
-    /// The settings in the `clusterConfig` are cluster wide settings that do not need to be configurable at role or role group level.
-    pub cluster_config: SupersetClusterConfig,
-
-    // no doc - docs in the struct.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub nodes: Option<Role<SupersetConfigFragment>>,
-}
-
-#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetClusterConfig {
-    /// List of AuthenticationClasses used to authenticate users.
-    #[serde(default)]
-    pub authentication: Vec<SupersetClientAuthenticationDetails>,
-
-    /// The name of the Secret object containing the admin user credentials and database connection details.
-    /// Read the
-    /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/superset/getting_started/first_steps)
-    /// to find out more.
-    pub credentials_secret: String,
-
-    /// Cluster operations like pause reconciliation or cluster stop.
-    #[serde(default)]
-    pub cluster_operation: ClusterOperation,
-
-    /// This field controls which type of Service the Operator creates for this SupersetCluster:
-    ///
-    /// * cluster-internal: Use a ClusterIP service
-    ///
-    /// * external-unstable: Use a NodePort service
-    ///
-    /// * external-stable: Use a LoadBalancer service
-    ///
-    /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
-    /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
-    /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
-    #[serde(default)]
-    pub listener_class: CurrentlySupportedListenerClasses,
-
-    /// The name of a Secret object.
-    /// The Secret should contain a key `connections.mapboxApiKey`.
-    /// This is the API key required for map charts to work that use mapbox.
-    /// The token should be in the JWT format.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mapbox_secret: Option<String>,
-
-    /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
-    /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
-    /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
-    /// to learn how to configure log aggregation with Vector.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub vector_aggregator_config_map_name: Option<String>,
-}
-
-// TODO: Temporary solution until listener-operator is finished
-#[derive(Clone, Debug, Default, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "PascalCase")]
-pub enum CurrentlySupportedListenerClasses {
-    #[default]
-    #[serde(rename = "cluster-internal")]
-    ClusterInternal,
-
-    #[serde(rename = "external-unstable")]
-    ExternalUnstable,
-
-    #[serde(rename = "external-stable")]
-    ExternalStable,
-}
-
-impl CurrentlySupportedListenerClasses {
+impl v1alpha1::CurrentlySupportedListenerClasses {
     pub fn k8s_service_type(&self) -> String {
         match self {
-            CurrentlySupportedListenerClasses::ClusterInternal => "ClusterIP".to_string(),
-            CurrentlySupportedListenerClasses::ExternalUnstable => "NodePort".to_string(),
-            CurrentlySupportedListenerClasses::ExternalStable => "LoadBalancer".to_string(),
+            v1alpha1::CurrentlySupportedListenerClasses::ClusterInternal => "ClusterIP".to_string(),
+            v1alpha1::CurrentlySupportedListenerClasses::ExternalUnstable => "NodePort".to_string(),
+            v1alpha1::CurrentlySupportedListenerClasses::ExternalStable => {
+                "LoadBalancer".to_string()
+            }
         }
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetCredentials {
-    pub admin_user: AdminUserCredentials,
-    pub connections: Connections,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AdminUserCredentials {
-    pub username: String,
-    pub firstname: String,
-    pub lastname: String,
-    pub email: String,
-    pub password: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Connections {
-    pub secret_key: String,
-    pub sqlalchemy_database_uri: String,
-}
-
-#[derive(
-    Clone, Debug, Deserialize, Display, EnumIter, Eq, Hash, JsonSchema, PartialEq, Serialize,
-)]
-pub enum SupersetRole {
-    #[strum(serialize = "node")]
-    Node,
-}
-
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
-#[fragment_attrs(
-    allow(clippy::derive_partial_eq_without_eq),
-    derive(
-        Clone,
-        Debug,
-        Default,
-        Deserialize,
-        Merge,
-        JsonSchema,
-        PartialEq,
-        Serialize
-    ),
-    serde(rename_all = "camelCase")
-)]
-pub struct SupersetStorageConfig {}
-
-#[derive(
-    Clone,
-    Debug,
-    Deserialize,
-    Display,
-    Eq,
-    EnumIter,
-    JsonSchema,
-    Ord,
-    PartialEq,
-    PartialOrd,
-    Serialize,
-)]
-#[serde(rename_all = "kebab-case")]
-#[strum(serialize_all = "kebab-case")]
-pub enum Container {
-    Superset,
-    Vector,
-}
-
-#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
-#[fragment_attrs(
-    derive(
-        Clone,
-        Debug,
-        Default,
-        Deserialize,
-        Merge,
-        JsonSchema,
-        PartialEq,
-        Serialize
-    ),
-    serde(rename_all = "camelCase")
-)]
-pub struct SupersetConfig {
-    /// Row limit when requesting chart data. Corresponds to ROW_LIMIT.
-    pub row_limit: Option<i32>,
-
-    /// Maximum time period a Superset request can take before timing out. This
-    /// setting affects the maximum duration a query to an underlying datasource
-    /// can take. If you get timeout errors before your query returns the result
-    /// you may need to increase this timeout. Corresponds to
-    /// SUPERSET_WEBSERVER_TIMEOUT.
-    pub webserver_timeout: Option<u32>,
-
-    /// CPU and memory limits for Superset pods
-    #[fragment_attrs(serde(default))]
-    pub resources: Resources<SupersetStorageConfig, NoRuntimeLimits>,
-
-    #[fragment_attrs(serde(default))]
-    pub logging: Logging<Container>,
-
-    #[fragment_attrs(serde(default))]
-    pub affinity: StackableAffinity,
-
-    /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
-    #[fragment_attrs(serde(default))]
-    pub graceful_shutdown_timeout: Option<Duration>,
-}
-
-impl SupersetConfig {
+impl v1alpha1::SupersetConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
     pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
 
-    fn default_config(cluster_name: &str, role: &SupersetRole) -> SupersetConfigFragment {
-        SupersetConfigFragment {
+    fn default_config(cluster_name: &str, role: &SupersetRole) -> v1alpha1::SupersetConfigFragment {
+        v1alpha1::SupersetConfigFragment {
             resources: ResourcesFragment {
                 cpu: CpuLimitsFragment {
                     min: Some(Quantity("300m".to_owned())),
@@ -368,10 +389,10 @@ impl SupersetConfig {
                     limit: Some(Quantity("2Gi".to_owned())),
                     runtime_limits: NoRuntimeLimitsFragment {},
                 },
-                storage: SupersetStorageConfigFragment {},
+                storage: v1alpha1::SupersetStorageConfigFragment {},
             },
             logging: product_logging::spec::default_logging(),
-            affinity: get_affinity(cluster_name, role),
+            affinity: affinity::get_affinity(cluster_name, role),
             graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
             row_limit: None,
             webserver_timeout: None,
@@ -379,8 +400,8 @@ impl SupersetConfig {
     }
 }
 
-impl Configuration for SupersetConfigFragment {
-    type Configurable = SupersetCluster;
+impl Configuration for v1alpha1::SupersetConfigFragment {
+    type Configurable = v1alpha1::SupersetCluster;
 
     fn compute_env(
         &self,
@@ -389,12 +410,12 @@ impl Configuration for SupersetConfigFragment {
     ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
         let mut result = BTreeMap::new();
         result.insert(
-            SupersetConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
+            v1alpha1::SupersetConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
             Some(cluster.spec.cluster_config.credentials_secret.clone()),
         );
         if let Some(msec) = &cluster.spec.cluster_config.mapbox_secret {
             result.insert(
-                SupersetConfig::MAPBOX_SECRET_PROPERTY.to_string(),
+                v1alpha1::SupersetConfig::MAPBOX_SECRET_PROPERTY.to_string(),
                 Some(msec.clone()),
             );
         }
@@ -430,14 +451,7 @@ impl Configuration for SupersetConfigFragment {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetClusterStatus {
-    #[serde(default)]
-    pub conditions: Vec<ClusterCondition>,
-}
-
-impl HasStatusCondition for SupersetCluster {
+impl HasStatusCondition for v1alpha1::SupersetCluster {
     fn conditions(&self) -> Vec<ClusterCondition> {
         match &self.status {
             Some(status) => status.conditions.clone(),
@@ -446,8 +460,8 @@ impl HasStatusCondition for SupersetCluster {
     }
 }
 
-impl SupersetCluster {
-    pub fn get_role(&self, role: &SupersetRole) -> Option<&Role<SupersetConfigFragment>> {
+impl v1alpha1::SupersetCluster {
+    pub fn get_role(&self, role: &SupersetRole) -> Option<&Role<v1alpha1::SupersetConfigFragment>> {
         match role {
             SupersetRole::Node => self.spec.nodes.as_ref(),
         }
@@ -462,7 +476,7 @@ impl SupersetCluster {
     pub fn node_rolegroup_ref(
         &self,
         group_name: impl Into<String>,
-    ) -> RoleGroupRef<SupersetCluster> {
+    ) -> RoleGroupRef<v1alpha1::SupersetCluster> {
         RoleGroupRef {
             cluster: ObjectRef::from_obj(self),
             role: SupersetRole::Node.to_string(),
@@ -480,10 +494,10 @@ impl SupersetCluster {
     pub fn merged_config(
         &self,
         role: &SupersetRole,
-        rolegroup_ref: &RoleGroupRef<SupersetCluster>,
-    ) -> Result<SupersetConfig, Error> {
+        rolegroup_ref: &RoleGroupRef<v1alpha1::SupersetCluster>,
+    ) -> Result<v1alpha1::SupersetConfig, Error> {
         // Initialize the result with all default values as baseline
-        let conf_defaults = SupersetConfig::default_config(&self.name_any(), role);
+        let conf_defaults = v1alpha1::SupersetConfig::default_config(&self.name_any(), role);
 
         let role = match role {
             SupersetRole::Node => self.spec.nodes.as_ref().context(UnknownSupersetRoleSnafu {
@@ -513,14 +527,4 @@ impl SupersetCluster {
         tracing::debug!("Merged config: {:?}", conf_rolegroup);
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
-}
-
-/// A reference to a [`SupersetCluster`]
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetClusterRef {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub namespace: Option<String>,
 }
