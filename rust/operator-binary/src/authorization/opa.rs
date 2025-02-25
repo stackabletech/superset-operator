@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use stackable_operator::{client::Client, commons::opa::OpaApiVersion, time::Duration};
-use stackable_superset_crd::{SupersetCluster, SupersetOpaConfig};
+use stackable_superset_crd::{SupersetCluster, SupersetOpaRoleMappingConfig};
 
 pub struct SupersetOpaConfigResolved {
     opa_base_url: String,
@@ -14,7 +14,7 @@ impl SupersetOpaConfigResolved {
     pub async fn from_opa_config(
         client: &Client,
         superset: &SupersetCluster,
-        opa_config: &SupersetOpaConfig,
+        opa_config: &SupersetOpaRoleMappingConfig,
     ) -> Result<Self, stackable_operator::commons::opa::Error> {
         // Get opa_base_url for later use in CustomOpaSecurityManager
         let opa_endpoint = opa_config

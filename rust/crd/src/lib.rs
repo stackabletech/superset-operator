@@ -197,9 +197,12 @@ pub struct SupersetClusterConfig {
 
     /// Authorization options for Superset.
     ///
-    /// Currently only role mapping is supported. This means if a user logs in and OPA role mapping is enabled,
-    /// user roles got synced from OPA into Superset. Roles in Superset get created automatically.
-    /// Warning: This will discard all roles previously assigned to the user.
+    /// Currently only role assignment is supported. This means that roles are assigned to users in
+    /// OPA but, due to the way Superset is implemented, the database also needs to be updated
+    /// to reflect these assignments.
+    /// Therefore, user roles and permissions must already exist in the Superset database before
+    /// they can be assigned to a user.
+    /// Warning: Any user roles assigned with the Superset UI are discarded.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authorization: Option<SupersetAuthorization>,
 
@@ -268,7 +271,7 @@ impl CurrentlySupportedListenerClasses {
 }
 #[derive(Clone, Deserialize, Serialize, Eq, JsonSchema, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct SupersetOpaConfig {
+pub struct SupersetOpaRoleMappingConfig {
     #[serde(flatten)]
     pub opa: OpaConfig,
 
@@ -280,7 +283,7 @@ pub struct SupersetOpaConfig {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetAuthorization {
-    pub opa: Option<SupersetOpaConfig>,
+    pub role_mapping_from_opa: Option<SupersetOpaRoleMappingConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -516,12 +519,12 @@ impl SupersetCluster {
         }
     }
 
-    pub fn get_opa_config(&self) -> Option<&SupersetOpaConfig> {
+    pub fn get_opa_config(&self) -> Option<&SupersetOpaRoleMappingConfig> {
         self.spec
             .cluster_config
             .authorization
             .as_ref()
-            .and_then(|a| a.opa.as_ref())
+            .and_then(|a| a.role_mapping_from_opa.as_ref())
     }
 
     /// Retrieve and merge resource configs for role and role groups

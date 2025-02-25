@@ -75,10 +75,10 @@ spec:
                       description: |-
                         Authorization options for Superset.
 
-                        Currently only role mapping is supported. This means if a user logs in and OPA role mapping is enabled, user roles got synced from OPA into Superset. Roles in Superset get created automatically. Warning: This will discard all roles previously assigned to the user.
+                        Currently only role assignment is supported. This means that roles are assigned to users in OPA but, due to the way Superset is implemented, the database also needs to be updated to reflect these assignments. Therefore, user roles and permissions must already exist in the Superset database before they can be assigned to a user. Warning: Any user roles assigned with the Superset UI are discarded.
                       nullable: true
                       properties:
-                        opa:
+                        roleMappingFromOpa:
                           description: Configure the OPA stacklet [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) and the name of the Rego package containing your authorization rules. Consult the [OPA authorization documentation](https://docs.stackable.tech/home/nightly/concepts/opa) to learn how to deploy Rego authorization rules with OPA.
                           nullable: true
                           properties:

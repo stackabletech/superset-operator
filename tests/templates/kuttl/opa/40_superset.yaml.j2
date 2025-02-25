@@ -30,7 +30,7 @@ spec:
     pullPolicy: IfNotPresent
   clusterConfig:
     authorization:
-      opa:
+      roleMappingFromOpa:
         configMapName: opa
         package: superset
         cache: {}
