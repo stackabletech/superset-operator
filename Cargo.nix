@@ -1558,7 +1558,7 @@ rec {
           "default" = [ "Debug" "Clone" "Copy" "PartialEq" "Eq" "PartialOrd" "Ord" "Hash" "Default" "Deref" "DerefMut" "Into" ];
           "full" = [ "syn/full" ];
         };
-        resolvedDefaultFeatures = [ "Clone" "Debug" "Default" "Hash" "PartialEq" ];
+        resolvedDefaultFeatures = [ "Clone" "Debug" "Default" "Eq" "Hash" "PartialEq" ];
       };
       "either" = rec {
         crateName = "either";
@@ -7229,13 +7229,13 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.85.0";
+        version = "0.86.0";
         edition = "2021";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "59506c6202778889a27b6ae8153457e60a49c68d";
-          sha256 = "0rh476rmn5850yj85hq8znwmlfhd7l5bkxz0n5i9m4cddxhi2cl5";
+          rev = "e5bfee596cc918b05f3e1d7e667c25951317cf31";
+          sha256 = "04a866w46mbrsqv7iq9x6l2kh1bnykkmfnjwwfrqk6njn91arvf1";
         };
         libName = "stackable_operator";
         authors = [
@@ -7268,7 +7268,7 @@ rec {
             name = "educe";
             packageId = "educe";
             usesDefaultFeatures = false;
-            features = [ "Clone" "Debug" "Default" "PartialEq" ];
+            features = [ "Clone" "Debug" "Default" "PartialEq" "Eq" ];
           }
           {
             name = "either";
@@ -7394,8 +7394,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "59506c6202778889a27b6ae8153457e60a49c68d";
-          sha256 = "0rh476rmn5850yj85hq8znwmlfhd7l5bkxz0n5i9m4cddxhi2cl5";
+          rev = "e5bfee596cc918b05f3e1d7e667c25951317cf31";
+          sha256 = "04a866w46mbrsqv7iq9x6l2kh1bnykkmfnjwwfrqk6njn91arvf1";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
@@ -7429,8 +7429,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "59506c6202778889a27b6ae8153457e60a49c68d";
-          sha256 = "0rh476rmn5850yj85hq8znwmlfhd7l5bkxz0n5i9m4cddxhi2cl5";
+          rev = "e5bfee596cc918b05f3e1d7e667c25951317cf31";
+          sha256 = "04a866w46mbrsqv7iq9x6l2kh1bnykkmfnjwwfrqk6njn91arvf1";
         };
         libName = "stackable_shared";
         authors = [

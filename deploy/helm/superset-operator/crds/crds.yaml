@@ -80,7 +80,6 @@ spec:
                       properties:
                         roleMappingFromOpa:
                           description: Configure the OPA stacklet [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) and the name of the Rego package containing your authorization rules. Consult the [OPA authorization documentation](https://docs.stackable.tech/home/nightly/concepts/opa) to learn how to deploy Rego authorization rules with OPA.
-                          nullable: true
                           properties:
                             cache:
                               description: Configuration for an Superset internal cache for calls to OPA
@@ -107,6 +106,8 @@ spec:
                             - cache
                             - configMapName
                           type: object
+                      required:
+                        - roleMappingFromOpa
                       type: object
                     clusterOperation:
                       default:

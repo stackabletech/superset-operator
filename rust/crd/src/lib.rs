@@ -282,7 +282,7 @@ pub struct SupersetOpaRoleMappingConfig {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetAuthorization {
-    pub role_mapping_from_opa: Option<SupersetOpaRoleMappingConfig>,
+    pub role_mapping_from_opa: SupersetOpaRoleMappingConfig,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -523,7 +523,7 @@ impl SupersetCluster {
             .cluster_config
             .authorization
             .as_ref()
-            .and_then(|a| a.role_mapping_from_opa.as_ref())
+            .map(|a| &a.role_mapping_from_opa)
     }
 
     /// Retrieve and merge resource configs for role and role groups
