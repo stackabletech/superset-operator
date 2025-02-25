@@ -276,25 +276,6 @@ pub struct SupersetOpaConfig {
     pub cache: UserInformationCache,
 }
 
-#[derive(Clone, Deserialize, Serialize, Eq, JsonSchema, Debug, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetOpaCacheConfig {
-    /// Cache duration , e.g. `30m`, `1h` or `2d`
-    #[serde(default = "cache_ttl_default")]
-    pub entry_time_to_live: Duration,
-
-    /// Number of maximum user-role mappings cached concurrently
-    #[serde(default = "cache_max_entries_default")]
-    pub max_entries: u32,
-}
-
-fn cache_max_entries_default() -> u32 {
-    128
-}
-
-fn cache_ttl_default() -> Duration {
-    Duration::from_secs(30)
-}
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
