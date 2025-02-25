@@ -279,7 +279,6 @@ pub struct SupersetOpaRoleMappingConfig {
     pub cache: UserInformationCache,
 }
 
-
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetAuthorization {
