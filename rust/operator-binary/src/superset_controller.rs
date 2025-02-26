@@ -288,7 +288,7 @@ pub enum Error {
         source: error_boundary::InvalidObject,
     },
 
-    #[snafu(display("invalid OpaConfig"))]
+    #[snafu(display("invalid OPA config"))]
     InvalidOpaConfig {
         source: stackable_operator::commons::opa::Error,
     },
