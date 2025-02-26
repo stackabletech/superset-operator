@@ -19,7 +19,7 @@ dimensions:
       - no-tls
       - insecure-tls
       - server-verification-tls
-  - name: opa
+  - name: opa-latest
     values:
       - 1.0.1
   - name: openshift
@@ -50,7 +50,7 @@ tests:
   - name: opa
     dimensions:
       - superset
-      - opa
+      - opa-latest
       - openshift
   - name: resources
     dimensions:
