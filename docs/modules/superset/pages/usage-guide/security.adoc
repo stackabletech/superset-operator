@@ -168,7 +168,7 @@ data:
     ]
 ----
 
-Mounting this `configMap` in superset as follows:
+You can instruct Superset to use the rego rule as follows:
 
 [source,yaml]
 ----
