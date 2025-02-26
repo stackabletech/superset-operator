@@ -3,6 +3,9 @@ use std::collections::BTreeMap;
 use stackable_operator::{client::Client, commons::opa::OpaApiVersion, time::Duration};
 use stackable_superset_crd::{SupersetCluster, SupersetOpaRoleMappingConfig};
 
+pub const OPA_IMPORTS: &[&str] =
+    &["from opa_authorizer.opa_manager import OpaSupersetSecurityManager"];
+
 pub struct SupersetOpaConfigResolved {
     opa_endpoint: String,
     cache_max_entries: u32,

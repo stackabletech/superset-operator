@@ -76,9 +76,9 @@ use stackable_superset_crd::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    authorization::opa::SupersetOpaConfigResolved,
+    authorization::opa::{SupersetOpaConfigResolved, OPA_IMPORTS},
     commands::add_cert_to_python_certifi_command,
-    config::{self, OPA_IMPORTS, PYTHON_IMPORTS},
+    config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{
