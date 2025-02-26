@@ -126,7 +126,8 @@ Further information for specifying an AuthenticationClass for an OIDC provider c
 Superset has a concept called `Roles` which allows you to grant user permissions based on roles.
 Have a look at the {superset-security}[Superset documentation on Security^{external-link-icon}^].
 
-=== [[OPA]] OPA role mapping
+[opa]
+=== OPA role mapping
 
 Superset can sync roles from OpenPolicyAgent.
 Currently only mapping is enabled as a larger refactoring of the upstream Superset concerning their security management is announced.
