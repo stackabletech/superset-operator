@@ -33,7 +33,6 @@ spec:
       roleMappingFromOpa:
         configMapName: opa
         package: superset
-        cache: {}
     credentialsSecret: superset-credentials
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
