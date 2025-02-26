@@ -132,7 +132,7 @@ Have a look at the {superset-security}[Superset documentation on Security^{exter
 Superset can sync roles from OpenPolicyAgent.
 Currently only mapping is enabled as a larger refactoring of the upstream Superset concerning their security management is announced.
 
-In order to map roles from OPA into Superset, we expect rego rules with a rule name `user_roles`.
+In order to map roles from OPA into Superset, we expect rego rules with a rule named `user_roles`.
 In the below example two users `admin` and `testuser` have roles defined as rego rule in Rego v1 to be compliant with OPA v1.0.0 release.
 
 IMPORTANT: Only role mapping is enabled!
