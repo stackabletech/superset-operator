@@ -163,8 +163,9 @@ jobs:
         if: env.GITHUB_TOKEN != null
         with:
           clippy_flags: --all-targets -- -D warnings
-          reporter: 'github-pr-review'
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_error: true
+          filter_mode: nofilter
       - name: Run clippy manually without annotations
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
