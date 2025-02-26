@@ -82,6 +82,9 @@ spec:
                           description: Configure the OPA stacklet [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery) and the name of the Rego package containing your authorization rules. Consult the [OPA authorization documentation](https://docs.stackable.tech/home/nightly/concepts/opa) to learn how to deploy Rego authorization rules with OPA.
                           properties:
                             cache:
+                              default:
+                                entryTimeToLive: 30s
+                                maxEntries: 10000
                               description: Configuration for an Superset internal cache for calls to OPA
                               properties:
                                 entryTimeToLive:
@@ -103,7 +106,6 @@ spec:
                               nullable: true
                               type: string
                           required:
-                            - cache
                             - configMapName
                           type: object
                       required:

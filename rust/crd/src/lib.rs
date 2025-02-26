@@ -276,6 +276,7 @@ pub struct SupersetOpaRoleMappingConfig {
     pub opa: OpaConfig,
 
     /// Configuration for an Superset internal cache for calls to OPA
+    #[serde(default)]
     pub cache: UserInformationCache,
 }
 
