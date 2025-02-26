@@ -18,7 +18,6 @@ impl SupersetOpaConfigResolved {
         superset: &SupersetCluster,
         opa_config: &SupersetOpaRoleMappingConfig,
     ) -> Result<Self, stackable_operator::commons::opa::Error> {
-        // Get opa_base_url for later use in CustomOpaSecurityManager
         let opa_endpoint = opa_config
             .opa
             .full_document_url_from_config_map(client, superset, None, OpaApiVersion::V1)
