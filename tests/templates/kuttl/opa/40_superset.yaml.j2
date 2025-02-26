@@ -1,0 +1,64 @@
+# $NAMESPACE will be replaced with the namespace of the test case.
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-credentials
+type: Opaque
+stringData:
+  adminUser.username: admin
+  adminUser.firstname: Superset
+  adminUser.lastname: Admin
+  adminUser.email: admin@superset.com
+  adminUser.password: admin
+  connections.secretKey: aQC11KVUJ3yTVcy2
+  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql/superset
+---
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: superset
+spec:
+  image:
+{% if test_scenario['values']['superset'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['superset'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['superset'].split(',')[0] }}"
+{% else %}
+    productVersion: "{{ test_scenario['values']['superset'] }}"
+{% endif %}
+    pullPolicy: IfNotPresent
+  clusterConfig:
+    authorization:
+      roleMappingFromOpa:
+        configMapName: opa
+        package: superset
+    credentialsSecret: superset-credentials
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+  nodes:
+    configOverrides:
+      superset_config.py:
+        # Enable the security API to be able to create roles from the test
+        FAB_ADD_SECURITY_API: "True"
+        # Enable FAB logging
+        SILENCE_FAB: "False"
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+        containers:
+          superset:
+            console:
+              level: DEBUG
+            file:
+              level: DEBUG
+            loggers:
+              ROOT:
+                level: DEBUG
+              flask_appbuilder.security:
+                level: DEBUG
+              opa_authorizer:
+                level: DEBUG
+    roleGroups:
+      default:
+        replicas: 1

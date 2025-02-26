@@ -76,6 +76,7 @@ use stackable_superset_crd::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
+    authorization::opa::{SupersetOpaConfigResolved, OPA_IMPORTS},
     commands::add_cert_to_python_certifi_command,
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
@@ -286,6 +287,11 @@ pub enum Error {
     InvalidSupersetCluster {
         source: error_boundary::InvalidObject,
     },
+
+    #[snafu(display("invalid OPA config"))]
+    InvalidOpaConfig {
+        source: stackable_operator::commons::opa::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -374,6 +380,15 @@ pub async fn reconcile_superset(
     )
     .context(CreateClusterResourcesSnafu)?;
 
+    let superset_opa_config = match superset.get_opa_config() {
+        Some(opa_config) => Some(
+            SupersetOpaConfigResolved::from_opa_config(client, superset, opa_config)
+                .await
+                .context(InvalidOpaConfigSnafu)?,
+        ),
+        None => None,
+    };
+
     let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
         superset,
         APP_NAME,
@@ -415,6 +430,7 @@ pub async fn reconcile_superset(
             &rolegroup,
             rolegroup_config,
             &auth_config,
+            &superset_opa_config,
             &config.logging,
             vector_aggregator_address.as_deref(),
         )?;
@@ -536,17 +552,19 @@ fn build_node_role_service(
 }
 
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
+#[allow(clippy::too_many_arguments)]
 fn build_rolegroup_config_map(
     superset: &SupersetCluster,
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<SupersetCluster>,
     rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
     authentication_config: &SupersetClientAuthenticationDetailsResolved,
+    superset_opa_config: &Option<SupersetOpaConfigResolved>,
     logging: &Logging<Container>,
     vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
     let mut config_properties = BTreeMap::new();
-
+    let mut imports = PYTHON_IMPORTS.to_vec();
     // TODO: this is true per default for versions 3.0.0 and up.
     //    We deactivate it here to keep existing functionality.
     //    However this is a security issue and should be configured properly
@@ -555,6 +573,15 @@ fn build_rolegroup_config_map(
 
     config::add_superset_config(&mut config_properties, authentication_config)
         .context(AddSupersetConfigSnafu)?;
+
+    // Adding opa configuration properties to config_properties.
+    // This will be injected as key/value pair in superset_config.py
+    if let Some(opa_config) = superset_opa_config {
+        // If opa role mapping is configured, insert CustomOpaSecurityManager import
+        imports.extend(OPA_IMPORTS);
+
+        config_properties.extend(opa_config.as_config());
+    }
 
     // The order here should be kept in order to preserve overrides.
     // No properties should be added after this extend.
@@ -579,7 +606,7 @@ fn build_rolegroup_config_map(
     flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
         &mut config_file,
         config_properties.iter(),
-        PYTHON_IMPORTS,
+        &imports,
     )
     .with_context(|_| BuildRoleGroupConfigFileSnafu {
         rolegroup: rolegroup.clone(),

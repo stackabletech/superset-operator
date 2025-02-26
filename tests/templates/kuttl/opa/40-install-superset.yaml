@@ -4,5 +4,5 @@ kind: TestStep
 timeout: 300
 commands:
   - script: >
-      envsubst '$NAMESPACE' < 40_install-superset.yaml |
+      envsubst '$NAMESPACE' < 40_superset.yaml |
       kubectl apply -n $NAMESPACE -f -

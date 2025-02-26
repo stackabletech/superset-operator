@@ -1,0 +1,15 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opa-superset-uif-rego
+  labels:
+    opa.stackable.tech/bundle: "true"
+data:
+  roles.rego: |
+    package superset
+
+    user_roles := roles if {
+      group_paths := data.stackable.opa.userinfo.v1.userInfoByUsername(input.username).groups
+      roles := [ trim(group,"/") | group := group_paths[_] ]
+    }
