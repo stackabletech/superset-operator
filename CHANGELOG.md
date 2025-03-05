@@ -11,6 +11,7 @@
 
 ### Changed
 
+- Bump `stackable-operator` to 0.87.0 ([#602]).
 - Default to OCI for image metadata and product image selection ([#586]).
 
 [#578]: https://github.com/stackabletech/superset-operator/pull/578
@@ -18,6 +19,7 @@
 [#585]: https://github.com/stackabletech/superset-operator/pull/585
 [#586]: https://github.com/stackabletech/superset-operator/pull/586
 [#595]: https://github.com/stackabletech/superset-operator/pull/595
+[#602]: https://github.com/stackabletech/superset-operator/pull/602
 
 ## [24.11.1] - 2025-01-10
 
