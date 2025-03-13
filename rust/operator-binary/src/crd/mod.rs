@@ -6,7 +6,9 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
+        cache::UserInformationCache,
         cluster_operation::ClusterOperation,
+        opa::OpaConfig,
         product_image_selection::ProductImage,
         resources::{
             CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimits, NoRuntimeLimitsFragment,
@@ -87,6 +89,12 @@ pub enum SupersetConfigOptions {
     AuthLdapTlsCertfile,
     AuthLdapTlsKeyfile,
     AuthLdapTlsCacertfile,
+    CustomSecurityManager,
+    AuthOpaRequestUrl,
+    AuthOpaPackage,
+    AuthOpaRule,
+    AuthOpaCacheMaxEntries,
+    AuthOpaCacheTtlInSec,
 }
 
 #[versioned(version(name = "v1alpha1"))]
@@ -127,6 +135,17 @@ pub mod versioned {
         /// List of AuthenticationClasses used to authenticate users.
         #[serde(default)]
         pub authentication: Vec<authentication::v1alpha1::SupersetClientAuthenticationDetails>,
+
+        /// Authorization options for Superset.
+        ///
+        /// Currently only role assignment is supported. This means that roles are assigned to users in
+        /// OPA but, due to the way Superset is implemented, the database also needs to be updated
+        /// to reflect these assignments.
+        /// Therefore, user roles and permissions must already exist in the Superset database before
+        /// they can be assigned to a user.
+        /// Warning: Any user roles assigned with the Superset UI are discarded.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub authorization: Option<SupersetAuthorization>,
 
         /// The name of the Secret object containing the admin user credentials and database connection details.
         /// Read the
@@ -220,6 +239,64 @@ pub mod versioned {
 
         #[serde(rename = "external-stable")]
         ExternalStable,
+    }
+
+    impl CurrentlySupportedListenerClasses {
+        pub fn k8s_service_type(&self) -> String {
+            match self {
+                CurrentlySupportedListenerClasses::ClusterInternal => "ClusterIP".to_string(),
+                CurrentlySupportedListenerClasses::ExternalUnstable => "NodePort".to_string(),
+                CurrentlySupportedListenerClasses::ExternalStable => "LoadBalancer".to_string(),
+            }
+        }
+    }
+    #[derive(Clone, Deserialize, Serialize, Eq, JsonSchema, Debug, PartialEq)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SupersetOpaRoleMappingConfig {
+        #[serde(flatten)]
+        pub opa: OpaConfig,
+
+        /// Configuration for an Superset internal cache for calls to OPA
+        #[serde(default)]
+        pub cache: UserInformationCache,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SupersetAuthorization {
+        pub role_mapping_from_opa: SupersetOpaRoleMappingConfig,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SupersetCredentials {
+        pub admin_user: AdminUserCredentials,
+        pub connections: Connections,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AdminUserCredentials {
+        pub username: String,
+        pub firstname: String,
+        pub lastname: String,
+        pub email: String,
+        pub password: String,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct Connections {
+        pub secret_key: String,
+        pub sqlalchemy_database_uri: String,
+    }
+
+    #[derive(
+        Clone, Debug, Deserialize, Display, EnumIter, Eq, Hash, JsonSchema, PartialEq, Serialize,
+    )]
+    pub enum SupersetRole {
+        #[strum(serialize = "node")]
+        Node,
     }
 
     #[allow(clippy::derive_partial_eq_without_eq)]
@@ -341,6 +418,7 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::LoggingConfigurator => PythonType::Expression,
             SupersetConfigOptions::AuthType => PythonType::Expression,
             SupersetConfigOptions::AuthUserRegistration => PythonType::BoolLiteral,
+            // Going to be an expression as we default it from env, if and only if opa is used
             SupersetConfigOptions::AuthUserRegistrationRole => PythonType::StringLiteral,
             SupersetConfigOptions::AuthRolesSyncAtLogin => PythonType::BoolLiteral,
             SupersetConfigOptions::AuthLdapServer => PythonType::StringLiteral,
@@ -358,6 +436,13 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::AuthLdapTlsCertfile => PythonType::StringLiteral,
             SupersetConfigOptions::AuthLdapTlsKeyfile => PythonType::StringLiteral,
             SupersetConfigOptions::AuthLdapTlsCacertfile => PythonType::StringLiteral,
+            // Configuration options used by CustomOpaSecurityManager
+            SupersetConfigOptions::CustomSecurityManager => PythonType::Expression,
+            SupersetConfigOptions::AuthOpaRequestUrl => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthOpaPackage => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthOpaRule => PythonType::StringLiteral,
+            SupersetConfigOptions::AuthOpaCacheMaxEntries => PythonType::IntLiteral,
+            SupersetConfigOptions::AuthOpaCacheTtlInSec => PythonType::IntLiteral,
         }
     }
 }
@@ -488,6 +573,14 @@ impl v1alpha1::SupersetCluster {
         match role {
             SupersetRole::Node => self.spec.nodes.as_ref().map(|n| &n.role_config),
         }
+    }
+
+    pub fn get_opa_config(&self) -> Option<&v1alpha1::SupersetOpaRoleMappingConfig> {
+        self.spec
+            .cluster_config
+            .authorization
+            .as_ref()
+            .map(|a| &a.role_mapping_from_opa)
     }
 
     /// Retrieve and merge resource configs for role and role groups

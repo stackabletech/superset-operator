@@ -13,11 +13,15 @@ dimensions:
   - name: superset-latest
     values:
       - 4.1.1
+      # - 4.1.1,oci.stackable.tech/razvan/superset:4.1.1-stackable0.0.0-dev
   - name: ldap-authentication
     values:
       - no-tls
       - insecure-tls
       - server-verification-tls
+  - name: opa-latest
+    values:
+      - 1.0.1
   - name: openshift
     values:
       - "false"
@@ -42,6 +46,11 @@ tests:
   - name: oidc
     dimensions:
       - superset
+      - openshift
+  - name: opa
+    dimensions:
+      - superset
+      - opa-latest
       - openshift
   - name: resources
     dimensions:

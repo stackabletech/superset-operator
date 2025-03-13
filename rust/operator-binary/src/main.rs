@@ -31,6 +31,7 @@ use crate::{
     superset_controller::SUPERSET_FULL_CONTROLLER_NAME,
 };
 
+mod authorization;
 mod commands;
 mod config;
 mod controller_commons;
