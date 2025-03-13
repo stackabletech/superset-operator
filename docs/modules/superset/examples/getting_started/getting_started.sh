@@ -54,17 +54,14 @@ exit 1
 ;;
 esac
 
-echo "Adding bitnami Helm repository"
-# tag::add-bitnami-repo[]
-helm repo add bitnami https://charts.bitnami.com/bitnami
-# end::add-bitnami-repo[]
-
 echo "Installing bitnami PostgreSQL"
 # tag::install-bitnami-psql[]
-helm install --wait superset bitnami/postgresql \
+helm install superset oci://registry-1.docker.io/bitnamicharts/postgresql \
+    --version 16.5.0 \
     --set auth.username=superset \
     --set auth.password=superset \
-    --set auth.database=superset
+    --set auth.database=superset \
+    --wait
 # end::install-bitnami-psql[]
 
 echo "Creating credentials secret"
