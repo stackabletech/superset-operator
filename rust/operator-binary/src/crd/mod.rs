@@ -145,7 +145,7 @@ pub mod versioned {
         /// they can be assigned to a user.
         /// Warning: Any user roles assigned with the Superset UI are discarded.
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub authorization: Option<SupersetAuthorization>,
+        pub authorization: Option<v1alpha1::SupersetAuthorization>,
 
         /// The name of the Secret object containing the admin user credentials and database connection details.
         /// Read the
@@ -241,15 +241,12 @@ pub mod versioned {
         ExternalStable,
     }
 
-    impl CurrentlySupportedListenerClasses {
-        pub fn k8s_service_type(&self) -> String {
-            match self {
-                CurrentlySupportedListenerClasses::ClusterInternal => "ClusterIP".to_string(),
-                CurrentlySupportedListenerClasses::ExternalUnstable => "NodePort".to_string(),
-                CurrentlySupportedListenerClasses::ExternalStable => "LoadBalancer".to_string(),
-            }
-        }
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SupersetAuthorization {
+        pub role_mapping_from_opa: v1alpha1::SupersetOpaRoleMappingConfig,
     }
+
     #[derive(Clone, Deserialize, Serialize, Eq, JsonSchema, Debug, PartialEq)]
     #[serde(rename_all = "camelCase")]
     pub struct SupersetOpaRoleMappingConfig {
@@ -259,44 +256,6 @@ pub mod versioned {
         /// Configuration for an Superset internal cache for calls to OPA
         #[serde(default)]
         pub cache: UserInformationCache,
-    }
-
-    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-    #[serde(rename_all = "camelCase")]
-    pub struct SupersetAuthorization {
-        pub role_mapping_from_opa: SupersetOpaRoleMappingConfig,
-    }
-
-    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-    #[serde(rename_all = "camelCase")]
-    pub struct SupersetCredentials {
-        pub admin_user: AdminUserCredentials,
-        pub connections: Connections,
-    }
-
-    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-    #[serde(rename_all = "camelCase")]
-    pub struct AdminUserCredentials {
-        pub username: String,
-        pub firstname: String,
-        pub lastname: String,
-        pub email: String,
-        pub password: String,
-    }
-
-    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-    #[serde(rename_all = "camelCase")]
-    pub struct Connections {
-        pub secret_key: String,
-        pub sqlalchemy_database_uri: String,
-    }
-
-    #[derive(
-        Clone, Debug, Deserialize, Display, EnumIter, Eq, Hash, JsonSchema, PartialEq, Serialize,
-    )]
-    pub enum SupersetRole {
-        #[strum(serialize = "node")]
-        Node,
     }
 
     #[allow(clippy::derive_partial_eq_without_eq)]
