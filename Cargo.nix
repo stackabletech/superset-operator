@@ -7710,7 +7710,7 @@ rec {
           }
           {
             name = "syn";
-            packageId = "syn 2.0.96";
+            packageId = "syn 2.0.99";
           }
         ];
         devDependencies = [
