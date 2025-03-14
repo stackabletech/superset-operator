@@ -3,9 +3,12 @@ use stackable_operator::{
     builder::pdb::PodDisruptionBudgetBuilder, client::Client, cluster_resources::ClusterResources,
     commons::pdb::PdbConfig, kube::ResourceExt,
 };
-use stackable_superset_crd::{SupersetCluster, SupersetRole, APP_NAME};
 
-use crate::{superset_controller::SUPERSET_CONTROLLER_NAME, OPERATOR_NAME};
+use crate::{
+    crd::{v1alpha1, SupersetRole, APP_NAME},
+    superset_controller::SUPERSET_CONTROLLER_NAME,
+    OPERATOR_NAME,
+};
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -23,7 +26,7 @@ pub enum Error {
 
 pub async fn add_pdbs(
     pdb: &PdbConfig,
-    superset: &SupersetCluster,
+    superset: &v1alpha1::SupersetCluster,
     role: &SupersetRole,
     client: &Client,
     cluster_resources: &mut ClusterResources,

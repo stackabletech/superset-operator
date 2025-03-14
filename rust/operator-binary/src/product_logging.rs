@@ -14,7 +14,8 @@ use stackable_operator::{
     },
     role_utils::RoleGroupRef,
 };
-use stackable_superset_crd::STACKABLE_LOG_DIR;
+
+use crate::crd::STACKABLE_LOG_DIR;
 
 #[derive(Snafu, Debug)]
 pub enum Error {

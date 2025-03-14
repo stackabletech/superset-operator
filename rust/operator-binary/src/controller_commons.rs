@@ -9,7 +9,8 @@ use stackable_operator::{
         },
     },
 };
-use stackable_superset_crd::MAX_LOG_FILES_SIZE;
+
+use crate::crd::MAX_LOG_FILES_SIZE;
 
 pub const CONFIG_VOLUME_NAME: &str = "config";
 pub const LOG_CONFIG_VOLUME_NAME: &str = "log-config";

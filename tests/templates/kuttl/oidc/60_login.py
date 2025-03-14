@@ -28,17 +28,17 @@ welcome_page = session.post(
 )
 
 assert welcome_page.ok, "Login failed"
-assert (
-    welcome_page.url == "http://superset-external:8088/superset/welcome/"
-), "Redirection to the Superset welcome page expected"
+assert welcome_page.url == "http://superset-external:8088/superset/welcome/", (
+    "Redirection to the Superset welcome page expected"
+)
 
 # Open the user information page in Superset
 userinfo_page = session.get("http://superset-external:8088/users/userinfo/")
 
 assert userinfo_page.ok, "Retrieving user information failed"
-assert (
-    userinfo_page.url == "http://superset-external:8088/superset/welcome/"
-), "Redirection to the Superset welcome page expected"
+assert userinfo_page.url == "http://superset-external:8088/superset/welcome/", (
+    "Redirection to the Superset welcome page expected"
+)
 
 # Expect the user data provided by Keycloak in Superset
 userinfo_page_html = BeautifulSoup(userinfo_page.text, "html.parser")
@@ -46,15 +46,15 @@ raw_data = userinfo_page_html.find(id="app")["data-bootstrap"]
 data = json.loads(raw_data)
 user_data = data["user"]
 
-assert (
-    user_data["firstName"] == "Jane"
-), "The first name of the user in Superset should match the one provided by Keycloak"
-assert (
-    user_data["lastName"] == "Doe"
-), "The last name of the user in Superset should match the one provided by Keycloak"
-assert (
-    user_data["email"] == "jane.doe@stackable.tech"
-), "The email of the user in Superset should match the one provided by Keycloak"
+assert user_data["firstName"] == "Jane", (
+    "The first name of the user in Superset should match the one provided by Keycloak"
+)
+assert user_data["lastName"] == "Doe", (
+    "The last name of the user in Superset should match the one provided by Keycloak"
+)
+assert user_data["email"] == "jane.doe@stackable.tech", (
+    "The email of the user in Superset should match the one provided by Keycloak"
+)
 
 # TODO Use different OIDC providers (currently only Keycloak is
 # supported)
