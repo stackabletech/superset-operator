@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use clap::{crate_description, crate_version, Parser};
-use crd::druidconnection::DruidConnection;
 use futures::{pin_mut, StreamExt};
 use stackable_operator::{
     cli::{Command, ProductOperatorRun},
@@ -26,7 +25,10 @@ use stackable_operator::{
 };
 
 use crate::{
-    crd::{druidconnection, v1alpha1, SupersetCluster, APP_NAME},
+    crd::{
+        druidconnection::{self, DruidConnection},
+        v1alpha1, SupersetCluster, APP_NAME,
+    },
     druid_connection_controller::DRUID_CONNECTION_FULL_CONTROLLER_NAME,
     superset_controller::SUPERSET_FULL_CONTROLLER_NAME,
 };

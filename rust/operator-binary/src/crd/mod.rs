@@ -102,7 +102,6 @@ pub mod versioned {
     /// A Superset cluster stacklet. This resource is managed by the Stackable operator for Apache Superset.
     /// Find more information on how to use it and the resources that the operator generates in the
     /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/superset/).
-    #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
     #[versioned(k8s(
         group = "superset.stackable.tech",
         plural = "supersetclusters",
@@ -115,6 +114,7 @@ pub mod versioned {
             schemars = "stackable_operator::schemars"
         )
     ))]
+    #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct SupersetClusterSpec {
         // no doc - docs in the struct.

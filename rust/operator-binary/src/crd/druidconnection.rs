@@ -19,7 +19,6 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 pub mod versioned {
     /// The DruidConnection resource can be used to automatically deploy a Druid datasource in Superset.
     /// Learn more about it in the [Superset operator usage guide](DOCS_BASE_URL_PLACEHOLDER/superset/usage-guide/connecting-druid).
-    #[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[versioned(k8s(
         group = "superset.stackable.tech",
         plural = "druidconnections",
@@ -31,6 +30,7 @@ pub mod versioned {
             schemars = "stackable_operator::schemars"
         )
     ))]
+    #[derive(Clone, CustomResource, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct DruidConnectionSpec {
         /// The Superset to connect.
