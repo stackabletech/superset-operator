@@ -1,9 +1,9 @@
 {
-  "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.87.0#stackable-operator-derive@0.3.1": "0asgwj93drwvqsgd5c563qawjc3avb42nav0i5dgs4zv8bldx6x0",
-  "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.87.0#stackable-operator@0.87.0": "0asgwj93drwvqsgd5c563qawjc3avb42nav0i5dgs4zv8bldx6x0",
-  "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.87.0#stackable-shared@0.0.1": "0asgwj93drwvqsgd5c563qawjc3avb42nav0i5dgs4zv8bldx6x0",
-  "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-versioned-0.5.1#k8s-version@0.1.2": "1l574x35z5ylidbc3qm0crp9qravhyry8i07ww3b1kpcr4w7dd53",
-  "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-versioned-0.5.1#stackable-versioned-macros@0.5.1": "1l574x35z5ylidbc3qm0crp9qravhyry8i07ww3b1kpcr4w7dd53",
-  "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-versioned-0.5.1#stackable-versioned@0.5.1": "1l574x35z5ylidbc3qm0crp9qravhyry8i07ww3b1kpcr4w7dd53",
+  "git+https://github.com/stackabletech//operator-rs.git?branch=chore%2Fbump-kube-update-status-option-type#k8s-version@0.1.2": "1jxj3xbqqsxwhxpjs01sgpmgqwym22df9hbpzw57b6lr1p2ix7cw",
+  "git+https://github.com/stackabletech//operator-rs.git?branch=chore%2Fbump-kube-update-status-option-type#stackable-operator-derive@0.3.1": "1jxj3xbqqsxwhxpjs01sgpmgqwym22df9hbpzw57b6lr1p2ix7cw",
+  "git+https://github.com/stackabletech//operator-rs.git?branch=chore%2Fbump-kube-update-status-option-type#stackable-operator@0.87.2": "1jxj3xbqqsxwhxpjs01sgpmgqwym22df9hbpzw57b6lr1p2ix7cw",
+  "git+https://github.com/stackabletech//operator-rs.git?branch=chore%2Fbump-kube-update-status-option-type#stackable-shared@0.0.1": "1jxj3xbqqsxwhxpjs01sgpmgqwym22df9hbpzw57b6lr1p2ix7cw",
+  "git+https://github.com/stackabletech//operator-rs.git?branch=chore%2Fbump-kube-update-status-option-type#stackable-versioned-macros@0.6.0": "1jxj3xbqqsxwhxpjs01sgpmgqwym22df9hbpzw57b6lr1p2ix7cw",
+  "git+https://github.com/stackabletech//operator-rs.git?branch=chore%2Fbump-kube-update-status-option-type#stackable-versioned@0.6.0": "1jxj3xbqqsxwhxpjs01sgpmgqwym22df9hbpzw57b6lr1p2ix7cw",
   "git+https://github.com/stackabletech/product-config.git?tag=0.7.0#product-config@0.7.0": "0gjsm80g6r75pm3824dcyiz4ysq1ka4c1if6k1mjm9cnd5ym0gny"
 }

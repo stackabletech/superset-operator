@@ -106,7 +106,7 @@ pub mod versioned {
         group = "superset.stackable.tech",
         plural = "supersetclusters",
         shortname = "superset",
-        status = "SupersetClusterStatus",
+        status = "v1alpha1::SupersetClusterStatus",
         namespaced,
         crates(
             kube_core = "stackable_operator::kube::core",

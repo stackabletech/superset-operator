@@ -22,7 +22,7 @@ pub mod versioned {
     #[versioned(k8s(
         group = "superset.stackable.tech",
         plural = "druidconnections",
-        status = "DruidConnectionStatus",
+        status = "v1alpha1::DruidConnectionStatus",
         namespaced,
         crates(
             kube_core = "stackable_operator::kube::core",
