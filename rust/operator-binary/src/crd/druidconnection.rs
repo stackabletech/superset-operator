@@ -8,7 +8,6 @@ use stackable_operator::{
 use stackable_versioned::versioned;
 
 #[derive(Snafu, Debug)]
-#[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[snafu(display("{druid_connection} is missing a namespace, this should not happen!"))]
     NoNamespace { druid_connection: String },
