@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
 use stackable_operator::{client::Client, commons::opa::OpaApiVersion, time::Duration};
-use stackable_superset_crd::{SupersetCluster, SupersetOpaRoleMappingConfig};
+
+use crate::crd::v1alpha1;
 
 pub const OPA_IMPORTS: &[&str] =
     &["from opa_authorizer.opa_manager import OpaSupersetSecurityManager"];
@@ -15,8 +16,8 @@ pub struct SupersetOpaConfigResolved {
 impl SupersetOpaConfigResolved {
     pub async fn from_opa_config(
         client: &Client,
-        superset: &SupersetCluster,
-        opa_config: &SupersetOpaRoleMappingConfig,
+        superset: &v1alpha1::SupersetCluster,
+        opa_config: &v1alpha1::SupersetOpaRoleMappingConfig,
     ) -> Result<Self, stackable_operator::commons::opa::Error> {
         let opa_endpoint = opa_config
             .opa
