@@ -7583,7 +7583,7 @@ rec {
       };
       "stackable-superset-operator" = rec {
         crateName = "stackable-superset-operator";
-        version = "0.0.0-dev";
+        version = "25.3.0";
         edition = "2021";
         crateBin = [
           {
