@@ -2421,7 +2421,7 @@ dependencies = [
 
 [[package]]
 name = "stackable-superset-operator"
-version = "0.0.0-dev"
+version = "25.3.0"
 dependencies = [
  "anyhow",
  "built",
