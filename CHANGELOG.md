@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [25.3.0] - 2025-03-21
+
 ### Added
 
 - Run a `containerdebug` process in the background of each Superset container to collect debugging information ([#578]).
