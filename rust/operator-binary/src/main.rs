@@ -112,6 +112,7 @@ async fn main() -> anyhow::Result<()> {
                 watcher::Config::default(),
             );
             let superset_store_1 = superset_controller.store();
+            let superset_store_2 = superset_controller.store();
             let superset_controller = superset_controller
                 .owns(
                     watch_namespace.get_api::<DeserializeGuard<Service>>(&client),
@@ -132,6 +133,17 @@ async fn main() -> anyhow::Result<()> {
                             .filter(move |superset| {
                                 references_authentication_class(superset, &authentication_class)
                             })
+                            .map(|superset| ObjectRef::from_obj(&*superset))
+                    },
+                )
+                .watches(
+                    watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
+                    watcher::Config::default(),
+                    move |config_map| {
+                        superset_store_2
+                            .state()
+                            .into_iter()
+                            .filter(move |superset| references_config_map(superset, &config_map))
                             .map(|superset| ObjectRef::from_obj(&*superset))
                     },
                 )
@@ -266,6 +278,31 @@ fn references_authentication_class(
         .authentication
         .iter()
         .any(|c| c.common.authentication_class_name() == &authentication_class_name)
+}
+
+fn references_config_map(
+    superset: &DeserializeGuard<v1alpha1::SupersetCluster>,
+    config_map: &DeserializeGuard<ConfigMap>,
+) -> bool {
+    let Ok(superset) = &superset.0 else {
+        return false;
+    };
+
+    superset
+        .spec
+        .cluster_config
+        .vector_aggregator_config_map_name
+        == Some(config_map.name_any())
+        || match superset.spec.cluster_config.authorization.clone() {
+            Some(superset_authorization) => {
+                superset_authorization
+                    .role_mapping_from_opa
+                    .opa
+                    .config_map_name
+                    == config_map.name_any()
+            }
+            None => false,
+        }
 }
 
 fn valid_druid_connection(
