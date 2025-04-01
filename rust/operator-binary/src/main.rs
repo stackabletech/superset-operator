@@ -143,7 +143,7 @@ async fn main() -> anyhow::Result<()> {
                         superset_store_2
                             .state()
                             .into_iter()
-                            .filter(move |superset| references_configmap(superset, &config_map))
+                            .filter(move |superset| references_config_map(superset, &config_map))
                             .map(|superset| ObjectRef::from_obj(&*superset))
                     },
                 )
@@ -280,7 +280,7 @@ fn references_authentication_class(
         .any(|c| c.common.authentication_class_name() == &authentication_class_name)
 }
 
-fn references_configmap(
+fn references_config_map(
     superset: &DeserializeGuard<v1alpha1::SupersetCluster>,
     config_map: &DeserializeGuard<ConfigMap>,
 ) -> bool {
