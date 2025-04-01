@@ -288,19 +288,18 @@ fn references_config_map(
         return false;
     };
 
-    let config_map_name = config_map.name_any();
     superset
         .spec
         .cluster_config
         .vector_aggregator_config_map_name
-        == Some(config_map_name.to_owned())
+        == Some(config_map.name_any())
         || match superset.spec.cluster_config.authorization.clone() {
             Some(superset_authorization) => {
                 superset_authorization
                     .role_mapping_from_opa
                     .opa
                     .config_map_name
-                    == config_map_name
+                    == config_map.name_any()
             }
             None => false,
         }
