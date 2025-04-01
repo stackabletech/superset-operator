@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix a bug where changes to ConfigMaps that are referenced in the Superset spec didn't trigger a reconciliation ([#609]).
+
+[#609]: https://github.com/stackabletech/superset-operator/pull/609
+
 ## [25.3.0] - 2025-03-21
 
 ### Added
