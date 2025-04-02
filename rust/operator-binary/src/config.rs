@@ -5,11 +5,11 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::commons::authentication::{ldap, oidc};
 
 use crate::crd::{
-    authentication::{
-        self, SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
-        DEFAULT_OIDC_PROVIDER,
-    },
     SupersetConfigOptions,
+    authentication::{
+        self, DEFAULT_OIDC_PROVIDER, SupersetAuthenticationClassResolved,
+        SupersetClientAuthenticationDetailsResolved,
+    },
 };
 
 #[derive(Snafu, Debug)]
@@ -35,7 +35,7 @@ pub const PYTHON_IMPORTS: &[&str] = &[
     "from superset.stats_logger import StatsdStatsLogger",
     "from flask_appbuilder.security.manager import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_OID, AUTH_REMOTE_USER)",
     "from log_config import StackableLoggingConfigurator",
-    ];
+];
 
 pub fn add_superset_config(
     config: &mut BTreeMap<String, String>,

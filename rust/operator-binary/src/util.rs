@@ -1,6 +1,6 @@
 use stackable_operator::{k8s_openapi::api::batch::v1::Job, kvp::ObjectLabels};
 
-use crate::{crd::APP_NAME, OPERATOR_NAME};
+use crate::{OPERATOR_NAME, crd::APP_NAME};
 
 pub enum JobState {
     InProgress,
