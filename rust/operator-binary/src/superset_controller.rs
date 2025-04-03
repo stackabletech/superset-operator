@@ -9,9 +9,9 @@ use std::{
 use const_format::concatcp;
 use indoc::formatdoc;
 use product_config::{
+    ProductConfigManager,
     flask_app_config_writer::{self, FlaskAppConfigWriterError},
     types::PropertyNameKind,
-    ProductConfigManager,
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -20,8 +20,8 @@ use stackable_operator::{
         configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
         pod::{
-            container::ContainerBuilder, resources::ResourceRequirementsBuilder,
-            security::PodSecurityContextBuilder, PodBuilder,
+            PodBuilder, container::ContainerBuilder, resources::ResourceRequirementsBuilder,
+            security::PodSecurityContextBuilder,
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
@@ -30,6 +30,7 @@ use stackable_operator::{
         rbac::build_rbac_resources,
     },
     k8s_openapi::{
+        DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
@@ -37,23 +38,22 @@ use stackable_operator::{
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
-        DeepMerge,
     },
     kube::{
-        core::{error_boundary, DeserializeGuard},
-        runtime::controller::Action,
         Resource, ResourceExt,
+        core::{DeserializeGuard, error_boundary},
+        runtime::controller::Action,
     },
     kvp::{Label, Labels},
     logging::controller::ReconcilerError,
     product_config_utils::{
-        transform_all_roles_to_config, validate_all_roles_and_groups_config,
         CONFIG_OVERRIDE_FILE_FOOTER_KEY, CONFIG_OVERRIDE_FILE_HEADER_KEY,
+        transform_all_roles_to_config, validate_all_roles_and_groups_config,
     },
     product_logging::{
         self,
         framework::{
-            create_vector_shutdown_file_command, remove_vector_shutdown_file_command, LoggingError,
+            LoggingError, create_vector_shutdown_file_command, remove_vector_shutdown_file_command,
         },
         spec::Logging,
     },
@@ -68,24 +68,24 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    authorization::opa::{SupersetOpaConfigResolved, OPA_IMPORTS},
+    APP_PORT, OPERATOR_NAME,
+    authorization::opa::{OPA_IMPORTS, SupersetOpaConfigResolved},
     commands::add_cert_to_python_certifi_command,
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
+        APP_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+        SUPERSET_CONFIG_FILENAME, SupersetConfigOptions, SupersetRole,
         authentication::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
         },
         v1alpha1::{Container, SupersetCluster, SupersetClusterStatus, SupersetConfig},
-        SupersetConfigOptions, SupersetRole, APP_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
-        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
     },
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{
-        extend_config_map_with_log_config, resolve_vector_aggregator_address, LOG_CONFIG_FILE,
+        LOG_CONFIG_FILE, extend_config_map_with_log_config, resolve_vector_aggregator_address,
     },
     util::build_recommended_labels,
-    APP_PORT, OPERATOR_NAME,
 };
 
 pub const SUPERSET_CONTROLLER_NAME: &str = "supersetcluster";
@@ -486,10 +486,10 @@ pub async fn reconcile_superset(
         .context(DeleteOrphanedResourcesSnafu)?;
 
     let status = SupersetClusterStatus {
-        conditions: compute_conditions(
-            superset,
-            &[&ss_cond_builder, &cluster_operation_cond_builder],
-        ),
+        conditions: compute_conditions(superset, &[
+            &ss_cond_builder,
+            &cluster_operation_cond_builder,
+        ]),
     };
     client
         .apply_patch_status(OPERATOR_NAME, superset, &status)

@@ -1,13 +1,12 @@
 use std::{collections::BTreeSet, future::Future, mem};
 
 use serde::{Deserialize, Serialize};
-use snafu::{ensure, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu, ensure};
 use stackable_operator::{
     client::Client,
     commons::authentication::{
-        ldap,
+        AuthenticationClass, AuthenticationClassProvider, ClientAuthenticationDetails, ldap,
         oidc::{self, IdentityProviderHint},
-        AuthenticationClass, AuthenticationClassProvider, ClientAuthenticationDetails,
     },
     schemars::{self, JsonSchema},
 };
@@ -32,7 +31,9 @@ pub enum Error {
         source: stackable_operator::client::Error,
     },
 
-    #[snafu(display("only one authentication type at a time is supported by Superset, see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924"))]
+    #[snafu(display(
+        "only one authentication type at a time is supported by Superset, see https://github.com/dpgaspar/Flask-AppBuilder/issues/1924"
+    ))]
     MultipleAuthenticationTypesNotSupported,
 
     #[snafu(display("only one LDAP provider at a time is supported by Superset"))]
@@ -66,7 +67,9 @@ pub enum Error {
         source: stackable_operator::commons::authentication::Error,
     },
 
-    #[snafu(display("the OIDC provider {oidc_provider:?} is not yet supported (AuthenticationClass {auth_class_name:?})"))]
+    #[snafu(display(
+        "the OIDC provider {oidc_provider:?} is not yet supported (AuthenticationClass {auth_class_name:?})"
+    ))]
     OidcProviderNotSupported {
         auth_class_name: String,
         oidc_provider: String,
@@ -279,8 +282,11 @@ impl SupersetClientAuthenticationDetailsResolved {
     ) -> Result<SupersetAuthenticationClassResolved> {
         let oidc_provider = match &provider.provider_hint {
             None => {
-                info!("No OIDC provider hint given in AuthClass {auth_class_name}, assuming {default_oidc_provider_name}",
-                    default_oidc_provider_name = serde_json::to_string(&DEFAULT_OIDC_PROVIDER).unwrap());
+                info!(
+                    "No OIDC provider hint given in AuthClass {auth_class_name}, assuming {default_oidc_provider_name}",
+                    default_oidc_provider_name =
+                        serde_json::to_string(&DEFAULT_OIDC_PROVIDER).unwrap()
+                );
                 DEFAULT_OIDC_PROVIDER
             }
             Some(oidc_provider) => oidc_provider.to_owned(),

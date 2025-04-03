@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
-use clap::{crate_description, crate_version, Parser};
-use futures::{pin_mut, StreamExt};
+use clap::{Parser, crate_description, crate_version};
+use futures::{StreamExt, pin_mut};
 use stackable_operator::{
+    YamlSchema,
     cli::{Command, ProductOperatorRun},
     commons::authentication::AuthenticationClass,
     k8s_openapi::api::{
@@ -11,23 +12,24 @@ use stackable_operator::{
         core::v1::{ConfigMap, Service},
     },
     kube::{
+        ResourceExt,
         core::DeserializeGuard,
         runtime::{
+            Controller,
             events::{Recorder, Reporter},
             reflector::ObjectRef,
-            watcher, Controller,
+            watcher,
         },
-        ResourceExt,
     },
     logging::controller::report_controller_reconciled,
     shared::yaml::SerializeOptions,
-    YamlSchema,
 };
 
 use crate::{
     crd::{
+        APP_NAME, SupersetCluster,
         druidconnection::{self, DruidConnection},
-        v1alpha1, SupersetCluster, APP_NAME,
+        v1alpha1,
     },
     druid_connection_controller::DRUID_CONNECTION_FULL_CONTROLLER_NAME,
     superset_controller::SUPERSET_FULL_CONTROLLER_NAME,
@@ -100,13 +102,11 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
 
-            let superset_event_recorder = Arc::new(Recorder::new(
-                client.as_kube_client(),
-                Reporter {
+            let superset_event_recorder =
+                Arc::new(Recorder::new(client.as_kube_client(), Reporter {
                     controller: SUPERSET_FULL_CONTROLLER_NAME.to_string(),
                     instance: None,
-                },
-            ));
+                }));
             let superset_controller = Controller::new(
                 watch_namespace.get_api::<DeserializeGuard<v1alpha1::SupersetCluster>>(&client),
                 watcher::Config::default(),
@@ -161,13 +161,11 @@ async fn main() -> anyhow::Result<()> {
                     },
                 );
 
-            let druid_connection_event_recorder = Arc::new(Recorder::new(
-                client.as_kube_client(),
-                Reporter {
+            let druid_connection_event_recorder =
+                Arc::new(Recorder::new(client.as_kube_client(), Reporter {
                     controller: DRUID_CONNECTION_FULL_CONTROLLER_NAME.to_string(),
                     instance: None,
-                },
-            ));
+                }));
             let druid_connection_controller = Controller::new(
                 watch_namespace
                     .get_api::<DeserializeGuard<druidconnection::v1alpha1::DruidConnection>>(
