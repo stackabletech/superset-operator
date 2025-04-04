@@ -1,10 +1,8 @@
 use std::fmt::{Display, Write};
 
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::Snafu;
 use stackable_operator::{
     builder::configmap::ConfigMapBuilder,
-    client::Client,
-    k8s_openapi::api::core::v1::ConfigMap,
     kube::Resource,
     product_logging::{
         self,
@@ -31,54 +29,17 @@ pub enum Error {
         entry: &'static str,
         cm_name: String,
     },
-    #[snafu(display("vectorAggregatorConfigMapName must be set"))]
-    MissingVectorAggregatorAddress,
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub const LOG_CONFIG_FILE: &str = "log_config.py";
 
-const VECTOR_AGGREGATOR_CM_ENTRY: &str = "ADDRESS";
 const LOG_FILE: &str = "superset.py.json";
-
-/// Return the address of the Vector aggregator if the corresponding ConfigMap name is given in the
-/// cluster spec
-pub async fn resolve_vector_aggregator_address<T: Resource>(
-    client: &Client,
-    cluster: &T,
-    vector_aggregator_config_map_name: Option<&str>,
-) -> Result<Option<String>> {
-    let vector_aggregator_address =
-        if let Some(vector_aggregator_config_map_name) = vector_aggregator_config_map_name {
-            let namespace = cluster
-                .meta()
-                .namespace
-                .as_deref()
-                .context(ObjectHasNoNamespaceSnafu)?;
-            let vector_aggregator_address = client
-                .get::<ConfigMap>(vector_aggregator_config_map_name, namespace)
-                .await
-                .context(ConfigMapNotFoundSnafu {
-                    cm_name: vector_aggregator_config_map_name.to_string(),
-                })?
-                .data
-                .and_then(|mut data| data.remove(VECTOR_AGGREGATOR_CM_ENTRY))
-                .context(MissingConfigMapEntrySnafu {
-                    entry: VECTOR_AGGREGATOR_CM_ENTRY,
-                    cm_name: vector_aggregator_config_map_name.to_string(),
-                })?;
-            Some(vector_aggregator_address)
-        } else {
-            None
-        };
-    Ok(vector_aggregator_address)
-}
 
 /// Extend the ConfigMap with logging and Vector configurations
 pub fn extend_config_map_with_log_config<C, K>(
     rolegroup: &RoleGroupRef<K>,
-    vector_aggregator_address: Option<&str>,
     logging: &Logging<C>,
     main_container: &C,
     vector_container: &C,
@@ -111,11 +72,7 @@ where
     if logging.enable_vector_agent {
         cm_builder.add_data(
             product_logging::framework::VECTOR_CONFIG_FILE,
-            product_logging::framework::create_vector_config(
-                rolegroup,
-                vector_aggregator_address.context(MissingVectorAggregatorAddressSnafu)?,
-                vector_log_config,
-            ),
+            product_logging::framework::create_vector_config(rolegroup, vector_log_config),
         );
     }
 

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` ([#609]).
+
 ### Fixed
 
 - Fix a bug where changes to ConfigMaps that are referenced in the Superset spec didn't trigger a reconciliation ([#609]).

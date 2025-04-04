@@ -81,9 +81,7 @@ use crate::{
         STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
     },
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
-    product_logging::{
-        extend_config_map_with_log_config, resolve_vector_aggregator_address, LOG_CONFIG_FILE,
-    },
+    product_logging::{extend_config_map_with_log_config, LOG_CONFIG_FILE},
     util::build_recommended_labels,
     APP_PORT, OPERATOR_NAME,
 };
@@ -195,10 +193,8 @@ pub enum Error {
     #[snafu(display("failed to resolve and merge config for role and role group"))]
     FailedToResolveConfig { source: crate::crd::Error },
 
-    #[snafu(display("failed to resolve the Vector aggregator address"))]
-    ResolveVectorAggregatorAddress {
-        source: crate::product_logging::Error,
-    },
+    #[snafu(display("vector agent is enabled but vector aggregator ConfigMap is missing"))]
+    VectorAggregatorConfigMapMissing,
 
     #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
     InvalidLoggingConfig {
@@ -322,18 +318,6 @@ pub async fn reconcile_superset(
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&superset.spec.cluster_config.cluster_operation);
 
-    let vector_aggregator_address = resolve_vector_aggregator_address(
-        client,
-        superset,
-        superset
-            .spec
-            .cluster_config
-            .vector_aggregator_config_map_name
-            .as_deref(),
-    )
-    .await
-    .context(ResolveVectorAggregatorAddressSnafu)?;
-
     let auth_config = SupersetClientAuthenticationDetailsResolved::from(
         &superset.spec.cluster_config.authentication,
         client,
@@ -430,7 +414,6 @@ pub async fn reconcile_superset(
             &auth_config,
             &superset_opa_config,
             &config.logging,
-            vector_aggregator_address.as_deref(),
         )?;
         let rg_statefulset = build_server_rolegroup_statefulset(
             superset,
@@ -559,7 +542,6 @@ fn build_rolegroup_config_map(
     authentication_config: &SupersetClientAuthenticationDetailsResolved,
     superset_opa_config: &Option<SupersetOpaConfigResolved>,
     logging: &Logging<Container>,
-    vector_aggregator_address: Option<&str>,
 ) -> Result<ConfigMap, Error> {
     let mut config_properties = BTreeMap::new();
     let mut imports = PYTHON_IMPORTS.to_vec();
@@ -640,7 +622,6 @@ fn build_rolegroup_config_map(
 
     extend_config_map_with_log_config(
         rolegroup,
-        vector_aggregator_address,
         logging,
         &Container::Superset,
         &Container::Vector,
@@ -908,21 +889,34 @@ fn build_server_rolegroup_statefulset(
     pb.add_container(metrics_container);
 
     if merged_config.logging.enable_vector_agent {
-        pb.add_container(
-            product_logging::framework::vector_container(
-                resolved_product_image,
-                CONFIG_VOLUME_NAME,
-                LOG_VOLUME_NAME,
-                merged_config.logging.containers.get(&Container::Vector),
-                ResourceRequirementsBuilder::new()
-                    .with_cpu_request("250m")
-                    .with_cpu_limit("500m")
-                    .with_memory_request("128Mi")
-                    .with_memory_limit("128Mi")
-                    .build(),
-            )
-            .context(ConfigureLoggingSnafu)?,
-        );
+        match superset
+            .spec
+            .cluster_config
+            .vector_aggregator_config_map_name
+            .to_owned()
+        {
+            Some(vector_aggregator_config_map_name) => {
+                pb.add_container(
+                    product_logging::framework::vector_container(
+                        resolved_product_image,
+                        CONFIG_VOLUME_NAME,
+                        LOG_VOLUME_NAME,
+                        merged_config.logging.containers.get(&Container::Vector),
+                        ResourceRequirementsBuilder::new()
+                            .with_cpu_request("250m")
+                            .with_cpu_limit("500m")
+                            .with_memory_request("128Mi")
+                            .with_memory_limit("128Mi")
+                            .build(),
+                        &vector_aggregator_config_map_name,
+                    )
+                    .context(ConfigureLoggingSnafu)?,
+                );
+            }
+            None => {
+                VectorAggregatorConfigMapMissingSnafu.fail()?;
+            }
+        }
     }
 
     let mut pod_template = pb.build_template();
