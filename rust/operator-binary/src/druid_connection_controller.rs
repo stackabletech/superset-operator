@@ -14,9 +14,9 @@ use stackable_operator::{
         core::v1::{ConfigMap, PodSpec, PodTemplateSpec},
     },
     kube::{
-        core::{error_boundary, DeserializeGuard, DynamicObject},
-        runtime::{controller::Action, reflector::ObjectRef},
         ResourceExt,
+        core::{DeserializeGuard, DynamicObject, error_boundary},
+        runtime::{controller::Action, reflector::ObjectRef},
     },
     logging::controller::ReconcilerError,
     status::condition::{ClusterConditionStatus, ClusterConditionType},
@@ -25,11 +25,11 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    crd::{druidconnection, v1alpha1, PYTHONPATH, SUPERSET_CONFIG_FILENAME},
+    APP_NAME, OPERATOR_NAME,
+    crd::{PYTHONPATH, SUPERSET_CONFIG_FILENAME, druidconnection, v1alpha1},
     rbac,
     superset_controller::DOCKER_IMAGE_BASE_NAME,
-    util::{get_job_state, JobState},
-    APP_NAME, OPERATOR_NAME,
+    util::{JobState, get_job_state},
 };
 
 pub const DRUID_CONNECTION_CONTROLLER_NAME: &str = "druid-connection";

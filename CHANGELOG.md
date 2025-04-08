@@ -2,15 +2,21 @@
 
 ## [Unreleased]
 
-### Added
+### Changed
 
-- Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` ([#609]).
+- Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#610]).
+  - BREAKING: The file log directory was set by `SUPERSET_OPERATOR_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS`
+    (or via `--rolling-logs <DIRECTORY>`).
+  - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
+- BREAKING: Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` instead
+    of having the operator write it to the vector config ([#609]).
 
 ### Fixed
 
-- Fix a bug where changes to ConfigMaps that are referenced in the Superset spec didn't trigger a reconciliation ([#609]).
+- Fix a bug where changes to ConfigMaps that are referenced in the SupersetCluster spec didn't trigger a reconciliation ([#609]).
 
 [#609]: https://github.com/stackabletech/superset-operator/pull/609
+[#610]: https://github.com/stackabletech/superset-operator/pull/610
 
 ## [25.3.0] - 2025-03-21
 

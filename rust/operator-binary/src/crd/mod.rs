@@ -21,7 +21,7 @@ use stackable_operator::{
         merge::Merge,
     },
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
-    kube::{runtime::reflector::ObjectRef, CustomResource, ResourceExt},
+    kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
     memory::{BinaryMultiple, MemoryQuantity},
     product_config_utils::{self, Configuration},
     product_logging::{self, spec::Logging},
