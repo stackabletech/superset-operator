@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#610]).
+  - BREAKING: The file log directory was set by `SUPERSET_OPERATOR_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS_DIR`
+    (or via `--rolling-logs <DIRECTORY>`).
+  - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
+
+[#610]: https://github.com/stackabletech/superset-operator/pull/610
+
 ## [25.3.0] - 2025-03-21
 
 ### Added
