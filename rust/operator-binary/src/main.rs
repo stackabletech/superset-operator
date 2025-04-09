@@ -150,8 +150,8 @@ async fn main() -> anyhow::Result<()> {
                 watch_namespace.get_api::<DeserializeGuard<v1alpha1::SupersetCluster>>(&client),
                 watcher::Config::default(),
             );
-            let superset_store_1 = superset_controller.store();
-            let superset_store_2 = superset_controller.store();
+            let authentication_class_store = superset_controller.store();
+            let config_map_store = superset_controller.store();
             let superset_controller = superset_controller
                 .owns(
                     watch_namespace.get_api::<DeserializeGuard<Service>>(&client),
@@ -166,7 +166,7 @@ async fn main() -> anyhow::Result<()> {
                     client.get_api::<DeserializeGuard<AuthenticationClass>>(&()),
                     watcher::Config::default(),
                     move |authentication_class| {
-                        superset_store_1
+                        authentication_class_store
                             .state()
                             .into_iter()
                             .filter(move |superset| {
@@ -179,7 +179,7 @@ async fn main() -> anyhow::Result<()> {
                     watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
                     watcher::Config::default(),
                     move |config_map| {
-                        superset_store_2
+                        config_map_store
                             .state()
                             .into_iter()
                             .filter(move |superset| references_config_map(superset, &config_map))
