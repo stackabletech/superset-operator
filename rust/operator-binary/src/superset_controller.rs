@@ -889,11 +889,10 @@ fn build_server_rolegroup_statefulset(
     pb.add_container(metrics_container);
 
     if merged_config.logging.enable_vector_agent {
-        match superset
+        match &superset
             .spec
             .cluster_config
             .vector_aggregator_config_map_name
-            .to_owned()
         {
             Some(vector_aggregator_config_map_name) => {
                 pb.add_container(
@@ -908,7 +907,7 @@ fn build_server_rolegroup_statefulset(
                             .with_memory_request("128Mi")
                             .with_memory_limit("128Mi")
                             .build(),
-                        &vector_aggregator_config_map_name,
+                        vector_aggregator_config_map_name,
                     )
                     .context(ConfigureLoggingSnafu)?,
                 );

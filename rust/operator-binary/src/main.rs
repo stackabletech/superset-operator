@@ -325,7 +325,7 @@ fn references_config_map(
         return false;
     };
 
-    match superset.spec.cluster_config.authorization.clone() {
+    match &superset.spec.cluster_config.authorization {
         Some(superset_authorization) => {
             superset_authorization
                 .role_mapping_from_opa
