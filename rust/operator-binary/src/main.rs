@@ -224,16 +224,16 @@ async fn main() -> anyhow::Result<()> {
                     ),
                 watcher::Config::default(),
             );
-            let druid_connection_store_1 = druid_connection_controller.store();
-            let druid_connection_store_2 = druid_connection_controller.store();
-            let druid_connection_store_3 = druid_connection_controller.store();
+            let superset_cluster_store = druid_connection_controller.store();
+            let job_store = druid_connection_controller.store();
+            let config_map_store = druid_connection_controller.store();
             let druid_connection_controller = druid_connection_controller
                 .shutdown_on_signal()
                 .watches(
                     watch_namespace.get_api::<DeserializeGuard<v1alpha1::SupersetCluster>>(&client),
                     watcher::Config::default(),
                     move |superset_cluster| {
-                        druid_connection_store_1
+                        superset_cluster_store
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
@@ -246,7 +246,7 @@ async fn main() -> anyhow::Result<()> {
                     watch_namespace.get_api::<DeserializeGuard<Job>>(&client),
                     watcher::Config::default(),
                     move |job| {
-                        druid_connection_store_2
+                        job_store
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| valid_druid_job(druid_connection, &job))
@@ -257,7 +257,7 @@ async fn main() -> anyhow::Result<()> {
                     watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
                     watcher::Config::default(),
                     move |config_map| {
-                        druid_connection_store_3
+                        config_map_store
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
