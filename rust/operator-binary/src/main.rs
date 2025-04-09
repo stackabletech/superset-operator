@@ -150,7 +150,8 @@ async fn main() -> anyhow::Result<()> {
                 watch_namespace.get_api::<DeserializeGuard<v1alpha1::SupersetCluster>>(&client),
                 watcher::Config::default(),
             );
-            let superset_store_1 = superset_controller.store();
+            let authentication_class_store = superset_controller.store();
+            let config_map_store = superset_controller.store();
             let superset_controller = superset_controller
                 .owns(
                     watch_namespace.get_api::<DeserializeGuard<Service>>(&client),
@@ -165,12 +166,23 @@ async fn main() -> anyhow::Result<()> {
                     client.get_api::<DeserializeGuard<AuthenticationClass>>(&()),
                     watcher::Config::default(),
                     move |authentication_class| {
-                        superset_store_1
+                        authentication_class_store
                             .state()
                             .into_iter()
                             .filter(move |superset| {
                                 references_authentication_class(superset, &authentication_class)
                             })
+                            .map(|superset| ObjectRef::from_obj(&*superset))
+                    },
+                )
+                .watches(
+                    watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
+                    watcher::Config::default(),
+                    move |config_map| {
+                        config_map_store
+                            .state()
+                            .into_iter()
+                            .filter(move |superset| references_config_map(superset, &config_map))
                             .map(|superset| ObjectRef::from_obj(&*superset))
                     },
                 )
@@ -212,16 +224,16 @@ async fn main() -> anyhow::Result<()> {
                     ),
                 watcher::Config::default(),
             );
-            let druid_connection_store_1 = druid_connection_controller.store();
-            let druid_connection_store_2 = druid_connection_controller.store();
-            let druid_connection_store_3 = druid_connection_controller.store();
+            let superset_cluster_store = druid_connection_controller.store();
+            let job_store = druid_connection_controller.store();
+            let config_map_store = druid_connection_controller.store();
             let druid_connection_controller = druid_connection_controller
                 .shutdown_on_signal()
                 .watches(
                     watch_namespace.get_api::<DeserializeGuard<v1alpha1::SupersetCluster>>(&client),
                     watcher::Config::default(),
                     move |superset_cluster| {
-                        druid_connection_store_1
+                        superset_cluster_store
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
@@ -234,7 +246,7 @@ async fn main() -> anyhow::Result<()> {
                     watch_namespace.get_api::<DeserializeGuard<Job>>(&client),
                     watcher::Config::default(),
                     move |job| {
-                        druid_connection_store_2
+                        job_store
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| valid_druid_job(druid_connection, &job))
@@ -245,7 +257,7 @@ async fn main() -> anyhow::Result<()> {
                     watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
                     watcher::Config::default(),
                     move |config_map| {
-                        druid_connection_store_3
+                        config_map_store
                             .state()
                             .into_iter()
                             .filter(move |druid_connection| {
@@ -303,6 +315,26 @@ fn references_authentication_class(
         .authentication
         .iter()
         .any(|c| c.common.authentication_class_name() == &authentication_class_name)
+}
+
+fn references_config_map(
+    superset: &DeserializeGuard<v1alpha1::SupersetCluster>,
+    config_map: &DeserializeGuard<ConfigMap>,
+) -> bool {
+    let Ok(superset) = &superset.0 else {
+        return false;
+    };
+
+    match &superset.spec.cluster_config.authorization {
+        Some(superset_authorization) => {
+            superset_authorization
+                .role_mapping_from_opa
+                .opa
+                .config_map_name
+                == config_map.name_any()
+        }
+        None => false,
+    }
 }
 
 fn valid_druid_connection(
