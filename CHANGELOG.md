@@ -13,10 +13,12 @@
 
 ### Fixed
 
+- Use `json` file extension for log files ([#615]).
 - Fix a bug where changes to ConfigMaps that are referenced in the SupersetCluster spec didn't trigger a reconciliation ([#609]).
 
 [#609]: https://github.com/stackabletech/superset-operator/pull/609
 [#610]: https://github.com/stackabletech/superset-operator/pull/610
+[#615]: https://github.com/stackabletech/superset-operator/pull/615
 
 ## [25.3.0] - 2025-03-21
 
