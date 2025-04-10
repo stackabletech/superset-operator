@@ -4,9 +4,11 @@
 
 ### Changed
 
-- Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#610]).
-  - BREAKING: The file log directory was set by `SUPERSET_OPERATOR_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS`
-    (or via `--rolling-logs <DIRECTORY>`).
+- BREAKING: Replace stackable-operator `initialize_logging` with stackable-telemetry `Tracing` ([#610], [#617]).
+  - The console log level was set by `SUPERSET_OPERATOR_LOG`, and is now set by `CONSOLE_LOG`.
+  - The file log level was set by `SUPERSET_OPERATOR_LOG`, and is now set by `FILE_LOG`.
+  - The file log directory was set by `SUPERSET_OPERATOR_LOG_DIRECTORY`, and is now set
+    by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
   - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
 - BREAKING: Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` instead
     of having the operator write it to the vector config ([#609]).
@@ -19,6 +21,7 @@
 [#609]: https://github.com/stackabletech/superset-operator/pull/609
 [#610]: https://github.com/stackabletech/superset-operator/pull/610
 [#615]: https://github.com/stackabletech/superset-operator/pull/615
+[#617]: https://github.com/stackabletech/superset-operator/pull/617
 
 ## [25.3.0] - 2025-03-21
 

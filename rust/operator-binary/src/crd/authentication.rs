@@ -9,8 +9,8 @@ use stackable_operator::{
         oidc::{self, IdentityProviderHint},
     },
     schemars::{self, JsonSchema},
+    versioned::versioned,
 };
-use stackable_versioned::versioned;
 use tracing::info;
 
 // The assumed OIDC provider if no hint is given in the AuthClass

@@ -4,8 +4,8 @@ use stackable_operator::{
     k8s_openapi::{apimachinery::pkg::apis::meta::v1::Time, chrono::Utc},
     kube::{CustomResource, ResourceExt},
     schemars::{self, JsonSchema},
+    versioned::versioned,
 };
-use stackable_versioned::versioned;
 
 #[derive(Snafu, Debug)]
 pub enum Error {
