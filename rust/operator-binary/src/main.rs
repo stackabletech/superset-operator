@@ -55,9 +55,6 @@ mod built_info {
 pub const APP_PORT: u16 = 8088;
 pub const OPERATOR_NAME: &str = "superset.stackable.tech";
 
-// TODO (@NickLarsenNZ): Change the variable to `CONSOLE_LOG`
-pub const ENV_VAR_CONSOLE_LOG: &str = "SUPERSET_OPERATOR_LOG";
-
 #[derive(Parser)]
 #[clap(about, author)]
 struct Opts {
