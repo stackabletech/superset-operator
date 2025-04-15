@@ -300,6 +300,8 @@ impl SupersetClientAuthenticationDetailsResolved {
             }
         );
 
+        // We have to enforce preferred_username here due to the flask implementation
+        // https://github.com/dpgaspar/Flask-AppBuilder/blob/6d44e6d581433dcea475764c4bb1270c24bbd6de/flask_appbuilder/security/manager.py#L719
         match oidc_provider {
             IdentityProviderHint::Keycloak => {
                 ensure!(
