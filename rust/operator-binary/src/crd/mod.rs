@@ -16,9 +16,8 @@ use stackable_operator::{
         },
     },
     config::{
-        fragment,
-        fragment::{Fragment, ValidationError},
-        merge::Merge,
+        fragment::{self, Fragment, ValidationError},
+        merge::{Atomic, Merge},
     },
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
@@ -48,6 +47,14 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     unit: BinaryMultiple::Mebi,
 };
 
+pub const LISTENER_VOLUME_NAME: &str = "listener";
+pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
+
+pub const APP_PORT_NAME: &str = "http";
+pub const APP_PORT: u16 = 8088;
+pub const METRICS_PORT_NAME: &str = "metrics";
+pub const METRICS_PORT: u16 = 9102;
+
 const DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 
 #[derive(Debug, Snafu)]
@@ -57,6 +64,12 @@ pub enum Error {
 
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
+
+    #[snafu(display("Configuration/Executor conflict!"))]
+    NoRoleForExecutorFailure,
+
+    #[snafu(display("object has no associated namespace"))]
+    NoNamespace,
 }
 
 #[derive(Display, EnumIter, EnumString)]
@@ -157,20 +170,6 @@ pub mod versioned {
         #[serde(default)]
         pub cluster_operation: ClusterOperation,
 
-        /// This field controls which type of Service the Operator creates for this SupersetCluster:
-        ///
-        /// * cluster-internal: Use a ClusterIP service
-        ///
-        /// * external-unstable: Use a NodePort service
-        ///
-        /// * external-stable: Use a LoadBalancer service
-        ///
-        /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
-        /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
-        /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
-        #[serde(default)]
-        pub listener_class: v1alpha1::CurrentlySupportedListenerClasses,
-
         /// The name of a Secret object.
         /// The Secret should contain a key `connections.mapboxApiKey`.
         /// This is the API key required for map charts to work that use mapbox.
@@ -224,21 +223,10 @@ pub mod versioned {
         /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
         #[fragment_attrs(serde(default))]
         pub graceful_shutdown_timeout: Option<Duration>,
-    }
 
-    // TODO: Temporary solution until listener-operator is finished
-    #[derive(Clone, Debug, Default, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-    #[serde(rename_all = "PascalCase")]
-    pub enum CurrentlySupportedListenerClasses {
-        #[default]
-        #[serde(rename = "cluster-internal")]
-        ClusterInternal,
-
-        #[serde(rename = "external-unstable")]
-        ExternalUnstable,
-
-        #[serde(rename = "external-stable")]
-        ExternalStable,
+        /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose the webserver.
+        #[serde(default)]
+        pub listener_class: v1alpha1::SupportedListenerClasses,
     }
 
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -301,6 +289,35 @@ pub mod versioned {
     pub struct SupersetClusterStatus {
         #[serde(default)]
         pub conditions: Vec<ClusterCondition>,
+    }
+}
+
+#[derive(Clone, Debug, Default, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum SupportedListenerClasses {
+    #[default]
+    #[serde(rename = "cluster-internal")]
+    #[strum(serialize = "cluster-internal")]
+    ClusterInternal,
+
+    #[serde(rename = "external-unstable")]
+    #[strum(serialize = "external-unstable")]
+    ExternalUnstable,
+
+    #[serde(rename = "external-stable")]
+    #[strum(serialize = "external-stable")]
+    ExternalStable,
+}
+
+impl Atomic for SupportedListenerClasses {}
+
+impl SupportedListenerClasses {
+    pub fn discoverable(&self) -> bool {
+        match self {
+            SupportedListenerClasses::ClusterInternal => false,
+            SupportedListenerClasses::ExternalUnstable => true,
+            SupportedListenerClasses::ExternalStable => true,
+        }
     }
 }
 
@@ -406,18 +423,6 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
     }
 }
 
-impl v1alpha1::CurrentlySupportedListenerClasses {
-    pub fn k8s_service_type(&self) -> String {
-        match self {
-            v1alpha1::CurrentlySupportedListenerClasses::ClusterInternal => "ClusterIP".to_string(),
-            v1alpha1::CurrentlySupportedListenerClasses::ExternalUnstable => "NodePort".to_string(),
-            v1alpha1::CurrentlySupportedListenerClasses::ExternalStable => {
-                "LoadBalancer".to_string()
-            }
-        }
-    }
-}
-
 impl v1alpha1::SupersetConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
     pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
@@ -440,6 +445,7 @@ impl v1alpha1::SupersetConfig {
             graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
             row_limit: None,
             webserver_timeout: None,
+            listener_class: Some(SupportedListenerClasses::ClusterInternal),
         }
     }
 }
@@ -578,5 +584,31 @@ impl v1alpha1::SupersetCluster {
 
         tracing::debug!("Merged config: {:?}", conf_rolegroup);
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
+    }
+
+    pub fn merged_listener_class(
+        &self,
+        role: &SupersetRole,
+        rolegroup_name: &String,
+    ) -> Result<Option<SupportedListenerClasses>, Error> {
+        let listener_class_default = Some(SupportedListenerClasses::ClusterInternal);
+
+        let role = match role {
+            SupersetRole::Node => self.spec.nodes.as_ref().context(UnknownSupersetRoleSnafu {
+                role: role.to_string(),
+                roles: vec![role.to_string()],
+            })?,
+        };
+
+        let mut listener_class_role = role.config.config.listener_class.to_owned();
+        let mut listener_class_rolegroup = role
+            .role_groups
+            .get(rolegroup_name)
+            .map(|rg| rg.config.config.listener_class.clone())
+            .unwrap_or_default();
+        listener_class_role.merge(&listener_class_default);
+        listener_class_rolegroup.merge(&listener_class_role);
+        tracing::debug!("Merged listener-class: {:?}", listener_class_rolegroup);
+        Ok(listener_class_rolegroup)
     }
 }

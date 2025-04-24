@@ -21,7 +21,7 @@ use stackable_operator::{
         meta::ObjectMetaBuilder,
         pod::{
             PodBuilder, container::ContainerBuilder, resources::ResourceRequirementsBuilder,
-            security::PodSecurityContextBuilder,
+            security::PodSecurityContextBuilder, volume::ListenerOperatorVolumeSourceBuilderError,
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
@@ -68,14 +68,15 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    APP_PORT, OPERATOR_NAME,
+    OPERATOR_NAME,
     authorization::opa::{OPA_IMPORTS, SupersetOpaConfigResolved},
     commands::add_cert_to_python_certifi_command,
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
-        APP_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
-        SUPERSET_CONFIG_FILENAME, SupersetConfigOptions, SupersetRole,
+        APP_NAME, APP_PORT, APP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, METRICS_PORT,
+        METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR,
+        STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME, SupersetConfigOptions, SupersetRole,
         authentication::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
         },
@@ -90,9 +91,6 @@ pub const SUPERSET_CONTROLLER_NAME: &str = "supersetcluster";
 pub const SUPERSET_FULL_CONTROLLER_NAME: &str =
     concatcp!(SUPERSET_CONTROLLER_NAME, '.', OPERATOR_NAME);
 pub const DOCKER_IMAGE_BASE_NAME: &str = "superset";
-
-const METRICS_PORT_NAME: &str = "metrics";
-const METRICS_PORT: i32 = 9102;
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -286,6 +284,11 @@ pub enum Error {
     InvalidOpaConfig {
         source: stackable_operator::commons::opa::Error,
     },
+
+    #[snafu(display("failed to build listener volume"))]
+    BuildListenerVolume {
+        source: ListenerOperatorVolumeSourceBuilderError,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -389,12 +392,6 @@ pub async fn reconcile_superset(
         .await
         .context(ApplyRoleBindingSnafu)?;
 
-    let node_role_service = build_node_role_service(superset, &resolved_product_image)?;
-    cluster_resources
-        .add(client, node_role_service)
-        .await
-        .context(ApplyRoleServiceSnafu)?;
-
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
     for (rolegroup_name, rolegroup_config) in role_node_config.iter() {
@@ -480,56 +477,6 @@ pub async fn reconcile_superset(
         .context(ApplyStatusSnafu)?;
 
     Ok(Action::await_change())
-}
-
-/// The server-role service is the primary endpoint that should be used by clients that do not perform internal load balancing,
-/// including targets outside of the cluster.
-fn build_node_role_service(
-    superset: &SupersetCluster,
-    resolved_product_image: &ResolvedProductImage,
-) -> Result<Service> {
-    let role_name = SupersetRole::Node.to_string();
-    let role_svc_name = superset
-        .node_role_service_name()
-        .context(GlobalServiceNameNotFoundSnafu)?;
-    Ok(Service {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(superset)
-            .name(format!("{}-external", &role_svc_name))
-            .ownerreference_from_resource(superset, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(build_recommended_labels(
-                superset,
-                SUPERSET_CONTROLLER_NAME,
-                &resolved_product_image.app_version_label,
-                &role_name,
-                "global",
-            ))
-            .context(MetadataBuildSnafu)?
-            .build(),
-        spec: Some(ServiceSpec {
-            type_: Some(
-                superset
-                    .spec
-                    .cluster_config
-                    .listener_class
-                    .k8s_service_type(),
-            ),
-            ports: Some(vec![ServicePort {
-                name: Some("http".to_string()),
-                port: APP_PORT.into(),
-                protocol: Some("TCP".to_string()),
-                ..ServicePort::default()
-            }]),
-            selector: Some(
-                Labels::role_selector(superset, APP_NAME, &role_name)
-                    .context(LabelBuildSnafu)?
-                    .into(),
-            ),
-            ..ServiceSpec::default()
-        }),
-        status: None,
-    })
 }
 
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
@@ -668,14 +615,14 @@ fn build_node_rolegroup_service(
             cluster_ip: Some("None".to_string()),
             ports: Some(vec![
                 ServicePort {
-                    name: Some("http".to_string()),
+                    name: Some(APP_PORT_NAME.into()),
                     port: APP_PORT.into(),
                     protocol: Some("TCP".to_string()),
                     ..ServicePort::default()
                 },
                 ServicePort {
                     name: Some(METRICS_PORT_NAME.into()),
-                    port: METRICS_PORT,
+                    port: METRICS_PORT.into(),
                     protocol: Some("TCP".to_string()),
                     ..ServicePort::default()
                 },
@@ -717,14 +664,18 @@ fn build_server_rolegroup_statefulset(
         .get(&rolegroup_ref.role_group)
         .context(NoNodeRoleSnafu)?;
 
+    let recommended_object_labels = build_recommended_labels(
+        superset,
+        SUPERSET_CONTROLLER_NAME,
+        &resolved_product_image.app_version_label,
+        &rolegroup_ref.role,
+        &rolegroup_ref.role_group,
+    );
+    let recommended_labels =
+        Labels::recommended(recommended_object_labels.clone()).context(LabelBuildSnafu)?;
+
     let metadata = ObjectMetaBuilder::new()
-        .with_recommended_labels(build_recommended_labels(
-            superset,
-            SUPERSET_CONTROLLER_NAME,
-            &resolved_product_image.app_version_label,
-            &rolegroup_ref.role,
-            &rolegroup_ref.role_group,
-        ))
+        .with_recommended_labels(recommended_object_labels.clone())
         .context(MetadataBuildSnafu)?
         .build();
 
@@ -850,6 +801,21 @@ fn build_server_rolegroup_statefulset(
     superset_cb.readiness_probe(probe.clone());
     superset_cb.liveness_probe(probe);
 
+    let listener_class = &merged_config.listener_class;
+    // all listeners will use ephemeral volumes as they can/should
+    // be removed when the pods are *terminated* (ephemeral PVCs will
+    // survive re-starts)
+    pb.add_listener_volume_by_listener_class(
+        LISTENER_VOLUME_NAME,
+        &listener_class.to_string(),
+        &recommended_labels,
+    )
+    .context(AddVolumeSnafu)?;
+
+    superset_cb
+        .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
+        .context(AddVolumeMountSnafu)?;
+
     pb.add_container(superset_cb.build());
     add_graceful_shutdown_config(merged_config, pb).context(GracefulShutdownSnafu)?;
 
@@ -870,7 +836,7 @@ fn build_server_rolegroup_statefulset(
             /stackable/statsd_exporter &
             wait_for_termination $!
         "}])
-        .add_container_port(METRICS_PORT_NAME, METRICS_PORT)
+        .add_container_port(METRICS_PORT_NAME, METRICS_PORT.into())
         .resources(
             ResourceRequirementsBuilder::new()
                 .with_cpu_request("100m")
@@ -928,13 +894,7 @@ fn build_server_rolegroup_statefulset(
             .name(rolegroup_ref.object_name())
             .ownerreference_from_resource(superset, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(build_recommended_labels(
-                superset,
-                SUPERSET_CONTROLLER_NAME,
-                &resolved_product_image.app_version_label,
-                &rolegroup_ref.role,
-                &rolegroup_ref.role_group,
-            ))
+            .with_recommended_labels(recommended_object_labels)
             .context(MetadataBuildSnafu)?
             .with_label(
                 Label::try_from(("restarter.stackable.tech/enabled", "true"))
