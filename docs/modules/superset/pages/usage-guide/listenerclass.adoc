@@ -2,17 +2,14 @@
 :description: Superset service exposition with ListenerClass: configure access via internal, external-unstable, or external-stable services.
 
 Apache Superset offers a web UI and an API.
-The Operator deploys a service called `<name>-external` (where `<name>` is the name of the SupersetCluster) through which Superset can be reached.
-
-This service can have three different types: `cluster-internal`, `external-unstable` and `external-stable`.
-Read more about the types in the xref:concepts:service-exposition.adoc[service exposition] documentation at platform level.
-
-This is how the ListenerClass is configured:
+The operator deploys a xref:listener-operator:listener.adoc[Listener] for the Nodes pod.
+The listener defaults to only being accessible from within the Kubernetes cluster, but this can be changed by setting `.spec.nodes.config.listenerClass`:
 
 [source,yaml]
 ----
 spec:
-  clusterConfig:
-    listenerClass: cluster-internal  # <1>
+  nodes:
+    config:
+      listenerClass: external-stable # <1>
 ----
-<1> The default `cluster-internal` setting.
+<1> Specify one of `external-stable`, `external-unstable`, `cluster-internal` (the default setting is `cluster-internal`).
