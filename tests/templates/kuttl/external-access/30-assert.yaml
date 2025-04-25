@@ -1,0 +1,62 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: install-superset
+timeout: 300
+commands:
+  - script: kubectl -n $NAMESPACE wait --for=condition=available=true supersetclusters.superset.stackable.tech/superset --timeout 301s
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: superset-node-default
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: superset-node-external-unstable
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: superset-node-cluster-internal
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: superset-node
+status:
+  expectedPods: 3
+  currentHealthy: 3
+  disruptionsAllowed: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset-node-cluster-internal-0-listener
+spec:
+  type: ClusterIP # cluster-internal
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset-node-default-0-listener
+spec:
+  type: NodePort # external-stable
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset-node-external-unstable-0-listener
+spec:
+  type: NodePort # external-unstable
