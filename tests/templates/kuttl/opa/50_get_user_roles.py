@@ -111,8 +111,10 @@ def main():
     global bearer_token
     global csrf_token
 
-    base_ui_url = f"http://superset-external.{namespace}.svc.cluster.local:8088"
-    base_api_url = f"http://superset-external.{namespace}.svc.cluster.local:8088/api/v1"
+    base_ui_url = f"http://superset-node-default.{namespace}.svc.cluster.local:8088"
+    base_api_url = (
+        f"http://superset-node-default.{namespace}.svc.cluster.local:8088/api/v1"
+    )
     bearer_token = get_bearer_token()
     csrf_token = get_csrf_token()
 
