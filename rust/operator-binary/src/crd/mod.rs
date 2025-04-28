@@ -17,7 +17,7 @@ use stackable_operator::{
     },
     config::{
         fragment::{self, Fragment, ValidationError},
-        merge::{Atomic, Merge},
+        merge::Merge,
     },
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
@@ -226,7 +226,7 @@ pub mod versioned {
 
         /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose the webserver.
         #[serde(default)]
-        pub listener_class: v1alpha1::SupportedListenerClasses,
+        pub listener_class: String,
     }
 
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -289,35 +289,6 @@ pub mod versioned {
     pub struct SupersetClusterStatus {
         #[serde(default)]
         pub conditions: Vec<ClusterCondition>,
-    }
-}
-
-#[derive(Clone, Debug, Default, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "PascalCase")]
-pub enum SupportedListenerClasses {
-    #[default]
-    #[serde(rename = "cluster-internal")]
-    #[strum(serialize = "cluster-internal")]
-    ClusterInternal,
-
-    #[serde(rename = "external-unstable")]
-    #[strum(serialize = "external-unstable")]
-    ExternalUnstable,
-
-    #[serde(rename = "external-stable")]
-    #[strum(serialize = "external-stable")]
-    ExternalStable,
-}
-
-impl Atomic for SupportedListenerClasses {}
-
-impl SupportedListenerClasses {
-    pub fn discoverable(&self) -> bool {
-        match self {
-            SupportedListenerClasses::ClusterInternal => false,
-            SupportedListenerClasses::ExternalUnstable => true,
-            SupportedListenerClasses::ExternalStable => true,
-        }
     }
 }
 
@@ -445,7 +416,7 @@ impl v1alpha1::SupersetConfig {
             graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
             row_limit: None,
             webserver_timeout: None,
-            listener_class: Some(SupportedListenerClasses::ClusterInternal),
+            listener_class: Some("cluster-internal".to_string()),
         }
     }
 }
@@ -511,6 +482,13 @@ impl HasStatusCondition for v1alpha1::SupersetCluster {
 }
 
 impl v1alpha1::SupersetCluster {
+    /// The name of the group-listener provided for a specific role-group.
+    /// The UI will use this group listener so that only one load balancer
+    /// is needed (per role group).
+    pub fn group_listener_name(&self, rolegroup: &RoleGroupRef<Self>) -> String {
+        format!("{}-group", rolegroup.object_name())
+    }
+
     pub fn get_role(&self, role: &SupersetRole) -> Option<&Role<v1alpha1::SupersetConfigFragment>> {
         match role {
             SupersetRole::Node => self.spec.nodes.as_ref(),
@@ -590,8 +568,8 @@ impl v1alpha1::SupersetCluster {
         &self,
         role: &SupersetRole,
         rolegroup_name: &String,
-    ) -> Result<Option<SupportedListenerClasses>, Error> {
-        let listener_class_default = Some(SupportedListenerClasses::ClusterInternal);
+    ) -> Result<Option<String>, Error> {
+        let listener_class_default = Some("cluster-internal".to_string());
 
         let role = match role {
             SupersetRole::Node => self.spec.nodes.as_ref().context(UnknownSupersetRoleSnafu {

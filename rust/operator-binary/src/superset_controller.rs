@@ -20,13 +20,21 @@ use stackable_operator::{
         configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
         pod::{
-            PodBuilder, container::ContainerBuilder, resources::ResourceRequirementsBuilder,
-            security::PodSecurityContextBuilder, volume::ListenerOperatorVolumeSourceBuilderError,
+            PodBuilder,
+            container::ContainerBuilder,
+            resources::ResourceRequirementsBuilder,
+            security::PodSecurityContextBuilder,
+            volume::{
+                ListenerOperatorVolumeSourceBuilder, ListenerOperatorVolumeSourceBuilderError,
+                ListenerReference,
+            },
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
-        authentication::oidc, product_image_selection::ResolvedProductImage,
+        authentication::oidc,
+        listener::{Listener, ListenerPort, ListenerSpec},
+        product_image_selection::ResolvedProductImage,
         rbac::build_rbac_resources,
     },
     k8s_openapi::{
@@ -80,7 +88,7 @@ use crate::{
         authentication::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
         },
-        v1alpha1::{Container, SupersetCluster, SupersetClusterStatus, SupersetConfig},
+        v1alpha1::{self, Container, SupersetCluster, SupersetClusterStatus, SupersetConfig},
     },
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{LOG_CONFIG_FILE, extend_config_map_with_log_config},
@@ -289,6 +297,12 @@ pub enum Error {
     BuildListenerVolume {
         source: ListenerOperatorVolumeSourceBuilderError,
     },
+
+    #[snafu(display("failed to apply group listener for {rolegroup}"))]
+    ApplyGroupListener {
+        source: stackable_operator::cluster_resources::Error,
+        rolegroup: RoleGroupRef<SupersetCluster>,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -422,6 +436,25 @@ pub async fn reconcile_superset(
             &rbac_sa.name_any(),
             &config,
         )?;
+
+        if let Some(listener_class) = superset
+            .merged_listener_class(&superset_role, &rolegroup.role_group)
+            .context(FailedToResolveConfigSnafu)?
+        {
+            let rg_group_listener = build_group_listener(
+                superset,
+                &resolved_product_image,
+                &rolegroup,
+                listener_class.to_string(),
+            )?;
+            cluster_resources
+                .add(client, rg_group_listener)
+                .await
+                .context(ApplyGroupListenerSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
+        }
+
         cluster_resources
             .add(client, rg_service)
             .await
@@ -644,6 +677,51 @@ fn build_node_rolegroup_service(
     })
 }
 
+pub fn build_group_listener(
+    superset: &v1alpha1::SupersetCluster,
+    resolved_product_image: &ResolvedProductImage,
+    rolegroup: &RoleGroupRef<v1alpha1::SupersetCluster>,
+    listener_class: String,
+) -> Result<Listener> {
+    Ok(Listener {
+        metadata: ObjectMetaBuilder::new()
+            .name_and_namespace(superset)
+            .name(superset.group_listener_name(rolegroup))
+            .ownerreference_from_resource(superset, None, Some(true))
+            .context(ObjectMissingMetadataForOwnerRefSnafu)?
+            .with_recommended_labels(build_recommended_labels(
+                superset,
+                SUPERSET_CONTROLLER_NAME,
+                &resolved_product_image.app_version_label,
+                &rolegroup.role,
+                &rolegroup.role_group,
+            ))
+            .context(MetadataBuildSnafu)?
+            .build(),
+        spec: ListenerSpec {
+            class_name: Some(listener_class),
+            ports: Some(listener_ports()),
+            ..ListenerSpec::default()
+        },
+        status: None,
+    })
+}
+
+fn listener_ports() -> Vec<ListenerPort> {
+    vec![
+        ListenerPort {
+            name: METRICS_PORT_NAME.to_string(),
+            port: METRICS_PORT.into(),
+            protocol: Some("TCP".to_string()),
+        },
+        ListenerPort {
+            name: APP_PORT_NAME.to_string(),
+            port: APP_PORT.into(),
+            protocol: Some("TCP".to_string()),
+        },
+    ]
+}
+
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_node_rolegroup_service`]).
@@ -671,8 +749,16 @@ fn build_server_rolegroup_statefulset(
         &rolegroup_ref.role,
         &rolegroup_ref.role_group,
     );
-    let recommended_labels =
-        Labels::recommended(recommended_object_labels.clone()).context(LabelBuildSnafu)?;
+    // Used for PVC templates that cannot be modified once they are deployed
+    let unversioned_recommended_labels = Labels::recommended(build_recommended_labels(
+        superset,
+        SUPERSET_CONTROLLER_NAME,
+        // A version value is required, and we do want to use the "recommended" format for the other desired labels
+        "none",
+        &rolegroup_ref.role,
+        &rolegroup_ref.role_group,
+    ))
+    .context(LabelBuildSnafu)?;
 
     let metadata = ObjectMetaBuilder::new()
         .with_recommended_labels(recommended_object_labels.clone())
@@ -801,16 +887,16 @@ fn build_server_rolegroup_statefulset(
     superset_cb.readiness_probe(probe.clone());
     superset_cb.liveness_probe(probe);
 
-    let listener_class = &merged_config.listener_class;
-    // all listeners will use ephemeral volumes as they can/should
-    // be removed when the pods are *terminated* (ephemeral PVCs will
-    // survive re-starts)
-    pb.add_listener_volume_by_listener_class(
-        LISTENER_VOLUME_NAME,
-        &listener_class.to_string(),
-        &recommended_labels,
+    // listener endpoints will use persistent volumes
+    // so that load balancers can hard-code the target addresses and
+    // that it is possible to connect to a consistent address
+    let pvc = ListenerOperatorVolumeSourceBuilder::new(
+        &ListenerReference::ListenerName(superset.group_listener_name(rolegroup_ref)),
+        &unversioned_recommended_labels,
     )
-    .context(AddVolumeSnafu)?;
+    .context(BuildListenerVolumeSnafu)?
+    .build_pvc(LISTENER_VOLUME_NAME.to_string())
+    .context(BuildListenerVolumeSnafu)?;
 
     superset_cb
         .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
@@ -920,6 +1006,7 @@ fn build_server_rolegroup_statefulset(
             },
             service_name: rolegroup_ref.object_name(),
             template: pod_template,
+            volume_claim_templates: Some(vec![pvc]),
             ..StatefulSetSpec::default()
         }),
         status: None,

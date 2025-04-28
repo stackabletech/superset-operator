@@ -12,8 +12,8 @@ kind: StatefulSet
 metadata:
   name: superset-node-default
 status:
-  readyReplicas: 1
-  replicas: 1
+  readyReplicas: 2
+  replicas: 2
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -36,27 +36,27 @@ kind: PodDisruptionBudget
 metadata:
   name: superset-node
 status:
-  expectedPods: 3
-  currentHealthy: 3
+  expectedPods: 4
+  currentHealthy: 4
   disruptionsAllowed: 1
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: superset-node-cluster-internal-0-listener
+  name: superset-node-cluster-internal-group
 spec:
   type: ClusterIP # cluster-internal
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: superset-node-default-0-listener
+  name: superset-node-default-group
 spec:
   type: NodePort # external-stable
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: superset-node-external-unstable-0-listener
+  name: superset-node-external-unstable-group
 spec:
   type: NodePort # external-unstable
