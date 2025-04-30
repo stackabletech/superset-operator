@@ -437,23 +437,18 @@ pub async fn reconcile_superset(
             &config,
         )?;
 
-        if let Some(listener_class) = superset
-            .merged_listener_class(&superset_role, &rolegroup.role_group)
-            .context(FailedToResolveConfigSnafu)?
-        {
-            let rg_group_listener = build_group_listener(
-                superset,
-                &resolved_product_image,
-                &rolegroup,
-                listener_class.to_string(),
-            )?;
-            cluster_resources
-                .add(client, rg_group_listener)
-                .await
-                .context(ApplyGroupListenerSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?;
-        }
+        let rg_group_listener = build_group_listener(
+            superset,
+            &resolved_product_image,
+            &rolegroup,
+            config.listener_class,
+        )?;
+        cluster_resources
+            .add(client, rg_group_listener)
+            .await
+            .context(ApplyGroupListenerSnafu {
+                rolegroup: rolegroup.clone(),
+            })?;
 
         cluster_resources
             .add(client, rg_service)
@@ -708,18 +703,11 @@ pub fn build_group_listener(
 }
 
 fn listener_ports() -> Vec<ListenerPort> {
-    vec![
-        ListenerPort {
-            name: METRICS_PORT_NAME.to_string(),
-            port: METRICS_PORT.into(),
-            protocol: Some("TCP".to_string()),
-        },
-        ListenerPort {
-            name: APP_PORT_NAME.to_string(),
-            port: APP_PORT.into(),
-            protocol: Some("TCP".to_string()),
-        },
-    ]
+    vec![ListenerPort {
+        name: APP_PORT_NAME.to_string(),
+        port: APP_PORT.into(),
+        protocol: Some("TCP".to_string()),
+    }]
 }
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.

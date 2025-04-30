@@ -563,30 +563,4 @@ impl v1alpha1::SupersetCluster {
         tracing::debug!("Merged config: {:?}", conf_rolegroup);
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
-
-    pub fn merged_listener_class(
-        &self,
-        role: &SupersetRole,
-        rolegroup_name: &String,
-    ) -> Result<Option<String>, Error> {
-        let listener_class_default = Some("cluster-internal".to_string());
-
-        let role = match role {
-            SupersetRole::Node => self.spec.nodes.as_ref().context(UnknownSupersetRoleSnafu {
-                role: role.to_string(),
-                roles: vec![role.to_string()],
-            })?,
-        };
-
-        let mut listener_class_role = role.config.config.listener_class.to_owned();
-        let mut listener_class_rolegroup = role
-            .role_groups
-            .get(rolegroup_name)
-            .map(|rg| rg.config.config.listener_class.clone())
-            .unwrap_or_default();
-        listener_class_role.merge(&listener_class_default);
-        listener_class_rolegroup.merge(&listener_class_role);
-        tracing::debug!("Merged listener-class: {:?}", listener_class_rolegroup);
-        Ok(listener_class_rolegroup)
-    }
 }
