@@ -486,7 +486,7 @@ impl v1alpha1::SupersetCluster {
     /// The UI will use this group listener so that only one load balancer
     /// is needed (per role group).
     pub fn group_listener_name(&self, rolegroup: &RoleGroupRef<Self>) -> String {
-        format!("{}-group", rolegroup.object_name())
+        format!("{rolegroup}-group", rolegroup = rolegroup.object_name())
     }
 
     pub fn get_role(&self, role: &SupersetRole) -> Option<&Role<v1alpha1::SupersetConfigFragment>> {
