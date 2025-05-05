@@ -639,19 +639,19 @@ fn build_node_rolegroup_service(
             .build(),
         spec: Some(ServiceSpec {
             // Internal communication does not need to be exposed
-            type_: Some("ClusterIP".to_string()),
-            cluster_ip: Some("None".to_string()),
+            type_: Some("ClusterIP".to_owned()),
+            cluster_ip: Some("None".to_owned()),
             ports: Some(vec![
                 ServicePort {
-                    name: Some(APP_PORT_NAME.into()),
+                    name: Some(APP_PORT_NAME.to_owned()),
                     port: APP_PORT.into(),
-                    protocol: Some("TCP".to_string()),
+                    protocol: Some("TCP".to_owned()),
                     ..ServicePort::default()
                 },
                 ServicePort {
-                    name: Some(METRICS_PORT_NAME.into()),
+                    name: Some(METRICS_PORT_NAME.to_owned()),
                     port: METRICS_PORT.into(),
-                    protocol: Some("TCP".to_string()),
+                    protocol: Some("TCP".to_owned()),
                     ..ServicePort::default()
                 },
             ]),
