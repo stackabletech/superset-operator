@@ -889,7 +889,7 @@ fn build_server_rolegroup_statefulset(
         &unversioned_recommended_labels,
     )
     .context(BuildListenerVolumeSnafu)?
-    .build_pvc(LISTENER_VOLUME_NAME.to_string())
+    .build_pvc(LISTENER_VOLUME_NAME.to_owned())
     .context(BuildListenerVolumeSnafu)?;
 
     superset_cb
