@@ -446,7 +446,7 @@ pub async fn reconcile_superset(
         cluster_resources
             .add(client, rg_group_listener)
             .await
-            .context(ApplyGroupListenerSnafu {
+            .with_context(|_| ApplyGroupListenerSnafu {
                 rolegroup: rolegroup.clone(),
             })?;
 
