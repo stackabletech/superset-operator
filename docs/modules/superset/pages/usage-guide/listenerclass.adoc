@@ -1,5 +1,5 @@
 = Service exposition with ListenerClasses
-:description: Superset service exposition with ListenerClass: configure access via internal, external-unstable, or external-stable services.
+:description: Configure the Superset service exposure with listener classes: cluster-internal, external-unstable, or external-stable.
 
 Apache Superset offers a web UI and an API.
 The operator deploys a xref:listener-operator:listener.adoc[Listener] for the Nodes pod.
