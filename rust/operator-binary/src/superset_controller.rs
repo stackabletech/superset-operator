@@ -702,8 +702,8 @@ pub fn build_group_listener(
     let listener = Listener {
         metadata,
         spec,
-        ..Default::default()
-    }
+        status: None,
+    };
 
     Ok(listener)
 }
