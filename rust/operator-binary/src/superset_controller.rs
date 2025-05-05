@@ -678,28 +678,34 @@ pub fn build_group_listener(
     rolegroup: &RoleGroupRef<v1alpha1::SupersetCluster>,
     listener_class: String,
 ) -> Result<Listener> {
-    Ok(Listener {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(superset)
-            .name(superset.group_listener_name(rolegroup))
-            .ownerreference_from_resource(superset, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(build_recommended_labels(
-                superset,
-                SUPERSET_CONTROLLER_NAME,
-                &resolved_product_image.app_version_label,
-                &rolegroup.role,
-                &rolegroup.role_group,
-            ))
-            .context(MetadataBuildSnafu)?
-            .build(),
-        spec: ListenerSpec {
-            class_name: Some(listener_class),
-            ports: Some(listener_ports()),
-            ..ListenerSpec::default()
-        },
-        status: None,
-    })
+    let metadata = ObjectMetaBuilder::new()
+        .name_and_namespace(superset)
+        .name(superset.group_listener_name(rolegroup))
+        .ownerreference_from_resource(superset, None, Some(true))
+        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .with_recommended_labels(build_recommended_labels(
+            superset,
+            SUPERSET_CONTROLLER_NAME,
+            &resolved_product_image.app_version_label,
+            &rolegroup.role,
+            &rolegroup.role_group,
+        ))
+        .context(MetadataBuildSnafu)?
+        .build();
+
+    let spec = ListenerSpec {
+        class_name: Some(listener_class),
+        ports: Some(listener_ports()),
+        ..Default::default()
+    };
+
+    let listener = Listener {
+        metadata,
+        spec,
+        ..Default::default()
+    }
+
+    Ok(listener)
 }
 
 fn listener_ports() -> Vec<ListenerPort> {
