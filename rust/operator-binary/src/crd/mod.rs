@@ -416,7 +416,7 @@ impl v1alpha1::SupersetConfig {
             graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
             row_limit: None,
             webserver_timeout: None,
-            listener_class: Some("cluster-internal".to_string()),
+            listener_class: Some("cluster-internal".to_owned()),
         }
     }
 }
