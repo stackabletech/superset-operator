@@ -710,9 +710,9 @@ pub fn build_group_listener(
 
 fn listener_ports() -> Vec<ListenerPort> {
     vec![ListenerPort {
-        name: APP_PORT_NAME.to_string(),
+        name: APP_PORT_NAME.to_owned(),
         port: APP_PORT.into(),
-        protocol: Some("TCP".to_string()),
+        protocol: Some("TCP".to_owned()),
     }]
 }
 
