@@ -43,20 +43,20 @@ status:
 apiVersion: v1
 kind: Service
 metadata:
-  name: superset-node-cluster-internal-group
+  name: superset-node-cluster-internal
 spec:
   type: ClusterIP # cluster-internal
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: superset-node-default-group
+  name: superset-node-default
 spec:
   type: NodePort # external-stable
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: superset-node-external-unstable-group
+  name: superset-node-external-unstable
 spec:
   type: NodePort # external-unstable

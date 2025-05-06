@@ -621,55 +621,48 @@ fn build_node_rolegroup_service(
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<SupersetCluster>,
 ) -> Result<Service> {
-    Ok(Service {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(superset)
-            .name(rolegroup.object_name())
-            .ownerreference_from_resource(superset, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(build_recommended_labels(
-                superset,
-                SUPERSET_CONTROLLER_NAME,
-                &resolved_product_image.app_version_label,
-                &rolegroup.role,
-                &rolegroup.role_group,
-            ))
-            .context(MetadataBuildSnafu)?
-            .with_label(Label::try_from(("prometheus.io/scrape", "true")).context(LabelBuildSnafu)?)
-            .build(),
-        spec: Some(ServiceSpec {
-            // Internal communication does not need to be exposed
-            type_: Some("ClusterIP".to_owned()),
-            cluster_ip: Some("None".to_owned()),
-            ports: Some(vec![
-                ServicePort {
-                    name: Some(APP_PORT_NAME.to_owned()),
-                    port: APP_PORT.into(),
-                    protocol: Some("TCP".to_owned()),
-                    ..ServicePort::default()
-                },
-                ServicePort {
-                    name: Some(METRICS_PORT_NAME.to_owned()),
-                    port: METRICS_PORT.into(),
-                    protocol: Some("TCP".to_owned()),
-                    ..ServicePort::default()
-                },
-            ]),
-            selector: Some(
-                Labels::role_group_selector(
-                    superset,
-                    APP_NAME,
-                    &rolegroup.role,
-                    &rolegroup.role_group,
-                )
+    let metadata = ObjectMetaBuilder::new()
+        .name_and_namespace(superset)
+        .name(format!("{name}-metrics", name = rolegroup.object_name()))
+        .ownerreference_from_resource(superset, None, Some(true))
+        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .with_recommended_labels(build_recommended_labels(
+            superset,
+            SUPERSET_CONTROLLER_NAME,
+            &resolved_product_image.app_version_label,
+            &rolegroup.role,
+            &rolegroup.role_group,
+        ))
+        .context(MetadataBuildSnafu)?
+        .with_label(Label::try_from(("prometheus.io/scrape", "true")).context(LabelBuildSnafu)?)
+        .build();
+
+    let spec = Some(ServiceSpec {
+        // Internal communication does not need to be exposed
+        type_: Some("ClusterIP".to_owned()),
+        cluster_ip: Some("None".to_owned()),
+        ports: Some(vec![ServicePort {
+            name: Some(METRICS_PORT_NAME.to_owned()),
+            port: METRICS_PORT.into(),
+            protocol: Some("TCP".to_owned()),
+            ..ServicePort::default()
+        }]),
+        selector: Some(
+            Labels::role_group_selector(superset, APP_NAME, &rolegroup.role, &rolegroup.role_group)
                 .context(LabelBuildSnafu)?
                 .into(),
-            ),
-            publish_not_ready_addresses: Some(true),
-            ..ServiceSpec::default()
-        }),
+        ),
+        publish_not_ready_addresses: Some(true),
+        ..ServiceSpec::default()
+    });
+
+    let service = Service {
+        metadata,
+        spec,
         status: None,
-    })
+    };
+
+    Ok(service)
 }
 
 pub fn build_group_listener(
