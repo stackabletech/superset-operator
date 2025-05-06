@@ -19,6 +19,7 @@
   - Replace stackable-operator `print_startup_string` with `tracing::info!` with fields.
 - BREAKING: Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` instead
     of having the operator write it to the vector config ([#609]).
+- test: Bump to Vector `0.46.1` ([#628]).
 
 ### Fixed
 
@@ -30,6 +31,7 @@
 [#615]: https://github.com/stackabletech/superset-operator/pull/615
 [#617]: https://github.com/stackabletech/superset-operator/pull/617
 [#623]: https://github.com/stackabletech/superset-operator/pull/623
+[#628]: https://github.com/stackabletech/superset-operator/pull/628
 
 ## [25.3.0] - 2025-03-21
 
