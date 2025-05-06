@@ -16,8 +16,7 @@ use stackable_operator::{
         },
     },
     config::{
-        fragment,
-        fragment::{Fragment, ValidationError},
+        fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
@@ -48,6 +47,14 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     unit: BinaryMultiple::Mebi,
 };
 
+pub const LISTENER_VOLUME_NAME: &str = "listener";
+pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
+
+pub const APP_PORT_NAME: &str = "http";
+pub const APP_PORT: u16 = 8088;
+pub const METRICS_PORT_NAME: &str = "metrics";
+pub const METRICS_PORT: u16 = 9102;
+
 const DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 
 #[derive(Debug, Snafu)]
@@ -57,6 +64,12 @@ pub enum Error {
 
     #[snafu(display("fragment validation failure"))]
     FragmentValidationFailure { source: ValidationError },
+
+    #[snafu(display("Configuration/Executor conflict!"))]
+    NoRoleForExecutorFailure,
+
+    #[snafu(display("object has no associated namespace"))]
+    NoNamespace,
 }
 
 #[derive(Display, EnumIter, EnumString)]
@@ -157,20 +170,6 @@ pub mod versioned {
         #[serde(default)]
         pub cluster_operation: ClusterOperation,
 
-        /// This field controls which type of Service the Operator creates for this SupersetCluster:
-        ///
-        /// * cluster-internal: Use a ClusterIP service
-        ///
-        /// * external-unstable: Use a NodePort service
-        ///
-        /// * external-stable: Use a LoadBalancer service
-        ///
-        /// This is a temporary solution with the goal to keep yaml manifests forward compatible.
-        /// In the future, this setting will control which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html)
-        /// will be used to expose the service, and ListenerClass names will stay the same, allowing for a non-breaking change.
-        #[serde(default)]
-        pub listener_class: v1alpha1::CurrentlySupportedListenerClasses,
-
         /// The name of a Secret object.
         /// The Secret should contain a key `connections.mapboxApiKey`.
         /// This is the API key required for map charts to work that use mapbox.
@@ -224,21 +223,10 @@ pub mod versioned {
         /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
         #[fragment_attrs(serde(default))]
         pub graceful_shutdown_timeout: Option<Duration>,
-    }
 
-    // TODO: Temporary solution until listener-operator is finished
-    #[derive(Clone, Debug, Default, Display, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-    #[serde(rename_all = "PascalCase")]
-    pub enum CurrentlySupportedListenerClasses {
-        #[default]
-        #[serde(rename = "cluster-internal")]
-        ClusterInternal,
-
-        #[serde(rename = "external-unstable")]
-        ExternalUnstable,
-
-        #[serde(rename = "external-stable")]
-        ExternalStable,
+        /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose the webserver.
+        #[serde(default)]
+        pub listener_class: String,
     }
 
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -406,18 +394,6 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
     }
 }
 
-impl v1alpha1::CurrentlySupportedListenerClasses {
-    pub fn k8s_service_type(&self) -> String {
-        match self {
-            v1alpha1::CurrentlySupportedListenerClasses::ClusterInternal => "ClusterIP".to_string(),
-            v1alpha1::CurrentlySupportedListenerClasses::ExternalUnstable => "NodePort".to_string(),
-            v1alpha1::CurrentlySupportedListenerClasses::ExternalStable => {
-                "LoadBalancer".to_string()
-            }
-        }
-    }
-}
-
 impl v1alpha1::SupersetConfig {
     pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
     pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
@@ -440,6 +416,7 @@ impl v1alpha1::SupersetConfig {
             graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
             row_limit: None,
             webserver_timeout: None,
+            listener_class: Some("cluster-internal".to_owned()),
         }
     }
 }
@@ -505,15 +482,17 @@ impl HasStatusCondition for v1alpha1::SupersetCluster {
 }
 
 impl v1alpha1::SupersetCluster {
+    /// The name of the group-listener provided for a specific role-group.
+    /// The UI will use this group listener so that only one load balancer
+    /// is needed (per role group).
+    pub fn group_listener_name(&self, rolegroup: &RoleGroupRef<Self>) -> String {
+        rolegroup.object_name()
+    }
+
     pub fn get_role(&self, role: &SupersetRole) -> Option<&Role<v1alpha1::SupersetConfigFragment>> {
         match role {
             SupersetRole::Node => self.spec.nodes.as_ref(),
         }
-    }
-
-    /// The name of the role-level load-balanced Kubernetes `Service`
-    pub fn node_role_service_name(&self) -> Option<String> {
-        self.metadata.name.clone()
     }
 
     /// Metadata about a node rolegroup

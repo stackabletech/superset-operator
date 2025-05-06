@@ -8,6 +8,7 @@
   - Use `--file-log-max-files` (or `FILE_LOG_MAX_FILES`) to limit the number of log files kept.
   - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
   - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
+- BREAKING: Added listener support for Superset ([#625]).
 
 ### Changed
 
@@ -31,6 +32,7 @@
 [#615]: https://github.com/stackabletech/superset-operator/pull/615
 [#617]: https://github.com/stackabletech/superset-operator/pull/617
 [#623]: https://github.com/stackabletech/superset-operator/pull/623
+[#625]: https://github.com/stackabletech/superset-operator/pull/625
 [#628]: https://github.com/stackabletech/superset-operator/pull/628
 
 ## [25.3.0] - 2025-03-21

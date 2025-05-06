@@ -52,7 +52,6 @@ mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
-pub const APP_PORT: u16 = 8088;
 pub const OPERATOR_NAME: &str = "superset.stackable.tech";
 
 #[derive(Parser)]

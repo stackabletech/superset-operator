@@ -60,6 +60,10 @@ tests:
     dimensions:
       - superset
       - openshift
+  - name: external-access
+    dimensions:
+      - superset
+      - openshift
 suites:
   - name: nightly
     patch:
