@@ -34,7 +34,7 @@ metadata:
   name: superset-with-ldap-server
 spec:
   image:
-    productVersion: 4.1.1
+    productVersion: 4.1.2
   clusterConfig:
     authentication:
     - authenticationClass: ldap    # <1>
@@ -64,7 +64,7 @@ metadata:
   name: superset-with-oidc
 spec:
   image:
-    productVersion: 4.1.1
+    productVersion: 4.1.2
   clusterConfig:
     authentication:
     - authenticationClass: keycloak                        # <1>
@@ -229,7 +229,7 @@ metadata:
   name: superset-with-oidc
 spec:
   image:
-    productVersion: 4.1.1
+    productVersion: 4.1.2
   clusterConfig:
     authentication:
     - authenticationClass: keycloak
