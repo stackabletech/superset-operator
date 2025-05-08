@@ -21,6 +21,7 @@
 - BREAKING: Inject the vector aggregator address into the vector config using the env var `VECTOR_AGGREGATOR_ADDRESS` instead
     of having the operator write it to the vector config ([#609]).
 - test: Bump to Vector `0.46.1` ([#628]).
+- test: Bump OPA to `1.4.2` ([#631]).
 
 ### Fixed
 
@@ -34,6 +35,7 @@
 [#623]: https://github.com/stackabletech/superset-operator/pull/623
 [#625]: https://github.com/stackabletech/superset-operator/pull/625
 [#628]: https://github.com/stackabletech/superset-operator/pull/628
+[#631]: https://github.com/stackabletech/superset-operator/pull/631
 
 ## [25.3.0] - 2025-03-21
 
