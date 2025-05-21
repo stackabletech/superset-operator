@@ -22,6 +22,7 @@
     of having the operator write it to the vector config ([#609]).
 - test: Bump to Vector `0.46.1` ([#628]).
 - test: Bump OPA to `1.4.2` ([#631]).
+- Use versioned common structs ([#635]).
 
 ### Fixed
 
@@ -36,6 +37,7 @@
 [#625]: https://github.com/stackabletech/superset-operator/pull/625
 [#628]: https://github.com/stackabletech/superset-operator/pull/628
 [#631]: https://github.com/stackabletech/superset-operator/pull/631
+[#635]: https://github.com/stackabletech/superset-operator/pull/635
 
 ## [25.3.0] - 2025-03-21
 
