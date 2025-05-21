@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
-use stackable_operator::commons::authentication::{ldap, oidc};
+use stackable_operator::crd::authentication::{ldap, oidc};
 
 use crate::crd::{
     SupersetConfigOptions,
@@ -16,17 +16,17 @@ use crate::crd::{
 pub enum Error {
     #[snafu(display("Failed to create LDAP endpoint url."))]
     FailedToCreateLdapEndpointUrl {
-        source: stackable_operator::commons::authentication::ldap::Error,
+        source: stackable_operator::crd::authentication::ldap::v1alpha1::Error,
     },
 
     #[snafu(display("invalid OIDC endpoint"))]
     InvalidOidcEndpoint {
-        source: stackable_operator::commons::authentication::oidc::Error,
+        source: stackable_operator::crd::authentication::oidc::v1alpha1::Error,
     },
 
     #[snafu(display("invalid well-known OIDC configuration URL"))]
     InvalidWellKnownConfigUrl {
-        source: stackable_operator::commons::authentication::oidc::Error,
+        source: stackable_operator::crd::authentication::oidc::v1alpha1::Error,
     },
 }
 
@@ -130,7 +130,7 @@ fn append_authentication_config(
 
 fn append_ldap_config(
     config: &mut BTreeMap<String, String>,
-    ldap: &ldap::AuthenticationProvider,
+    ldap: &ldap::v1alpha1::AuthenticationProvider,
 ) -> Result<(), Error> {
     config.insert(
         SupersetConfigOptions::AuthType.to_string(),
@@ -205,8 +205,8 @@ fn append_ldap_config(
 fn append_oidc_config(
     config: &mut BTreeMap<String, String>,
     providers: &[(
-        &oidc::AuthenticationProvider,
-        &oidc::ClientAuthenticationOptions<()>,
+        &oidc::v1alpha1::AuthenticationProvider,
+        &oidc::v1alpha1::ClientAuthenticationOptions<()>,
     )],
 ) -> Result<(), Error> {
     config.insert(
@@ -218,7 +218,7 @@ fn append_oidc_config(
 
     for (oidc, client_options) in providers {
         let (env_client_id, env_client_secret) =
-            oidc::AuthenticationProvider::client_credentials_env_names(
+            oidc::v1alpha1::AuthenticationProvider::client_credentials_env_names(
                 &client_options.client_credentials_secret_ref,
             );
         let mut scopes = oidc.scopes.clone();
@@ -230,7 +230,7 @@ fn append_oidc_config(
             .unwrap_or(&DEFAULT_OIDC_PROVIDER);
 
         let oauth_providers_config_entry = match oidc_provider {
-            oidc::IdentityProviderHint::Keycloak => {
+            oidc::v1alpha1::IdentityProviderHint::Keycloak => {
                 let endpoint_url = oidc.endpoint_url().context(InvalidOidcEndpointSnafu)?;
                 let mut api_base_url = endpoint_url.as_str().trim_end_matches('/').to_owned();
                 api_base_url.push_str("/protocol/");
@@ -315,7 +315,7 @@ mod tests {
         use stackable_operator::commons::tls_verification::{CaCert, Tls, TlsServerVerification};
 
         let mut properties = BTreeMap::new();
-        let provider = oidc::AuthenticationProvider::new(
+        let provider = oidc::v1alpha1::AuthenticationProvider::new(
             "keycloak.mycorp.org".to_owned().try_into().unwrap(),
             Some(443),
             root_path,
@@ -330,7 +330,7 @@ mod tests {
             vec!["openid".to_owned()],
             None,
         );
-        let oidc = oidc::ClientAuthenticationOptions {
+        let oidc = oidc::v1alpha1::ClientAuthenticationOptions {
             client_credentials_secret_ref: "nifi-keycloak-client".to_owned(),
             extra_scopes: vec![],
             product_specific_fields: (),
