@@ -4,20 +4,19 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu, ensure};
 use stackable_operator::{
     client::Client,
-    commons::authentication::{
-        AuthenticationClass, AuthenticationClassProvider, ClientAuthenticationDetails, ldap,
-        oidc::{self, IdentityProviderHint},
-    },
+    crd::authentication::{core, ldap, oidc},
     schemars::{self, JsonSchema},
     versioned::versioned,
 };
 use tracing::info;
 
 // The assumed OIDC provider if no hint is given in the AuthClass
-pub const DEFAULT_OIDC_PROVIDER: IdentityProviderHint = IdentityProviderHint::Keycloak;
+pub const DEFAULT_OIDC_PROVIDER: oidc::v1alpha1::IdentityProviderHint =
+    oidc::v1alpha1::IdentityProviderHint::Keycloak;
 
 const SUPPORTED_AUTHENTICATION_CLASS_PROVIDERS: &[&str] = &["LDAP", "OIDC"];
-const SUPPORTED_OIDC_PROVIDERS: &[IdentityProviderHint] = &[IdentityProviderHint::Keycloak];
+const SUPPORTED_OIDC_PROVIDERS: &[oidc::v1alpha1::IdentityProviderHint] =
+    &[oidc::v1alpha1::IdentityProviderHint::Keycloak];
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -64,7 +63,7 @@ pub enum Error {
 
     #[snafu(display("invalid OIDC configuration"))]
     OidcConfigurationInvalid {
-        source: stackable_operator::commons::authentication::Error,
+        source: stackable_operator::crd::authentication::core::v1alpha1::Error,
     },
 
     #[snafu(display(
@@ -98,7 +97,7 @@ pub mod versioned {
     #[serde(rename_all = "camelCase")]
     pub struct SupersetClientAuthenticationDetails {
         #[serde(flatten)]
-        pub common: ClientAuthenticationDetails<()>,
+        pub common: core::v1alpha1::ClientAuthenticationDetails<()>,
 
         /// Allow users who are not already in the FAB DB.
         /// Gets mapped to `AUTH_USER_REGISTRATION`
@@ -136,11 +135,11 @@ pub struct SupersetClientAuthenticationDetailsResolved {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SupersetAuthenticationClassResolved {
     Ldap {
-        provider: ldap::AuthenticationProvider,
+        provider: ldap::v1alpha1::AuthenticationProvider,
     },
     Oidc {
-        provider: oidc::AuthenticationProvider,
-        client_auth_options: oidc::ClientAuthenticationOptions<()>,
+        provider: oidc::v1alpha1::AuthenticationProvider,
+        client_auth_options: oidc::v1alpha1::ClientAuthenticationOptions<()>,
     },
 }
 
@@ -157,7 +156,7 @@ impl SupersetClientAuthenticationDetailsResolved {
         auth_details: &[v1alpha1::SupersetClientAuthenticationDetails],
         client: &Client,
     ) -> Result<SupersetClientAuthenticationDetailsResolved> {
-        let resolve_auth_class = |auth_details: ClientAuthenticationDetails| async move {
+        let resolve_auth_class = |auth_details: core::v1alpha1::ClientAuthenticationDetails| async move {
             auth_details.resolve_class(client).await
         };
         SupersetClientAuthenticationDetailsResolved::resolve(auth_details, resolve_auth_class).await
@@ -165,10 +164,12 @@ impl SupersetClientAuthenticationDetailsResolved {
 
     pub async fn resolve<R>(
         auth_details: &[v1alpha1::SupersetClientAuthenticationDetails],
-        resolve_auth_class: impl Fn(ClientAuthenticationDetails) -> R,
+        resolve_auth_class: impl Fn(core::v1alpha1::ClientAuthenticationDetails) -> R,
     ) -> Result<SupersetClientAuthenticationDetailsResolved>
     where
-        R: Future<Output = Result<AuthenticationClass, stackable_operator::client::Error>>,
+        R: Future<
+            Output = Result<core::v1alpha1::AuthenticationClass, stackable_operator::client::Error>,
+        >,
     {
         let mut resolved_auth_classes = Vec::new();
         let mut user_registration = None;
@@ -191,7 +192,7 @@ impl SupersetClientAuthenticationDetailsResolved {
                 .context(AuthenticationClassRetrievalFailedSnafu)?;
 
             match &auth_class.spec.provider {
-                AuthenticationClassProvider::Ldap(provider) => {
+                core::v1alpha1::AuthenticationClassProvider::Ldap(provider) => {
                     let resolved_auth_class = SupersetAuthenticationClassResolved::Ldap {
                         provider: provider.to_owned(),
                     };
@@ -210,7 +211,7 @@ impl SupersetClientAuthenticationDetailsResolved {
 
                     resolved_auth_classes.push(resolved_auth_class);
                 }
-                AuthenticationClassProvider::Oidc(provider) => {
+                core::v1alpha1::AuthenticationClassProvider::Oidc(provider) => {
                     let resolved_auth_class =
                         SupersetClientAuthenticationDetailsResolved::from_oidc(
                             auth_class_name,
@@ -277,7 +278,7 @@ impl SupersetClientAuthenticationDetailsResolved {
 
     fn from_oidc(
         auth_class_name: &str,
-        provider: &oidc::AuthenticationProvider,
+        provider: &oidc::v1alpha1::AuthenticationProvider,
         auth_details: &v1alpha1::SupersetClientAuthenticationDetails,
     ) -> Result<SupersetAuthenticationClassResolved> {
         let oidc_provider = match &provider.provider_hint {
@@ -303,7 +304,7 @@ impl SupersetClientAuthenticationDetailsResolved {
         // We have to enforce preferred_username here due to the flask implementation
         // https://github.com/dpgaspar/Flask-AppBuilder/blob/6d44e6d581433dcea475764c4bb1270c24bbd6de/flask_appbuilder/security/manager.py#L719
         match oidc_provider {
-            IdentityProviderHint::Keycloak => {
+            oidc::v1alpha1::IdentityProviderHint::Keycloak => {
                 ensure!(
                     &provider.principal_claim == "preferred_username",
                     OidcPrincipalClaimNotSupportedSnafu {
@@ -338,12 +339,12 @@ mod tests {
     use indoc::indoc;
     use stackable_operator::{
         commons::{
-            authentication::oidc,
             networking::HostName,
             tls_verification::{
                 CaCert, Tls, TlsClientDetails, TlsServerVerification, TlsVerification,
             },
         },
+        crd::authentication::oidc,
         kube,
     };
 
@@ -467,7 +468,7 @@ mod tests {
             SupersetClientAuthenticationDetailsResolved {
                 authentication_classes_resolved: vec![
                     SupersetAuthenticationClassResolved::Oidc {
-                        provider: oidc::AuthenticationProvider::new(
+                        provider: oidc::v1alpha1::AuthenticationProvider::new(
                             HostName::try_from("first.oidc.server".to_string()).unwrap(),
                             Some(443),
                             "/realms/main/".into(),
@@ -480,16 +481,16 @@ mod tests {
                             },
                             "preferred_username".into(),
                             vec!["openid".into(), "email".into(), "profile".into()],
-                            Some(IdentityProviderHint::Keycloak)
+                            Some(oidc::v1alpha1::IdentityProviderHint::Keycloak)
                         ),
-                        client_auth_options: oidc::ClientAuthenticationOptions {
+                        client_auth_options: oidc::v1alpha1::ClientAuthenticationOptions {
                             client_credentials_secret_ref: "superset-oidc-client1".into(),
                             extra_scopes: vec!["groups".into()],
                             product_specific_fields: ()
                         }
                     },
                     SupersetAuthenticationClassResolved::Oidc {
-                        provider: oidc::AuthenticationProvider::new(
+                        provider: oidc::v1alpha1::AuthenticationProvider::new(
                             HostName::try_from("second.oidc.server".to_string()).unwrap(),
                             None,
                             "/realms/test/".into(),
@@ -498,7 +499,7 @@ mod tests {
                             vec!["openid".into(), "email".into(), "profile".into()],
                             None
                         ),
-                        client_auth_options: oidc::ClientAuthenticationOptions {
+                        client_auth_options: oidc::v1alpha1::ClientAuthenticationOptions {
                             client_credentials_secret_ref: "superset-oidc-client2".into(),
                             extra_scopes: Vec::new(),
                             product_specific_fields: ()
@@ -921,7 +922,7 @@ mod tests {
     /// Deserialize the given `AuthenticationClass` YAML documents.
     ///
     /// Fail if the given string cannot be deserialized.
-    fn deserialize_auth_classes(input: &str) -> Vec<AuthenticationClass> {
+    fn deserialize_auth_classes(input: &str) -> Vec<core::v1alpha1::AuthenticationClass> {
         if input.is_empty() {
             Vec::new()
         } else {
@@ -942,13 +943,20 @@ mod tests {
     /// `stackable_operator::commons::authentication::ClientAuthenticationDetails`
     /// which requires a Kubernetes client.
     fn create_auth_class_resolver(
-        auth_classes: Vec<AuthenticationClass>,
+        auth_classes: Vec<core::v1alpha1::AuthenticationClass>,
     ) -> impl Fn(
-        ClientAuthenticationDetails,
+        core::v1alpha1::ClientAuthenticationDetails,
     ) -> Pin<
-        Box<dyn Future<Output = Result<AuthenticationClass, stackable_operator::client::Error>>>,
+        Box<
+            dyn Future<
+                Output = Result<
+                    core::v1alpha1::AuthenticationClass,
+                    stackable_operator::client::Error,
+                >,
+            >,
+        >,
     > {
-        move |auth_details: ClientAuthenticationDetails| {
+        move |auth_details: core::v1alpha1::ClientAuthenticationDetails| {
             let auth_classes = auth_classes.clone();
             Box::pin(async move {
                 auth_classes

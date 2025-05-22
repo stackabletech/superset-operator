@@ -5,7 +5,7 @@ use futures::{StreamExt, pin_mut};
 use stackable_operator::{
     YamlSchema,
     cli::{Command, ProductOperatorRun},
-    commons::authentication::AuthenticationClass,
+    crd::authentication::core,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         batch::v1::Job,
@@ -127,7 +127,7 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .shutdown_on_signal()
                 .watches(
-                    client.get_api::<DeserializeGuard<AuthenticationClass>>(&()),
+                    client.get_api::<DeserializeGuard<core::v1alpha1::AuthenticationClass>>(&()),
                     watcher::Config::default(),
                     move |authentication_class| {
                         authentication_class_store
@@ -266,7 +266,7 @@ async fn main() -> anyhow::Result<()> {
 
 fn references_authentication_class(
     superset: &DeserializeGuard<v1alpha1::SupersetCluster>,
-    authentication_class: &DeserializeGuard<AuthenticationClass>,
+    authentication_class: &DeserializeGuard<core::v1alpha1::AuthenticationClass>,
 ) -> bool {
     let Ok(superset) = &superset.0 else {
         return false;

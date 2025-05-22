@@ -31,12 +31,8 @@ use stackable_operator::{
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{
-        authentication::oidc,
-        listener::{Listener, ListenerPort, ListenerSpec},
-        product_image_selection::ResolvedProductImage,
-        rbac::build_rbac_resources,
-    },
+    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
+    crd::{authentication::oidc, listener},
     k8s_openapi::{
         DeepMerge,
         api::{
@@ -259,7 +255,7 @@ pub enum Error {
 
     #[snafu(display("failed to add LDAP Volumes and VolumeMounts"))]
     AddLdapVolumesAndVolumeMounts {
-        source: stackable_operator::commons::authentication::ldap::Error,
+        source: stackable_operator::crd::authentication::ldap::v1alpha1::Error,
     },
 
     #[snafu(display("failed to add TLS Volumes and VolumeMounts"))]
@@ -670,7 +666,7 @@ pub fn build_group_listener(
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<v1alpha1::SupersetCluster>,
     listener_class: String,
-) -> Result<Listener> {
+) -> Result<listener::v1alpha1::Listener> {
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(superset)
         .name(superset.group_listener_name(rolegroup))
@@ -686,13 +682,13 @@ pub fn build_group_listener(
         .context(MetadataBuildSnafu)?
         .build();
 
-    let spec = ListenerSpec {
+    let spec = listener::v1alpha1::ListenerSpec {
         class_name: Some(listener_class),
         ports: Some(listener_ports()),
         ..Default::default()
     };
 
-    let listener = Listener {
+    let listener = listener::v1alpha1::Listener {
         metadata,
         spec,
         status: None,
@@ -701,8 +697,8 @@ pub fn build_group_listener(
     Ok(listener)
 }
 
-fn listener_ports() -> Vec<ListenerPort> {
-    vec![ListenerPort {
+fn listener_ports() -> Vec<listener::v1alpha1::ListenerPort> {
+    vec![listener::v1alpha1::ListenerPort {
         name: APP_PORT_NAME.to_owned(),
         port: APP_PORT.into(),
         protocol: Some("TCP".to_owned()),
@@ -991,7 +987,7 @@ fn build_server_rolegroup_statefulset(
                 ),
                 ..LabelSelector::default()
             },
-            service_name: rolegroup_ref.object_name(),
+            service_name: Some(rolegroup_ref.object_name()),
             template: pod_template,
             volume_claim_templates: Some(vec![pvc]),
             ..StatefulSetSpec::default()
@@ -1062,7 +1058,7 @@ fn authentication_env_vars(
     oidc_client_credentials_secrets
         .iter()
         .cloned()
-        .flat_map(oidc::AuthenticationProvider::client_credentials_env_var_mounts)
+        .flat_map(oidc::v1alpha1::AuthenticationProvider::client_credentials_env_var_mounts)
         .collect()
 }
 
