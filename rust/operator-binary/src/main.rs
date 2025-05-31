@@ -105,11 +105,13 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
 
-            let superset_event_recorder =
-                Arc::new(Recorder::new(client.as_kube_client(), Reporter {
+            let superset_event_recorder = Arc::new(Recorder::new(
+                client.as_kube_client(),
+                Reporter {
                     controller: SUPERSET_FULL_CONTROLLER_NAME.to_string(),
                     instance: None,
-                }));
+                },
+            ));
             let superset_controller = Controller::new(
                 watch_namespace.get_api::<DeserializeGuard<v1alpha1::SupersetCluster>>(&client),
                 watcher::Config::default(),
@@ -176,11 +178,13 @@ async fn main() -> anyhow::Result<()> {
                     },
                 );
 
-            let druid_connection_event_recorder =
-                Arc::new(Recorder::new(client.as_kube_client(), Reporter {
+            let druid_connection_event_recorder = Arc::new(Recorder::new(
+                client.as_kube_client(),
+                Reporter {
                     controller: DRUID_CONNECTION_FULL_CONTROLLER_NAME.to_string(),
                     instance: None,
-                }));
+                },
+            ));
             let druid_connection_controller = Controller::new(
                 watch_namespace
                     .get_api::<DeserializeGuard<druidconnection::v1alpha1::DruidConnection>>(

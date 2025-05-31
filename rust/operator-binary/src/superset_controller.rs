@@ -490,10 +490,10 @@ pub async fn reconcile_superset(
         .context(DeleteOrphanedResourcesSnafu)?;
 
     let status = SupersetClusterStatus {
-        conditions: compute_conditions(superset, &[
-            &ss_cond_builder,
-            &cluster_operation_cond_builder,
-        ]),
+        conditions: compute_conditions(
+            superset,
+            &[&ss_cond_builder, &cluster_operation_cond_builder],
+        ),
     };
     client
         .apply_patch_status(OPERATOR_NAME, superset, &status)
