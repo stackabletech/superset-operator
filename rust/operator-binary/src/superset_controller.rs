@@ -755,8 +755,6 @@ fn build_server_rolegroup_statefulset(
         .image_pull_secrets_from_product_image(resolved_product_image)
         .security_context(
             PodSecurityContextBuilder::new()
-                .run_as_user(1000)
-                .run_as_group(0)
                 .fs_group(1000) // Needed for secret-operator
                 .build(),
         )

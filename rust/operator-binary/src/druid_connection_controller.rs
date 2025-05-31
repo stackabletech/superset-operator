@@ -344,12 +344,7 @@ async fn build_import_job(
             image_pull_secrets: resolved_product_image.pull_secrets.clone(),
             restart_policy: Some("Never".to_string()),
             service_account: Some(sa_name.to_string()),
-            security_context: Some(
-                PodSecurityContextBuilder::new()
-                    .run_as_user(1000)
-                    .run_as_group(0)
-                    .build(),
-            ),
+            security_context: Some(PodSecurityContextBuilder::new().build()),
             ..Default::default()
         }),
     };
