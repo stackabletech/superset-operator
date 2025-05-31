@@ -23,6 +23,10 @@
 - test: Bump to Vector `0.46.1` ([#628]).
 - test: Bump OPA to `1.4.2` ([#631]).
 - Use versioned common structs ([#635]).
+- BREAKING: Previously this operator would hardcode the UID and GID of the Pods being created to 1000/0, this has changed now ([#637])
+  - The `runAsUser` and `runAsGroup` fields will not be set anymore by the operator
+  - The defaults from the docker images itself will now apply, which will be different from 1000/0 going forward
+  - This is marked as breaking because tools and policies might exist, which require these fields to be set
 
 ### Fixed
 
@@ -38,6 +42,7 @@
 [#628]: https://github.com/stackabletech/superset-operator/pull/628
 [#631]: https://github.com/stackabletech/superset-operator/pull/631
 [#635]: https://github.com/stackabletech/superset-operator/pull/635
+[#637]: https://github.com/stackabletech/superset-operator/pull/637
 
 ## [25.3.0] - 2025-03-21
 
