@@ -34,11 +34,12 @@ spec:
     pullPolicy: IfNotPresent
   clusterConfig:
     credentialsSecret: superset-credentials
-    listenerClass: external-unstable
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
   nodes:
+    roleConfig:
+      listenerClass: external-unstable
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}

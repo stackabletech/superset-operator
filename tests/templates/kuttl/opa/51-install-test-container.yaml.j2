@@ -74,7 +74,7 @@ spec:
             - name: REQUESTS_CA_BUNDLE
               value: /stackable/tls/ca.crt
             - name: SUPERSET_BASE_URL
-              value: superset-external.$NAMESPACE.svc.cluster.local:8088
+              value: superset-node.$NAMESPACE.svc.cluster.local:8088
       volumes:
         - name: tls
           csi:

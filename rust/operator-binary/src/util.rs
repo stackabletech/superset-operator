@@ -48,3 +48,7 @@ pub fn build_recommended_labels<'a, T>(
         role_group,
     }
 }
+
+pub fn rolegroup_metrics_service_name(role_group_ref_object_name: &str) -> String {
+    format!("{role_group_ref_object_name}-metrics")
+}

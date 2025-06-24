@@ -155,8 +155,9 @@ spec:
       - authenticationClass: superset-with-ldap-server-veri-tls-ldap
         userRegistrationRole: Admin
     credentialsSecret: superset-with-ldap-server-veri-tls-credentials
-    listenerClass: external-unstable
   nodes:
+    roleConfig:
+      listenerClass: external-unstable
     roleGroups:
       default:
         replicas: 1

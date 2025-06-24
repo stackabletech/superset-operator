@@ -90,7 +90,7 @@ sleep 10
 
 echo "Starting port-forwarding of port 8088"
 # tag::port-forwarding[]
-kubectl port-forward service/simple-superset-external 8088 > /dev/null 2>&1 &
+kubectl port-forward service/simple-superset-node 8088 > /dev/null 2>&1 &
 # end::port-forwarding[]
 PORT_FORWARD_PID=$!
 # shellcheck disable=2064 # we want the PID evaluated now, not at the time the trap is

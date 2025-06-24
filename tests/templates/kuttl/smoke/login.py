@@ -7,7 +7,7 @@ logging.basicConfig(
 )
 
 http_code = requests.post(
-    "http://superset-node-default:8088/api/v1/security/login",
+    "http://superset-node:8088/api/v1/security/login",
     json={
         "password": "admin",
         "provider": "db",
