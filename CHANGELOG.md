@@ -27,6 +27,7 @@
   - The `runAsUser` and `runAsGroup` fields will not be set anymore by the operator
   - The defaults from the docker images itself will now apply, which will be different from 1000/0 going forward
   - This is marked as breaking because tools and policies might exist, which require these fields to be set
+- Changed listener class to be role-only ([#643]).
 
 ### Fixed
 
@@ -43,6 +44,7 @@
 [#631]: https://github.com/stackabletech/superset-operator/pull/631
 [#635]: https://github.com/stackabletech/superset-operator/pull/635
 [#637]: https://github.com/stackabletech/superset-operator/pull/637
+[#643]: https://github.com/stackabletech/superset-operator/pull/643
 
 ## [25.3.0] - 2025-03-21
 
