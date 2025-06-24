@@ -29,16 +29,8 @@ spec:
   clusterConfig:
     credentialsSecret: superset-credentials
   nodes:
-    config:
-      listenerClass: test-external-stable-$NAMESPACE
+    roleConfig:
+      listenerClass: test-external-unstable-$NAMESPACE
     roleGroups:
       default:
         replicas: 2
-      external-unstable:
-        replicas: 1
-        config:
-          listenerClass: test-external-unstable-$NAMESPACE
-      cluster-internal:
-        replicas: 1
-        config:
-          listenerClass: test-cluster-internal-$NAMESPACE

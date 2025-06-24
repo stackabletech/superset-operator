@@ -8,8 +8,9 @@ spec:
     productVersion: 4.1.2
   clusterConfig:
     credentialsSecret: simple-superset-credentials
-    listenerClass: external-unstable
   nodes:
+    roleConfig:
+      listenerClass: external-unstable
     roleGroups:
       default:
         config:

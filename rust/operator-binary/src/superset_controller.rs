@@ -48,7 +48,7 @@ use stackable_operator::{
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
-    kvp::{Label, Labels},
+    kvp::{Label, Labels, ObjectLabels},
     logging::controller::ReconcilerError,
     product_config_utils::{
         CONFIG_OVERRIDE_FILE_FOOTER_KEY, CONFIG_OVERRIDE_FILE_HEADER_KEY,
@@ -88,7 +88,7 @@ use crate::{
     },
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{LOG_CONFIG_FILE, extend_config_map_with_log_config},
-    util::build_recommended_labels,
+    util::{build_recommended_labels, rolegroup_metrics_service_name},
 };
 
 pub const SUPERSET_CONTROLLER_NAME: &str = "supersetcluster";
@@ -110,6 +110,9 @@ pub enum Error {
 
     #[snafu(display("object defines no node role"))]
     NoNodeRole,
+
+    #[snafu(display("object defines no node role-group"))]
+    NoNodeRoleGroup,
 
     #[snafu(display("failed to calculate global service name"))]
     GlobalServiceNameNotFound,
@@ -294,10 +297,9 @@ pub enum Error {
         source: ListenerOperatorVolumeSourceBuilderError,
     },
 
-    #[snafu(display("failed to apply group listener for {rolegroup}"))]
+    #[snafu(display("failed to apply group listener"))]
     ApplyGroupListener {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<SupersetCluster>,
     },
 }
 
@@ -433,19 +435,6 @@ pub async fn reconcile_superset(
             &config,
         )?;
 
-        let rg_group_listener = build_group_listener(
-            superset,
-            &resolved_product_image,
-            &rolegroup,
-            config.listener_class,
-        )?;
-        cluster_resources
-            .add(client, rg_group_listener)
-            .await
-            .with_context(|_| ApplyGroupListenerSnafu {
-                rolegroup: rolegroup.clone(),
-            })?;
-
         cluster_resources
             .add(client, rg_service)
             .await
@@ -468,13 +457,34 @@ pub async fn reconcile_superset(
         );
     }
 
-    let role_config = superset.role_config(&superset_role);
+    if let Some(listener_class) = &superset_role.listener_class_name(superset) {
+        if let Some(listener_group_name) = superset.group_listener_name(&superset_role) {
+            let group_listener = build_group_listener(
+                superset,
+                build_recommended_labels(
+                    superset,
+                    SUPERSET_CONTROLLER_NAME,
+                    "none",
+                    &superset_role.to_string(),
+                    "none",
+                ),
+                listener_class.to_string(),
+                listener_group_name,
+            )?;
+            cluster_resources
+                .add(client, group_listener)
+                .await
+                .context(ApplyGroupListenerSnafu)?;
+        }
+    }
+
+    let generic_role_config = superset.generic_role_config(&superset_role);
     if let Some(GenericRoleConfig {
         pod_disruption_budget: pdb,
-    }) = role_config
+    }) = generic_role_config
     {
         add_pdbs(
-            pdb,
+            &pdb,
             superset,
             &superset_role,
             client,
@@ -619,7 +629,7 @@ fn build_node_rolegroup_service(
 ) -> Result<Service> {
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(superset)
-        .name(format!("{name}-metrics", name = rolegroup.object_name()))
+        .name(rolegroup_metrics_service_name(&rolegroup.object_name()))
         .ownerreference_from_resource(superset, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(build_recommended_labels(
@@ -663,22 +673,16 @@ fn build_node_rolegroup_service(
 
 pub fn build_group_listener(
     superset: &v1alpha1::SupersetCluster,
-    resolved_product_image: &ResolvedProductImage,
-    rolegroup: &RoleGroupRef<v1alpha1::SupersetCluster>,
+    object_labels: ObjectLabels<v1alpha1::SupersetCluster>,
     listener_class: String,
+    listener_group_name: String,
 ) -> Result<listener::v1alpha1::Listener> {
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(superset)
-        .name(superset.group_listener_name(rolegroup))
+        .name(listener_group_name)
         .ownerreference_from_resource(superset, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
-        .with_recommended_labels(build_recommended_labels(
-            superset,
-            SUPERSET_CONTROLLER_NAME,
-            &resolved_product_image.app_version_label,
-            &rolegroup.role,
-            &rolegroup.role_group,
-        ))
+        .with_recommended_labels(object_labels)
         .context(MetadataBuildSnafu)?
         .build();
 
@@ -723,7 +727,7 @@ fn build_server_rolegroup_statefulset(
     let role_group = role
         .role_groups
         .get(&rolegroup_ref.role_group)
-        .context(NoNodeRoleSnafu)?;
+        .context(NoNodeRoleGroupSnafu)?;
 
     let recommended_object_labels = build_recommended_labels(
         superset,
@@ -871,13 +875,18 @@ fn build_server_rolegroup_statefulset(
     // listener endpoints will use persistent volumes
     // so that load balancers can hard-code the target addresses and
     // that it is possible to connect to a consistent address
-    let pvc = ListenerOperatorVolumeSourceBuilder::new(
-        &ListenerReference::ListenerName(superset.group_listener_name(rolegroup_ref)),
-        &unversioned_recommended_labels,
-    )
-    .context(BuildListenerVolumeSnafu)?
-    .build_pvc(LISTENER_VOLUME_NAME.to_owned())
-    .context(BuildListenerVolumeSnafu)?;
+    let pvcs = if let Some(group_listener_name) = superset.group_listener_name(superset_role) {
+        let pvc = ListenerOperatorVolumeSourceBuilder::new(
+            &ListenerReference::ListenerName(group_listener_name),
+            &unversioned_recommended_labels,
+        )
+        .context(BuildListenerVolumeSnafu)?
+        .build_pvc(LISTENER_VOLUME_NAME.to_owned())
+        .context(BuildListenerVolumeSnafu)?;
+        Some(vec![pvc])
+    } else {
+        None
+    };
 
     superset_cb
         .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
@@ -985,9 +994,9 @@ fn build_server_rolegroup_statefulset(
                 ),
                 ..LabelSelector::default()
             },
-            service_name: Some(rolegroup_ref.object_name()),
+            service_name: Some(rolegroup_metrics_service_name(&rolegroup_ref.object_name())),
             template: pod_template,
-            volume_claim_templates: Some(vec![pvc]),
+            volume_claim_templates: pvcs,
             ..StatefulSetSpec::default()
         }),
         status: None,

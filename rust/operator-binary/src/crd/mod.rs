@@ -32,6 +32,8 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
+use crate::crd::v1alpha1::{SupersetConfigFragment, SupersetRoleConfig};
+
 pub mod affinity;
 pub mod authentication;
 pub mod druidconnection;
@@ -139,7 +141,19 @@ pub mod versioned {
 
         // no doc - docs in the struct.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub nodes: Option<Role<v1alpha1::SupersetConfigFragment>>,
+        pub nodes: Option<Role<v1alpha1::SupersetConfigFragment, SupersetRoleConfig>>,
+    }
+
+    // TODO: move generic version to op-rs?
+    #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SupersetRoleConfig {
+        #[serde(flatten)]
+        pub common: GenericRoleConfig,
+
+        /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
+        #[serde(default = "default_listener_class")]
+        pub listener_class: String,
     }
 
     #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -223,10 +237,6 @@ pub mod versioned {
         /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
         #[fragment_attrs(serde(default))]
         pub graceful_shutdown_timeout: Option<Duration>,
-
-        /// This field controls which [ListenerClass](DOCS_BASE_URL_PLACEHOLDER/listener-operator/listenerclass.html) is used to expose the webserver.
-        #[serde(default)]
-        pub listener_class: String,
     }
 
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -292,6 +302,19 @@ pub mod versioned {
     }
 }
 
+impl Default for v1alpha1::SupersetRoleConfig {
+    fn default() -> Self {
+        v1alpha1::SupersetRoleConfig {
+            listener_class: default_listener_class(),
+            common: Default::default(),
+        }
+    }
+}
+
+fn default_listener_class() -> String {
+    "cluster-internal".to_string()
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SupersetCredentials {
@@ -322,6 +345,18 @@ pub struct Connections {
 pub enum SupersetRole {
     #[strum(serialize = "node")]
     Node,
+}
+
+impl SupersetRole {
+    pub fn listener_class_name(&self, superset: &v1alpha1::SupersetCluster) -> Option<String> {
+        match self {
+            Self::Node => superset
+                .spec
+                .nodes
+                .to_owned()
+                .map(|node| node.role_config.listener_class),
+        }
+    }
 }
 
 /// A reference to a [`v1alpha1::SupersetCluster`]
@@ -416,7 +451,6 @@ impl v1alpha1::SupersetConfig {
             graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
             row_limit: None,
             webserver_timeout: None,
-            listener_class: Some("cluster-internal".to_owned()),
         }
     }
 }
@@ -482,14 +516,32 @@ impl HasStatusCondition for v1alpha1::SupersetCluster {
 }
 
 impl v1alpha1::SupersetCluster {
-    /// The name of the group-listener provided for a specific role-group.
-    /// The UI will use this group listener so that only one load balancer
-    /// is needed (per role group).
-    pub fn group_listener_name(&self, rolegroup: &RoleGroupRef<Self>) -> String {
-        rolegroup.object_name()
+    /// The name of the group-listener provided for a specific role.
+    /// Nodes will use this group listener so that only one load balancer
+    /// is needed for that role.
+    pub fn group_listener_name(&self, role: &SupersetRole) -> Option<String> {
+        match role {
+            SupersetRole::Node => Some(format!(
+                "{cluster_name}-{role}",
+                cluster_name = self.name_any()
+            )),
+        }
     }
 
-    pub fn get_role(&self, role: &SupersetRole) -> Option<&Role<v1alpha1::SupersetConfigFragment>> {
+    pub fn generic_role_config(&self, role: &SupersetRole) -> Option<GenericRoleConfig> {
+        self.get_role_config(role).map(|r| r.common.to_owned())
+    }
+
+    pub fn get_role_config(&self, role: &SupersetRole) -> Option<&SupersetRoleConfig> {
+        match role {
+            SupersetRole::Node => self.spec.nodes.as_ref().map(|c| &c.role_config),
+        }
+    }
+
+    pub fn get_role(
+        &self,
+        role: &SupersetRole,
+    ) -> Option<&Role<SupersetConfigFragment, SupersetRoleConfig>> {
         match role {
             SupersetRole::Node => self.spec.nodes.as_ref(),
         }
@@ -504,12 +556,6 @@ impl v1alpha1::SupersetCluster {
             cluster: ObjectRef::from_obj(self),
             role: SupersetRole::Node.to_string(),
             role_group: group_name.into(),
-        }
-    }
-
-    pub fn role_config(&self, role: &SupersetRole) -> Option<&GenericRoleConfig> {
-        match role {
-            SupersetRole::Node => self.spec.nodes.as_ref().map(|n| &n.role_config),
         }
     }
 

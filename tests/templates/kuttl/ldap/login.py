@@ -13,7 +13,7 @@ if __name__ == "__main__":
     )
 
     http_code = requests.post(
-        "http://superset-with-ldap-node-default:8088/api/v1/security/login",
+        "http://superset-with-ldap-node:8088/api/v1/security/login",
         json={
             "username": "integrationtest",
             "password": "integrationtest",
