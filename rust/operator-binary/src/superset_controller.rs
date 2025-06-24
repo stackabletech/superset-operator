@@ -114,9 +114,6 @@ pub enum Error {
     #[snafu(display("object defines no node role-group"))]
     NoNodeRoleGroup,
 
-    #[snafu(display("failed to calculate global service name"))]
-    GlobalServiceNameNotFound,
-
     #[snafu(display("invalid container name"))]
     InvalidContainerName {
         source: stackable_operator::builder::pod::container::Error,
