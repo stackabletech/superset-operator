@@ -30,3 +30,10 @@ metadata:
   name: superset-node
 spec:
   type: NodePort # external-unstable
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset-node-default-metrics
+spec:
+  type: ClusterIP
