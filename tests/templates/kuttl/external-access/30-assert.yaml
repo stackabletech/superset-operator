@@ -37,3 +37,10 @@ metadata:
   name: superset-node-default-metrics
 spec:
   type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset-node-default-headless
+spec:
+  type: ClusterIP
