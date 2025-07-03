@@ -32,14 +32,12 @@ use stackable_operator::{
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
-    crd::{authentication::oidc, listener},
+    crd::authentication::oidc,
     k8s_openapi::{
         DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{
-                ConfigMap, EnvVar, HTTPGetAction, Probe, Service, ServicePort, ServiceSpec,
-            },
+            core::v1::{ConfigMap, EnvVar, HTTPGetAction, Probe, Service, ServiceSpec},
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
@@ -48,7 +46,7 @@ use stackable_operator::{
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
-    kvp::{Label, Labels, ObjectLabels},
+    kvp::{Label, Labels},
     logging::controller::ReconcilerError,
     product_config_utils::{
         CONFIG_OVERRIDE_FILE_FOOTER_KEY, CONFIG_OVERRIDE_FILE_HEADER_KEY,
@@ -78,14 +76,15 @@ use crate::{
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
-        APP_NAME, APP_PORT, APP_PORT_NAME, LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, METRICS_PORT,
-        METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR,
-        STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME, SupersetConfigOptions, SupersetRole,
+        APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
+        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
+        SupersetConfigOptions, SupersetRole,
         authentication::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
         },
-        v1alpha1::{self, Container, SupersetCluster, SupersetClusterStatus, SupersetConfig},
+        v1alpha1::{Container, SupersetCluster, SupersetClusterStatus, SupersetConfig},
     },
+    listener::{LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, build_group_listener},
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{LOG_CONFIG_FILE, extend_config_map_with_log_config},
     util::{build_recommended_labels, rolegroup_metrics_service_name},
@@ -298,6 +297,8 @@ pub enum Error {
     ApplyGroupListener {
         source: stackable_operator::cluster_resources::Error,
     },
+    #[snafu(display("failed to configure listener"))]
+    ListenerConfiguration { source: crate::listener::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -410,8 +411,6 @@ pub async fn reconcile_superset(
             .merged_config(&SupersetRole::Node, &rolegroup)
             .context(FailedToResolveConfigSnafu)?;
 
-        let rg_service =
-            build_node_rolegroup_service(superset, &resolved_product_image, &rolegroup)?;
         let rg_configmap = build_rolegroup_config_map(
             superset,
             &resolved_product_image,
@@ -431,13 +430,16 @@ pub async fn reconcile_superset(
             &rbac_sa.name_any(),
             &config,
         )?;
-
-        cluster_resources
-            .add(client, rg_service)
-            .await
-            .with_context(|_| ApplyRoleGroupServiceSnafu {
-                rolegroup: rolegroup.clone(),
-            })?;
+        for rg_service in
+            build_node_rolegroup_services(superset, &resolved_product_image, &rolegroup)?
+        {
+            cluster_resources
+                .add(client, rg_service)
+                .await
+                .with_context(|_| ApplyRoleGroupServiceSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
+        }
         cluster_resources
             .add(client, rg_configmap)
             .await
@@ -467,7 +469,8 @@ pub async fn reconcile_superset(
                 ),
                 listener_class.to_string(),
                 listener_group_name,
-            )?;
+            )
+            .context(ListenerConfigurationSnafu)?;
             cluster_resources
                 .add(client, group_listener)
                 .await
@@ -619,91 +622,88 @@ fn build_rolegroup_config_map(
 /// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a certain rolegroup
 ///
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
-fn build_node_rolegroup_service(
+fn build_node_rolegroup_services(
     superset: &SupersetCluster,
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<SupersetCluster>,
-) -> Result<Service> {
-    let metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(superset)
-        .name(rolegroup_metrics_service_name(&rolegroup.object_name()))
-        .ownerreference_from_resource(superset, None, Some(true))
-        .context(ObjectMissingMetadataForOwnerRefSnafu)?
-        .with_recommended_labels(build_recommended_labels(
-            superset,
-            SUPERSET_CONTROLLER_NAME,
-            &resolved_product_image.app_version_label,
-            &rolegroup.role,
-            &rolegroup.role_group,
-        ))
-        .context(MetadataBuildSnafu)?
-        .with_label(Label::try_from(("prometheus.io/scrape", "true")).context(LabelBuildSnafu)?)
-        .build();
-
-    let spec = Some(ServiceSpec {
-        // Internal communication does not need to be exposed
-        type_: Some("ClusterIP".to_owned()),
-        cluster_ip: Some("None".to_owned()),
-        ports: Some(vec![ServicePort {
-            name: Some(METRICS_PORT_NAME.to_owned()),
-            port: METRICS_PORT.into(),
-            protocol: Some("TCP".to_owned()),
-            ..ServicePort::default()
-        }]),
-        selector: Some(
-            Labels::role_group_selector(superset, APP_NAME, &rolegroup.role, &rolegroup.role_group)
-                .context(LabelBuildSnafu)?
-                .into(),
-        ),
-        publish_not_ready_addresses: Some(true),
-        ..ServiceSpec::default()
-    });
-
-    let service = Service {
-        metadata,
-        spec,
-        status: None,
-    };
+) -> Result<Vec<Service>> {
+    let service = vec![
+        Service {
+            metadata: ObjectMetaBuilder::new()
+                .name_and_namespace(superset)
+                .name(superset.rolegroup_headless_metrics_service_name(&rolegroup))
+                .ownerreference_from_resource(superset, None, Some(true))
+                .context(ObjectMissingMetadataForOwnerRefSnafu)?
+                .with_recommended_labels(build_recommended_labels(
+                    superset,
+                    SUPERSET_CONTROLLER_NAME,
+                    &resolved_product_image.app_version_label,
+                    &rolegroup.role,
+                    &rolegroup.role_group,
+                ))
+                .context(MetadataBuildSnafu)?
+                .with_label(
+                    Label::try_from(("prometheus.io/scrape", "true")).context(LabelBuildSnafu)?,
+                )
+                .build(),
+            spec: Some(ServiceSpec {
+                // Internal communication does not need to be exposed
+                type_: Some("ClusterIP".to_owned()),
+                cluster_ip: Some("None".to_owned()),
+                ports: Some(superset.metrics_ports()),
+                selector: Some(
+                    Labels::role_group_selector(
+                        superset,
+                        APP_NAME,
+                        &rolegroup.role,
+                        &rolegroup.role_group,
+                    )
+                    .context(LabelBuildSnafu)?
+                    .into(),
+                ),
+                publish_not_ready_addresses: Some(true),
+                ..ServiceSpec::default()
+            }),
+            status: None,
+        },
+        Service {
+            metadata: ObjectMetaBuilder::new()
+                .name_and_namespace(superset)
+                .name(superset.rolegroup_headless_service_name(&rolegroup))
+                .ownerreference_from_resource(superset, None, Some(true))
+                .context(ObjectMissingMetadataForOwnerRefSnafu)?
+                .with_recommended_labels(build_recommended_labels(
+                    superset,
+                    SUPERSET_CONTROLLER_NAME,
+                    &resolved_product_image.app_version_label,
+                    &rolegroup.role,
+                    &rolegroup.role_group,
+                ))
+                .context(MetadataBuildSnafu)?
+                .build(),
+            spec: Some(ServiceSpec {
+                // Internal communication does not need to be exposed
+                type_: Some("ClusterIP".to_owned()),
+                cluster_ip: Some("None".to_owned()),
+                ports: Some(superset.service_ports()),
+                selector: Some(
+                    Labels::role_group_selector(
+                        superset,
+                        APP_NAME,
+                        &rolegroup.role,
+                        &rolegroup.role_group,
+                    )
+                    .context(LabelBuildSnafu)?
+                    .into(),
+                ),
+                publish_not_ready_addresses: Some(true),
+                ..ServiceSpec::default()
+            }),
+            status: None,
+        },
+    ];
 
     Ok(service)
-}
-
-pub fn build_group_listener(
-    superset: &v1alpha1::SupersetCluster,
-    object_labels: ObjectLabels<v1alpha1::SupersetCluster>,
-    listener_class: String,
-    listener_group_name: String,
-) -> Result<listener::v1alpha1::Listener> {
-    let metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(superset)
-        .name(listener_group_name)
-        .ownerreference_from_resource(superset, None, Some(true))
-        .context(ObjectMissingMetadataForOwnerRefSnafu)?
-        .with_recommended_labels(object_labels)
-        .context(MetadataBuildSnafu)?
-        .build();
-
-    let spec = listener::v1alpha1::ListenerSpec {
-        class_name: Some(listener_class),
-        ports: Some(listener_ports()),
-        ..Default::default()
-    };
-
-    let listener = listener::v1alpha1::Listener {
-        metadata,
-        spec,
-        status: None,
-    };
-
-    Ok(listener)
-}
-
-fn listener_ports() -> Vec<listener::v1alpha1::ListenerPort> {
-    vec![listener::v1alpha1::ListenerPort {
-        name: APP_PORT_NAME.to_owned(),
-        port: APP_PORT.into(),
-        protocol: Some("TCP".to_owned()),
-    }]
 }
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
