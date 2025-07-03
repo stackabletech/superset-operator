@@ -19,7 +19,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
-    k8s_openapi::{api::core::v1::ServicePort, apimachinery::pkg::api::resource::Quantity},
+    k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
     memory::{BinaryMultiple, MemoryQuantity},
     product_config_utils::{self, Configuration},
@@ -522,43 +522,6 @@ impl v1alpha1::SupersetCluster {
                 cluster_name = self.name_any()
             )),
         }
-    }
-
-    /// Set of functions to define service names on rolegroup level.
-    /// Headless service for cluster internal purposes only.
-    // TODO: Move to operator-rs
-    pub fn rolegroup_headless_service_name(
-        &self,
-        rolegroup: &RoleGroupRef<v1alpha1::SupersetCluster>,
-    ) -> String {
-        format!("{name}-headless", name = rolegroup.object_name())
-    }
-
-    /// Headless metrics service exposes Prometheus endpoint only
-    // TODO: Move to operator-rs
-    pub fn rolegroup_headless_metrics_service_name(
-        &self,
-        rolegroup: &RoleGroupRef<v1alpha1::SupersetCluster>,
-    ) -> String {
-        format!("{name}-metrics", name = rolegroup.object_name())
-    }
-
-    pub fn metrics_ports(&self) -> Vec<ServicePort> {
-        vec![ServicePort {
-            name: Some(METRICS_PORT_NAME.to_string()),
-            port: METRICS_PORT.into(),
-            protocol: Some("TCP".to_string()),
-            ..ServicePort::default()
-        }]
-    }
-
-    pub fn service_ports(&self) -> Vec<ServicePort> {
-        vec![ServicePort {
-            name: Some(APP_PORT_NAME.to_string()),
-            port: APP_PORT.into(),
-            protocol: Some("TCP".to_string()),
-            ..ServicePort::default()
-        }]
     }
 
     pub fn generic_role_config(&self, role: &SupersetRole) -> Option<GenericRoleConfig> {

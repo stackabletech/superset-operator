@@ -37,7 +37,7 @@ use stackable_operator::{
         DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{ConfigMap, EnvVar, HTTPGetAction, Probe, Service, ServiceSpec},
+            core::v1::{ConfigMap, EnvVar, HTTPGetAction, Probe},
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
@@ -87,6 +87,7 @@ use crate::{
     listener::{LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, build_group_listener},
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{LOG_CONFIG_FILE, extend_config_map_with_log_config},
+    service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
     util::{build_recommended_labels, rolegroup_metrics_service_name},
 };
 
@@ -299,6 +300,8 @@ pub enum Error {
     },
     #[snafu(display("failed to configure listener"))]
     ListenerConfiguration { source: crate::listener::Error },
+    #[snafu(display("faild to configure service"))]
+    ServiceConfiguration { source: crate::service::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -430,16 +433,29 @@ pub async fn reconcile_superset(
             &rbac_sa.name_any(),
             &config,
         )?;
-        for rg_service in
-            build_node_rolegroup_services(superset, &resolved_product_image, &rolegroup)?
-        {
-            cluster_resources
-                .add(client, rg_service)
-                .await
-                .with_context(|_| ApplyRoleGroupServiceSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?;
-        }
+
+        let rg_metrics_service =
+            build_node_rolegroup_metrics_service(superset, &resolved_product_image, &rolegroup)
+                .context(ServiceConfigurationSnafu)?;
+
+        let rg_headless_service =
+            build_node_rolegroup_headless_service(superset, &resolved_product_image, &rolegroup)
+                .context(ServiceConfigurationSnafu)?;
+
+        cluster_resources
+            .add(client, rg_metrics_service)
+            .await
+            .with_context(|_| ApplyRoleGroupServiceSnafu {
+                rolegroup: rolegroup.clone(),
+            })?;
+
+        cluster_resources
+            .add(client, rg_headless_service)
+            .await
+            .with_context(|_| ApplyRoleGroupServiceSnafu {
+                rolegroup: rolegroup.clone(),
+            })?;
+
         cluster_resources
             .add(client, rg_configmap)
             .await
@@ -619,96 +635,10 @@ fn build_rolegroup_config_map(
         })
 }
 
-/// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a certain rolegroup
-///
-/// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
-fn build_node_rolegroup_services(
-    superset: &SupersetCluster,
-    resolved_product_image: &ResolvedProductImage,
-    rolegroup: &RoleGroupRef<SupersetCluster>,
-) -> Result<Vec<Service>> {
-    let service = vec![
-        Service {
-            metadata: ObjectMetaBuilder::new()
-                .name_and_namespace(superset)
-                .name(superset.rolegroup_headless_metrics_service_name(rolegroup))
-                .ownerreference_from_resource(superset, None, Some(true))
-                .context(ObjectMissingMetadataForOwnerRefSnafu)?
-                .with_recommended_labels(build_recommended_labels(
-                    superset,
-                    SUPERSET_CONTROLLER_NAME,
-                    &resolved_product_image.app_version_label,
-                    &rolegroup.role,
-                    &rolegroup.role_group,
-                ))
-                .context(MetadataBuildSnafu)?
-                .with_label(
-                    Label::try_from(("prometheus.io/scrape", "true")).context(LabelBuildSnafu)?,
-                )
-                .build(),
-            spec: Some(ServiceSpec {
-                // Internal communication does not need to be exposed
-                type_: Some("ClusterIP".to_owned()),
-                cluster_ip: Some("None".to_owned()),
-                ports: Some(superset.metrics_ports()),
-                selector: Some(
-                    Labels::role_group_selector(
-                        superset,
-                        APP_NAME,
-                        &rolegroup.role,
-                        &rolegroup.role_group,
-                    )
-                    .context(LabelBuildSnafu)?
-                    .into(),
-                ),
-                publish_not_ready_addresses: Some(true),
-                ..ServiceSpec::default()
-            }),
-            status: None,
-        },
-        Service {
-            metadata: ObjectMetaBuilder::new()
-                .name_and_namespace(superset)
-                .name(superset.rolegroup_headless_service_name(rolegroup))
-                .ownerreference_from_resource(superset, None, Some(true))
-                .context(ObjectMissingMetadataForOwnerRefSnafu)?
-                .with_recommended_labels(build_recommended_labels(
-                    superset,
-                    SUPERSET_CONTROLLER_NAME,
-                    &resolved_product_image.app_version_label,
-                    &rolegroup.role,
-                    &rolegroup.role_group,
-                ))
-                .context(MetadataBuildSnafu)?
-                .build(),
-            spec: Some(ServiceSpec {
-                // Internal communication does not need to be exposed
-                type_: Some("ClusterIP".to_owned()),
-                cluster_ip: Some("None".to_owned()),
-                ports: Some(superset.service_ports()),
-                selector: Some(
-                    Labels::role_group_selector(
-                        superset,
-                        APP_NAME,
-                        &rolegroup.role,
-                        &rolegroup.role_group,
-                    )
-                    .context(LabelBuildSnafu)?
-                    .into(),
-                ),
-                publish_not_ready_addresses: Some(true),
-                ..ServiceSpec::default()
-            }),
-            status: None,
-        },
-    ];
-
-    Ok(service)
-}
-
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
-/// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding [`Service`] (from [`build_node_rolegroup_services`]).
+/// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding
+/// [`Service`](`stackable_operator::k8s_openapi::api::core::v1::Service`) (from [`build_node_rolegroup_headless_service`] and [`build_node_rolegroup_metrics_service`]).
 #[allow(clippy::too_many_arguments)]
 fn build_server_rolegroup_statefulset(
     superset: &SupersetCluster,

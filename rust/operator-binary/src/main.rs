@@ -46,6 +46,7 @@ mod listener;
 mod operations;
 mod product_logging;
 mod rbac;
+mod service;
 mod superset_controller;
 mod util;
 
