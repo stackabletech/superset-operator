@@ -631,7 +631,7 @@ fn build_node_rolegroup_services(
         Service {
             metadata: ObjectMetaBuilder::new()
                 .name_and_namespace(superset)
-                .name(superset.rolegroup_headless_metrics_service_name(&rolegroup))
+                .name(superset.rolegroup_headless_metrics_service_name(rolegroup))
                 .ownerreference_from_resource(superset, None, Some(true))
                 .context(ObjectMissingMetadataForOwnerRefSnafu)?
                 .with_recommended_labels(build_recommended_labels(
@@ -669,7 +669,7 @@ fn build_node_rolegroup_services(
         Service {
             metadata: ObjectMetaBuilder::new()
                 .name_and_namespace(superset)
-                .name(superset.rolegroup_headless_service_name(&rolegroup))
+                .name(superset.rolegroup_headless_service_name(rolegroup))
                 .ownerreference_from_resource(superset, None, Some(true))
                 .context(ObjectMissingMetadataForOwnerRefSnafu)?
                 .with_recommended_labels(build_recommended_labels(
