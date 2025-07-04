@@ -42,9 +42,11 @@ mod config;
 mod controller_commons;
 mod crd;
 mod druid_connection_controller;
+mod listener;
 mod operations;
 mod product_logging;
 mod rbac;
+mod service;
 mod superset_controller;
 mod util;
 

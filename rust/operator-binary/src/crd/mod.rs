@@ -32,7 +32,10 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
-use crate::crd::v1alpha1::{SupersetConfigFragment, SupersetRoleConfig};
+use crate::{
+    crd::v1alpha1::{SupersetConfigFragment, SupersetRoleConfig},
+    listener::default_listener_class,
+};
 
 pub mod affinity;
 pub mod authentication;
@@ -48,9 +51,6 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
 };
-
-pub const LISTENER_VOLUME_NAME: &str = "listener";
-pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
 pub const APP_PORT_NAME: &str = "http";
 pub const APP_PORT: u16 = 8088;
@@ -309,10 +309,6 @@ impl Default for v1alpha1::SupersetRoleConfig {
             common: Default::default(),
         }
     }
-}
-
-fn default_listener_class() -> String {
-    "cluster-internal".to_string()
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

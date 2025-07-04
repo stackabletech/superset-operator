@@ -9,6 +9,7 @@
   - Use `--file-log-rotation-period` (or `FILE_LOG_ROTATION_PERIOD`) to configure the frequency of rotation.
   - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
 - BREAKING: Added listener support for Superset ([#625]).
+- Add internal headless service in addition to the metrics service and move listener logic to listener.rs ([#644])
 
 ### Changed
 
@@ -45,6 +46,7 @@
 [#635]: https://github.com/stackabletech/superset-operator/pull/635
 [#637]: https://github.com/stackabletech/superset-operator/pull/637
 [#643]: https://github.com/stackabletech/superset-operator/pull/643
+[#644]: https://github.com/stackabletech/superset-operator/pull/644
 
 ## [25.3.0] - 2025-03-21
 
