@@ -641,7 +641,7 @@ fn build_rolegroup_config_map(
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 ///
 /// The [`Pod`](`stackable_operator::k8s_openapi::api::core::v1::Pod`)s are accessible through the corresponding
-/// [`Service`](`stackable_operator::k8s_openapi::api::core::v1::Service`) (from [`build_node_rolegroup_headless_service`] and [`build_node_rolegroup_metrics_service`]).
+/// [`Service`](`stackable_operator::k8s_openapi::api::core::v1::Service`) (via [`build_node_rolegroup_headless_service`] and metrics from [`build_node_rolegroup_metrics_service`]).
 #[allow(clippy::too_many_arguments)]
 fn build_server_rolegroup_statefulset(
     superset: &SupersetCluster,
