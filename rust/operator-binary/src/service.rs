@@ -83,7 +83,7 @@ pub fn build_node_rolegroup_metrics_service(
     let metrics_service = Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(superset)
-            .name(rolegroup_headless_metrics_service_name(rolegroup))
+            .name(rolegroup_metrics_service_name(rolegroup))
             .ownerreference_from_resource(superset, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(build_recommended_labels(
@@ -130,7 +130,7 @@ pub fn rolegroup_headless_service_name(
 
 /// Headless metrics service exposes Prometheus endpoint only
 // TODO: Move to operator-rs
-pub fn rolegroup_headless_metrics_service_name(
+pub fn rolegroup_metrics_service_name(
     rolegroup: &RoleGroupRef<v1alpha1::SupersetCluster>,
 ) -> String {
     format!("{name}-metrics", name = rolegroup.object_name())

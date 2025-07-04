@@ -87,8 +87,11 @@ use crate::{
     listener::{LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, build_group_listener},
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{LOG_CONFIG_FILE, extend_config_map_with_log_config},
-    service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
-    util::{build_recommended_labels, rolegroup_metrics_service_name},
+    service::{
+        build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service,
+        rolegroup_headless_service_name,
+    },
+    util::build_recommended_labels,
 };
 
 pub const SUPERSET_CONTROLLER_NAME: &str = "supersetcluster";
@@ -921,7 +924,7 @@ fn build_server_rolegroup_statefulset(
                 ),
                 ..LabelSelector::default()
             },
-            service_name: Some(rolegroup_metrics_service_name(&rolegroup_ref.object_name())),
+            service_name: Some(rolegroup_headless_service_name(rolegroup_ref)),
             template: pod_template,
             volume_claim_templates: pvcs,
             ..StatefulSetSpec::default()
