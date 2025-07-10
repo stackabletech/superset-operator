@@ -810,7 +810,6 @@ fn build_server_rolegroup_statefulset(
             &ListenerReference::ListenerName(group_listener_name),
             &unversioned_recommended_labels,
         )
-        .context(BuildListenerVolumeSnafu)?
         .build_pvc(LISTENER_VOLUME_NAME.to_owned())
         .context(BuildListenerVolumeSnafu)?;
         Some(vec![pvc])
