@@ -1,3 +1,6 @@
+// TODO: Look into how to properly resolve `clippy::result_large_err`.
+// This will need changes in our and upstream error types.
+#![allow(clippy::result_large_err)]
 use std::sync::Arc;
 
 use clap::Parser;
@@ -28,8 +31,8 @@ use stackable_operator::{
 
 use crate::{
     crd::{
-        APP_NAME, SupersetCluster,
-        druidconnection::{self, DruidConnection},
+        APP_NAME, SupersetCluster, SupersetClusterVersion,
+        druidconnection::{self, DruidConnection, DruidConnectionVersion},
         v1alpha1,
     },
     druid_connection_controller::DRUID_CONNECTION_FULL_CONTROLLER_NAME,
@@ -68,9 +71,9 @@ async fn main() -> anyhow::Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => {
-            SupersetCluster::merged_crd(SupersetCluster::V1Alpha1)?
+            SupersetCluster::merged_crd(SupersetClusterVersion::V1Alpha1)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
-            DruidConnection::merged_crd(DruidConnection::V1Alpha1)?
+            DruidConnection::merged_crd(DruidConnectionVersion::V1Alpha1)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         Command::Run(ProductOperatorRun {

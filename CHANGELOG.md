@@ -10,6 +10,7 @@
   - Use `--console-log-format` (or `CONSOLE_LOG_FORMAT`) to set the format to `plain` (default) or `json`.
 - BREAKING: Added listener support for Superset ([#625]).
 - Add internal headless service in addition to the metrics service and move listener logic to listener.rs ([#644])
+- Add RBAC rule to helm template for automatic cluster domain detection ([#646]).
 
 ### Changed
 
@@ -29,11 +30,21 @@
   - The defaults from the docker images itself will now apply, which will be different from 1000/0 going forward
   - This is marked as breaking because tools and policies might exist, which require these fields to be set
 - Changed listener class to be role-only ([#643]).
+- BREAKING: Bump stackable-operator to 0.94.0 and update other dependencies ([#646]).
+  - The default Kubernetes cluster domain name is now fetched from the kubelet API unless explicitly configured.
+  - This requires operators to have the RBAC permission to get nodes/proxy in the apiGroup "". The helm-chart takes care of this.
+  - The CLI argument `--kubernetes-node-name` or env variable `KUBERNETES_NODE_NAME` needs to be set. The helm-chart takes care of this.
 
 ### Fixed
 
 - Use `json` file extension for log files ([#615]).
 - Fix a bug where changes to ConfigMaps that are referenced in the SupersetCluster spec didn't trigger a reconciliation ([#609]).
+- Allow uppercase characters in domain names ([#646]).
+
+## Removed
+
+- Remove the `lastUpdateTime` field from the stacklet status ([#646]).
+- Remove role binding to legacy service accounts ([#646]).
 
 [#609]: https://github.com/stackabletech/superset-operator/pull/609
 [#610]: https://github.com/stackabletech/superset-operator/pull/610
@@ -47,6 +58,7 @@
 [#637]: https://github.com/stackabletech/superset-operator/pull/637
 [#643]: https://github.com/stackabletech/superset-operator/pull/643
 [#644]: https://github.com/stackabletech/superset-operator/pull/644
+[#646]: https://github.com/stackabletech/superset-operator/pull/646
 
 ## [25.3.0] - 2025-03-21
 
