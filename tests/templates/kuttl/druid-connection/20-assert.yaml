@@ -29,5 +29,3 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: test-superset-serviceaccount
-- kind: ServiceAccount
-  name: superset-serviceaccount
