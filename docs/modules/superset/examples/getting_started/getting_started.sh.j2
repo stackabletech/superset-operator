@@ -110,5 +110,5 @@ echo "Loading examples ..."
 # tag::load-examples[]
 kubectl apply -f superset-load-examples-job.yaml
 sleep 5
-kubectl wait --for=condition=complete --timeout=300s job/superset-load-examples
+kubectl wait --for=condition=complete --timeout=1500s job/superset-load-examples
 # end::load-examples[]
