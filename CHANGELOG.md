@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [25.7.0-rc1] - 2025-07-18
+
 ### Added
 
 - Adds new telemetry CLI arguments and environment variables ([#623]).
