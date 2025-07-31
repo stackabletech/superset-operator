@@ -786,21 +786,7 @@ fn build_server_rolegroup_statefulset(
                 create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
         }])
         .resources(merged_config.resources.clone().into());
-    let probe = Probe {
-        http_get: Some(HTTPGetAction {
-            port: IntOrString::Int(APP_PORT.into()),
-            path: Some("/health".to_string()),
-            ..HTTPGetAction::default()
-        }),
-        initial_delay_seconds: Some(15),
-        period_seconds: Some(15),
-        timeout_seconds: Some(1),
-        failure_threshold: Some(3),
-        success_threshold: Some(1),
-        ..Probe::default()
-    };
-    superset_cb.readiness_probe(probe.clone());
-    superset_cb.liveness_probe(probe);
+    add_superset_container_probes(&mut superset_cb);
 
     // listener endpoints will use persistent volumes
     // so that load balancers can hard-code the target addresses and
@@ -930,6 +916,35 @@ fn build_server_rolegroup_statefulset(
         }),
         status: None,
     })
+}
+
+fn add_superset_container_probes(superset_cb: &mut ContainerBuilder) {
+    let probe_action = HTTPGetAction {
+        port: IntOrString::Int(APP_PORT.into()),
+        path: Some("/health".to_string()),
+        ..HTTPGetAction::default()
+    };
+    let common_probe = Probe {
+        http_get: Some(probe_action),
+        period_seconds: Some(5),
+        timeout_seconds: Some(5),
+        success_threshold: Some(1),
+        ..Probe::default()
+    };
+    superset_cb.startup_probe(Probe {
+        failure_threshold: Some(10 /* minutes */ * 60 / 5),
+        ..common_probe.clone()
+    });
+    // Remove it from the Service immediately
+    superset_cb.readiness_probe(Probe {
+        failure_threshold: Some(1),
+        ..common_probe.clone()
+    });
+    // But only restart it after 3 failures
+    superset_cb.readiness_probe(Probe {
+        failure_threshold: Some(3),
+        ..common_probe
+    });
 }
 
 fn add_authentication_volumes_and_volume_mounts(
