@@ -52,6 +52,10 @@ echo "Installing bitnami PostgreSQL"
 # tag::install-bitnami-psql[]
 helm install superset oci://registry-1.docker.io/bitnamicharts/postgresql \
     --version 16.5.0 \
+    --set image.repository=bitnamilegacy/postgresql \
+    --set volumePermissions.image.repository=bitnamilegacy/os-shell \
+    --set metrics.image.repository=bitnamilegacy/postgres-exporter \
+    --set global.security.allowInsecureImages=true \
     --set auth.username=superset \
     --set auth.password=superset \
     --set auth.database=superset \

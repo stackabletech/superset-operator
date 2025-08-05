@@ -1,6 +1,6 @@
 # helm install secret-operator oci://oci.stackable.tech/sdp-charts/secret-operator
 # helm install commons-operator oci://oci.stackable.tech/sdp-charts/commons-operator
-# helm install --repo https://charts.bitnami.com/bitnami --set auth.username=superset --set auth.password=superset --set auth.database=superset superset-postgresql postgresql
+# helm install --set auth.username=superset --set auth.password=superset --set auth.database=superset --set image.repository=bitnamilegacy/postgresql --set volumePermissions.image.repository=bitnamilegacy/os-shell --set metrics.image.repository=bitnamilegacy/postgres-exporter --set global.security.allowInsecureImages=true superset-postgresql oci://registry-1.docker.io/bitnamicharts/postgresql
 
 # Log in with user01/user01 or user02/user02
 ---
@@ -36,7 +36,7 @@ spec:
     spec:
       containers:
         - name: openldap
-          image: docker.io/bitnami/openldap:2.5
+          image: docker.io/bitnamilegacy/openldap:2.5
           env:
             - name: LDAP_ADMIN_USERNAME
               value: admin
