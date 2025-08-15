@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix container not starting because Superset was starting too slow and was killed because a failing liveness probe.
+  We now add a proper startup probe, which allows Superset to take longer to start up ([#654]).
+
+[#654]: https://github.com/stackabletech/superset-operator/pull/654
+
 ## [25.7.0] - 2025-07-23
 
 ## [25.7.0-rc1] - 2025-07-18
