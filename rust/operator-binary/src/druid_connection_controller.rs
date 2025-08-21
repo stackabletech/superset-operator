@@ -8,7 +8,7 @@ use stackable_operator::{
         pod::{container::ContainerBuilder, security::PodSecurityContextBuilder},
     },
     client::Client,
-    commons::product_image_selection::ResolvedProductImage,
+    commons::product_image_selection::{self, ResolvedProductImage},
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
         core::v1::{ConfigMap, PodSpec, PodTemplateSpec},
@@ -19,8 +19,8 @@ use stackable_operator::{
         runtime::{controller::Action, reflector::ObjectRef},
     },
     logging::controller::ReconcilerError,
+    shared::time::Duration,
     status::condition::{ClusterConditionStatus, ClusterConditionType},
-    time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -94,6 +94,11 @@ pub enum Error {
     InvalidDruidConnection {
         source: error_boundary::InvalidObject,
     },
+
+    #[snafu(display("failed to resolve product image"))]
+    ResolveProductImage {
+        source: product_image_selection::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -121,6 +126,7 @@ impl ReconcilerError for Error {
             Error::ApplyRoleBinding { .. } => None,
             Error::SupersetClusterRetrieval { .. } => None,
             Error::InvalidDruidConnection { .. } => None,
+            Error::ResolveProductImage { .. } => None,
         }
     }
 }
@@ -204,10 +210,11 @@ pub async fn reconcile_druid_connection(
                         client,
                     )
                     .await?;
-                    let resolved_product_image: ResolvedProductImage = superset_cluster
+                    let resolved_product_image = superset_cluster
                         .spec
                         .image
-                        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION);
+                        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION)
+                        .context(ResolveProductImageSnafu)?;
                     let job = build_import_job(
                         &superset_cluster,
                         druid_connection,

@@ -1549,7 +1549,7 @@ rec {
         };
         resolvedDefaultFeatures = [ "std" ];
       };
-      "darling" = rec {
+      "darling 0.20.11" = rec {
         crateName = "darling";
         version = "0.20.11";
         edition = "2021";
@@ -1560,11 +1560,11 @@ rec {
         dependencies = [
           {
             name = "darling_core";
-            packageId = "darling_core";
+            packageId = "darling_core 0.20.11";
           }
           {
             name = "darling_macro";
-            packageId = "darling_macro";
+            packageId = "darling_macro 0.20.11";
           }
         ];
         features = {
@@ -1574,7 +1574,33 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "suggestions" ];
       };
-      "darling_core" = rec {
+      "darling 0.21.2" = rec {
+        crateName = "darling";
+        version = "0.21.2";
+        edition = "2021";
+        sha256 = "0w05fq6kl16avbgkgwxg5c8myj397539gq337r1x1hr2s8yhni08";
+        authors = [
+          "Ted Driggs <ted.driggs@outlook.com>"
+        ];
+        dependencies = [
+          {
+            name = "darling_core";
+            packageId = "darling_core 0.21.2";
+          }
+          {
+            name = "darling_macro";
+            packageId = "darling_macro 0.21.2";
+          }
+        ];
+        features = {
+          "default" = [ "suggestions" ];
+          "diagnostics" = [ "darling_core/diagnostics" ];
+          "serde" = [ "darling_core/serde" ];
+          "suggestions" = [ "darling_core/suggestions" ];
+        };
+        resolvedDefaultFeatures = [ "default" "suggestions" ];
+      };
+      "darling_core 0.20.11" = rec {
         crateName = "darling_core";
         version = "0.20.11";
         edition = "2021";
@@ -1616,7 +1642,50 @@ rec {
         };
         resolvedDefaultFeatures = [ "strsim" "suggestions" ];
       };
-      "darling_macro" = rec {
+      "darling_core 0.21.2" = rec {
+        crateName = "darling_core";
+        version = "0.21.2";
+        edition = "2021";
+        sha256 = "0zmzz0czsc8590n4n6isnii5d8da0gm6hnkinyqlm818ph97jnyj";
+        authors = [
+          "Ted Driggs <ted.driggs@outlook.com>"
+        ];
+        dependencies = [
+          {
+            name = "fnv";
+            packageId = "fnv";
+          }
+          {
+            name = "ident_case";
+            packageId = "ident_case";
+          }
+          {
+            name = "proc-macro2";
+            packageId = "proc-macro2";
+          }
+          {
+            name = "quote";
+            packageId = "quote";
+          }
+          {
+            name = "strsim";
+            packageId = "strsim";
+            optional = true;
+          }
+          {
+            name = "syn";
+            packageId = "syn 2.0.104";
+            features = [ "full" "extra-traits" ];
+          }
+        ];
+        features = {
+          "serde" = [ "dep:serde" ];
+          "strsim" = [ "dep:strsim" ];
+          "suggestions" = [ "strsim" ];
+        };
+        resolvedDefaultFeatures = [ "strsim" "suggestions" ];
+      };
+      "darling_macro 0.20.11" = rec {
         crateName = "darling_macro";
         version = "0.20.11";
         edition = "2021";
@@ -1628,7 +1697,32 @@ rec {
         dependencies = [
           {
             name = "darling_core";
-            packageId = "darling_core";
+            packageId = "darling_core 0.20.11";
+          }
+          {
+            name = "quote";
+            packageId = "quote";
+          }
+          {
+            name = "syn";
+            packageId = "syn 2.0.104";
+          }
+        ];
+
+      };
+      "darling_macro 0.21.2" = rec {
+        crateName = "darling_macro";
+        version = "0.21.2";
+        edition = "2021";
+        sha256 = "0cfmv5ks4fjfr2w23zvhjzkkc300ah1x0qkf6blcic3zxadln5ff";
+        procMacro = true;
+        authors = [
+          "Ted Driggs <ted.driggs@outlook.com>"
+        ];
+        dependencies = [
+          {
+            name = "darling_core";
+            packageId = "darling_core 0.21.2";
           }
           {
             name = "quote";
@@ -4490,8 +4584,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "958f62f2befdd984ad9fcd272d0214055c3a7601";
-          sha256 = "0hiymhr40ix4jv9dmvp5d009xs6v0frvllr2xkf5mw43rcg44mgd";
+          rev = "20659fe864c643fe48c7ff70ed417f0ed05ccf45";
+          sha256 = "0db745j2nz5kz5mp8sh8af26gh9wx3cdad7ggl9f9jki1ms534z0";
         };
         libName = "k8s_version";
         authors = [
@@ -4500,7 +4594,7 @@ rec {
         dependencies = [
           {
             name = "darling";
-            packageId = "darling";
+            packageId = "darling 0.21.2";
             optional = true;
           }
           {
@@ -4929,7 +5023,7 @@ rec {
         dependencies = [
           {
             name = "darling";
-            packageId = "darling";
+            packageId = "darling 0.20.11";
           }
           {
             name = "proc-macro2";
@@ -7165,9 +7259,9 @@ rec {
       };
       "rstest" = rec {
         crateName = "rstest";
-        version = "0.25.0";
+        version = "0.26.1";
         edition = "2021";
-        sha256 = "17bqpqcy029gmsqy2y3v4iyb9kj4i4mqkypqglzr2gk1z2995hvg";
+        sha256 = "0jcxhg9mxlr2p9an14algbcq6ax7r0sk1w1kbals5aiv0qy1k8zm";
         authors = [
           "Michele d'Amico <michele.damico@gmail.com>"
         ];
@@ -7188,12 +7282,6 @@ rec {
             usesDefaultFeatures = false;
           }
         ];
-        buildDependencies = [
-          {
-            name = "rustc_version";
-            packageId = "rustc_version";
-          }
-        ];
         features = {
           "async-timeout" = [ "dep:futures-timer" "dep:futures-util" "rstest_macros/async-timeout" ];
           "crate-name" = [ "rstest_macros/crate-name" ];
@@ -7203,9 +7291,9 @@ rec {
       };
       "rstest_macros" = rec {
         crateName = "rstest_macros";
-        version = "0.25.0";
+        version = "0.26.1";
         edition = "2021";
-        sha256 = "0ikpla102bmmzzv0ivr5h9v9k3b24v93zljlvvlpnc4xfjcqs5hz";
+        sha256 = "185v185wn2x3llp3nn1i7h44vi5ffnnsj8b1a32m2ygzy08m714w";
         procMacro = true;
         authors = [
           "Michele d'Amico <michele.damico@gmail.com>"
@@ -8393,13 +8481,13 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.94.0";
+        version = "0.95.0";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "958f62f2befdd984ad9fcd272d0214055c3a7601";
-          sha256 = "0hiymhr40ix4jv9dmvp5d009xs6v0frvllr2xkf5mw43rcg44mgd";
+          rev = "20659fe864c643fe48c7ff70ed417f0ed05ccf45";
+          sha256 = "0db745j2nz5kz5mp8sh8af26gh9wx3cdad7ggl9f9jki1ms534z0";
         };
         libName = "stackable_operator";
         authors = [
@@ -8511,11 +8599,13 @@ rec {
           {
             name = "stackable-telemetry";
             packageId = "stackable-telemetry";
+            optional = true;
             features = [ "clap" ];
           }
           {
             name = "stackable-versioned";
             packageId = "stackable-versioned";
+            optional = true;
           }
           {
             name = "strum";
@@ -8547,9 +8637,13 @@ rec {
           }
         ];
         features = {
+          "certs" = [ "dep:stackable-certs" ];
           "default" = [ "telemetry" "versioned" ];
-          "full" = [ "time" "telemetry" "versioned" ];
-          "time" = [ "dep:time" ];
+          "full" = [ "certs" "telemetry" "versioned" "time" "webhook" ];
+          "telemetry" = [ "dep:stackable-telemetry" ];
+          "time" = [ "stackable-shared/time" ];
+          "versioned" = [ "dep:stackable-versioned" ];
+          "webhook" = [ "dep:stackable-webhook" ];
         };
         resolvedDefaultFeatures = [ "default" "telemetry" "versioned" ];
       };
@@ -8560,8 +8654,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "958f62f2befdd984ad9fcd272d0214055c3a7601";
-          sha256 = "0hiymhr40ix4jv9dmvp5d009xs6v0frvllr2xkf5mw43rcg44mgd";
+          rev = "20659fe864c643fe48c7ff70ed417f0ed05ccf45";
+          sha256 = "0db745j2nz5kz5mp8sh8af26gh9wx3cdad7ggl9f9jki1ms534z0";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
@@ -8571,7 +8665,7 @@ rec {
         dependencies = [
           {
             name = "darling";
-            packageId = "darling";
+            packageId = "darling 0.21.2";
           }
           {
             name = "proc-macro2";
@@ -8590,13 +8684,13 @@ rec {
       };
       "stackable-shared" = rec {
         crateName = "stackable-shared";
-        version = "0.0.1";
+        version = "0.0.2";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "958f62f2befdd984ad9fcd272d0214055c3a7601";
-          sha256 = "0hiymhr40ix4jv9dmvp5d009xs6v0frvllr2xkf5mw43rcg44mgd";
+          rev = "20659fe864c643fe48c7ff70ed417f0ed05ccf45";
+          sha256 = "0db745j2nz5kz5mp8sh8af26gh9wx3cdad7ggl9f9jki1ms534z0";
         };
         libName = "stackable_shared";
         authors = [
@@ -8604,10 +8698,21 @@ rec {
         ];
         dependencies = [
           {
+            name = "k8s-openapi";
+            packageId = "k8s-openapi";
+            usesDefaultFeatures = false;
+            features = [ "schemars" "v1_33" ];
+          }
+          {
             name = "kube";
             packageId = "kube";
             usesDefaultFeatures = false;
             features = [ "client" "jsonpatch" "runtime" "derive" "rustls-tls" "ring" ];
+          }
+          {
+            name = "schemars";
+            packageId = "schemars";
+            features = [ "url" ];
           }
           {
             name = "semver";
@@ -8626,8 +8731,31 @@ rec {
             name = "snafu";
             packageId = "snafu 0.8.6";
           }
+          {
+            name = "strum";
+            packageId = "strum";
+            features = [ "derive" ];
+          }
+          {
+            name = "time";
+            packageId = "time";
+            optional = true;
+          }
         ];
-
+        devDependencies = [
+          {
+            name = "k8s-openapi";
+            packageId = "k8s-openapi";
+            usesDefaultFeatures = false;
+            features = [ "schemars" "v1_33" ];
+          }
+        ];
+        features = {
+          "default" = [ "time" ];
+          "full" = [ "time" ];
+          "time" = [ "dep:time" ];
+        };
+        resolvedDefaultFeatures = [ "default" "time" ];
       };
       "stackable-superset-operator" = rec {
         crateName = "stackable-superset-operator";
@@ -8742,8 +8870,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "958f62f2befdd984ad9fcd272d0214055c3a7601";
-          sha256 = "0hiymhr40ix4jv9dmvp5d009xs6v0frvllr2xkf5mw43rcg44mgd";
+          rev = "20659fe864c643fe48c7ff70ed417f0ed05ccf45";
+          sha256 = "0db745j2nz5kz5mp8sh8af26gh9wx3cdad7ggl9f9jki1ms534z0";
         };
         libName = "stackable_telemetry";
         authors = [
@@ -8847,13 +8975,13 @@ rec {
       };
       "stackable-versioned" = rec {
         crateName = "stackable-versioned";
-        version = "0.8.0";
+        version = "0.8.1";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "958f62f2befdd984ad9fcd272d0214055c3a7601";
-          sha256 = "0hiymhr40ix4jv9dmvp5d009xs6v0frvllr2xkf5mw43rcg44mgd";
+          rev = "20659fe864c643fe48c7ff70ed417f0ed05ccf45";
+          sha256 = "0db745j2nz5kz5mp8sh8af26gh9wx3cdad7ggl9f9jki1ms534z0";
         };
         libName = "stackable_versioned";
         authors = [
@@ -8891,13 +9019,13 @@ rec {
       };
       "stackable-versioned-macros" = rec {
         crateName = "stackable-versioned-macros";
-        version = "0.8.0";
+        version = "0.8.1";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "958f62f2befdd984ad9fcd272d0214055c3a7601";
-          sha256 = "0hiymhr40ix4jv9dmvp5d009xs6v0frvllr2xkf5mw43rcg44mgd";
+          rev = "20659fe864c643fe48c7ff70ed417f0ed05ccf45";
+          sha256 = "0db745j2nz5kz5mp8sh8af26gh9wx3cdad7ggl9f9jki1ms534z0";
         };
         procMacro = true;
         libName = "stackable_versioned_macros";
@@ -8911,7 +9039,7 @@ rec {
           }
           {
             name = "darling";
-            packageId = "darling";
+            packageId = "darling 0.21.2";
           }
           {
             name = "indoc";
@@ -9337,7 +9465,7 @@ rec {
           "std" = [ "alloc" "deranged/std" ];
           "wasm-bindgen" = [ "dep:js-sys" ];
         };
-        resolvedDefaultFeatures = [ "alloc" "formatting" "parsing" "std" ];
+        resolvedDefaultFeatures = [ "alloc" "default" "formatting" "parsing" "std" ];
       };
       "time-core" = rec {
         crateName = "time-core";
