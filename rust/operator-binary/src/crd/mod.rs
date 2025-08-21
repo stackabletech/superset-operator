@@ -26,8 +26,8 @@ use stackable_operator::{
     product_logging::{self, spec::Logging},
     role_utils::{GenericRoleConfig, Role, RoleGroupRef},
     schemars::{self, JsonSchema},
+    shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
-    time::Duration,
     versioned::versioned,
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};

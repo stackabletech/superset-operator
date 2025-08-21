@@ -45,7 +45,7 @@ pub fn build_node_rolegroup_headless_service(
             .with_recommended_labels(build_recommended_labels(
                 superset,
                 SUPERSET_CONTROLLER_NAME,
-                &resolved_product_image.app_version_label,
+                &resolved_product_image.app_version_label_value,
                 &rolegroup.role,
                 &rolegroup.role_group,
             ))
@@ -89,7 +89,7 @@ pub fn build_node_rolegroup_metrics_service(
             .with_recommended_labels(build_recommended_labels(
                 superset,
                 SUPERSET_CONTROLLER_NAME,
-                &resolved_product_image.app_version_label,
+                &resolved_product_image.app_version_label_value,
                 &rolegroup.role,
                 &rolegroup.role_group,
             ))

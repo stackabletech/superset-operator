@@ -31,7 +31,10 @@ use stackable_operator::{
         },
     },
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{product_image_selection::ResolvedProductImage, rbac::build_rbac_resources},
+    commons::{
+        product_image_selection::{self, ResolvedProductImage},
+        rbac::build_rbac_resources,
+    },
     crd::authentication::oidc,
     k8s_openapi::{
         DeepMerge,
@@ -60,11 +63,11 @@ use stackable_operator::{
         spec::Logging,
     },
     role_utils::{GenericRoleConfig, RoleGroupRef},
+    shared::time::Duration,
     status::condition::{
         compute_conditions, operations::ClusterOperationsConditionBuilder,
         statefulset::StatefulSetConditionBuilder,
     },
-    time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
@@ -301,10 +304,17 @@ pub enum Error {
     ApplyGroupListener {
         source: stackable_operator::cluster_resources::Error,
     },
+
     #[snafu(display("failed to configure listener"))]
     ListenerConfiguration { source: crate::listener::Error },
-    #[snafu(display("faild to configure service"))]
+
+    #[snafu(display("failed to configure service"))]
     ServiceConfiguration { source: crate::service::Error },
+
+    #[snafu(display("failed to resolve product image"))]
+    ResolveProductImage {
+        source: product_image_selection::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -331,7 +341,8 @@ pub async fn reconcile_superset(
     let resolved_product_image: ResolvedProductImage = superset
         .spec
         .image
-        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION);
+        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION)
+        .context(ResolveProductImageSnafu)?;
     let superset_role = SupersetRole::Node;
 
     let cluster_operation_cond_builder =
@@ -608,7 +619,7 @@ fn build_rolegroup_config_map(
                 .with_recommended_labels(build_recommended_labels(
                     superset,
                     SUPERSET_CONTROLLER_NAME,
-                    &resolved_product_image.app_version_label,
+                    &resolved_product_image.app_version_label_value,
                     &rolegroup.role,
                     &rolegroup.role_group,
                 ))
@@ -662,7 +673,7 @@ fn build_server_rolegroup_statefulset(
     let recommended_object_labels = build_recommended_labels(
         superset,
         SUPERSET_CONTROLLER_NAME,
-        &resolved_product_image.app_version_label,
+        &resolved_product_image.app_version_label_value,
         &rolegroup_ref.role,
         &rolegroup_ref.role_group,
     );

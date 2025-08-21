@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use stackable_operator::{client::Client, commons::opa::OpaApiVersion, time::Duration};
+use stackable_operator::{client::Client, commons::opa::OpaApiVersion, shared::time::Duration};
 
 use crate::crd::v1alpha1;
 
