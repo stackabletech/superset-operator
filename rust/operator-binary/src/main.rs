@@ -7,7 +7,7 @@ use clap::Parser;
 use futures::{StreamExt, pin_mut};
 use stackable_operator::{
     YamlSchema,
-    cli::{Command, ProductOperatorRun},
+    cli::{Command, CommonOptions, ProductOperatorRun},
     crd::authentication::core,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
@@ -77,11 +77,14 @@ async fn main() -> anyhow::Result<()> {
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         Command::Run(ProductOperatorRun {
+            common:
+                CommonOptions {
+                    telemetry,
+                    cluster_info,
+                },
+            operator_environment: _,
             product_config,
             watch_namespace,
-            operator_environment: _,
-            telemetry,
-            cluster_info,
         }) => {
             // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
             // - The console log level was set by `SUPERSET_OPERATOR_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).

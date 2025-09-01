@@ -1459,7 +1459,7 @@ dependencies = [
 [[package]]
 name = "k8s-version"
 version = "0.1.3"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=fix%2Fprobe-builder-clone#426a44abdfb4baa5a860208e57969f45d8dd483f"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.96.0#89f484ca4e86b565e083e9ad7573e21dbe29a3af"
 dependencies = [
  "darling 0.21.2",
  "regex",
@@ -2623,8 +2623,8 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "stackable-operator"
-version = "0.95.1"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=fix%2Fprobe-builder-clone#426a44abdfb4baa5a860208e57969f45d8dd483f"
+version = "0.96.0"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.96.0#89f484ca4e86b565e083e9ad7573e21dbe29a3af"
 dependencies = [
  "chrono",
  "clap",
@@ -2662,7 +2662,7 @@ dependencies = [
 [[package]]
 name = "stackable-operator-derive"
 version = "0.3.1"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=fix%2Fprobe-builder-clone#426a44abdfb4baa5a860208e57969f45d8dd483f"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.96.0#89f484ca4e86b565e083e9ad7573e21dbe29a3af"
 dependencies = [
  "darling 0.21.2",
  "proc-macro2",
@@ -2673,7 +2673,7 @@ dependencies = [
 [[package]]
 name = "stackable-shared"
 version = "0.0.2"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=fix%2Fprobe-builder-clone#426a44abdfb4baa5a860208e57969f45d8dd483f"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.96.0#89f484ca4e86b565e083e9ad7573e21dbe29a3af"
 dependencies = [
  "k8s-openapi",
  "kube",
@@ -2712,7 +2712,7 @@ dependencies = [
 [[package]]
 name = "stackable-telemetry"
 version = "0.6.1"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=fix%2Fprobe-builder-clone#426a44abdfb4baa5a860208e57969f45d8dd483f"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.96.0#89f484ca4e86b565e083e9ad7573e21dbe29a3af"
 dependencies = [
  "axum",
  "clap",
@@ -2736,7 +2736,7 @@ dependencies = [
 [[package]]
 name = "stackable-versioned"
 version = "0.8.1"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=fix%2Fprobe-builder-clone#426a44abdfb4baa5a860208e57969f45d8dd483f"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.96.0#89f484ca4e86b565e083e9ad7573e21dbe29a3af"
 dependencies = [
  "schemars",
  "serde",
@@ -2749,7 +2749,7 @@ dependencies = [
 [[package]]
 name = "stackable-versioned-macros"
 version = "0.8.1"
-source = "git+https://github.com/stackabletech//operator-rs.git?branch=fix%2Fprobe-builder-clone#426a44abdfb4baa5a860208e57969f45d8dd483f"
+source = "git+https://github.com/stackabletech/operator-rs.git?tag=stackable-operator-0.96.0#89f484ca4e86b565e083e9ad7573e21dbe29a3af"
 dependencies = [
  "convert_case",
  "darling 0.21.2",
