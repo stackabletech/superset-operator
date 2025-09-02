@@ -939,9 +939,9 @@ fn add_superset_container_probes(superset_cb: &mut ContainerBuilder) {
         common
             .clone()
             .with_failure_threshold_duration(Duration::from_minutes_unchecked(10))
-            .expect("static period is always non-zero")
+            .expect("const period is non-zero")
             .build()
-            .expect("static durations are not too long"),
+            .expect("const duration does not overflow"),
     );
 
     // Remove it from the Service immediately
@@ -949,14 +949,14 @@ fn add_superset_container_probes(superset_cb: &mut ContainerBuilder) {
         common
             .clone()
             .build()
-            .expect("static durations are not too long"),
+            .expect("const duration does not overflow"),
     );
     // But only restart it after 3 failures
     superset_cb.liveness_probe(
         common
             .with_failure_threshold(3)
             .build()
-            .expect("static durations are not too long"),
+            .expect("const duration does not overflow"),
     );
 }
 
