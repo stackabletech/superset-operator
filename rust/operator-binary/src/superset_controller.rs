@@ -22,6 +22,7 @@ use stackable_operator::{
         pod::{
             PodBuilder,
             container::ContainerBuilder,
+            probe::ProbeBuilder,
             resources::ResourceRequirementsBuilder,
             security::PodSecurityContextBuilder,
             volume::{
@@ -40,9 +41,9 @@ use stackable_operator::{
         DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{ConfigMap, EnvVar, HTTPGetAction, Probe},
+            core::v1::{ConfigMap, EnvVar},
         },
-        apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
+        apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
     kube::{
         Resource, ResourceExt,
@@ -797,21 +798,7 @@ fn build_server_rolegroup_statefulset(
                 create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
         }])
         .resources(merged_config.resources.clone().into());
-    let probe = Probe {
-        http_get: Some(HTTPGetAction {
-            port: IntOrString::Int(APP_PORT.into()),
-            path: Some("/health".to_string()),
-            ..HTTPGetAction::default()
-        }),
-        initial_delay_seconds: Some(15),
-        period_seconds: Some(15),
-        timeout_seconds: Some(1),
-        failure_threshold: Some(3),
-        success_threshold: Some(1),
-        ..Probe::default()
-    };
-    superset_cb.readiness_probe(probe.clone());
-    superset_cb.liveness_probe(probe);
+    add_superset_container_probes(&mut superset_cb);
 
     // listener endpoints will use persistent volumes
     // so that load balancers can hard-code the target addresses and
@@ -941,6 +928,36 @@ fn build_server_rolegroup_statefulset(
         }),
         status: None,
     })
+}
+
+fn add_superset_container_probes(superset_cb: &mut ContainerBuilder) {
+    let common =
+        ProbeBuilder::http_get_port_scheme_path(APP_PORT, None, Some("/health".to_owned()))
+            .with_period(Duration::from_secs(5));
+
+    superset_cb.startup_probe(
+        common
+            .clone()
+            .with_failure_threshold_duration(Duration::from_minutes_unchecked(10))
+            .expect("const period is non-zero")
+            .build()
+            .expect("const duration does not overflow"),
+    );
+
+    // Remove it from the Service immediately
+    superset_cb.readiness_probe(
+        common
+            .clone()
+            .build()
+            .expect("const duration does not overflow"),
+    );
+    // But only restart it after 3 failures
+    superset_cb.liveness_probe(
+        common
+            .with_failure_threshold(3)
+            .build()
+            .expect("const duration does not overflow"),
+    );
 }
 
 fn add_authentication_volumes_and_volume_mounts(
