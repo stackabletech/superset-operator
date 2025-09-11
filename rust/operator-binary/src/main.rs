@@ -82,9 +82,10 @@ async fn main() -> anyhow::Result<()> {
                     telemetry,
                     cluster_info,
                 },
-            operator_environment: _,
             product_config,
             watch_namespace,
+            operator_environment: _,
+            disable_crd_maintenance: _,
         }) => {
             // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
             // - The console log level was set by `SUPERSET_OPERATOR_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).
