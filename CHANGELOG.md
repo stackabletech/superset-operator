@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Helm: Allow Pod `priorityClassName` to be configured ([#664]).
+
+[#664]: https://github.com/stackabletech/superset-operator/pull/664
+
 ### Fixed
 
 - Fix container not starting because Superset was starting too slow and was killed because a failing liveness probe.
