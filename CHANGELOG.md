@@ -5,8 +5,11 @@
 ### Added
 
 - Helm: Allow Pod `priorityClassName` to be configured ([#664]).
+- Add version `4.1.4` ([#669]).
 
-[#664]: https://github.com/stackabletech/superset-operator/pull/664
+### Changed
+
+- Deprecate version `4.0.2` ([#666]).
 
 ### Fixed
 
@@ -15,6 +18,9 @@
 
 [#654]: https://github.com/stackabletech/superset-operator/pull/654
 [#663]: https://github.com/stackabletech/superset-operator/pull/663
+[#664]: https://github.com/stackabletech/superset-operator/pull/664
+[#666]: https://github.com/stackabletech/superset-operator/pull/666
+[#669]: https://github.com/stackabletech/superset-operator/pull/669
 
 ## [25.7.0] - 2025-07-23
 
