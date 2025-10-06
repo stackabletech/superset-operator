@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add end-of-support checker ([#670]).
 - Helm: Allow Pod `priorityClassName` to be configured ([#664]).
 - Add version `4.1.4` ([#669]).
 
@@ -21,6 +22,7 @@
 [#664]: https://github.com/stackabletech/superset-operator/pull/664
 [#666]: https://github.com/stackabletech/superset-operator/pull/666
 [#669]: https://github.com/stackabletech/superset-operator/pull/669
+[#670]: https://github.com/stackabletech/superset-operator/pull/670
 
 ## [25.7.0] - 2025-07-23
 
