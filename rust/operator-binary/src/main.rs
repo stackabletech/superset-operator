@@ -4,11 +4,12 @@
 use std::sync::Arc;
 
 use clap::Parser;
-use futures::{StreamExt, pin_mut};
+use futures::{FutureExt, StreamExt};
 use stackable_operator::{
     YamlSchema,
-    cli::{Command, CommonOptions, ProductOperatorRun},
+    cli::{Command, RunArguments},
     crd::authentication::core,
+    eos::EndOfSupportChecker,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         batch::v1::Job,
@@ -76,22 +77,19 @@ async fn main() -> anyhow::Result<()> {
             DruidConnection::merged_crd(DruidConnectionVersion::V1Alpha1)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
-        Command::Run(ProductOperatorRun {
-            common:
-                CommonOptions {
-                    telemetry,
-                    cluster_info,
-                },
-            product_config,
-            watch_namespace,
+        Command::Run(RunArguments {
             operator_environment: _,
-            disable_crd_maintenance: _,
+            watch_namespace,
+            product_config,
+            maintenance,
+            common,
         }) => {
             // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
             // - The console log level was set by `SUPERSET_OPERATOR_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).
             // - The file log level was set by `SUPERSET_OPERATOR_LOG`, and is now set via `FILE_LOG` (when using Tracing::pre_configured).
             // - The file log directory was set by `SUPERSET_OPERATOR_LOG_DIRECTORY`, and is now set by `ROLLING_LOGS_DIR` (or via `--rolling-logs <DIRECTORY>`).
-            let _tracing_guard = Tracing::pre_configured(built_info::PKG_NAME, telemetry).init()?;
+            let _tracing_guard =
+                Tracing::pre_configured(built_info::PKG_NAME, common.telemetry).init()?;
 
             tracing::info!(
                 built_info.pkg_version = built_info::PKG_VERSION,
@@ -103,6 +101,11 @@ async fn main() -> anyhow::Result<()> {
                 description = built_info::PKG_DESCRIPTION
             );
 
+            let eos_checker =
+                EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, maintenance.end_of_support)?
+                    .run()
+                    .map(anyhow::Ok);
+
             let product_config = product_config.load(&[
                 "deploy/config-spec/properties.yaml",
                 "/etc/stackable/superset-operator/config-spec/properties.yaml",
@@ -110,7 +113,7 @@ async fn main() -> anyhow::Result<()> {
 
             let client = stackable_operator::client::initialize_operator(
                 Some(OPERATOR_NAME.to_string()),
-                &cluster_info,
+                &common.cluster_info,
             )
             .await?;
 
@@ -185,7 +188,8 @@ async fn main() -> anyhow::Result<()> {
                             .await;
                         }
                     },
-                );
+                )
+                .map(anyhow::Ok);
 
             let druid_connection_event_recorder = Arc::new(Recorder::new(
                 client.as_kube_client(),
@@ -266,11 +270,15 @@ async fn main() -> anyhow::Result<()> {
                             .await;
                         }
                     },
-                );
+                )
+                .map(anyhow::Ok);
 
-            pin_mut!(superset_controller, druid_connection_controller);
             // kube-runtime's Controller will tokio::spawn each reconciliation, so this only concerns the internal watch machinery
-            futures::future::select(superset_controller, druid_connection_controller).await;
+            futures::try_join!(
+                druid_connection_controller,
+                superset_controller,
+                eos_checker
+            )?;
         }
     }
 

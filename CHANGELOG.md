@@ -4,6 +4,10 @@
 
 ### Added
 
+- Add end-of-support checker which can be controlled with environment variables and CLI arguments ([#670]).
+  - `EOS_CHECK_MODE` (`--eos-check-mode`) to set the EoS check mode. Currently, only "offline" is supported.
+  - `EOS_INTERVAL` (`--eos-interval`) to set the interval in which the operator checks if it is EoS.
+  - `EOS_DISABLED` (`--eos-disabled`) to disable the EoS checker completely.
 - Helm: Allow Pod `priorityClassName` to be configured ([#664]).
 - Add version `4.1.4` ([#669]).
 
@@ -21,6 +25,7 @@
 [#664]: https://github.com/stackabletech/superset-operator/pull/664
 [#666]: https://github.com/stackabletech/superset-operator/pull/666
 [#669]: https://github.com/stackabletech/superset-operator/pull/669
+[#670]: https://github.com/stackabletech/superset-operator/pull/670
 
 ## [25.7.0] - 2025-07-23
 
