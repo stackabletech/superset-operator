@@ -10,6 +10,7 @@
   - `EOS_DISABLED` (`--eos-disabled`) to disable the EoS checker completely.
 - Helm: Allow Pod `priorityClassName` to be configured ([#664]).
 - Add version `4.1.4` ([#669]).
+- Add `prometheus.io/path|port|scheme` annotations to metrics service ([#671]).
 
 ### Changed
 
@@ -26,6 +27,7 @@
 [#666]: https://github.com/stackabletech/superset-operator/pull/666
 [#669]: https://github.com/stackabletech/superset-operator/pull/669
 [#670]: https://github.com/stackabletech/superset-operator/pull/670
+[#671]: https://github.com/stackabletech/superset-operator/pull/671
 
 ## [25.7.0] - 2025-07-23
 
