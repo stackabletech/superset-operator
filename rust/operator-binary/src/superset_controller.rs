@@ -91,10 +91,7 @@ use crate::{
     listener::{LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME, build_group_listener},
     operations::{graceful_shutdown::add_graceful_shutdown_config, pdb::add_pdbs},
     product_logging::{LOG_CONFIG_FILE, extend_config_map_with_log_config},
-    service::{
-        build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service,
-        rolegroup_headless_service_name,
-    },
+    service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
     util::build_recommended_labels,
 };
 
@@ -112,9 +109,6 @@ pub struct Ctx {
 #[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
-    #[snafu(display("object has no namespace"))]
-    ObjectHasNoNamespace,
-
     #[snafu(display("object defines no node role"))]
     NoNodeRole,
 
@@ -133,11 +127,6 @@ pub enum Error {
 
     #[snafu(display("failed to delete orphaned resources"))]
     DeleteOrphanedResources {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to apply global Service"))]
-    ApplyRoleService {
         source: stackable_operator::cluster_resources::Error,
     },
 
@@ -921,7 +910,7 @@ fn build_server_rolegroup_statefulset(
                 ),
                 ..LabelSelector::default()
             },
-            service_name: Some(rolegroup_headless_service_name(rolegroup_ref)),
+            service_name: Some(rolegroup_ref.rolegroup_headless_service_name()),
             template: pod_template,
             volume_claim_templates: pvcs,
             ..StatefulSetSpec::default()

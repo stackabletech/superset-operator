@@ -3,7 +3,7 @@ use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::core::v1::{Service, ServicePort, ServiceSpec},
-    kvp::{Label, Labels},
+    kvp::{Annotations, Labels},
     role_utils::RoleGroupRef,
 };
 
@@ -34,20 +34,20 @@ pub enum Error {
 pub fn build_node_rolegroup_headless_service(
     superset: &v1alpha1::SupersetCluster,
     resolved_product_image: &ResolvedProductImage,
-    rolegroup: &RoleGroupRef<v1alpha1::SupersetCluster>,
+    rolegroup_ref: &RoleGroupRef<v1alpha1::SupersetCluster>,
 ) -> Result<Service, Error> {
     let headless_service = Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(superset)
-            .name(rolegroup_headless_service_name(rolegroup))
+            .name(rolegroup_ref.rolegroup_headless_service_name())
             .ownerreference_from_resource(superset, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(build_recommended_labels(
                 superset,
                 SUPERSET_CONTROLLER_NAME,
                 &resolved_product_image.app_version_label_value,
-                &rolegroup.role,
-                &rolegroup.role_group,
+                &rolegroup_ref.role,
+                &rolegroup_ref.role_group,
             ))
             .context(MetadataBuildSnafu)?
             .build(),
@@ -60,8 +60,8 @@ pub fn build_node_rolegroup_headless_service(
                 Labels::role_group_selector(
                     superset,
                     APP_NAME,
-                    &rolegroup.role,
-                    &rolegroup.role_group,
+                    &rolegroup_ref.role,
+                    &rolegroup_ref.role_group,
                 )
                 .context(LabelBuildSnafu)?
                 .into(),
@@ -78,23 +78,24 @@ pub fn build_node_rolegroup_headless_service(
 pub fn build_node_rolegroup_metrics_service(
     superset: &v1alpha1::SupersetCluster,
     resolved_product_image: &ResolvedProductImage,
-    rolegroup: &RoleGroupRef<v1alpha1::SupersetCluster>,
+    rolegroup_ref: &RoleGroupRef<v1alpha1::SupersetCluster>,
 ) -> Result<Service, Error> {
     let metrics_service = Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(superset)
-            .name(rolegroup_metrics_service_name(rolegroup))
+            .name(rolegroup_ref.rolegroup_metrics_service_name())
             .ownerreference_from_resource(superset, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(build_recommended_labels(
                 superset,
                 SUPERSET_CONTROLLER_NAME,
                 &resolved_product_image.app_version_label_value,
-                &rolegroup.role,
-                &rolegroup.role_group,
+                &rolegroup_ref.role,
+                &rolegroup_ref.role_group,
             ))
             .context(MetadataBuildSnafu)?
-            .with_label(Label::try_from(("prometheus.io/scrape", "true")).context(LabelBuildSnafu)?)
+            .with_labels(prometheus_labels())
+            .with_annotations(prometheus_annotations())
             .build(),
         spec: Some(ServiceSpec {
             // Internal communication does not need to be exposed
@@ -105,8 +106,8 @@ pub fn build_node_rolegroup_metrics_service(
                 Labels::role_group_selector(
                     superset,
                     APP_NAME,
-                    &rolegroup.role,
-                    &rolegroup.role_group,
+                    &rolegroup_ref.role,
+                    &rolegroup_ref.role_group,
                 )
                 .context(LabelBuildSnafu)?
                 .into(),
@@ -118,22 +119,6 @@ pub fn build_node_rolegroup_metrics_service(
     };
 
     Ok(metrics_service)
-}
-
-/// Headless service for cluster internal purposes only.
-// TODO: Move to operator-rs
-pub fn rolegroup_headless_service_name(
-    rolegroup: &RoleGroupRef<v1alpha1::SupersetCluster>,
-) -> String {
-    format!("{name}-headless", name = rolegroup.object_name())
-}
-
-/// Headless metrics service exposes Prometheus endpoint only
-// TODO: Move to operator-rs
-pub fn rolegroup_metrics_service_name(
-    rolegroup: &RoleGroupRef<v1alpha1::SupersetCluster>,
-) -> String {
-    format!("{name}-metrics", name = rolegroup.object_name())
 }
 
 fn metrics_ports() -> Vec<ServicePort> {
@@ -152,4 +137,23 @@ fn service_ports() -> Vec<ServicePort> {
         protocol: Some("TCP".to_string()),
         ..ServicePort::default()
     }]
+}
+/// Common labels for Prometheus
+fn prometheus_labels() -> Labels {
+    Labels::try_from([("prometheus.io/scrape", "true")]).expect("should be a valid label")
+}
+
+/// Common annotations for Prometheus
+///
+/// These annotations can be used in a ServiceMonitor.
+///
+/// see also <https://github.com/prometheus-community/helm-charts/blob/prometheus-27.32.0/charts/prometheus/values.yaml#L983-L1036>
+fn prometheus_annotations() -> Annotations {
+    Annotations::try_from([
+        ("prometheus.io/path".to_owned(), "/metrics".to_owned()),
+        ("prometheus.io/port".to_owned(), METRICS_PORT.to_string()),
+        ("prometheus.io/scheme".to_owned(), "http".to_owned()),
+        ("prometheus.io/scrape".to_owned(), "true".to_owned()),
+    ])
+    .expect("should be valid annotations")
 }
