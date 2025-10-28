@@ -4302,8 +4302,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "be422046081be2fb9f37dfece660e007273f4e32";
-          sha256 = "14mp7m9x1d6s1xxhdh5rqvkxdksmz96km1hfn0yshdfw6ic5m8cv";
+          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
+          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
         };
         libName = "k8s_version";
         authors = [
@@ -8086,13 +8086,13 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.99.0";
+        version = "0.100.1";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "be422046081be2fb9f37dfece660e007273f4e32";
-          sha256 = "14mp7m9x1d6s1xxhdh5rqvkxdksmz96km1hfn0yshdfw6ic5m8cv";
+          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
+          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
         };
         libName = "stackable_operator";
         authors = [
@@ -8260,8 +8260,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "be422046081be2fb9f37dfece660e007273f4e32";
-          sha256 = "14mp7m9x1d6s1xxhdh5rqvkxdksmz96km1hfn0yshdfw6ic5m8cv";
+          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
+          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
@@ -8295,8 +8295,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "be422046081be2fb9f37dfece660e007273f4e32";
-          sha256 = "14mp7m9x1d6s1xxhdh5rqvkxdksmz96km1hfn0yshdfw6ic5m8cv";
+          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
+          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
         };
         libName = "stackable_shared";
         authors = [
@@ -8483,8 +8483,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "be422046081be2fb9f37dfece660e007273f4e32";
-          sha256 = "14mp7m9x1d6s1xxhdh5rqvkxdksmz96km1hfn0yshdfw6ic5m8cv";
+          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
+          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
         };
         libName = "stackable_telemetry";
         authors = [
@@ -8588,13 +8588,13 @@ rec {
       };
       "stackable-versioned" = rec {
         crateName = "stackable-versioned";
-        version = "0.8.2";
+        version = "0.8.3";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "be422046081be2fb9f37dfece660e007273f4e32";
-          sha256 = "14mp7m9x1d6s1xxhdh5rqvkxdksmz96km1hfn0yshdfw6ic5m8cv";
+          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
+          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
         };
         libName = "stackable_versioned";
         authors = [
@@ -8632,13 +8632,13 @@ rec {
       };
       "stackable-versioned-macros" = rec {
         crateName = "stackable-versioned-macros";
-        version = "0.8.2";
+        version = "0.8.3";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "be422046081be2fb9f37dfece660e007273f4e32";
-          sha256 = "14mp7m9x1d6s1xxhdh5rqvkxdksmz96km1hfn0yshdfw6ic5m8cv";
+          rev = "184423db7409f853bd69db7eeecd1affbf97ef40";
+          sha256 = "1a98klljvifnc168f1wc3d6szcry1lamxgjjdq89plr99p4b953l";
         };
         procMacro = true;
         libName = "stackable_versioned_macros";
