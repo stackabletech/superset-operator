@@ -15,6 +15,7 @@
 ### Changed
 
 - Deprecate version `4.0.2` ([#666]).
+- Bump stackable-operator to `0.100.1` ([#674]).
 
 ### Fixed
 
@@ -28,6 +29,7 @@
 [#669]: https://github.com/stackabletech/superset-operator/pull/669
 [#670]: https://github.com/stackabletech/superset-operator/pull/670
 [#671]: https://github.com/stackabletech/superset-operator/pull/671
+[#674]: https://github.com/stackabletech/superset-operator/pull/674
 
 ## [25.7.0] - 2025-07-23
 
