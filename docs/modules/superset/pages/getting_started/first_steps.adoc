@@ -67,12 +67,31 @@ include::example$getting_started/getting_started.sh[tag=wait-superset]
 
 Once the Superset node is created and the database is initialized, you can open Superset in your browser.
 
-To forward the Superset port (`8088`) to localhost, run:
+Use the `stackablectl` command line tool to find out the Superset URL.
 
 [source,bash]
-include::example$getting_started/getting_started.sh[tag=port-forwarding]
+----
+stackablectl stacklet list
 
-Then, open `http://localhost:8088` in your browser and log in with the admin credentials from the Kubernetes secret.
+┌──────────┬─────────────────┬───────────┬──────────────────────────────────────┬─────────────────────────────────┐
+│ PRODUCT  ┆ NAME            ┆ NAMESPACE ┆ ENDPOINTS                            ┆ CONDITIONS                      │
+╞══════════╪═════════════════╪═══════════╪══════════════════════════════════════╪═════════════════════════════════╡
+│ superset ┆ simple-superset ┆ default   ┆ node-http  http://192.168.49.2:30462 ┆ Available, Reconciling, Running │
+└──────────┴─────────────────┴───────────┴──────────────────────────────────────┴─────────────────────────────────┘
+----
+
+Then, open the HTTP endpoint (in this example `http://192.168.49.2:30462` in your browser and log in with the user credentials for Superset.
+
+Again, use `stackablectl` to find out those credentials:
+
+[source,bash]
+----
+stackablectl stacklet credentials superset simple-superset
+Credentials for superset (simple-superset) in namespace "default":
+
+ USERNAME  admin 
+ PASSWORD  admin
+----
 
 image::getting_started/superset-login.png[Login screen of Superset]
 
