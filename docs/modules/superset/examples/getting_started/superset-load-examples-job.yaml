@@ -13,7 +13,7 @@ spec:
         name: config
       containers:
       - name: superset
-        image: oci.stackable.tech/sdp/superset:4.1.4-stackable25.11.0-rc1
+        image: oci.stackable.tech/sdp/superset:4.1.4-stackable25.11.0
         command: [
           "/bin/sh",
           "-c",
