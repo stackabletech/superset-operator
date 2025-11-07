@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [25.11.0] - 2025-11-07
+
+## [25.11.0-rc1] - 2025-11-06
+
 ### Added
 
 - Add end-of-support checker which can be controlled with environment variables and CLI arguments ([#670]).
