@@ -5,7 +5,7 @@ metadata:
   name: simple-superset
 spec:
   image:
-    productVersion: 4.1.4
+    productVersion: 6.0.0-rc2
   clusterConfig:
     credentialsSecret: simple-superset-credentials
   nodes:
