@@ -61,6 +61,13 @@ pub fn add_superset_config(
         SupersetConfigOptions::LoggingConfigurator.to_string(),
         "StackableLoggingConfigurator()".into(),
     );
+    // Flask AppBuilder requires this to be set, otherwise the web ui cannot be used.
+    // We chose to make it an expression in case the user wants to override it through
+    // configurationOverrides (though it would require other settings like the private key too).
+    config.insert(
+        SupersetConfigOptions::RecaptchaPublicKey.to_string(),
+        "''".to_owned(),
+    );
 
     append_authentication_config(config, authentication_config)?;
 
