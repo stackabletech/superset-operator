@@ -4,7 +4,7 @@
 
 ### Added
 
-- Support for Superset 6.0.0-rc2 ([#680]).
+- Add support for Superset 6.0.0-rc2 ([#680]).
 
 [#680]: https://github.com/stackabletech/superset-operator/pull/680
 
