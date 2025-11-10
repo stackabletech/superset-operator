@@ -33,7 +33,7 @@ pub enum Error {
 pub const PYTHON_IMPORTS: &[&str] = &[
     "import os",
     "from superset.stats_logger import StatsdStatsLogger",
-    "from flask_appbuilder.security.manager import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_OID, AUTH_REMOTE_USER)",
+    "from flask_appbuilder.security.manager import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_REMOTE_USER)",
     "from log_config import StackableLoggingConfigurator",
 ];
 
