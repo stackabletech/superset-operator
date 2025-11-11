@@ -110,6 +110,9 @@ pub enum SupersetConfigOptions {
     AuthOpaRule,
     AuthOpaCacheMaxEntries,
     AuthOpaCacheTtlInSec,
+    // Flask AppBuilder (currently) requires this to be set, even if not used,
+    // otherwise the web UI cannot be used,
+    RecaptchaPublicKey,
 }
 
 #[versioned(
@@ -425,6 +428,11 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
             SupersetConfigOptions::AuthOpaRule => PythonType::StringLiteral,
             SupersetConfigOptions::AuthOpaCacheMaxEntries => PythonType::IntLiteral,
             SupersetConfigOptions::AuthOpaCacheTtlInSec => PythonType::IntLiteral,
+            // Flask AppBuilder (currently) requires this option to be set (even if empty).
+            // If we set it to a string, the user cannot then get it from an expression in
+            // configOverrides. So we make it an expression, but will need to manually quote the
+            // empty string as a default.
+            SupersetConfigOptions::RecaptchaPublicKey => PythonType::Expression,
         }
     }
 }

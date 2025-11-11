@@ -33,7 +33,7 @@ pub enum Error {
 pub const PYTHON_IMPORTS: &[&str] = &[
     "import os",
     "from superset.stats_logger import StatsdStatsLogger",
-    "from flask_appbuilder.security.manager import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_OID, AUTH_REMOTE_USER)",
+    "from flask_appbuilder.security.manager import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_REMOTE_USER)",
     "from log_config import StackableLoggingConfigurator",
 ];
 
@@ -43,23 +43,30 @@ pub fn add_superset_config(
 ) -> Result<(), Error> {
     config.insert(
         SupersetConfigOptions::SecretKey.to_string(),
-        "os.environ.get('SECRET_KEY')".into(),
+        "os.environ.get('SECRET_KEY')".to_owned(),
     );
     config.insert(
         SupersetConfigOptions::SqlalchemyDatabaseUri.to_string(),
-        "os.environ.get('SQLALCHEMY_DATABASE_URI')".into(),
+        "os.environ.get('SQLALCHEMY_DATABASE_URI')".to_owned(),
     );
     config.insert(
         SupersetConfigOptions::StatsLogger.to_string(),
-        "StatsdStatsLogger(host='0.0.0.0', port=9125)".into(),
+        "StatsdStatsLogger(host='0.0.0.0', port=9125)".to_owned(),
     );
     config.insert(
         SupersetConfigOptions::MapboxApiKey.to_string(),
-        "os.environ.get('MAPBOX_API_KEY', '')".into(),
+        "os.environ.get('MAPBOX_API_KEY', '')".to_owned(),
     );
     config.insert(
         SupersetConfigOptions::LoggingConfigurator.to_string(),
-        "StackableLoggingConfigurator()".into(),
+        "StackableLoggingConfigurator()".to_owned(),
+    );
+    // Flask AppBuilder requires this to be set, otherwise the web ui cannot be used.
+    // We chose to make it an expression in case the user wants to override it through
+    // configurationOverrides (though it would require other settings like the private key too).
+    config.insert(
+        SupersetConfigOptions::RecaptchaPublicKey.to_string(),
+        "''".to_owned(),
     );
 
     append_authentication_config(config, authentication_config)?;

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add support for Superset 6.0.0-rc2 ([#680]).
+
+[#680]: https://github.com/stackabletech/superset-operator/pull/680
+
 ## [25.11.0] - 2025-11-07
 
 ## [25.11.0-rc1] - 2025-11-06
