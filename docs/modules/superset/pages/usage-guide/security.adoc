@@ -177,19 +177,19 @@ spec:
   clusterConfig:
     authorization:
       roleMappingFromOpa:
-        configMapName: superset-opa-regorules # <1>
+        configMapName: opa # <1>
         package: superset
         cache: # <2>
           entryTimeToLive: 10s # <3>
           maxEntries: 5 # <4>
 ----
 
-<1> ConfigMap name containing rego rules
-<2> Mandatory Opa caching. If not set, default settings apply.
-<3> Time for cached entries per user can live. Defaults to 30s.
-<4> Number of maximum entries, defaults to 1000. Cache will be disabled for maxEntries: 0.
+<1> Discovery ConfigMap of your OpaCluster
+<2> Optional caching of group memberships. If not set, default settings apply.
+<3> Time to live for cached user entries. Defaults to 30s.
+<4> Maximum number of entries, defaults to 1000. Cache will be disabled for maxEntries: 0.
 
-IMPORTANT: Any role assignments done in the Superset UI are discarded and will be overridden by the OPA security manager.
+IMPORTANT: Any role assignments done in the Superset UI are discarded and will be overridden by the OPA security manager. Groups are only sync on log in!
 
 === Superset database
 
