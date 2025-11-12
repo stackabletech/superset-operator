@@ -184,8 +184,8 @@ spec:
           maxEntries: 5 # <4>
 ----
 
-<1> Discovery ConfigMap of your OpaCluster
-<2> Optional caching of group memberships. If not set, default settings apply.
+<1> Discovery ConfigMap of your OpaCluster.
+<2> Caching of group memberships. If not set, the default settings below apply.
 <3> Time to live for cached user entries. Defaults to 30s.
 <4> Maximum number of entries, defaults to 1000. Cache will be disabled for maxEntries: 0.
 
