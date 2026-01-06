@@ -6,7 +6,12 @@
 
 - Add support for Superset 6.0.0-rc2 ([#680]).
 
+### Changed
+
+- Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#691]).
+
 [#680]: https://github.com/stackabletech/superset-operator/pull/680
+[#691]: https://github.com/stackabletech/superset-operator/pull/691
 
 ## [25.11.0] - 2025-11-07
 
