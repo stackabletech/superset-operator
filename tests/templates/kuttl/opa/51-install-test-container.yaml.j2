@@ -76,12 +76,20 @@ spec:
             - name: SUPERSET_BASE_URL
               value: superset-node.$NAMESPACE.svc.cluster.local:8088
       volumes:
-        - name: tls
-          csi:
-            driver: secrets.stackable.tech
-            volumeAttributes:
-              secrets.stackable.tech/class: tls
-              secrets.stackable.tech/scope: pod
         - name: get-user-roles-script
           configMap:
             name: get-user-roles-script
+        - name: tls
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls
+                  secrets.stackable.tech/scope: pod
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
