@@ -379,6 +379,7 @@ pub async fn reconcile_superset(
         SUPERSET_CONTROLLER_NAME,
         &superset.object_ref(&()),
         ClusterResourceApplyStrategy::from(&superset.spec.cluster_config.cluster_operation),
+        &superset.spec.object_overrides,
     )
     .context(CreateClusterResourcesSnafu)?;
 
