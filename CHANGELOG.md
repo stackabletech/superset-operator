@@ -5,6 +5,8 @@
 ### Added
 
 - Add support for Superset 6.0.0-rc2 ([#680]).
+- Support objectOverrides using `.spec.objectOverrides`.
+  See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#693]).
 
 ### Changed
 
@@ -12,6 +14,7 @@
 
 [#680]: https://github.com/stackabletech/superset-operator/pull/680
 [#691]: https://github.com/stackabletech/superset-operator/pull/691
+[#693]: https://github.com/stackabletech/superset-operator/pull/693
 
 ## [25.11.0] - 2025-11-07
 

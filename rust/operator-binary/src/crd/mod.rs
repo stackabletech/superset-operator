@@ -19,6 +19,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
+    deep_merger::ObjectOverrides,
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
     memory::{BinaryMultiple, MemoryQuantity},
@@ -145,6 +146,10 @@ pub mod versioned {
         /// Settings that affect all roles and role groups.
         /// The settings in the `clusterConfig` are cluster wide settings that do not need to be configurable at role or role group level.
         pub cluster_config: v1alpha1::SupersetClusterConfig,
+
+        // no doc - docs in the struct.
+        #[serde(default)]
+        pub object_overrides: ObjectOverrides,
 
         // no doc - docs in the struct.
         #[serde(default, skip_serializing_if = "Option::is_none")]
