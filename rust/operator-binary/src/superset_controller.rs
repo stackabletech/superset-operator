@@ -467,6 +467,9 @@ pub async fn reconcile_superset(
             .with_context(|_| ApplyRoleGroupConfigSnafu {
                 rolegroup: rolegroup.clone(),
             })?;
+
+        // Note: The StatefulSet needs to be applied last, so that we don't cause unnecessary Pod
+        // restarts. See https://github.com/stackabletech/commons-operator/issues/111 for details.
         ss_cond_builder.add(
             cluster_resources
                 .add(client, rg_statefulset.clone())
