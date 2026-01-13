@@ -11,6 +11,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: superset-node-default
+  generation: 1 # There should be no unneeded Pod restarts
 spec:
   template:
     spec:
