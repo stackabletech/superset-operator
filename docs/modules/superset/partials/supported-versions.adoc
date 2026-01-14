@@ -2,7 +2,5 @@
 // This is a separate file, since it is used by both the direct Superset documentation, and the overarching
 // Stackable Platform documentation.
 
-- 6.0.0-rc2 (experimental)
+- 6.0.0
 - 4.1.4 (LTS)
-- 4.1.2 (deprecated)
-- 4.0.2 (deprecated)
