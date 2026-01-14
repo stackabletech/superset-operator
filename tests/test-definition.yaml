@@ -6,8 +6,6 @@
 dimensions:
   - name: superset
     values:
-      - 4.0.2
-      - 4.1.2
       - 4.1.4
       - 6.0.0
       # Or use a custom image:
