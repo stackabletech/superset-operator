@@ -9,12 +9,12 @@ dimensions:
       - 4.0.2
       - 4.1.2
       - 4.1.4
-      - 6.0.0-rc2
+      - 6.0.0
       # Or use a custom image:
       # - x.x.x,oci.stackable.tech/razvan/superset:x.x.x-stackable0.0.0-dev
   - name: superset-latest
     values:
-      - 6.0.0-rc2
+      - 6.0.0
       # - x.x.x,oci.stackable.tech/razvan/superset:x.x.x-stackable0.0.0-dev
   - name: ldap-authentication
     values:
