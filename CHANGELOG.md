@@ -4,7 +4,7 @@
 
 ### Added
 
-- Add support for Superset 6.0.0-rc2 ([#680]).
+- Add support for Superset 6.0.0 ([#680], [#695]).
 - Support objectOverrides using `.spec.objectOverrides`.
   See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#693]).
 
@@ -12,9 +12,14 @@
 
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#691]).
 
+### Removed
+
+- Remove support for Superset 4.0.2 and 4.1.2 ([#695]).
+
 [#680]: https://github.com/stackabletech/superset-operator/pull/680
 [#691]: https://github.com/stackabletech/superset-operator/pull/691
 [#693]: https://github.com/stackabletech/superset-operator/pull/693
+[#695]: https://github.com/stackabletech/superset-operator/pull/695
 
 ## [25.11.0] - 2025-11-07
 
