@@ -12,6 +12,8 @@ kind: StatefulSet
 metadata:
   name: superset-node-default
   generation: 1 # There should be no unneeded Pod restarts
+  labels:
+    restarter.stackable.tech/enabled: "true"
 spec:
   template:
     spec:
