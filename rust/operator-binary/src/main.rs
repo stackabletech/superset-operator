@@ -28,6 +28,7 @@ use stackable_operator::{
     logging::controller::report_controller_reconciled,
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
+    utils::signal::SignalWatcher,
 };
 
 use crate::{
@@ -101,9 +102,13 @@ async fn main() -> anyhow::Result<()> {
                 description = built_info::PKG_DESCRIPTION
             );
 
+            // Watches for the SIGTERM signal and sends a signal to all receivers, which gracefully
+            // shuts down all concurrent tasks below (EoS checker, controller).
+            let sigterm_watcher = SignalWatcher::sigterm()?;
+
             let eos_checker =
                 EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, maintenance.end_of_support)?
-                    .run()
+                    .run(sigterm_watcher.handle())
                     .map(anyhow::Ok);
 
             let product_config = product_config.load(&[
@@ -139,7 +144,6 @@ async fn main() -> anyhow::Result<()> {
                     watch_namespace.get_api::<DeserializeGuard<StatefulSet>>(&client),
                     watcher::Config::default(),
                 )
-                .shutdown_on_signal()
                 .watches(
                     client.get_api::<DeserializeGuard<core::v1alpha1::AuthenticationClass>>(&()),
                     watcher::Config::default(),
@@ -164,6 +168,7 @@ async fn main() -> anyhow::Result<()> {
                             .map(|superset| ObjectRef::from_obj(&*superset))
                     },
                 )
+                .graceful_shutdown_on(sigterm_watcher.handle())
                 .run(
                     superset_controller::reconcile_superset,
                     superset_controller::error_policy,
@@ -209,7 +214,6 @@ async fn main() -> anyhow::Result<()> {
             let job_store = druid_connection_controller.store();
             let config_map_store = druid_connection_controller.store();
             let druid_connection_controller = druid_connection_controller
-                .shutdown_on_signal()
                 .watches(
                     watch_namespace.get_api::<DeserializeGuard<v1alpha1::SupersetCluster>>(&client),
                     watcher::Config::default(),
@@ -247,6 +251,7 @@ async fn main() -> anyhow::Result<()> {
                             .map(|druid_connection| ObjectRef::from_obj(&*druid_connection))
                     },
                 )
+                .graceful_shutdown_on(sigterm_watcher.handle())
                 .run(
                     druid_connection_controller::reconcile_druid_connection,
                     druid_connection_controller::error_policy,
