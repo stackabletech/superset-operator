@@ -10,6 +10,7 @@
 
 ### Changed
 
+- Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#699]).
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#691]).
 
 ### Removed
@@ -20,6 +21,7 @@
 [#691]: https://github.com/stackabletech/superset-operator/pull/691
 [#693]: https://github.com/stackabletech/superset-operator/pull/693
 [#695]: https://github.com/stackabletech/superset-operator/pull/695
+[#699]: https://github.com/stackabletech/superset-operator/pull/699
 
 ## [25.11.0] - 2025-11-07
 
