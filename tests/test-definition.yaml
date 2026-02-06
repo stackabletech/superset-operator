@@ -21,7 +21,7 @@ dimensions:
       - server-verification-tls
   - name: opa-latest
     values:
-      - 1.12.2
+      - 1.12.3
   - name: openshift
     values:
       - "false"
