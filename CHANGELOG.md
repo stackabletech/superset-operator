@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add conversion webhook ([#702]).
 - Add support for Superset 6.0.0 ([#680], [#695]).
 - Support objectOverrides using `.spec.objectOverrides`.
   See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#693]).
@@ -22,6 +23,7 @@
 [#693]: https://github.com/stackabletech/superset-operator/pull/693
 [#695]: https://github.com/stackabletech/superset-operator/pull/695
 [#699]: https://github.com/stackabletech/superset-operator/pull/699
+[#702]: https://github.com/stackabletech/superset-operator/pull/702
 
 ## [25.11.0] - 2025-11-07
 
