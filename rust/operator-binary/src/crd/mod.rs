@@ -42,6 +42,7 @@ pub mod affinity;
 pub mod authentication;
 pub mod druidconnection;
 
+pub const FIELD_MANAGER: &str = "superset-operator";
 pub const APP_NAME: &str = "superset";
 pub const STACKABLE_CONFIG_DIR: &str = "/stackable/config";
 pub const STACKABLE_LOG_CONFIG_DIR: &str = "/stackable/log_config";

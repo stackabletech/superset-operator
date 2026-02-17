@@ -3,8 +3,9 @@
 #![allow(clippy::result_large_err)]
 use std::sync::Arc;
 
+use anyhow::anyhow;
 use clap::Parser;
-use futures::{FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt, TryFutureExt};
 use stackable_operator::{
     YamlSchema,
     cli::{Command, RunArguments},
@@ -39,6 +40,7 @@ use crate::{
     },
     druid_connection_controller::DRUID_CONNECTION_FULL_CONTROLLER_NAME,
     superset_controller::SUPERSET_FULL_CONTROLLER_NAME,
+    webhooks::conversion::create_webhook_server,
 };
 
 mod authorization;
@@ -54,6 +56,7 @@ mod rbac;
 mod service;
 mod superset_controller;
 mod util;
+mod webhooks;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -79,7 +82,7 @@ async fn main() -> anyhow::Result<()> {
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
         }
         Command::Run(RunArguments {
-            operator_environment: _,
+            operator_environment,
             watch_namespace,
             product_config,
             maintenance,
@@ -111,16 +114,27 @@ async fn main() -> anyhow::Result<()> {
                     .run(sigterm_watcher.handle())
                     .map(anyhow::Ok);
 
-            let product_config = product_config.load(&[
-                "deploy/config-spec/properties.yaml",
-                "/etc/stackable/superset-operator/config-spec/properties.yaml",
-            ])?;
-
             let client = stackable_operator::client::initialize_operator(
                 Some(OPERATOR_NAME.to_string()),
                 &common.cluster_info,
             )
             .await?;
+
+            let webhook_server = create_webhook_server(
+                &operator_environment,
+                maintenance.disable_crd_maintenance,
+                client.as_kube_client(),
+            )
+            .await?;
+
+            let webhook_server = webhook_server
+                .run(sigterm_watcher.handle())
+                .map_err(|err| anyhow!(err).context("failed to run webhook server"));
+
+            let product_config = product_config.load(&[
+                "deploy/config-spec/properties.yaml",
+                "/etc/stackable/superset-operator/config-spec/properties.yaml",
+            ])?;
 
             let superset_event_recorder = Arc::new(Recorder::new(
                 client.as_kube_client(),
@@ -282,6 +296,7 @@ async fn main() -> anyhow::Result<()> {
             futures::try_join!(
                 druid_connection_controller,
                 superset_controller,
+                webhook_server,
                 eos_checker
             )?;
         }
