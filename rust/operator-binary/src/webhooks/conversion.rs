@@ -8,7 +8,10 @@ use stackable_operator::{
     },
 };
 
-use crate::crd::{FIELD_MANAGER, SupersetCluster, SupersetClusterVersion};
+use crate::crd::{
+    FIELD_MANAGER, SupersetCluster, SupersetClusterVersion,
+    druidconnection::{DruidConnection, DruidConnectionVersion},
+};
 
 /// Contains errors which can be encountered when creating the conversion webhook server and the
 /// CRD maintainer.
@@ -27,10 +30,16 @@ pub async fn create_webhook_server(
     disable_crd_maintenance: bool,
     client: Client,
 ) -> Result<WebhookServer, Error> {
-    let crds_and_handlers = vec![(
-        SupersetCluster::merged_crd(SupersetClusterVersion::V1Alpha1).context(MergeCrdSnafu)?,
-        SupersetCluster::try_convert,
-    )];
+    let crds_and_handlers = vec![
+        (
+            DruidConnection::merged_crd(DruidConnectionVersion::V1Alpha1).context(MergeCrdSnafu)?,
+            DruidConnection::try_convert as fn(_) -> _,
+        ),
+        (
+            SupersetCluster::merged_crd(SupersetClusterVersion::V1Alpha1).context(MergeCrdSnafu)?,
+            SupersetCluster::try_convert as fn(_) -> _,
+        ),
+    ];
 
     let conversion_webhook_options = ConversionWebhookOptions {
         disable_crd_maintenance,
