@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use stackable_operator::{
-    k8s_openapi::{apimachinery::pkg::apis::meta::v1::Time, chrono::Utc},
+    k8s_openapi::{self, apimachinery::pkg::apis::meta::v1::Time},
     kube::{CustomResource, ResourceExt},
     schemars::{self, JsonSchema},
     versioned::versioned,
@@ -111,27 +111,30 @@ impl v1alpha1::DruidConnection {
 impl v1alpha1::DruidConnectionStatus {
     pub fn new() -> Self {
         Self {
-            started_at: Some(Time(Utc::now())),
+            started_at: Some(Time(k8s_openapi::jiff::Timestamp::now())),
             condition: v1alpha1::DruidConnectionStatusCondition::Pending,
         }
     }
 
     pub fn importing(&self) -> Self {
-        let mut new = self.clone();
-        new.condition = v1alpha1::DruidConnectionStatusCondition::Importing;
-        new
+        Self {
+            condition: v1alpha1::DruidConnectionStatusCondition::Importing,
+            ..self.clone()
+        }
     }
 
     pub fn ready(&self) -> Self {
-        let mut new = self.clone();
-        new.condition = v1alpha1::DruidConnectionStatusCondition::Ready;
-        new
+        Self {
+            condition: v1alpha1::DruidConnectionStatusCondition::Ready,
+            ..self.clone()
+        }
     }
 
     pub fn failed(&self) -> Self {
-        let mut new = self.clone();
-        new.condition = v1alpha1::DruidConnectionStatusCondition::Failed;
-        new
+        Self {
+            condition: v1alpha1::DruidConnectionStatusCondition::Failed,
+            ..self.clone()
+        }
     }
 }
 
