@@ -1,6 +1,5 @@
 use std::fmt::{Display, Write};
 
-use snafu::Snafu;
 use stackable_operator::{
     builder::configmap::ConfigMapBuilder,
     kube::Resource,
@@ -15,24 +14,6 @@ use stackable_operator::{
 
 use crate::crd::STACKABLE_LOG_DIR;
 
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display("object has no namespace"))]
-    ObjectHasNoNamespace,
-    #[snafu(display("failed to retrieve the ConfigMap [{cm_name}]"))]
-    ConfigMapNotFound {
-        source: stackable_operator::client::Error,
-        cm_name: String,
-    },
-    #[snafu(display("failed to retrieve the entry [{entry}] for ConfigMap [{cm_name}]"))]
-    MissingConfigMapEntry {
-        entry: &'static str,
-        cm_name: String,
-    },
-}
-
-type Result<T, E = Error> = std::result::Result<T, E>;
-
 pub const LOG_CONFIG_FILE: &str = "log_config.py";
 
 const LOG_FILE: &str = "superset.py.json";
@@ -44,8 +25,7 @@ pub fn extend_config_map_with_log_config<C, K>(
     main_container: &C,
     vector_container: &C,
     cm_builder: &mut ConfigMapBuilder,
-) -> Result<()>
-where
+) where
     C: Clone + Ord + Display,
     K: Resource,
 {
@@ -75,8 +55,6 @@ where
             product_logging::framework::create_vector_config(rolegroup, vector_log_config),
         );
     }
-
-    Ok(())
 }
 
 fn create_superset_config(log_config: &AutomaticContainerLogConfig, log_dir: &str) -> String {

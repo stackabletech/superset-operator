@@ -19,13 +19,12 @@ use stackable_operator::{
 
 use crate::{
     authorization::opa::{OPA_IMPORTS, SupersetOpaConfigResolved},
-    config::{self, PYTHON_IMPORTS},
+    config::{self, product_logging::extend_config_map_with_log_config, superset::PYTHON_IMPORTS},
     crd::{
         SUPERSET_CONFIG_FILENAME, SupersetConfigOptions,
         authentication::SupersetClientAuthenticationDetailsResolved,
         v1alpha1::{Container, SupersetCluster},
     },
-    product_logging::extend_config_map_with_log_config,
     resources::build_recommended_labels,
     superset_controller::SUPERSET_CONTROLLER_NAME,
 };
@@ -38,7 +37,7 @@ pub enum Error {
     },
 
     #[snafu(display("failed to add Superset config settings"))]
-    AddSupersetConfig { source: crate::config::Error },
+    AddSupersetConfig { source: config::superset::Error },
 
     #[snafu(display(
         "failed to write to String (Vec<u8> to be precise) containing superset config"
@@ -60,12 +59,6 @@ pub enum Error {
     BuildRoleGroupConfig {
         source: stackable_operator::builder::configmap::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
-    },
-
-    #[snafu(display("failed to add the logging configuration to the ConfigMap [{cm_name}]"))]
-    InvalidLoggingConfig {
-        source: crate::product_logging::Error,
-        cm_name: String,
     },
 }
 
@@ -90,7 +83,7 @@ pub fn build_rolegroup_config_map(
     //    Issue: https://github.com/stackabletech/superset-operator/issues/416
     config_properties.insert("TALISMAN_ENABLED".to_string(), "False".to_string());
 
-    config::add_superset_config(&mut config_properties, authentication_config)
+    config::superset::add_superset_config(&mut config_properties, authentication_config)
         .context(AddSupersetConfigSnafu)?;
 
     // Adding opa configuration properties to config_properties.
@@ -165,10 +158,7 @@ pub fn build_rolegroup_config_map(
         &Container::Superset,
         &Container::Vector,
         &mut cm_builder,
-    )
-    .context(InvalidLoggingConfigSnafu {
-        cm_name: rolegroup.object_name(),
-    })?;
+    );
 
     cm_builder
         .build()

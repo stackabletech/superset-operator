@@ -38,8 +38,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    commands::add_cert_to_python_certifi_command,
-    controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
+    config::{commands::add_cert_to_python_certifi_command, product_logging::LOG_CONFIG_FILE},
     crd::{
         APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
         STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
@@ -50,9 +49,8 @@ use crate::{
         v1alpha1::{Container, SupersetCluster, SupersetConfig},
     },
     operations::graceful_shutdown::add_graceful_shutdown_config,
-    product_logging::LOG_CONFIG_FILE,
     resources::{
-        build_recommended_labels,
+        CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME, build_recommended_labels,
         listener::{LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
     },
     superset_controller::SUPERSET_CONTROLLER_NAME,
@@ -335,7 +333,7 @@ pub fn build_server_rolegroup_statefulset(
         )
         .build();
 
-    pb.add_volumes(controller_commons::create_volumes(
+    pb.add_volumes(crate::resources::create_volumes(
         &rolegroup_ref.object_name(),
         merged_config.logging.containers.get(&Container::Superset),
     ))

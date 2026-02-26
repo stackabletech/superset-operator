@@ -44,13 +44,10 @@ use crate::{
 };
 
 mod authorization;
-mod commands;
 mod config;
-mod controller_commons;
 mod crd;
 mod druid_connection_controller;
 mod operations;
-mod product_logging;
 mod resources;
 mod superset_controller;
 mod webhooks;
