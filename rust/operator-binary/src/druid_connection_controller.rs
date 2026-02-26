@@ -27,9 +27,9 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::{
     APP_NAME, OPERATOR_NAME,
     crd::{PYTHONPATH, SUPERSET_CONFIG_FILENAME, druidconnection, v1alpha1},
+    operations::job_state::{JobState, get_job_state},
     resources::rbac,
     superset_controller::DOCKER_IMAGE_BASE_NAME,
-    util::{JobState, get_job_state},
 };
 
 pub const DRUID_CONNECTION_CONTROLLER_NAME: &str = "druid-connection";

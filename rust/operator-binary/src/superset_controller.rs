@@ -36,12 +36,12 @@ use crate::{
     },
     operations::pdb::add_pdbs,
     resources::{
+        build_recommended_labels,
         configmap::build_rolegroup_config_map,
         listener::build_group_listener,
         service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
         statefulset::build_server_rolegroup_statefulset,
     },
-    util::build_recommended_labels,
 };
 
 pub const SUPERSET_CONTROLLER_NAME: &str = "supersetcluster";

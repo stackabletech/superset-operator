@@ -53,7 +53,6 @@ mod operations;
 mod product_logging;
 mod resources;
 mod superset_controller;
-mod util;
 mod webhooks;
 
 mod built_info {

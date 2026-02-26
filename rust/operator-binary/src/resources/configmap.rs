@@ -26,8 +26,8 @@ use crate::{
         v1alpha1::{Container, SupersetCluster},
     },
     product_logging::extend_config_map_with_log_config,
+    resources::build_recommended_labels,
     superset_controller::SUPERSET_CONTROLLER_NAME,
-    util::build_recommended_labels,
 };
 
 #[derive(Snafu, Debug)]

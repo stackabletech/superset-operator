@@ -51,9 +51,11 @@ use crate::{
     },
     operations::graceful_shutdown::add_graceful_shutdown_config,
     product_logging::LOG_CONFIG_FILE,
-    resources::listener::{LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
+    resources::{
+        build_recommended_labels,
+        listener::{LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
+    },
     superset_controller::SUPERSET_CONTROLLER_NAME,
-    util::build_recommended_labels,
 };
 
 #[derive(Snafu, Debug)]
