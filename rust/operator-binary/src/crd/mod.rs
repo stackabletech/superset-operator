@@ -35,7 +35,7 @@ use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
     crd::v1alpha1::{SupersetConfigFragment, SupersetRoleConfig},
-    listener::default_listener_class,
+    resources::listener::default_listener_class,
 };
 
 pub mod affinity;
@@ -155,6 +155,14 @@ pub mod versioned {
         // no doc - docs in the struct.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pub nodes: Option<Role<v1alpha1::SupersetConfigFragment, SupersetRoleConfig>>,
+
+        // no doc - docs in the struct.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub workers: Option<Role<v1alpha1::SupersetConfigFragment, SupersetRoleConfig>>,
+
+        // no doc - docs in the struct.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub beat: Option<Role<v1alpha1::SupersetConfigFragment, SupersetRoleConfig>>,
     }
 
     // TODO: move generic version to op-rs?
@@ -354,6 +362,10 @@ pub struct Connections {
 pub enum SupersetRole {
     #[strum(serialize = "node")]
     Node,
+    #[strum(serialize = "worker")]
+    Worker,
+    #[strum(serialize = "beat")]
+    Beat,
 }
 
 impl SupersetRole {
@@ -364,7 +376,16 @@ impl SupersetRole {
                 .nodes
                 .to_owned()
                 .map(|node| node.role_config.listener_class),
+            Self::Worker | Self::Beat => None,
         }
+    }
+
+    pub fn roles() -> Vec<String> {
+        let mut roles = vec![];
+        for role in Self::iter() {
+            roles.push(role.to_string())
+        }
+        roles
     }
 }
 
@@ -448,6 +469,7 @@ impl v1alpha1::SupersetConfig {
     pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
 
     fn default_config(cluster_name: &str, role: &SupersetRole) -> v1alpha1::SupersetConfigFragment {
+        // TODO: Match for roles
         v1alpha1::SupersetConfigFragment {
             resources: ResourcesFragment {
                 cpu: CpuLimitsFragment {
@@ -539,6 +561,7 @@ impl v1alpha1::SupersetCluster {
                 "{cluster_name}-{role}",
                 cluster_name = self.name_any()
             )),
+            SupersetRole::Worker | SupersetRole::Beat => None,
         }
     }
 
@@ -547,9 +570,7 @@ impl v1alpha1::SupersetCluster {
     }
 
     pub fn get_role_config(&self, role: &SupersetRole) -> Option<&SupersetRoleConfig> {
-        match role {
-            SupersetRole::Node => self.spec.nodes.as_ref().map(|c| &c.role_config),
-        }
+        self.get_role(role).as_ref().map(|c| &c.role_config)
     }
 
     pub fn get_role(
@@ -558,6 +579,8 @@ impl v1alpha1::SupersetCluster {
     ) -> Option<&Role<SupersetConfigFragment, SupersetRoleConfig>> {
         match role {
             SupersetRole::Node => self.spec.nodes.as_ref(),
+            SupersetRole::Worker => self.spec.workers.as_ref(),
+            SupersetRole::Beat => self.spec.beat.as_ref(),
         }
     }
 
@@ -590,12 +613,10 @@ impl v1alpha1::SupersetCluster {
         // Initialize the result with all default values as baseline
         let conf_defaults = v1alpha1::SupersetConfig::default_config(&self.name_any(), role);
 
-        let role = match role {
-            SupersetRole::Node => self.spec.nodes.as_ref().context(UnknownSupersetRoleSnafu {
-                role: role.to_string(),
-                roles: vec![role.to_string()],
-            })?,
-        };
+        let role = self.get_role(role).context(UnknownSupersetRoleSnafu {
+            role: role.to_string(),
+            roles: SupersetRole::roles(),
+        })?;
 
         // Retrieve role resource config
         let mut conf_role = role.config.config.to_owned();

@@ -27,7 +27,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::{
     APP_NAME, OPERATOR_NAME,
     crd::{PYTHONPATH, SUPERSET_CONFIG_FILENAME, druidconnection, v1alpha1},
-    rbac,
+    resources::rbac,
     superset_controller::DOCKER_IMAGE_BASE_NAME,
     util::{JobState, get_job_state},
 };
