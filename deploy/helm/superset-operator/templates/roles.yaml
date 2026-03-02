@@ -53,6 +53,18 @@ rules:
   - apiGroups:
       - apps
     resources:
+      - deployments
+    verbs:
+      - get
+      - create
+      - delete
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apps
+    resources:
       - statefulsets
     verbs:
       - get

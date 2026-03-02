@@ -1,5 +1,5 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
-use std::{borrow::Cow, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
 use const_format::concatcp;
 use product_config::{ProductConfigManager, types::PropertyNameKind};
@@ -20,8 +20,8 @@ use stackable_operator::{
     role_utils::{GenericRoleConfig, RoleGroupRef},
     shared::time::Duration,
     status::condition::{
-        compute_conditions, operations::ClusterOperationsConditionBuilder,
-        statefulset::StatefulSetConditionBuilder,
+        compute_conditions, deployment::DeploymentConditionBuilder,
+        operations::ClusterOperationsConditionBuilder, statefulset::StatefulSetConditionBuilder,
     },
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
@@ -38,6 +38,7 @@ use crate::{
     resources::{
         build_recommended_labels,
         configmap::build_rolegroup_config_map,
+        deployment::build_worker_rolegroup_deployment,
         listener::build_group_listener,
         service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
         statefulset::build_server_rolegroup_statefulset,
@@ -60,6 +61,9 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("object defines no node role"))]
     NoNodeRole,
+
+    #[snafu(display("failed to parse role: {source}"))]
+    ParseRole { source: strum::ParseError },
 
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
@@ -85,6 +89,12 @@ pub enum Error {
 
     #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
     ApplyRoleGroupStatefulSet {
+        source: stackable_operator::cluster_resources::Error,
+        rolegroup: RoleGroupRef<SupersetCluster>,
+    },
+
+    #[snafu(display("failed to apply Deployment for {rolegroup}"))]
+    ApplyRoleGroupDeployment {
         source: stackable_operator::cluster_resources::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
@@ -153,19 +163,14 @@ pub enum Error {
         source: stackable_operator::cluster_resources::Error,
     },
 
-    #[snafu(display("failed to configure listener"))]
-    ListenerConfiguration {
+    #[snafu(display("failed to build listener"))]
+    BuildListener {
         source: crate::resources::listener::Error,
     },
 
-    #[snafu(display("failed to configure service"))]
-    ServiceConfiguration {
+    #[snafu(display("failed to build service"))]
+    BuildService {
         source: crate::resources::service::Error,
-    },
-
-    #[snafu(display("failed to resolve product image"))]
-    ResolveProductImage {
-        source: product_image_selection::Error,
     },
 
     #[snafu(display("failed to build statefulset"))]
@@ -173,9 +178,19 @@ pub enum Error {
         source: crate::resources::statefulset::Error,
     },
 
+    #[snafu(display("failed to build deployment"))]
+    BuildDeployment {
+        source: crate::resources::deployment::Error,
+    },
+
     #[snafu(display("failed to build configmap"))]
     BuildConfigMap {
         source: crate::resources::configmap::Error,
+    },
+
+    #[snafu(display("failed to resolve product image"))]
+    ResolveProductImage {
+        source: product_image_selection::Error,
     },
 }
 
@@ -205,7 +220,6 @@ pub async fn reconcile_superset(
         .image
         .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION)
         .context(ResolveProductImageSnafu)?;
-    let superset_role = SupersetRole::Node;
 
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&superset.spec.cluster_config.cluster_operation);
@@ -221,16 +235,40 @@ pub async fn reconcile_superset(
         &resolved_product_image.product_version,
         &transform_all_roles_to_config(
             superset,
-            [(
-                superset_role.to_string(),
+            [
                 (
-                    vec![
-                        PropertyNameKind::Env,
-                        PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
-                    ],
-                    superset.spec.nodes.clone().context(NoNodeRoleSnafu)?,
+                    SupersetRole::Node.to_string(),
+                    (
+                        vec![
+                            PropertyNameKind::Env,
+                            PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
+                        ],
+                        superset.spec.nodes.clone().context(NoNodeRoleSnafu)?,
+                    ),
                 ),
-            )]
+                (
+                    SupersetRole::Worker.to_string(),
+                    (
+                        vec![
+                            PropertyNameKind::Env,
+                            PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
+                        ],
+                        // TODO: improve error
+                        superset.spec.workers.clone().context(NoNodeRoleSnafu)?,
+                    ),
+                ),
+                // (
+                //     SupersetRole::Beat.to_string(),
+                //     (
+                //         vec![
+                //             PropertyNameKind::Env,
+                //             PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
+                //         ],
+                //         // TODO: improve error
+                //         superset.spec.beat.clone().context(NoNodeRoleSnafu)?,
+                //     ),
+                // ),
+            ]
             .into(),
         )
         .context(GenerateProductConfigSnafu)?,
@@ -239,11 +277,6 @@ pub async fn reconcile_superset(
         false,
     )
     .context(InvalidProductConfigSnafu)?;
-
-    let role_node_config = validated_config
-        .get(superset_role.to_string().as_str())
-        .map(Cow::Borrowed)
-        .unwrap_or_default();
 
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
@@ -282,115 +315,153 @@ pub async fn reconcile_superset(
         .await
         .context(ApplyRoleBindingSnafu)?;
 
-    let mut ss_cond_builder = StatefulSetConditionBuilder::default();
+    let mut statefulset_cond_builder = StatefulSetConditionBuilder::default();
+    let mut deployment_cond_builder = DeploymentConditionBuilder::default();
 
-    for (rolegroup_name, rolegroup_config) in role_node_config.iter() {
-        let rolegroup = superset.node_rolegroup_ref(rolegroup_name);
+    for (superset_role_str, role_config) in validated_config {
+        let superset_role = SupersetRole::from_str(&superset_role_str).context(ParseRoleSnafu)?;
 
-        let config = superset
-            .merged_config(&SupersetRole::Node, &rolegroup)
-            .context(FailedToResolveConfigSnafu)?;
+        for (rolegroup_name, rolegroup_config) in role_config.iter() {
+            let rolegroup = superset.rolegroup_ref(&superset_role, rolegroup_name);
 
-        let rg_configmap = build_rolegroup_config_map(
-            superset,
-            &resolved_product_image,
-            &rolegroup,
-            rolegroup_config,
-            &auth_config,
-            &superset_opa_config,
-            &config.logging,
-        )
-        .context(BuildConfigMapSnafu)?;
-        let rg_statefulset = build_server_rolegroup_statefulset(
-            superset,
-            &resolved_product_image,
-            &superset_role,
-            &rolegroup,
-            rolegroup_config,
-            &auth_config,
-            &rbac_sa.name_any(),
-            &config,
-        )
-        .context(BuildStatefulSetSnafu)?;
+            let config = superset
+                .merged_config(&superset_role, &rolegroup)
+                .context(FailedToResolveConfigSnafu)?;
 
-        let rg_metrics_service =
-            build_node_rolegroup_metrics_service(superset, &resolved_product_image, &rolegroup)
-                .context(ServiceConfigurationSnafu)?;
-
-        let rg_headless_service =
-            build_node_rolegroup_headless_service(superset, &resolved_product_image, &rolegroup)
-                .context(ServiceConfigurationSnafu)?;
-
-        cluster_resources
-            .add(client, rg_metrics_service)
-            .await
-            .with_context(|_| ApplyRoleGroupServiceSnafu {
-                rolegroup: rolegroup.clone(),
-            })?;
-
-        cluster_resources
-            .add(client, rg_headless_service)
-            .await
-            .with_context(|_| ApplyRoleGroupServiceSnafu {
-                rolegroup: rolegroup.clone(),
-            })?;
-
-        cluster_resources
-            .add(client, rg_configmap)
-            .await
-            .with_context(|_| ApplyRoleGroupConfigSnafu {
-                rolegroup: rolegroup.clone(),
-            })?;
-
-        // Note: The StatefulSet needs to be applied after all ConfigMaps and Secrets it mounts
-        // to prevent unnecessary Pod restarts.
-        // See https://github.com/stackabletech/commons-operator/issues/111 for details.
-        ss_cond_builder.add(
-            cluster_resources
-                .add(client, rg_statefulset.clone())
-                .await
-                .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
-                    rolegroup: rolegroup.clone(),
-                })?,
-        );
-    }
-
-    if let Some(listener_class) = &superset_role.listener_class_name(superset) {
-        if let Some(listener_group_name) = superset.group_listener_name(&superset_role) {
-            let group_listener = build_group_listener(
+            let rg_configmap = build_rolegroup_config_map(
                 superset,
-                build_recommended_labels(
-                    superset,
-                    SUPERSET_CONTROLLER_NAME,
-                    &resolved_product_image.product_version,
-                    &superset_role.to_string(),
-                    "none",
-                ),
-                listener_class.to_string(),
-                listener_group_name,
+                &resolved_product_image,
+                &rolegroup,
+                rolegroup_config,
+                &auth_config,
+                &superset_opa_config,
+                &config.logging,
             )
-            .context(ListenerConfigurationSnafu)?;
-            cluster_resources
-                .add(client, group_listener)
-                .await
-                .context(ApplyGroupListenerSnafu)?;
-        }
-    }
+            .context(BuildConfigMapSnafu)?;
 
-    let generic_role_config = superset.generic_role_config(&superset_role);
-    if let Some(GenericRoleConfig {
-        pod_disruption_budget: pdb,
-    }) = generic_role_config
-    {
-        add_pdbs(
-            &pdb,
-            superset,
-            &superset_role,
-            client,
-            &mut cluster_resources,
-        )
-        .await
-        .context(FailedToCreatePdbSnafu)?;
+            let rg_metrics_service =
+                build_node_rolegroup_metrics_service(superset, &resolved_product_image, &rolegroup)
+                    .context(BuildServiceSnafu)?;
+
+            let rg_headless_service = build_node_rolegroup_headless_service(
+                superset,
+                &resolved_product_image,
+                &rolegroup,
+            )
+            .context(BuildServiceSnafu)?;
+
+            cluster_resources
+                .add(client, rg_metrics_service)
+                .await
+                .with_context(|_| ApplyRoleGroupServiceSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
+
+            cluster_resources
+                .add(client, rg_headless_service)
+                .await
+                .with_context(|_| ApplyRoleGroupServiceSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
+
+            cluster_resources
+                .add(client, rg_configmap)
+                .await
+                .with_context(|_| ApplyRoleGroupConfigSnafu {
+                    rolegroup: rolegroup.clone(),
+                })?;
+
+            match superset_role {
+                SupersetRole::Node => {
+                    let rg_statefulset = build_server_rolegroup_statefulset(
+                        superset,
+                        &resolved_product_image,
+                        &superset_role,
+                        &rolegroup,
+                        rolegroup_config,
+                        &auth_config,
+                        &rbac_sa.name_any(),
+                        &config,
+                    )
+                    .context(BuildStatefulSetSnafu)?;
+
+                    // Note: The StatefulSet needs to be applied after all ConfigMaps and Secrets it mounts
+                    // to prevent unnecessary Pod restarts.
+                    // See https://github.com/stackabletech/commons-operator/issues/111 for details.
+                    statefulset_cond_builder.add(
+                        cluster_resources
+                            .add(client, rg_statefulset.clone())
+                            .await
+                            .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
+                                rolegroup: rolegroup.clone(),
+                            })?,
+                    );
+                }
+                SupersetRole::Worker => {
+                    let rg_deployment = build_worker_rolegroup_deployment(
+                        superset,
+                        &resolved_product_image,
+                        &superset_role,
+                        &rolegroup,
+                        rolegroup_config,
+                        &rbac_sa.name_any(),
+                        &config,
+                    )
+                    .context(BuildDeploymentSnafu)?;
+
+                    // Note: The Deployment needs to be applied after all ConfigMaps and Secrets it mounts
+                    // to prevent unnecessary Pod restarts.
+                    // See https://github.com/stackabletech/commons-operator/issues/111 for details.
+                    deployment_cond_builder.add(
+                        cluster_resources
+                            .add(client, rg_deployment.clone())
+                            .await
+                            .with_context(|_| ApplyRoleGroupDeploymentSnafu {
+                                rolegroup: rolegroup.clone(),
+                            })?,
+                    );
+                }
+                SupersetRole::Beat => todo!(),
+            }
+
+            if let Some(listener_class) = &superset_role.listener_class_name(superset) {
+                if let Some(listener_group_name) = superset.group_listener_name(&superset_role) {
+                    let group_listener = build_group_listener(
+                        superset,
+                        build_recommended_labels(
+                            superset,
+                            SUPERSET_CONTROLLER_NAME,
+                            &resolved_product_image.product_version,
+                            &superset_role.to_string(),
+                            "none",
+                        ),
+                        listener_class.to_string(),
+                        listener_group_name,
+                    )
+                    .context(BuildListenerSnafu)?;
+                    cluster_resources
+                        .add(client, group_listener)
+                        .await
+                        .context(ApplyGroupListenerSnafu)?;
+                }
+            }
+
+            let generic_role_config = superset.generic_role_config(&superset_role);
+            if let Some(GenericRoleConfig {
+                pod_disruption_budget: pdb,
+            }) = generic_role_config
+            {
+                add_pdbs(
+                    &pdb,
+                    superset,
+                    &superset_role,
+                    client,
+                    &mut cluster_resources,
+                )
+                .await
+                .context(FailedToCreatePdbSnafu)?;
+            }
+        }
     }
 
     cluster_resources
@@ -401,7 +472,11 @@ pub async fn reconcile_superset(
     let status = SupersetClusterStatus {
         conditions: compute_conditions(
             superset,
-            &[&ss_cond_builder, &cluster_operation_cond_builder],
+            &[
+                &statefulset_cond_builder,
+                &deployment_cond_builder,
+                &cluster_operation_cond_builder,
+            ],
         ),
     };
     client

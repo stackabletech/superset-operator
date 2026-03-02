@@ -1,0 +1,9 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: copy-scripts
+timeout: 300
+commands:
+  - script: kubectl cp -n $NAMESPACE ./create-database.sh test-celery-worker-0:/tmp
+  - script: kubectl cp -n $NAMESPACE ./run-select-query.sh test-celery-worker-0:/tmp

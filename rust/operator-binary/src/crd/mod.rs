@@ -357,7 +357,17 @@ pub struct Connections {
 }
 
 #[derive(
-    Clone, Debug, Deserialize, Display, EnumIter, Eq, Hash, JsonSchema, PartialEq, Serialize,
+    Clone,
+    Debug,
+    Deserialize,
+    Display,
+    EnumIter,
+    EnumString,
+    Eq,
+    Hash,
+    JsonSchema,
+    PartialEq,
+    Serialize,
 )]
 pub enum SupersetRole {
     #[strum(serialize = "node")]
@@ -469,24 +479,61 @@ impl v1alpha1::SupersetConfig {
     pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
 
     fn default_config(cluster_name: &str, role: &SupersetRole) -> v1alpha1::SupersetConfigFragment {
-        // TODO: Match for roles
-        v1alpha1::SupersetConfigFragment {
-            resources: ResourcesFragment {
-                cpu: CpuLimitsFragment {
-                    min: Some(Quantity("300m".to_owned())),
-                    max: Some(Quantity("1200m".to_owned())),
+        match role {
+            SupersetRole::Node => v1alpha1::SupersetConfigFragment {
+                resources: ResourcesFragment {
+                    cpu: CpuLimitsFragment {
+                        min: Some(Quantity("300m".to_owned())),
+                        max: Some(Quantity("1200m".to_owned())),
+                    },
+                    memory: MemoryLimitsFragment {
+                        limit: Some(Quantity("2Gi".to_owned())),
+                        runtime_limits: NoRuntimeLimitsFragment {},
+                    },
+                    storage: v1alpha1::SupersetStorageConfigFragment {},
                 },
-                memory: MemoryLimitsFragment {
-                    limit: Some(Quantity("2Gi".to_owned())),
-                    runtime_limits: NoRuntimeLimitsFragment {},
-                },
-                storage: v1alpha1::SupersetStorageConfigFragment {},
+                logging: product_logging::spec::default_logging(),
+                affinity: affinity::get_affinity(cluster_name, role),
+                graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
+                row_limit: None,
+                webserver_timeout: None,
             },
-            logging: product_logging::spec::default_logging(),
-            affinity: affinity::get_affinity(cluster_name, role),
-            graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
-            row_limit: None,
-            webserver_timeout: None,
+            SupersetRole::Worker => v1alpha1::SupersetConfigFragment {
+                resources: ResourcesFragment {
+                    cpu: CpuLimitsFragment {
+                        min: Some(Quantity("1000m".to_owned())),
+                        max: Some(Quantity("2000m".to_owned())),
+                    },
+                    memory: MemoryLimitsFragment {
+                        limit: Some(Quantity("3Gi".to_owned())),
+                        runtime_limits: NoRuntimeLimitsFragment {},
+                    },
+                    storage: v1alpha1::SupersetStorageConfigFragment {},
+                },
+                logging: product_logging::spec::default_logging(),
+                affinity: affinity::get_affinity(cluster_name, role),
+                graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
+                row_limit: None,
+                webserver_timeout: None,
+            },
+            SupersetRole::Beat => v1alpha1::SupersetConfigFragment {
+                resources: ResourcesFragment {
+                    cpu: CpuLimitsFragment {
+                        min: Some(Quantity("200m".to_owned())),
+                        max: Some(Quantity("500m".to_owned())),
+                    },
+                    memory: MemoryLimitsFragment {
+                        limit: Some(Quantity("1Gi".to_owned())),
+                        runtime_limits: NoRuntimeLimitsFragment {},
+                    },
+                    storage: v1alpha1::SupersetStorageConfigFragment {},
+                },
+                logging: product_logging::spec::default_logging(),
+                affinity: affinity::get_affinity(cluster_name, role),
+                graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
+                row_limit: None,
+                webserver_timeout: None,
+            },
         }
     }
 }
@@ -585,13 +632,14 @@ impl v1alpha1::SupersetCluster {
     }
 
     /// Metadata about a node rolegroup
-    pub fn node_rolegroup_ref(
+    pub fn rolegroup_ref(
         &self,
+        role: &SupersetRole,
         group_name: impl Into<String>,
     ) -> RoleGroupRef<v1alpha1::SupersetCluster> {
         RoleGroupRef {
             cluster: ObjectRef::from_obj(self),
-            role: SupersetRole::Node.to_string(),
+            role: role.to_string(),
             role_group: group_name.into(),
         }
     }

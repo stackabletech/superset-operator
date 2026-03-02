@@ -1,0 +1,12 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: >-
+      helm install superset-redis
+      --namespace $NAMESPACE
+      --version 17.11.3
+      -f helm-bitnami-redis-values.yaml
+      --repo https://charts.bitnami.com/bitnami redis
+      --wait
+    timeout: 600
