@@ -1,5 +1,6 @@
 use std::fmt::{Display, Write};
 
+use indoc::formatdoc;
 use stackable_operator::{
     builder::configmap::ConfigMapBuilder,
     kube::Resource,
@@ -72,41 +73,42 @@ fn create_superset_config(log_config: &AutomaticContainerLogConfig, log_dir: &st
             );
         });
 
-    format!(
-        "\
-import flask.config
-import logging
-import os
-from superset.utils.logging_configurator import LoggingConfigurator
-from pythonjsonlogger import jsonlogger
+    formatdoc!(
+        "
+        import flask.config
+        import logging
+        import os
+        from superset.utils.logging_configurator import LoggingConfigurator
+        from pythonjsonlogger import jsonlogger
 
-os.makedirs('{log_dir}', exist_ok=True)
+        os.makedirs('{log_dir}', exist_ok=True)
 
-class StackableLoggingConfigurator(LoggingConfigurator):
-    def configure_logging(self, app_config: flask.config.Config, debug_mode: bool):
-        logFormat = '%(asctime)s:%(levelname)s:%(name)s:%(message)s'
+        class StackableLoggingConfigurator(LoggingConfigurator):
+            def configure_logging(self, app_config: flask.config.Config, debug_mode: bool):
+                logFormat = '%(asctime)s:%(levelname)s:%(name)s:%(message)s'
 
-        plainTextFormatter = logging.Formatter(logFormat)
-        jsonFormatter = jsonlogger.JsonFormatter(logFormat)
+                plainTextFormatter = logging.Formatter(logFormat)
+                jsonFormatter = jsonlogger.JsonFormatter(logFormat)
 
-        consoleHandler = logging.StreamHandler()
-        consoleHandler.setLevel({console_log_level})
-        consoleHandler.setFormatter(plainTextFormatter)
+                consoleHandler = logging.StreamHandler()
+                consoleHandler.setLevel({console_log_level})
+                consoleHandler.setFormatter(plainTextFormatter)
 
-        fileHandler = logging.handlers.RotatingFileHandler(
-            '{log_dir}/{LOG_FILE}',
-            maxBytes=1048576,
-            backupCount=1,
-        )
-        fileHandler.setLevel({file_log_level})
-        fileHandler.setFormatter(jsonFormatter)
+                fileHandler = logging.handlers.RotatingFileHandler(
+                    '{log_dir}/{LOG_FILE}',
+                    maxBytes=1048576,
+                    backupCount=1,
+                )
+                fileHandler.setLevel({file_log_level})
+                fileHandler.setFormatter(jsonFormatter)
 
-        rootLogger = logging.getLogger()
-        rootLogger.setLevel({root_log_level})
-        rootLogger.addHandler(consoleHandler)
-        rootLogger.addHandler(fileHandler)
+                rootLogger = logging.getLogger()
+                rootLogger.setLevel({root_log_level})
+                rootLogger.addHandler(consoleHandler)
+                rootLogger.addHandler(fileHandler)
 
-{loggers_config}",
+        {loggers_config}
+        ",
         root_log_level = log_config.root_log_level().to_python_expression(),
         console_log_level = log_config
             .console

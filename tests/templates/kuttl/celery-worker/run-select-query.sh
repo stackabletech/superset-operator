@@ -1,12 +1,20 @@
 #!/bin/sh
 ACCESS_TOKEN=$(curl -s -X POST "http://superset-node:8088/api/v1/security/login" \
     -H "Content-Type: application/json" \
-    -d '{"username": "admin", "password": "admin", "provider": "db"}' | jq -r '.access_token')
+    -d '{
+        "username": "admin",
+        "password": "admin",
+        "provider": "db"
+    }' | jq -r '.access_token')
 
 EXECUTE_QUERY_RESPONSE=$(curl -X POST "http://superset-node:8088/api/v1/sqllab/execute/" \
     -H "Authorization: Bearer $ACCESS_TOKEN" \
     -H "Content-Type: application/json" \
-    -d '{"database_id": 1, "runAsync": true, "sql": "SELECT username, first_name, last_name from public.ab_user;"}')
+    -d '{
+        "database_id": 1,
+        "runAsync": true,
+        "sql": "SELECT username, first_name, last_name from public.ab_user;"
+    }')
 
 QUERY_ID=$(echo "$EXECUTE_QUERY_RESPONSE" | jq -r '.query.queryId')
 QUERY_STATE=$(echo "$EXECUTE_QUERY_RESPONSE" | jq -r '.query.state')
