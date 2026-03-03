@@ -11,6 +11,7 @@
 
 ### Changed
 
+- Bump stackable-operator to 0.106.2, snafu to 0.9, strum to 0.28 ([#706]).
 - Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#699]).
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#691]).
 
@@ -24,6 +25,7 @@
 [#695]: https://github.com/stackabletech/superset-operator/pull/695
 [#699]: https://github.com/stackabletech/superset-operator/pull/699
 [#702]: https://github.com/stackabletech/superset-operator/pull/702
+[#706]: https://github.com/stackabletech/superset-operator/pull/706
 
 ## [25.11.0] - 2025-11-07
 
