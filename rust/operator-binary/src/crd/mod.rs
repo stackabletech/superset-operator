@@ -324,30 +324,6 @@ impl Default for v1alpha1::SupersetRoleConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetCredentials {
-    pub admin_user: AdminUserCredentials,
-    pub connections: Connections,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AdminUserCredentials {
-    pub username: String,
-    pub firstname: String,
-    pub lastname: String,
-    pub email: String,
-    pub password: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Connections {
-    pub secret_key: String,
-    pub sqlalchemy_database_uri: String,
-}
-
 #[derive(
     Clone, Debug, Deserialize, Display, EnumIter, Eq, Hash, JsonSchema, PartialEq, Serialize,
 )]
@@ -366,16 +342,6 @@ impl SupersetRole {
                 .map(|node| node.role_config.listener_class),
         }
     }
-}
-
-/// A reference to a [`v1alpha1::SupersetCluster`]
-#[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SupersetClusterRef {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub namespace: Option<String>,
 }
 
 impl SupersetConfigOptions {
