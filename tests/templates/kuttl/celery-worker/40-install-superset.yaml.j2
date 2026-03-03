@@ -41,6 +41,15 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+        containers:
+          superset:
+            console:
+              level: DEBUG
+            file:
+              level: DEBUG
+            loggers:
+              ROOT:
+                level: DEBUG
     configOverrides:
       # Add endpoints that need to be exempt from CSRF protection
       superset_config.py:
@@ -75,6 +84,15 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+        containers:
+          superset:
+            console:
+              level: DEBUG
+            file:
+              level: DEBUG
+            loggers:
+              ROOT:
+                level: DEBUG
     configOverrides:
       superset_config.py:
         EXPERIMENTAL_FILE_FOOTER: |-
