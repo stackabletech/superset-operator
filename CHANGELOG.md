@@ -19,6 +19,10 @@
 
 - Remove support for Superset 4.0.2 and 4.1.2 ([#695]).
 
+### Fixed
+
+- Fix "404 page not found" error for the initial object list ([#708]).
+
 [#680]: https://github.com/stackabletech/superset-operator/pull/680
 [#691]: https://github.com/stackabletech/superset-operator/pull/691
 [#693]: https://github.com/stackabletech/superset-operator/pull/693
