@@ -11,13 +11,17 @@
 
 ### Changed
 
-- Bump stackable-operator to 0.106.2, snafu to 0.9, strum to 0.28 ([#706]).
+- Bump stackable-operator to 0.108.0, snafu to 0.9, strum to 0.28 ([#706], [#708]).
 - Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#699]).
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#691]).
 
 ### Removed
 
 - Remove support for Superset 4.0.2 and 4.1.2 ([#695]).
+
+### Fixed
+
+- Fix "404 page not found" error for the initial object list ([#708]).
 
 [#680]: https://github.com/stackabletech/superset-operator/pull/680
 [#691]: https://github.com/stackabletech/superset-operator/pull/691
@@ -26,6 +30,7 @@
 [#699]: https://github.com/stackabletech/superset-operator/pull/699
 [#702]: https://github.com/stackabletech/superset-operator/pull/702
 [#706]: https://github.com/stackabletech/superset-operator/pull/706
+[#708]: https://github.com/stackabletech/superset-operator/pull/708
 
 ## [25.11.0] - 2025-11-07
 
