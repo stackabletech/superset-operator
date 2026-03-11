@@ -299,6 +299,9 @@ async fn main() -> anyhow::Result<()> {
                     None,
                 )
                 .await?;
+                // The druid_controller also watches SupersetCluster
+                signal::crd_established(&client, v1alpha1::SupersetCluster::crd_name(), None)
+                    .await?;
                 druid_connection_controller.await
             };
 
