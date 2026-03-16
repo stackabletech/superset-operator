@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [26.3.0-rc1] - 2026-03-16
+
 ### Added
 
 - Add conversion webhook ([#702]).
