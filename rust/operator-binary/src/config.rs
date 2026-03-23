@@ -244,6 +244,14 @@ fn append_oidc_config(
                 let well_known_config_url = oidc
                     .well_known_config_url()
                     .context(InvalidWellKnownConfigUrlSnafu)?;
+                let client_auth_method = serde_json::to_value(
+                    client_options.client_authentication_method,
+                )
+                .expect("ClientAuthenticationMethod should serialize to JSON");
+                let client_auth_method = client_auth_method
+                    .as_str()
+                    .expect("ClientAuthenticationMethod should serialize to a string");
+
                 formatdoc!(
                     "
                       {{ 'name': 'keycloak',
@@ -257,6 +265,7 @@ fn append_oidc_config(
                           }},
                           'api_base_url': '{api_base_url}',
                           'server_metadata_url': '{well_known_config_url}',
+                          'token_endpoint_auth_method': '{client_auth_method}',
                         }},
                       }}",
                     scopes = scopes.join(" "),
@@ -340,6 +349,7 @@ mod tests {
         let oidc = oidc::v1alpha1::ClientAuthenticationOptions {
             client_credentials_secret_ref: "nifi-keycloak-client".to_owned(),
             extra_scopes: vec![],
+            client_authentication_method: Default::default(),
             product_specific_fields: (),
         };
 
@@ -357,6 +367,7 @@ mod tests {
         assert!(oauth_providers.contains("client_id': os.environ.get("));
         assert!(oauth_providers.contains("client_secret': os.environ.get("));
         assert!(oauth_providers.contains("'scope': 'openid'"));
+        assert!(oauth_providers.contains("'token_endpoint_auth_method': 'client_secret_basic'"));
         assert!(oauth_providers.contains(&format!("'api_base_url': '{expected_api_base_url}'")));
         assert!(oauth_providers.contains(&format!(
             "'server_metadata_url': '{expected_server_metadata_url}'"
