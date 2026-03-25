@@ -6,6 +6,7 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
+  # For automatic cluster domain detection
   - apiGroups:
       - ""
     resources:
@@ -13,31 +14,45 @@ rules:
     verbs:
       - list
       - watch
-  # For automatic cluster domain detection
+  # For automatic cluster domain detection (read node DNS details via kubelet proxy)
   - apiGroups:
       - ""
     resources:
       - nodes/proxy
     verbs:
       - get
+  # Manage core namespaced resources created per SupersetCluster.
+  # All resources are applied via Server-Side Apply (create + patch) and tracked for
+  # orphan cleanup (list + delete). The ReconciliationPaused strategy uses get instead
+  # of apply_patch, so get is also required. The update verb is not needed (SSA uses patch).
+  # - configmaps: store role group configuration and Vector log config; watched via .watches()
+  # - services: expose the Superset web UI (headless) and metrics endpoint; watched via .owns()
   - apiGroups:
       - ""
     resources:
-      - pods
       - configmaps
-      - secrets
       - services
-      - endpoints
-      - serviceaccounts
-      - secrets
     verbs:
       - create
       - delete
       - get
       - list
       - patch
-      - update
       - watch
+  # ServiceAccounts are created per SupersetCluster and per DruidConnection (for the import Job).
+  # Applied via SSA and tracked for orphan cleanup. Not watched by the controller.
+  - apiGroups:
+      - ""
+    resources:
+      - serviceaccounts
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+  # RoleBindings bind the product ClusterRole to per-cluster ServiceAccounts.
+  # Applied via SSA and tracked for orphan cleanup. Not watched by the controller.
   - apiGroups:
       - rbac.authorization.k8s.io
     resources:
@@ -48,32 +63,34 @@ rules:
       - get
       - list
       - patch
-      - update
-      - watch
+  # StatefulSets run the Superset web server pods.
+  # Applied via SSA, tracked for orphan cleanup, and watched via .owns().
   - apiGroups:
       - apps
     resources:
       - statefulsets
     verbs:
-      - get
       - create
       - delete
+      - get
       - list
       - patch
-      - update
       - watch
+  # Jobs run the Druid datasource import task (one Job per DruidConnection).
+  # Applied directly via SSA (not tracked by cluster_resources, so no orphan cleanup / no delete).
+  # The druid connection controller watches Jobs via .watches() and reads them via client.get().
   - apiGroups:
       - batch
     resources:
       - jobs
     verbs:
       - create
-      - delete
       - get
       - list
       - patch
-      - update
       - watch
+  # PodDisruptionBudgets protect Superset pods from simultaneous voluntary eviction.
+  # Applied via SSA and tracked for orphan cleanup. Not watched by the controller.
   - apiGroups:
       - policy
     resources:
@@ -84,8 +101,6 @@ rules:
       - get
       - list
       - patch
-      - update
-      - watch
   - apiGroups:
       - apiextensions.k8s.io
     resources:
@@ -101,6 +116,7 @@ rules:
       - list
       - watch
       {{- end }}
+  # Required to emit Kubernetes events reporting reconciliation results and errors.
   - apiGroups:
       - events.k8s.io
     resources:
@@ -108,23 +124,33 @@ rules:
     verbs:
       - create
       - patch
+  # Watch the operator's own CRDs. The superset controller is triggered by SupersetCluster changes;
+  # the druid connection controller is triggered by DruidConnection changes and also watches
+  # SupersetCluster (to react when the cluster becomes available).
   - apiGroups:
       - {{ include "operator.name" . }}.stackable.tech
     resources:
       - {{ include "operator.name" . }}clusters
       - druidconnections
-      - druidconnections/status
     verbs:
       - get
       - list
-      - patch
       - watch
+  # Patch status for SupersetCluster (reports conditions such as Available/Degraded).
   - apiGroups:
       - {{ include "operator.name" . }}.stackable.tech
     resources:
       - {{ include "operator.name" . }}clusters/status
     verbs:
       - patch
+  # Patch status for DruidConnection (tracks import job progress: Pending/Importing/Ready/Failed).
+  - apiGroups:
+      - {{ include "operator.name" . }}.stackable.tech
+    resources:
+      - druidconnections/status
+    verbs:
+      - patch
+  # Watch AuthenticationClass resources to react when authentication configuration changes.
   - apiGroups:
       - authentication.stackable.tech
     resources:
@@ -133,6 +159,7 @@ rules:
       - get
       - list
       - watch
+  # Bind the product ClusterRole to per-cluster ServiceAccounts (creates RoleBindings).
   - apiGroups:
       - rbac.authorization.k8s.io
     resources:
@@ -141,17 +168,18 @@ rules:
       - bind
     resourceNames:
       - {{ include "operator.name" . }}-clusterrole
+  # Listeners expose Superset externally via the Stackable Listener Operator.
+  # Applied via SSA and tracked for orphan cleanup. Not watched by the controller.
   - apiGroups:
       - listeners.stackable.tech
     resources:
       - listeners
     verbs:
-      - get
-      - list
-      - watch
-      - patch
       - create
       - delete
+      - get
+      - list
+      - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -160,6 +188,8 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
+  # The Superset pod reads its own ServiceAccount token and ConfigMaps (e.g. for OPA role mapping).
+  # It also reads the credentials Secret to obtain database URI, secret key, and admin credentials.
   - apiGroups:
       - ""
     resources:
@@ -168,6 +198,7 @@ rules:
       - serviceaccounts
     verbs:
       - get
+  # Required to emit Kubernetes events from within the Superset pod.
   - apiGroups:
       - events.k8s.io
     resources:
@@ -176,6 +207,7 @@ rules:
       - create
       - patch
 {{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
+  # Required on OpenShift to allow Superset pods to run as a non-root user (nonroot-v2 SCC).
   - apiGroups:
       - security.openshift.io
     resources:
