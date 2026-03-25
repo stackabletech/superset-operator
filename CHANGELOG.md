@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Helm deployed RBAC permissions documented, with unnecessary permissions removed ([#717]).
+
+[#717]: https://github.com/stackabletech/superset-operator/pull/717
+
 ## [26.3.0] - 2026-03-16
 
 ## [26.3.0-rc1] - 2026-03-16
