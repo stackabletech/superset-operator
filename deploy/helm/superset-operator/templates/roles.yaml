@@ -181,16 +181,6 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
-  # The Superset pod reads its own ServiceAccount token and ConfigMaps (e.g. for OPA role mapping).
-  # It also reads the credentials Secret to obtain database URI, secret key, and admin credentials.
-  - apiGroups:
-      - ""
-    resources:
-      - configmaps
-      - secrets
-      - serviceaccounts
-    verbs:
-      - get
   # Required to emit Kubernetes events from within the Superset pod.
   - apiGroups:
       - events.k8s.io
