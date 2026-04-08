@@ -6,14 +6,6 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
-  # For automatic cluster domain detection
-  - apiGroups:
-      - ""
-    resources:
-      - nodes
-    verbs:
-      - list
-      - watch
   # For automatic cluster domain detection (read node DNS details via kubelet proxy)
   - apiGroups:
       - ""
