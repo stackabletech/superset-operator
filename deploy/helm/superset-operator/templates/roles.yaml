@@ -105,10 +105,10 @@ rules:
       {{- if .Values.maintenance.customResourceDefinitions.maintain }}
       - create
       - patch
+      {{- end }}
       # Required for startup condition
       - list
       - watch
-      {{- end }}
   # Required to emit Kubernetes events reporting reconciliation results and errors.
   - apiGroups:
       - events.k8s.io
