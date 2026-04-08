@@ -52,6 +52,15 @@ rules:
       - get
       - list
       - patch
+  # Required to bind the product ClusterRole to the per-cluster ServiceAccount.
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - clusterroles
+    verbs:
+      - bind
+    resourceNames:
+      - {{ include "operator.name" . }}-clusterrole
   # StatefulSet created per role group. Applied via SSA and tracked for orphan cleanup.
   - apiGroups:
       - apps
@@ -143,15 +152,6 @@ rules:
       - get
       - list
       - watch
-  # Required to bind the product ClusterRole to the per-cluster ServiceAccount.
-  - apiGroups:
-      - rbac.authorization.k8s.io
-    resources:
-      - clusterroles
-    verbs:
-      - bind
-    resourceNames:
-      - {{ include "operator.name" . }}-clusterrole
   # Listener created per role group for external access. Applied via SSA and tracked for orphan
   # cleanup.
   - apiGroups:
