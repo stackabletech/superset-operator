@@ -172,14 +172,6 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
-  # Required to emit Kubernetes events from within the Superset pod.
-  - apiGroups:
-      - events.k8s.io
-    resources:
-      - events
-    verbs:
-      - create
-      - patch
 {{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
   # Required on OpenShift to allow Superset pods to run as a non-root user.
   - apiGroups:
