@@ -160,10 +160,9 @@ impl SupersetClientAuthenticationDetailsResolved {
         auth_details: &[v1alpha1::SupersetClientAuthenticationDetails],
         client: &Client,
     ) -> Result<SupersetClientAuthenticationDetailsResolved> {
-        let resolve_auth_class =
-            |auth_details: core::v1alpha1::ClientAuthenticationDetails<
-                oidc::v1alpha1::ClientAuthenticationMethodOption,
-            >| async move { auth_details.resolve_class(client).await };
+        let resolve_auth_class = |auth_details: core::v1alpha1::ClientAuthenticationDetails<
+            oidc::v1alpha1::ClientAuthenticationMethodOption,
+        >| async move { auth_details.resolve_class(client).await };
         SupersetClientAuthenticationDetailsResolved::resolve(auth_details, resolve_auth_class).await
     }
 
@@ -495,9 +494,10 @@ mod tests {
                         client_auth_options: oidc::v1alpha1::ClientAuthenticationOptions {
                             client_credentials_secret_ref: "superset-oidc-client1".into(),
                             extra_scopes: vec!["groups".into()],
-                            product_specific_fields: oidc::v1alpha1::ClientAuthenticationMethodOption {
-                                client_authentication_method: Default::default(),
-                            }
+                            product_specific_fields:
+                                oidc::v1alpha1::ClientAuthenticationMethodOption {
+                                    client_authentication_method: Default::default(),
+                                }
                         }
                     },
                     SupersetAuthenticationClassResolved::Oidc {
@@ -513,9 +513,10 @@ mod tests {
                         client_auth_options: oidc::v1alpha1::ClientAuthenticationOptions {
                             client_credentials_secret_ref: "superset-oidc-client2".into(),
                             extra_scopes: Vec::new(),
-                            product_specific_fields: oidc::v1alpha1::ClientAuthenticationMethodOption {
-                                client_authentication_method: Default::default(),
-                            }
+                            product_specific_fields:
+                                oidc::v1alpha1::ClientAuthenticationMethodOption {
+                                    client_authentication_method: Default::default(),
+                                }
                         }
                     }
                 ],
@@ -955,6 +956,7 @@ mod tests {
     /// Use this function in the tests to replace
     /// `stackable_operator::commons::authentication::ClientAuthenticationDetails`
     /// which requires a Kubernetes client.
+    #[allow(clippy::type_complexity)]
     fn create_auth_class_resolver(
         auth_classes: Vec<core::v1alpha1::AuthenticationClass>,
     ) -> impl Fn(

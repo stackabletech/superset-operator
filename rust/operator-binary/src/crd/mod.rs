@@ -34,10 +34,7 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
-use crate::{
-    crd::v1alpha1::SupersetRoleConfig,
-    listener::default_listener_class,
-};
+use crate::{crd::v1alpha1::SupersetRoleConfig, listener::default_listener_class};
 
 pub mod affinity;
 pub mod authentication;
@@ -546,10 +543,7 @@ impl v1alpha1::SupersetCluster {
         }
     }
 
-    pub fn get_role(
-        &self,
-        role: &SupersetRole,
-    ) -> Option<&SupersetRoleType> {
+    pub fn get_role(&self, role: &SupersetRole) -> Option<&SupersetRoleType> {
         match role {
             SupersetRole::Node => self.spec.nodes.as_ref(),
         }
