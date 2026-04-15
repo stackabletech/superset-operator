@@ -349,7 +349,7 @@ pub async fn reconcile_superset(
         &resolved_product_image.product_version,
         &transform_all_roles_to_config(
             superset,
-            [(
+            &[(
                 superset_role.to_string(),
                 (
                     vec![
@@ -611,7 +611,7 @@ fn build_rolegroup_config_map(
                 .name(rolegroup.object_name())
                 .ownerreference_from_resource(superset, None, Some(true))
                 .context(ObjectMissingMetadataForOwnerRefSnafu)?
-                .with_recommended_labels(build_recommended_labels(
+                .with_recommended_labels(&build_recommended_labels(
                     superset,
                     SUPERSET_CONTROLLER_NAME,
                     &resolved_product_image.app_version_label_value,
@@ -673,7 +673,7 @@ fn build_server_rolegroup_statefulset(
         &rolegroup_ref.role_group,
     );
     // Used for PVC templates that cannot be modified once they are deployed
-    let unversioned_recommended_labels = Labels::recommended(build_recommended_labels(
+    let unversioned_recommended_labels = Labels::recommended(&build_recommended_labels(
         superset,
         SUPERSET_CONTROLLER_NAME,
         // A version value is required, and we do want to use the "recommended" format for the other desired labels
@@ -684,7 +684,7 @@ fn build_server_rolegroup_statefulset(
     .context(LabelBuildSnafu)?;
 
     let metadata = ObjectMetaBuilder::new()
-        .with_recommended_labels(recommended_object_labels.clone())
+        .with_recommended_labels(&recommended_object_labels)
         .context(MetadataBuildSnafu)?
         .build();
 
@@ -891,7 +891,7 @@ fn build_server_rolegroup_statefulset(
             .name(rolegroup_ref.object_name())
             .ownerreference_from_resource(superset, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(recommended_object_labels)
+            .with_recommended_labels(&recommended_object_labels)
             .context(MetadataBuildSnafu)?
             .with_label(
                 Label::try_from(("restarter.stackable.tech/enabled", "true"))

@@ -89,7 +89,7 @@ Again, use `stackablectl` to find out those credentials:
 stackablectl stacklet credentials superset simple-superset
 Credentials for superset (simple-superset) in namespace "default":
 
- USERNAME  admin 
+ USERNAME  admin
  PASSWORD  admin
 ----
 

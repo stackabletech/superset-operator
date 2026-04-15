@@ -42,7 +42,7 @@ pub fn build_node_rolegroup_headless_service(
             .name(rolegroup_ref.rolegroup_headless_service_name())
             .ownerreference_from_resource(superset, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(build_recommended_labels(
+            .with_recommended_labels(&build_recommended_labels(
                 superset,
                 SUPERSET_CONTROLLER_NAME,
                 &resolved_product_image.app_version_label_value,
@@ -86,7 +86,7 @@ pub fn build_node_rolegroup_metrics_service(
             .name(rolegroup_ref.rolegroup_metrics_service_name())
             .ownerreference_from_resource(superset, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(build_recommended_labels(
+            .with_recommended_labels(&build_recommended_labels(
                 superset,
                 SUPERSET_CONTROLLER_NAME,
                 &resolved_product_image.app_version_label_value,

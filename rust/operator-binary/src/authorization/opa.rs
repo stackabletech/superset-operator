@@ -21,7 +21,7 @@ impl SupersetOpaConfigResolved {
     ) -> Result<Self, stackable_operator::commons::opa::Error> {
         let opa_endpoint = opa_config
             .opa
-            .full_document_url_from_config_map(client, superset, None, OpaApiVersion::V1)
+            .full_document_url_from_config_map(client, superset, None, &OpaApiVersion::V1)
             .await?;
 
         Ok(SupersetOpaConfigResolved {

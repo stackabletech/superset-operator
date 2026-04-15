@@ -19,6 +19,7 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
+    config_overrides::{KeyValueConfigOverrides, KeyValueOverridesProvider},
     deep_merger::ObjectOverrides,
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
@@ -33,10 +34,7 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
-use crate::{
-    crd::v1alpha1::{SupersetConfigFragment, SupersetRoleConfig},
-    listener::default_listener_class,
-};
+use crate::{crd::v1alpha1::SupersetRoleConfig, listener::default_listener_class};
 
 pub mod affinity;
 pub mod authentication;
@@ -60,6 +58,9 @@ pub const METRICS_PORT_NAME: &str = "metrics";
 pub const METRICS_PORT: u16 = 9102;
 
 const DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
+
+pub type SupersetRoleType =
+    Role<v1alpha1::SupersetConfigFragment, v1alpha1::SupersetConfigOverrides, SupersetRoleConfig>;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -154,7 +155,7 @@ pub mod versioned {
 
         // no doc - docs in the struct.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub nodes: Option<Role<v1alpha1::SupersetConfigFragment, SupersetRoleConfig>>,
+        pub nodes: Option<SupersetRoleType>,
     }
 
     // TODO: move generic version to op-rs?
@@ -167,6 +168,17 @@ pub mod versioned {
         /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
         #[serde(default = "default_listener_class")]
         pub listener_class: String,
+    }
+
+    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SupersetConfigOverrides {
+        #[serde(
+            default,
+            rename = "superset_config.py",
+            skip_serializing_if = "Option::is_none"
+        )]
+        pub superset_config_py: Option<KeyValueConfigOverrides>,
     }
 
     #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -320,6 +332,19 @@ impl Default for v1alpha1::SupersetRoleConfig {
         v1alpha1::SupersetRoleConfig {
             listener_class: default_listener_class(),
             common: Default::default(),
+        }
+    }
+}
+
+impl KeyValueOverridesProvider for v1alpha1::SupersetConfigOverrides {
+    fn get_key_value_overrides(&self, file: &str) -> BTreeMap<String, Option<String>> {
+        match file {
+            SUPERSET_CONFIG_FILENAME => self
+                .superset_config_py
+                .as_ref()
+                .map(KeyValueConfigOverrides::as_product_config_overrides)
+                .unwrap_or_default(),
+            _ => BTreeMap::new(),
         }
     }
 }
@@ -518,10 +543,7 @@ impl v1alpha1::SupersetCluster {
         }
     }
 
-    pub fn get_role(
-        &self,
-        role: &SupersetRole,
-    ) -> Option<&Role<SupersetConfigFragment, SupersetRoleConfig>> {
+    pub fn get_role(&self, role: &SupersetRole) -> Option<&SupersetRoleType> {
         match role {
             SupersetRole::Node => self.spec.nodes.as_ref(),
         }

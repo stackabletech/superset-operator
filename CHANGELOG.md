@@ -2,9 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#717]).
+- BREAKING: `configOverrides` now only accepts the supported config file name `superset_config.py`. Previously arbitrary keys were silently accepted but ignored ([#719]).
+- Bump `stackable-operator` to 0.110.0 and `kube` to 3.1.0 ([#719]).
+- Support setting `clientAuthenticationMethod` for OIDC authentication. The value is passed through to the Flask-AppBuilder config as `token_endpoint_auth_method` ([#719]).
 
 [#717]: https://github.com/stackabletech/superset-operator/pull/717
+[#719]: https://github.com/stackabletech/superset-operator/pull/719
 
 ## [26.3.0] - 2026-03-16
 
