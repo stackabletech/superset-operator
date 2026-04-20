@@ -8,10 +8,11 @@
 - BREAKING: `configOverrides` now only accepts the supported config file name `superset_config.py`. Previously arbitrary keys were silently accepted but ignored ([#719]).
 - Bump `stackable-operator` to 0.110.0 and `kube` to 3.1.0 ([#719]).
 - Support setting `clientAuthenticationMethod` for OIDC authentication. The value is passed through to the Flask-AppBuilder config as `token_endpoint_auth_method` ([#719]).
-- BREAKING: Rename `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `superset_config.py` for arbitrary python code to `FILE_HEADER` and `FILE_FOOTER`  ([]).
+- BREAKING: Rename `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `superset_config.py` for arbitrary python code to `FILE_HEADER` and `FILE_FOOTER`  ([#721]).
 
 [#717]: https://github.com/stackabletech/superset-operator/pull/717
 [#719]: https://github.com/stackabletech/superset-operator/pull/719
+[#721]: https://github.com/stackabletech/superset-operator/pull/721
 
 ## [26.3.0] - 2026-03-16
 
