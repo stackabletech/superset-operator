@@ -4862,7 +4862,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "95490f2d703d20cf1895e5976fdc5fb8f02aa293";
+          rev = "96f42571ea185a3cd76fedde351fcabbeefcae16";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         libName = "k8s_version";
@@ -9491,7 +9491,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "95490f2d703d20cf1895e5976fdc5fb8f02aa293";
+          rev = "96f42571ea185a3cd76fedde351fcabbeefcae16";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         libName = "stackable_certs";
@@ -9589,12 +9589,12 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.110.0";
+        version = "0.110.1";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "95490f2d703d20cf1895e5976fdc5fb8f02aa293";
+          rev = "96f42571ea185a3cd76fedde351fcabbeefcae16";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         libName = "stackable_operator";
@@ -9774,7 +9774,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "95490f2d703d20cf1895e5976fdc5fb8f02aa293";
+          rev = "96f42571ea185a3cd76fedde351fcabbeefcae16";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         procMacro = true;
@@ -9809,7 +9809,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "95490f2d703d20cf1895e5976fdc5fb8f02aa293";
+          rev = "96f42571ea185a3cd76fedde351fcabbeefcae16";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         libName = "stackable_shared";
@@ -9944,7 +9944,7 @@ rec {
           {
             name = "stackable-operator";
             packageId = "stackable-operator";
-            features = [ "webhook" ];
+            features = [ "crds" "webhook" ];
           }
           {
             name = "strum";
@@ -9996,7 +9996,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "95490f2d703d20cf1895e5976fdc5fb8f02aa293";
+          rev = "96f42571ea185a3cd76fedde351fcabbeefcae16";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         libName = "stackable_telemetry";
@@ -10106,7 +10106,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "95490f2d703d20cf1895e5976fdc5fb8f02aa293";
+          rev = "96f42571ea185a3cd76fedde351fcabbeefcae16";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         libName = "stackable_versioned";
@@ -10150,7 +10150,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "95490f2d703d20cf1895e5976fdc5fb8f02aa293";
+          rev = "96f42571ea185a3cd76fedde351fcabbeefcae16";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         procMacro = true;
@@ -10218,7 +10218,7 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "95490f2d703d20cf1895e5976fdc5fb8f02aa293";
+          rev = "96f42571ea185a3cd76fedde351fcabbeefcae16";
           sha256 = "1fgc7i8rhq1nl9m4s69sbfiywy2jx4narpynvm3g54vd5yd4c6m2";
         };
         libName = "stackable_webhook";

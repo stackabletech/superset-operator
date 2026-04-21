@@ -34,9 +34,11 @@ use stackable_operator::{
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
         product_image_selection::{self, ResolvedProductImage},
+        random_secret_creation,
         rbac::build_rbac_resources,
     },
     crd::authentication::oidc,
+    database_connections::TemplatingMechanism,
     k8s_openapi::{
         DeepMerge,
         api::{
@@ -80,9 +82,9 @@ use crate::{
     config::{self, PYTHON_IMPORTS},
     controller_commons::{self, CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
     crd::{
-        APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
-        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
-        SupersetConfigOptions, SupersetRole,
+        APP_NAME, APP_PORT, INTERNAL_SECRET_SECRET_KEY, METRICS_PORT, METRICS_PORT_NAME,
+        PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+        SUPERSET_CONFIG_FILENAME, SupersetConfigOptions, SupersetRole,
         authentication::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
         },
@@ -305,6 +307,11 @@ pub enum Error {
     ResolveProductImage {
         source: product_image_selection::Error,
     },
+
+    #[snafu(display("failed to create SECRET_KEY secret"))]
+    InvalidSecretKey {
+        source: random_secret_creation::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -409,6 +416,16 @@ pub async fn reconcile_superset(
         .add(client, rbac_rolebinding)
         .await
         .context(ApplyRoleBindingSnafu)?;
+
+    random_secret_creation::create_random_secret_if_not_exists(
+        &superset.shared_secret_key_secret_name(),
+        INTERNAL_SECRET_SECRET_KEY,
+        256,
+        superset,
+        client,
+    )
+    .await
+    .context(InvalidSecretKeySnafu)?;
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
@@ -701,6 +718,16 @@ fn build_server_rolegroup_statefulset(
         .affinity(&merged_config.affinity)
         .service_account_name(sa_name);
 
+    // "METADATA" is the prefix for the env vars that hold the database credentials
+    // (e.g. METADATA_DATABASE_USERNAME, METADATA_DATABASE_PASSWORD). It must match
+    // the prefix used by the airflow-operator for consistency.
+    let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
+    let metadata_database_connection_details = superset
+        .spec
+        .cluster_config
+        .metadata_database
+        .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism);
+
     let mut superset_cb = ContainerBuilder::new(&Container::Superset.to_string())
         .context(InvalidContainerNameSnafu)?;
 
@@ -709,14 +736,7 @@ fn build_server_rolegroup_statefulset(
         .cloned()
         .unwrap_or_default()
     {
-        if name == SupersetConfig::CREDENTIALS_SECRET_PROPERTY {
-            superset_cb.add_env_var_from_secret("SECRET_KEY", &value, "connections.secretKey");
-            superset_cb.add_env_var_from_secret(
-                "SQLALCHEMY_DATABASE_URI",
-                &value,
-                "connections.sqlalchemyDatabaseUri",
-            );
-        } else if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
+        if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
             superset_cb.add_env_var_from_secret(
                 "MAPBOX_API_KEY",
                 &value,
@@ -726,6 +746,19 @@ fn build_server_rolegroup_statefulset(
             superset_cb.add_env_var(name, value);
         };
     }
+
+    // SECRET_KEY from auto-generated secret
+    superset_cb.add_env_var_from_secret(
+        "SECRET_KEY",
+        superset.shared_secret_key_secret_name(),
+        INTERNAL_SECRET_SECRET_KEY,
+    );
+
+    // Database connection URL from metadataDatabase
+    superset_cb.add_env_var(
+        "SQLALCHEMY_DATABASE_URI",
+        metadata_database_connection_details.url_template.clone(),
+    );
 
     add_authentication_volumes_and_volume_mounts(authentication_config, &mut superset_cb, pb)?;
 
@@ -737,7 +770,7 @@ fn build_server_rolegroup_statefulset(
         .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
         .context(MissingWebServerTimeoutInSupersetConfigSnafu)?;
 
-    let secret = &superset.spec.cluster_config.credentials_secret;
+    let secret = &superset.spec.cluster_config.credentials_secret_name;
 
     superset_cb
         .image_from_product_image(resolved_product_image)
@@ -770,6 +803,14 @@ fn build_server_rolegroup_statefulset(
 
             {auth_commands}
 
+            # SQLALCHEMY_DATABASE_URI contains a template with bash variable references
+            # (e.g. ${{METADATA_DATABASE_USERNAME}}) that must be resolved before Python
+            # reads it via os.environ.get(). Airflow's config system calls expandvars()
+            # on env var values automatically (see [1]), but Superset does not - so we
+            # resolve them here with eval.
+            # [1] https://github.com/apache/airflow/blob/2.10.5/airflow/configuration.py#L1084-L1086
+            # (same behaviour in 3.x: shared/configuration/src/airflow_shared/configuration/parser.py)
+            export SQLALCHEMY_DATABASE_URI=$(eval echo \"$SQLALCHEMY_DATABASE_URI\")
             superset db upgrade
             set +x
             echo 'Running \"superset fab create-admin [...]\", which is not shown as it leaks the Superset admin credentials'
@@ -812,6 +853,8 @@ fn build_server_rolegroup_statefulset(
     superset_cb
         .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
         .context(AddVolumeMountSnafu)?;
+
+    metadata_database_connection_details.add_to_container(&mut superset_cb);
 
     pb.add_container(superset_cb.build());
     add_graceful_shutdown_config(merged_config, pb).context(GracefulShutdownSnafu)?;

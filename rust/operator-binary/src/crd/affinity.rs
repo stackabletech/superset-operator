@@ -45,14 +45,21 @@ mod tests {
           image:
             productVersion: 4.1.4
           clusterConfig:
-            credentialsSecret: superset-db-credentials
+            credentialsSecretName: superset-db-credentials
+            metadataDatabase:
+              postgresql:
+                host: superset-postgresql
+                database: superset
+                credentialsSecretName: superset-postgresql-credentials
           nodes:
             roleGroups:
               default:
                 replicas: 1
         "#;
+        let deserializer = serde_yaml::Deserializer::from_str(input);
         let superset: v1alpha1::SupersetCluster =
-            serde_yaml::from_str(input).expect("illegal test input");
+            serde_yaml::with::singleton_map_recursive::deserialize(deserializer)
+                .expect("illegal test input");
         let merged_config = superset
             .merged_config(&SupersetRole::Node, &superset.node_rolegroup_ref("default"))
             .unwrap();

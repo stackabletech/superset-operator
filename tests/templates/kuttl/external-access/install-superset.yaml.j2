@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: superset-credentials
+  name: superset-admin-credentials
 type: Opaque
 stringData:
   adminUser.username: admin
@@ -10,8 +10,14 @@ stringData:
   adminUser.lastname: Admin
   adminUser.email: admin@superset.com
   adminUser.password: admin
-  connections.secretKey: thisISaSECRET_1234
-  connections.sqlalchemyDatabaseUri: postgresql://superset:superset@superset-postgresql/superset
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-postgresql-credentials
+stringData:
+  username: superset
+  password: superset
 ---
 apiVersion: superset.stackable.tech/v1alpha1
 kind: SupersetCluster
@@ -27,7 +33,12 @@ spec:
 {% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
-    credentialsSecret: superset-credentials
+    credentialsSecretName: superset-admin-credentials
+    metadataDatabase:
+      postgresql:
+        host: superset-postgresql
+        database: superset
+        credentialsSecretName: superset-postgresql-credentials
   nodes:
     roleConfig:
       listenerClass: test-external-unstable-$NAMESPACE

@@ -16,7 +16,7 @@ Refer to the xref:required-external-components[supported databases] for producti
 
 == Secret with Superset credentials
 
-You need to create a secret with the required credentials (database connection credentials and an admin account for Superset).
+You need to create secrets with the required credentials (an admin account for Superset and database connection credentials).
 Create a file called `superset-credentials.yaml`:
 
 [source,yaml]
@@ -27,13 +27,11 @@ Apply the Secret:
 [source,bash]
 include::example$getting_started/getting_started.sh[tag=apply-superset-credentials]
 
-The `connections.secretKey` will be used for securely signing the session cookies and can be used by the extensions for any other security-related needs.
-It should be a long, random string.
-
-`connections.sqlalchemyDatabaseUri` must contain the connection string to the SQL database storing the Superset metadata.
-
 The `adminUser` fields are used to create an admin user.
 If using non-default authentication (e.g., LDAP), the admin user is disabled.
+
+The database connection credentials are stored in a separate secret.
+Create it in the `superset.yaml` file (shown below) or apply it separately.
 
 == Creation of a Superset node
 
@@ -50,7 +48,7 @@ include::example$getting_started/getting_started.sh[tag=apply-superset-cluster]
 
 `metadata.name` contains the name of the Superset cluster.
 
-The previously created secret must be referenced in `spec.clusterConfig.credentialsSecret`.
+The previously created credentials secret must be referenced in `spec.clusterConfig.credentialsSecretName`, and the database connection is configured via `spec.clusterConfig.metadataDatabase`.
 
 The `rowLimit` configuration option defines the row limit when requesting chart data.
 
