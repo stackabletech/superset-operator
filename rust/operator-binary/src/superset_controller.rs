@@ -309,7 +309,7 @@ pub enum Error {
     },
 
     #[snafu(display("failed to create SECRET_KEY secret"))]
-    InvalidSecretKey {
+    CreateSecretKeySecret {
         source: random_secret_creation::Error,
     },
 }
