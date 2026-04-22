@@ -16,7 +16,7 @@ Refer to the xref:required-external-components[supported databases] for producti
 
 == Secret with Superset credentials
 
-You need to create secrets with the required credentials (an admin account for Superset and database connection credentials).
+You need to create two Secrets with the required credentials (an admin account for Superset as well as database connection credentials).
 Create a file called `superset-credentials.yaml`:
 
 [source,yaml]
@@ -48,7 +48,7 @@ include::example$getting_started/getting_started.sh[tag=apply-superset-cluster]
 
 `metadata.name` contains the name of the Superset cluster.
 
-The previously created credentials secret must be referenced in `spec.clusterConfig.credentialsSecretName`, and the database connection is configured via `spec.clusterConfig.metadataDatabase`.
+The previously created credentials Secret must be referenced in `spec.clusterConfig.credentialsSecretName`, and the database connection Secret is configured via `spec.clusterConfig.metadataDatabase`.
 
 The `rowLimit` configuration option defines the row limit when requesting chart data.
 

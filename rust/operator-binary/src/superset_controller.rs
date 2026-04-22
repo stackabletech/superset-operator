@@ -719,7 +719,7 @@ fn build_server_rolegroup_statefulset(
         .service_account_name(sa_name);
 
     // "METADATA" is the prefix for the env vars that hold the database credentials
-    // (e.g. METADATA_DATABASE_USERNAME, METADATA_DATABASE_PASSWORD). It must match
+    // (e.g. METADATA_DATABASE_USERNAME, METADATA_DATABASE_PASSWORD). It should match
     // the prefix used by the airflow-operator for consistency.
     let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
     let metadata_database_connection_details = superset

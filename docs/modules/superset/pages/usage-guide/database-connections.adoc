@@ -17,11 +17,11 @@ spec:
         credentialsSecretName: superset-postgresql-credentials # <2>
 ----
 <1> A reference to one of the supported database backends (e.g. `postgresql`).
-<2> A reference to a Secret which must contain the two fields `username` and `password`.
+<2> A reference to a Secret which must contain the two keys `username` and `password`.
 
 == Generic connections
 
-Alternatively, these connections can also be defined in full in a referenced secret:
+Alternatively, these connections can also be defined in full in a referenced Secret:
 
 [source,yaml]
 ----
@@ -32,4 +32,4 @@ spec:
         connectionUrlSecretName: superset-metadata # <1>
 ----
 
-<1> A reference to a secret which must contain the single field `connectionUrl` e.g. `postgresql://superset:superset@superset-postgresql/superset`
+<1> A reference to a Secret which must contain the single key `connectionUrl` e.g. `postgresql://superset:superset@superset-postgresql/superset`
