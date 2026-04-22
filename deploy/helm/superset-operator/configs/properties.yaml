@@ -3,18 +3,6 @@ version: 0.1.0
 spec:
   units: []
 properties:
-  - property: &credentialsSecretName
-      propertyNames:
-        - name: "credentialsSecretName"
-          kind:
-            type: "env"
-      datatype:
-        type: "string"
-      roles:
-        - name: "node"
-          required: true
-      asOfVersion: "0.0.0"
-      description: "The name of the Secret where the Superset credentials are stored."
   - property: &rowLimit
       propertyNames:
         - name: "ROW_LIMIT"

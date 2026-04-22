@@ -444,7 +444,6 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
 }
 
 impl v1alpha1::SupersetConfig {
-    pub const CREDENTIALS_SECRET_NAME_PROPERTY: &'static str = "credentialsSecretName";
     pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
 
     fn default_config(cluster_name: &str, role: &SupersetRole) -> v1alpha1::SupersetConfigFragment {
@@ -478,10 +477,6 @@ impl Configuration for v1alpha1::SupersetConfigFragment {
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
         let mut result = BTreeMap::new();
-        result.insert(
-            v1alpha1::SupersetConfig::CREDENTIALS_SECRET_NAME_PROPERTY.to_string(),
-            Some(cluster.spec.cluster_config.credentials_secret_name.clone()),
-        );
         if let Some(msec) = &cluster.spec.cluster_config.mapbox_secret {
             result.insert(
                 v1alpha1::SupersetConfig::MAPBOX_SECRET_PROPERTY.to_string(),
