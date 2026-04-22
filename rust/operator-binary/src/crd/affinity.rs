@@ -29,6 +29,7 @@ mod tests {
             api::core::v1::{PodAffinityTerm, PodAntiAffinity, WeightedPodAffinityTerm},
             apimachinery::pkg::apis::meta::v1::LabelSelector,
         },
+        utils::yaml_from_str_singleton_map,
     };
 
     use super::*;
@@ -56,10 +57,8 @@ mod tests {
               default:
                 replicas: 1
         "#;
-        let deserializer = serde_yaml::Deserializer::from_str(input);
         let superset: v1alpha1::SupersetCluster =
-            serde_yaml::with::singleton_map_recursive::deserialize(deserializer)
-                .expect("illegal test input");
+            yaml_from_str_singleton_map(input).expect("illegal test input");
         let merged_config = superset
             .merged_config(&SupersetRole::Node, &superset.node_rolegroup_ref("default"))
             .unwrap();
