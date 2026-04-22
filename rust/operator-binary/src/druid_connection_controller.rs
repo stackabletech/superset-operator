@@ -318,7 +318,7 @@ async fn build_import_job(
 ) -> Result<Job> {
     let mut commands = vec![];
 
-    let config = "import os; SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI')";
+    let config = "import os; SQLALCHEMY_DATABASE_URI = os.path.expandvars(os.environ.get('SQLALCHEMY_DATABASE_URI'))";
     commands.push(format!("mkdir -p {PYTHONPATH}"));
     commands.push(format!(
         "echo \"{config}\" > {PYTHONPATH}/{SUPERSET_CONFIG_FILENAME}"
@@ -345,20 +345,7 @@ async fn build_import_job(
     container_builder
         .image_from_product_image(resolved_product_image)
         .command(vec!["/bin/bash".to_string()])
-        .args(vec![
-            String::from("-c"),
-            // SQLALCHEMY_DATABASE_URI contains a template with bash variable references
-            // (e.g. ${METADATA_DATABASE_USERNAME}) that must be resolved before Python
-            // reads it via os.environ. Airflow's config system calls expandvars()
-            // on env var values automatically (see [1]), but Superset does not - so we
-            // resolve them here with eval.
-            // [1] https://github.com/apache/airflow/blob/2.10.5/airflow/configuration.py#L1084-L1086
-            // (same behaviour in 3.x: shared/configuration/src/airflow_shared/configuration/parser.py)
-            format!(
-                "export SQLALCHEMY_DATABASE_URI=$(eval echo \"$SQLALCHEMY_DATABASE_URI\")\n{}",
-                commands.join("; ")
-            ),
-        ])
+        .args(vec![String::from("-c"), commands.join("; ")])
         .add_env_var(
             "SQLALCHEMY_DATABASE_URI",
             metadata_database_connection_details.url_template.clone(),

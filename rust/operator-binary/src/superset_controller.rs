@@ -803,14 +803,6 @@ fn build_server_rolegroup_statefulset(
 
             {auth_commands}
 
-            # SQLALCHEMY_DATABASE_URI contains a template with bash variable references
-            # (e.g. ${{METADATA_DATABASE_USERNAME}}) that must be resolved before Python
-            # reads it via os.environ.get(). Airflow's config system calls expandvars()
-            # on env var values automatically (see [1]), but Superset does not - so we
-            # resolve them here with eval.
-            # [1] https://github.com/apache/airflow/blob/2.10.5/airflow/configuration.py#L1084-L1086
-            # (same behaviour in 3.x: shared/configuration/src/airflow_shared/configuration/parser.py)
-            export SQLALCHEMY_DATABASE_URI=$(eval echo \"$SQLALCHEMY_DATABASE_URI\")
             superset db upgrade
             set +x
             echo 'Running \"superset fab create-admin [...]\", which is not shown as it leaks the Superset admin credentials'

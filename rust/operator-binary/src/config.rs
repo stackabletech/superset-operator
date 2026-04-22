@@ -47,7 +47,7 @@ pub fn add_superset_config(
     );
     config.insert(
         SupersetConfigOptions::SqlalchemyDatabaseUri.to_string(),
-        "os.environ.get('SQLALCHEMY_DATABASE_URI')".to_owned(),
+        "os.path.expandvars(os.environ.get('SQLALCHEMY_DATABASE_URI'))".to_owned(),
     );
     config.insert(
         SupersetConfigOptions::StatsLogger.to_string(),
