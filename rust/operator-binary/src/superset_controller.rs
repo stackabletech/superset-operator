@@ -425,7 +425,7 @@ pub async fn reconcile_superset(
         client,
     )
     .await
-    .context(InvalidSecretKeySnafu)?;
+    .context(CreateSecretKeySecretSnafu)?;
 
     let mut ss_cond_builder = StatefulSetConditionBuilder::default();
 
