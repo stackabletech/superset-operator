@@ -34,10 +34,14 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
-use crate::{crd::v1alpha1::SupersetRoleConfig, listener::default_listener_class};
+use crate::{
+    crd::{databases::MetadataDatabaseConnection, v1alpha1::SupersetRoleConfig},
+    listener::default_listener_class,
+};
 
 pub mod affinity;
 pub mod authentication;
+pub mod databases;
 pub mod druidconnection;
 
 pub const FIELD_MANAGER: &str = "superset-operator";
@@ -51,6 +55,8 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
 };
+
+pub const INTERNAL_SECRET_SECRET_KEY: &str = "SECRET_KEY";
 
 pub const APP_PORT_NAME: &str = "http";
 pub const APP_PORT: u16 = 8088;
@@ -199,11 +205,14 @@ pub mod versioned {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub authorization: Option<v1alpha1::SupersetAuthorization>,
 
-        /// The name of the Secret object containing the admin user credentials and database connection details.
+        /// Configure the database where Superset stores all its internal metadata.
+        pub metadata_database: MetadataDatabaseConnection,
+
+        /// The name of the Secret object containing the admin user credentials.
         /// Read the
         /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/superset/getting_started/first_steps)
         /// to find out more.
-        pub credentials_secret: String,
+        pub credentials_secret_name: String,
 
         /// Cluster operations like pause reconciliation or cluster stop.
         #[serde(default)]
@@ -435,7 +444,6 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
 }
 
 impl v1alpha1::SupersetConfig {
-    pub const CREDENTIALS_SECRET_PROPERTY: &'static str = "credentialsSecret";
     pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
 
     fn default_config(cluster_name: &str, role: &SupersetRole) -> v1alpha1::SupersetConfigFragment {
@@ -469,17 +477,12 @@ impl Configuration for v1alpha1::SupersetConfigFragment {
         _role_name: &str,
     ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
         let mut result = BTreeMap::new();
-        result.insert(
-            v1alpha1::SupersetConfig::CREDENTIALS_SECRET_PROPERTY.to_string(),
-            Some(cluster.spec.cluster_config.credentials_secret.clone()),
-        );
         if let Some(msec) = &cluster.spec.cluster_config.mapbox_secret {
             result.insert(
                 v1alpha1::SupersetConfig::MAPBOX_SECRET_PROPERTY.to_string(),
                 Some(msec.clone()),
             );
         }
-
         Ok(result)
     }
 
@@ -521,6 +524,10 @@ impl HasStatusCondition for v1alpha1::SupersetCluster {
 }
 
 impl v1alpha1::SupersetCluster {
+    pub fn shared_secret_key_secret_name(&self) -> String {
+        format!("{}-secret-key", &self.name_any())
+    }
+
     /// The name of the group-listener provided for a specific role.
     /// Nodes will use this group listener so that only one load balancer
     /// is needed for that role.

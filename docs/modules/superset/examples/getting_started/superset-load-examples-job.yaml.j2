@@ -15,9 +15,10 @@ spec:
       - name: superset
         image: oci.stackable.tech/sdp/superset:6.0.0-stackable{{ versions.superset }}
         command: [
-          "/bin/sh",
+          "/bin/bash",
           "-c",
-          "mkdir --parents /stackable/app/pythonpath && \
+          "export SQLALCHEMY_DATABASE_URI=\"postgresql://${DB_USERNAME}:${DB_PASSWORD}@superset-postgresql.default.svc.cluster.local/superset\" && \
+          mkdir --parents /stackable/app/pythonpath && \
           cp /stackable/config/* /stackable/app/pythonpath && \
           echo 'SQLALCHEMY_EXAMPLES_URI = os.environ.get(\"SQLALCHEMY_DATABASE_URI\")' >> /stackable/app/pythonpath/superset_config.py && \
           superset load_examples"
@@ -26,13 +27,18 @@ spec:
         - name: SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: connections.secretKey
-              name: simple-superset-credentials
-        - name: SQLALCHEMY_DATABASE_URI
+              key: SECRET_KEY
+              name: simple-superset-secret-key
+        - name: DB_USERNAME
           valueFrom:
             secretKeyRef:
-              key: connections.sqlalchemyDatabaseUri
-              name: simple-superset-credentials
+              key: username
+              name: superset-postgresql-credentials
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: superset-postgresql-credentials
         volumeMounts:
         - mountPath: /stackable/config
           name: config

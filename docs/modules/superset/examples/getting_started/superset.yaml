@@ -1,4 +1,12 @@
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-postgresql-credentials
+stringData:
+  username: superset
+  password: superset
+---
 apiVersion: superset.stackable.tech/v1alpha1
 kind: SupersetCluster
 metadata:
@@ -7,7 +15,12 @@ spec:
   image:
     productVersion: 6.0.0
   clusterConfig:
-    credentialsSecret: simple-superset-credentials
+    credentialsSecretName: superset-admin-credentials
+    metadataDatabase:
+      postgresql:
+        host: superset-postgresql
+        database: superset
+        credentialsSecretName: superset-postgresql-credentials
   nodes:
     roleConfig:
       listenerClass: external-unstable

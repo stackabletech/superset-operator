@@ -9,10 +9,18 @@
 - Bump `stackable-operator` to 0.110.0 and `kube` to 3.1.0 ([#719]).
 - Support setting `clientAuthenticationMethod` for OIDC authentication. The value is passed through to the Flask-AppBuilder config as `token_endpoint_auth_method` ([#719]).
 - BREAKING: Rename `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `superset_config.py` for arbitrary Python code to `FILE_HEADER` and `FILE_FOOTER`  ([#719], [#721]).
+- Use an internal Secret for the Superset `SECRET_KEY`.
+  Going forward, the operator will automatically create the Secret in case it doesn't exist ([#722]).
+- BREAKING: The `.clusterConfig.credentialsSecret` field has been renamed to `.clusterConfig.credentialsSecretName` for consistency ([#722]).
+- BREAKING: Implement generic database connection.
+  This means you need to replace your simple database connection string with a typed struct.
+  This struct is consistent between different CRDs, so that you can easily copy/paste it between stacklets.
+  More information can be found in the [Superset database documentation](https://docs.stackable.tech/home/nightly/superset/usage-guide/database-connections) for details ([#722]).
 
 [#717]: https://github.com/stackabletech/superset-operator/pull/717
 [#719]: https://github.com/stackabletech/superset-operator/pull/719
 [#721]: https://github.com/stackabletech/superset-operator/pull/721
+[#722]: https://github.com/stackabletech/superset-operator/pull/722
 
 ## [26.3.0] - 2026-03-16
 

@@ -16,10 +16,12 @@ rules:
   # Manage core namespaced resources created per SupersetCluster.
   # All resources are applied via Server-Side Apply (create + patch) and tracked for
   # orphan cleanup (list + delete). ReconciliationPaused uses get.
+  # Secrets are needed for auto-generated SECRET_KEY (random_secret_creation).
   - apiGroups:
       - ""
     resources:
       - configmaps
+      - secrets
       - services
     verbs:
       - create
