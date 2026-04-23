@@ -83,7 +83,7 @@ pub fn build_rolegroup_config_map(
     //    Issue: https://github.com/stackabletech/superset-operator/issues/416
     config_properties.insert("TALISMAN_ENABLED".to_string(), "False".to_string());
 
-    config::superset::add_superset_config(&mut config_properties, authentication_config)
+    config::superset::add_superset_config(&mut config_properties, superset, authentication_config)
         .context(AddSupersetConfigSnafu)?;
 
     // Adding opa configuration properties to config_properties.
@@ -111,7 +111,7 @@ pub fn build_rolegroup_config_map(
     // By removing the keys from `config_properties`, we avoid pasting the Python code into a Python variable as well
     // (which would be bad)
     if let Some(header) = config_properties.remove(CONFIG_OVERRIDE_FILE_HEADER_KEY) {
-        writeln!(config_file, "{}", header).context(WriteToConfigFileStringSnafu)?;
+        writeln!(config_file, "{header}").context(WriteToConfigFileStringSnafu)?;
     }
     let temp_file_footer = config_properties.remove(CONFIG_OVERRIDE_FILE_FOOTER_KEY);
 
@@ -124,8 +124,11 @@ pub fn build_rolegroup_config_map(
         rolegroup: rolegroup.clone(),
     })?;
 
+    // We have to add a python class (no key) and cannot use the superset::config machinery.
+    config::superset::append_celery_worker_config(&mut config_file, superset);
+
     if let Some(footer) = temp_file_footer {
-        writeln!(config_file, "{}", footer).context(WriteToConfigFileStringSnafu)?;
+        writeln!(config_file, "{footer}").context(WriteToConfigFileStringSnafu)?;
     }
 
     let mut cm_builder = ConfigMapBuilder::new();

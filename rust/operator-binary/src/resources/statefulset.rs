@@ -19,7 +19,6 @@ use stackable_operator::{
         },
     },
     commons::product_image_selection::ResolvedProductImage,
-    database_connections::TemplatingMechanism,
     k8s_openapi::{
         DeepMerge,
         api::{
@@ -191,18 +190,27 @@ pub fn build_server_rolegroup_statefulset(
         .affinity(&merged_config.affinity)
         .service_account_name(sa_name);
 
+    let mut superset_cb = ContainerBuilder::new(&Container::Superset.to_string())
+        .context(InvalidContainerNameSnafu)?;
+
     // "METADATA" is the prefix for the env vars that hold the database credentials
     // (e.g. METADATA_DATABASE_USERNAME, METADATA_DATABASE_PASSWORD). It should match
     // the prefix used by the airflow-operator for consistency.
-    let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
-    let metadata_database_connection_details = superset
-        .spec
-        .cluster_config
-        .metadata_database
-        .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism);
+    let metadata_database_connection_details =
+        super::metadata_database_connection_details(superset);
+    let celery_result_backend_connection_details =
+        super::celery_result_backend_connection_details(superset);
+    let celery_broker_connection_details = super::celery_broker_connection_details(superset);
 
-    let mut superset_cb = ContainerBuilder::new(&Container::Superset.to_string())
-        .context(InvalidContainerNameSnafu)?;
+    metadata_database_connection_details.add_to_container(&mut superset_cb);
+    if let Some(celery_result_backend_connection_details) =
+        &celery_result_backend_connection_details
+    {
+        celery_result_backend_connection_details.add_to_container(&mut superset_cb);
+    }
+    if let Some(celery_broker_connection_details) = celery_broker_connection_details {
+        celery_broker_connection_details.add_to_container(&mut superset_cb);
+    }
 
     for (name, value) in node_config
         .get(&PropertyNameKind::Env)
@@ -225,12 +233,6 @@ pub fn build_server_rolegroup_statefulset(
         "SECRET_KEY",
         superset.shared_secret_key_secret_name(),
         crate::crd::INTERNAL_SECRET_SECRET_KEY,
-    );
-
-    // Database connection URL from metadataDatabase
-    superset_cb.add_env_var(
-        "SQLALCHEMY_DATABASE_URI",
-        metadata_database_connection_details.url_template.clone(),
     );
 
     add_authentication_volumes_and_volume_mounts(authentication_config, &mut superset_cb, pb)?;
@@ -318,8 +320,6 @@ pub fn build_server_rolegroup_statefulset(
     superset_cb
         .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
         .context(AddVolumeMountSnafu)?;
-
-    metadata_database_connection_details.add_to_container(&mut superset_cb);
 
     pb.add_container(superset_cb.build());
     add_graceful_shutdown_config(merged_config, pb).context(GracefulShutdownSnafu)?;

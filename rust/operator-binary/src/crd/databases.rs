@@ -37,7 +37,7 @@ impl Deref for MetadataDatabaseConnection {
 #[serde(rename_all = "camelCase")]
 pub enum CeleryResultBackendConnection {
     // Docs are on the struct
-    Postgresql(PostgresqlConnection),
+    Redis(RedisConnection),
 
     // Docs are on the struct
     Generic(GenericCeleryDatabaseConnection),
@@ -48,7 +48,7 @@ impl Deref for CeleryResultBackendConnection {
 
     fn deref(&self) -> &Self::Target {
         match self {
-            Self::Postgresql(p) => p,
+            Self::Redis(r) => r,
             Self::Generic(g) => g,
         }
     }

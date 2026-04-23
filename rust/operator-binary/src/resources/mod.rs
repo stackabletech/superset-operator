@@ -105,18 +105,19 @@ pub(crate) fn create_volumes(
 
 pub(crate) fn metadata_database_connection_details(
     superset: &SupersetCluster,
-    templating_mechanism: &TemplatingMechanism,
 ) -> SqlAlchemyDatabaseConnectionDetails {
     superset
         .spec
         .cluster_config
         .metadata_database
-        .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism)
+        .sqlalchemy_connection_details_with_templating(
+            "METADATA",
+            &TemplatingMechanism::BashEnvSubstitution,
+        )
 }
 
 pub(crate) fn celery_result_backend_connection_details(
     superset: &SupersetCluster,
-    templating_mechanism: &TemplatingMechanism,
 ) -> Option<CeleryDatabaseConnectionDetails> {
     // Removed the &'a and reference
     superset
@@ -127,14 +128,13 @@ pub(crate) fn celery_result_backend_connection_details(
         .map(|backend| {
             backend.celery_connection_details_with_templating(
                 "CELERY_RESULT_BACKEND",
-                templating_mechanism,
+                &TemplatingMechanism::BashEnvSubstitution,
             )
         })
 }
 
 pub(crate) fn celery_broker_connection_details(
     superset: &SupersetCluster,
-    templating_mechanism: &TemplatingMechanism,
 ) -> Option<CeleryDatabaseConnectionDetails> {
     // Removed the &'a and reference
     superset
@@ -143,6 +143,9 @@ pub(crate) fn celery_broker_connection_details(
         .celery_broker
         .as_ref()
         .map(|broker| {
-            broker.celery_connection_details_with_templating("CELERY_BROKER", templating_mechanism)
+            broker.celery_connection_details_with_templating(
+                "CELERY_BROKER",
+                &TemplatingMechanism::BashEnvSubstitution,
+            )
         })
 }

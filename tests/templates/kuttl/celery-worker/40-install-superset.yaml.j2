@@ -25,6 +25,14 @@ stringData:
   username: superset
   password: superset
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-redis-credentials
+stringData:
+  username: 
+  password: superset
+---
 apiVersion: superset.stackable.tech/v1alpha1
 kind: SupersetCluster
 metadata:
@@ -45,6 +53,14 @@ spec:
         host: superset-postgresql
         database: superset
         credentialsSecretName: superset-postgresql-credentials
+    celeryResultBackend:
+      redis:
+        host: superset-redis-master
+        credentialsSecretName: superset-redis-credentials
+    celeryBroker:
+      redis:
+        host: superset-redis-master
+        credentialsSecretName: superset-redis-credentials
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
@@ -61,33 +77,6 @@ spec:
             loggers:
               ROOT:
                 level: DEBUG
-    configOverrides:
-      # Add endpoints that need to be exempt from CSRF protection
-      superset_config.py:
-        FILE_FOOTER: |-
-          # Otherwise {"message": "400 Bad Request: The CSRF token is missing.", "error_type": "GENERIC_BACKEND_ERROR", "level": "error", "extra": {"issue_codes": [{"code": 1011, "message": "Issue 1011 - Superset encountered an unexpected error."}]}}
-          WTF_CSRF_ENABLED = False
-
-          ### CELERY ASYNC
-          from flask_caching.backends.rediscache import RedisCache
-          RESULTS_BACKEND = RedisCache(host='superset-redis-master', port=6379, key_prefix='superset_results', password='superset')
-
-          class CeleryConfig(object):
-            broker_url = "redis://:superset@superset-redis-master:6379/0"
-            imports = (
-                "superset.sql_lab",
-                "superset.tasks.scheduler",
-            )
-            result_backend = "redis://:superset@superset-redis-master:6379/0"
-            worker_prefetch_multiplier = 10
-            task_acks_late = True
-            task_annotations = {
-                "sql_lab.get_sql_results": {
-                    "rate_limit": "100/s",
-                },
-            }
-
-          CELERY_CONFIG = CeleryConfig
     roleGroups:
       default:
         replicas: 1
@@ -104,29 +93,6 @@ spec:
             loggers:
               ROOT:
                 level: DEBUG
-    configOverrides:
-      superset_config.py:
-        FILE_FOOTER: |-
-          ### CELERY ASYNC
-          from flask_caching.backends.rediscache import RedisCache
-          RESULTS_BACKEND = RedisCache(host='superset-redis-master', port=6379, key_prefix='superset_results', password='superset')
-
-          class CeleryConfig(object):
-            broker_url = "redis://:superset@superset-redis-master:6379/0"
-            imports = (
-                "superset.sql_lab",
-                "superset.tasks.scheduler",
-            )
-            result_backend = "redis://:superset@superset-redis-master:6379/0"
-            worker_prefetch_multiplier = 10
-            task_acks_late = True
-            task_annotations = {
-                "sql_lab.get_sql_results": {
-                    "rate_limit": "100/s",
-                },
-            }
-
-          CELERY_CONFIG = CeleryConfig
     roleGroups:
       default:
         replicas: 1
