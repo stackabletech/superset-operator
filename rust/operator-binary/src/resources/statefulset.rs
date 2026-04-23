@@ -19,6 +19,7 @@ use stackable_operator::{
         },
     },
     commons::product_image_selection::ResolvedProductImage,
+    database_connections::TemplatingMechanism,
     k8s_openapi::{
         DeepMerge,
         api::{
@@ -162,7 +163,7 @@ pub fn build_server_rolegroup_statefulset(
         &rolegroup_ref.role_group,
     );
     // Used for PVC templates that cannot be modified once they are deployed
-    let unversioned_recommended_labels = Labels::recommended(build_recommended_labels(
+    let unversioned_recommended_labels = Labels::recommended(&build_recommended_labels(
         superset,
         SUPERSET_CONTROLLER_NAME,
         // A version value is required, and we do want to use the "recommended" format for the other desired labels
@@ -173,7 +174,7 @@ pub fn build_server_rolegroup_statefulset(
     .context(LabelBuildSnafu)?;
 
     let metadata = ObjectMetaBuilder::new()
-        .with_recommended_labels(recommended_object_labels.clone())
+        .with_recommended_labels(&recommended_object_labels)
         .context(MetadataBuildSnafu)?
         .build();
 
@@ -190,6 +191,16 @@ pub fn build_server_rolegroup_statefulset(
         .affinity(&merged_config.affinity)
         .service_account_name(sa_name);
 
+    // "METADATA" is the prefix for the env vars that hold the database credentials
+    // (e.g. METADATA_DATABASE_USERNAME, METADATA_DATABASE_PASSWORD). It should match
+    // the prefix used by the airflow-operator for consistency.
+    let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
+    let metadata_database_connection_details = superset
+        .spec
+        .cluster_config
+        .metadata_database
+        .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism);
+
     let mut superset_cb = ContainerBuilder::new(&Container::Superset.to_string())
         .context(InvalidContainerNameSnafu)?;
 
@@ -198,14 +209,7 @@ pub fn build_server_rolegroup_statefulset(
         .cloned()
         .unwrap_or_default()
     {
-        if name == SupersetConfig::CREDENTIALS_SECRET_PROPERTY {
-            superset_cb.add_env_var_from_secret("SECRET_KEY", &value, "connections.secretKey");
-            superset_cb.add_env_var_from_secret(
-                "SQLALCHEMY_DATABASE_URI",
-                &value,
-                "connections.sqlalchemyDatabaseUri",
-            );
-        } else if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
+        if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
             superset_cb.add_env_var_from_secret(
                 "MAPBOX_API_KEY",
                 &value,
@@ -215,6 +219,19 @@ pub fn build_server_rolegroup_statefulset(
             superset_cb.add_env_var(name, value);
         };
     }
+
+    // SECRET_KEY from auto-generated secret
+    superset_cb.add_env_var_from_secret(
+        "SECRET_KEY",
+        superset.shared_secret_key_secret_name(),
+        crate::crd::INTERNAL_SECRET_SECRET_KEY,
+    );
+
+    // Database connection URL from metadataDatabase
+    superset_cb.add_env_var(
+        "SQLALCHEMY_DATABASE_URI",
+        metadata_database_connection_details.url_template.clone(),
+    );
 
     add_authentication_volumes_and_volume_mounts(authentication_config, &mut superset_cb, pb)?;
 
@@ -226,7 +243,7 @@ pub fn build_server_rolegroup_statefulset(
         .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
         .context(MissingWebServerTimeoutInSupersetConfigSnafu)?;
 
-    let secret = &superset.spec.cluster_config.credentials_secret;
+    let secret = &superset.spec.cluster_config.credentials_secret_name;
 
     superset_cb
         .image_from_product_image(resolved_product_image)
@@ -301,6 +318,8 @@ pub fn build_server_rolegroup_statefulset(
     superset_cb
         .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
         .context(AddVolumeMountSnafu)?;
+
+    metadata_database_connection_details.add_to_container(&mut superset_cb);
 
     pb.add_container(superset_cb.build());
     add_graceful_shutdown_config(merged_config, pb).context(GracefulShutdownSnafu)?;
@@ -380,7 +399,7 @@ pub fn build_server_rolegroup_statefulset(
             .name(rolegroup_ref.object_name())
             .ownerreference_from_resource(superset, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
-            .with_recommended_labels(recommended_object_labels)
+            .with_recommended_labels(&recommended_object_labels)
             .context(MetadataBuildSnafu)?
             .with_label(
                 Label::try_from(("restarter.stackable.tech/enabled", "true"))
