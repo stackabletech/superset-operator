@@ -35,7 +35,12 @@ use stackable_operator::{
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
-    crd::{databases::MetadataDatabaseConnection, v1alpha1::SupersetRoleConfig},
+    crd::{
+        databases::{
+            CeleryBrokerConnection, CeleryResultBackendConnection, MetadataDatabaseConnection,
+        },
+        v1alpha1::SupersetRoleConfig,
+    },
     resources::listener::default_listener_class,
 };
 
@@ -215,6 +220,20 @@ pub mod versioned {
 
         /// Configure the database where Superset stores all its internal metadata.
         pub metadata_database: MetadataDatabaseConnection,
+
+        /// Connection information for the celery backend database.
+        /// Only works if `workers` (and `beat`) roles are set.
+        ///
+        /// Ignored otherwise.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub celery_result_backend: Option<CeleryResultBackendConnection>,
+
+        /// Connection information for the celery broker queue.
+        ///
+        /// Only works if `workers` (and `beat`) roles are set.
+        /// Ignored otherwise.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub celery_broker: Option<CeleryBrokerConnection>,
 
         /// The name of the Secret object containing the admin user credentials.
         /// Read the

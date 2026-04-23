@@ -263,6 +263,7 @@ pub async fn reconcile_superset(
                         superset.spec.workers.clone().context(NoNodeRoleSnafu)?,
                     ),
                 ),
+                // TODO: uncomment
                 // (
                 //     SupersetRole::Beat.to_string(),
                 //     (

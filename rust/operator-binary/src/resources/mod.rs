@@ -1,5 +1,12 @@
 use stackable_operator::{
     builder::pod::volume::VolumeBuilder,
+    database_connections::{
+        TemplatingMechanism,
+        drivers::{
+            celery::CeleryDatabaseConnectionDetails,
+            sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
+        },
+    },
     k8s_openapi::api::core::v1::{ConfigMapVolumeSource, EmptyDirVolumeSource, Volume},
     kvp::ObjectLabels,
     product_logging::{
@@ -11,7 +18,7 @@ use stackable_operator::{
     },
 };
 
-use crate::{OPERATOR_NAME, crd::APP_NAME};
+use crate::{OPERATOR_NAME, crd::APP_NAME, v1alpha1::SupersetCluster};
 
 pub mod configmap;
 pub mod deployment;
@@ -45,7 +52,7 @@ pub fn build_recommended_labels<'a, T>(
     }
 }
 
-pub fn create_volumes(
+pub(crate) fn create_volumes(
     config_map_name: &str,
     log_config: Option<&ContainerLogConfig>,
 ) -> Vec<Volume> {
@@ -94,4 +101,48 @@ pub fn create_volumes(
     }
 
     volumes
+}
+
+pub(crate) fn metadata_database_connection_details(
+    superset: &SupersetCluster,
+    templating_mechanism: &TemplatingMechanism,
+) -> SqlAlchemyDatabaseConnectionDetails {
+    superset
+        .spec
+        .cluster_config
+        .metadata_database
+        .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism)
+}
+
+pub(crate) fn celery_result_backend_connection_details(
+    superset: &SupersetCluster,
+    templating_mechanism: &TemplatingMechanism,
+) -> Option<CeleryDatabaseConnectionDetails> {
+    // Removed the &'a and reference
+    superset
+        .spec
+        .cluster_config
+        .celery_result_backend
+        .as_ref()
+        .map(|backend| {
+            backend.celery_connection_details_with_templating(
+                "CELERY_RESULT_BACKEND",
+                templating_mechanism,
+            )
+        })
+}
+
+pub(crate) fn celery_broker_connection_details(
+    superset: &SupersetCluster,
+    templating_mechanism: &TemplatingMechanism,
+) -> Option<CeleryDatabaseConnectionDetails> {
+    // Removed the &'a and reference
+    superset
+        .spec
+        .cluster_config
+        .celery_broker
+        .as_ref()
+        .map(|broker| {
+            broker.celery_connection_details_with_templating("CELERY_BROKER", templating_mechanism)
+        })
 }
