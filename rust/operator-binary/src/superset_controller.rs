@@ -39,7 +39,7 @@ use crate::{
     resources::{
         build_recommended_labels,
         configmap::build_rolegroup_config_map,
-        deployment::build_worker_rolegroup_deployment,
+        deployment::{build_beat_rolegroup_deployment, build_worker_rolegroup_deployment},
         listener::build_group_listener,
         service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
         statefulset::build_server_rolegroup_statefulset,
@@ -263,18 +263,17 @@ pub async fn reconcile_superset(
                         superset.spec.workers.clone().context(NoNodeRoleSnafu)?,
                     ),
                 ),
-                // TODO: uncomment
-                // (
-                //     SupersetRole::Beat.to_string(),
-                //     (
-                //         vec![
-                //             PropertyNameKind::Env,
-                //             PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
-                //         ],
-                //         // TODO: improve error
-                //         superset.spec.beat.clone().context(NoNodeRoleSnafu)?,
-                //     ),
-                // ),
+                (
+                    SupersetRole::Beat.to_string(),
+                    (
+                        vec![
+                            PropertyNameKind::Env,
+                            PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
+                        ],
+                        // TODO: improve error
+                        superset.spec.beat.clone().context(NoNodeRoleSnafu)?,
+                    ),
+                ),
             ]
             .into(),
         )
@@ -415,7 +414,7 @@ pub async fn reconcile_superset(
                     );
                 }
                 SupersetRole::Worker => {
-                    let rg_deployment = build_worker_rolegroup_deployment(
+                    let rg_worker_deployment = build_worker_rolegroup_deployment(
                         superset,
                         &resolved_product_image,
                         &superset_role,
@@ -431,14 +430,37 @@ pub async fn reconcile_superset(
                     // See https://github.com/stackabletech/commons-operator/issues/111 for details.
                     deployment_cond_builder.add(
                         cluster_resources
-                            .add(client, rg_deployment.clone())
+                            .add(client, rg_worker_deployment.clone())
                             .await
                             .with_context(|_| ApplyRoleGroupDeploymentSnafu {
                                 rolegroup: rolegroup.clone(),
                             })?,
                     );
                 }
-                SupersetRole::Beat => todo!(),
+                SupersetRole::Beat => {
+                    let rg_beat_deployment = build_beat_rolegroup_deployment(
+                        superset,
+                        &resolved_product_image,
+                        &superset_role,
+                        &rolegroup,
+                        rolegroup_config,
+                        &rbac_sa.name_any(),
+                        &config,
+                    )
+                    .context(BuildDeploymentSnafu)?;
+
+                    // Note: The Deployment needs to be applied after all ConfigMaps and Secrets it mounts
+                    // to prevent unnecessary Pod restarts.
+                    // See https://github.com/stackabletech/commons-operator/issues/111 for details.
+                    deployment_cond_builder.add(
+                        cluster_resources
+                            .add(client, rg_beat_deployment.clone())
+                            .await
+                            .with_context(|_| ApplyRoleGroupDeploymentSnafu {
+                                rolegroup: rolegroup.clone(),
+                            })?,
+                    );
+                }
             }
 
             if let Some(listener_class) = &superset_role.listener_class_name(superset) {

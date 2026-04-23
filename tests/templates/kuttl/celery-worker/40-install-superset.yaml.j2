@@ -68,15 +68,12 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-        containers:
-          superset:
-            console:
-              level: DEBUG
-            file:
-              level: DEBUG
-            loggers:
-              ROOT:
-                level: DEBUG
+    configOverrides:
+      superset_config.py:
+        FILE_FOOTER: |-
+          # Add endpoints that need to be exempt from CSRF protection
+          # Otherwise {"message": "400 Bad Request: The CSRF token is missing.", "error_type": "GENERIC_BACKEND_ERROR", "level": "error", "extra": {"issue_codes": [{"code": 1011, "message": "Issue 1011 - Superset encountered an unexpected error."}]}}
+          WTF_CSRF_ENABLED = False
     roleGroups:
       default:
         replicas: 1
@@ -84,15 +81,13 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
-        containers:
-          superset:
-            console:
-              level: DEBUG
-            file:
-              level: DEBUG
-            loggers:
-              ROOT:
-                level: DEBUG
+    roleGroups:
+      default:
+        replicas: 1
+  beat:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
       default:
         replicas: 1

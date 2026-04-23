@@ -54,3 +54,27 @@ status:
   expectedPods: 1
   currentHealthy: 1
   disruptionsAllowed: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: superset-beat-default
+  generation: 1 # There should be no unneeded Pod restarts
+  labels:
+    restarter.stackable.tech/enabled: "true"
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 120
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: superset-beat
+status:
+  expectedPods: 1
+  currentHealthy: 1
+  disruptionsAllowed: 1
