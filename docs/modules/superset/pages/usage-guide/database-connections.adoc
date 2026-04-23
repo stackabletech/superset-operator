@@ -1,0 +1,35 @@
+= Database connections
+:description: Configure Superset database connectivity.
+
+Superset requires a metadata database for storing slices, connections, tables, dashboards and other metadata.
+The actual connection string is calculated by the operator so that the user does not need to remember the exact structure.
+
+== Typed connections
+
+[source,yaml]
+----
+spec:
+  clusterConfig:
+    metadataDatabase:
+      postgresql: # <1>
+        host: superset-postgresql
+        database: superset
+        credentialsSecretName: superset-postgresql-credentials # <2>
+----
+<1> A reference to one of the supported database backends (e.g. `postgresql`).
+<2> A reference to a Secret which must contain the two keys `username` and `password`.
+
+== Generic connections
+
+Alternatively, these connections can also be defined in full in a referenced Secret:
+
+[source,yaml]
+----
+spec:
+  clusterConfig:
+    metadataDatabase:
+      generic:
+        connectionUrlSecretName: superset-metadata # <1>
+----
+
+<1> A reference to a Secret which must contain the single key `connectionUrl` e.g. `postgresql://superset:superset@superset-postgresql/superset`

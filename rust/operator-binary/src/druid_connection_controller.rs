@@ -9,6 +9,7 @@ use stackable_operator::{
     },
     client::Client,
     commons::product_image_selection::{self, ResolvedProductImage},
+    database_connections::TemplatingMechanism,
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
         core::v1::{ConfigMap, PodSpec, PodTemplateSpec},
@@ -26,7 +27,9 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     APP_NAME, OPERATOR_NAME,
-    crd::{PYTHONPATH, SUPERSET_CONFIG_FILENAME, druidconnection, v1alpha1},
+    crd::{
+        INTERNAL_SECRET_SECRET_KEY, PYTHONPATH, SUPERSET_CONFIG_FILENAME, druidconnection, v1alpha1,
+    },
     operations::job_state::{JobState, get_job_state},
     resources::rbac,
     superset_controller::DOCKER_IMAGE_BASE_NAME,
@@ -315,7 +318,7 @@ async fn build_import_job(
 ) -> Result<Job> {
     let mut commands = vec![];
 
-    let config = "import os; SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI')";
+    let config = "import os; SQLALCHEMY_DATABASE_URI = os.path.expandvars(os.environ.get('SQLALCHEMY_DATABASE_URI'))";
     commands.push(format!("mkdir -p {PYTHONPATH}"));
     commands.push(format!(
         "echo \"{config}\" > {PYTHONPATH}/{SUPERSET_CONFIG_FILENAME}"
@@ -327,18 +330,35 @@ async fn build_import_job(
         "superset import_datasources -p /tmp/druids.yaml",
     ));
 
-    let secret = &superset_cluster.spec.cluster_config.credentials_secret;
+    // "METADATA" is the prefix for the env vars that hold the database credentials
+    // (e.g. METADATA_DATABASE_USERNAME, METADATA_DATABASE_PASSWORD). It should match
+    // the prefix used by the airflow-operator for consistency.
+    let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
+    let metadata_database_connection_details = superset_cluster
+        .spec
+        .cluster_config
+        .metadata_database
+        .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism);
 
-    let container = ContainerBuilder::new("superset-import-druid-connection")
-        .expect("ContainerBuilder not created")
+    let mut container_builder = ContainerBuilder::new("superset-import-druid-connection")
+        .expect("ContainerBuilder not created");
+    container_builder
         .image_from_product_image(resolved_product_image)
-        .command(vec!["/bin/sh".to_string()])
+        .command(vec!["/bin/bash".to_string()])
         .args(vec![String::from("-c"), commands.join("; ")])
-        .add_env_var_from_secret("DATABASE_URI", secret, "connections.sqlalchemyDatabaseUri")
-        // From 2.1.0 superset barfs if the SECRET_KEY is not set properly. This causes the import job to fail.
-        // Setting the env var is enough to be picked up: https://superset.apache.org/docs/installation/configuring-superset/#configuration
-        .add_env_var_from_secret("SUPERSET_SECRET_KEY", secret, "connections.secretKey")
-        .build();
+        .add_env_var(
+            "SQLALCHEMY_DATABASE_URI",
+            metadata_database_connection_details.url_template.clone(),
+        )
+        .add_env_var_from_secret(
+            "SUPERSET_SECRET_KEY",
+            superset_cluster.shared_secret_key_secret_name(),
+            INTERNAL_SECRET_SECRET_KEY,
+        );
+
+    metadata_database_connection_details.add_to_container(&mut container_builder);
+
+    let container = container_builder.build();
 
     let pod = PodTemplateSpec {
         metadata: Some(

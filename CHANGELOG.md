@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Document Helm deployed RBAC permissions and remove unnecessary permissions ([#717]).
+- BREAKING: `configOverrides` now only accepts the supported config file name `superset_config.py`. Previously arbitrary keys were silently accepted but ignored ([#719]).
+- Bump `stackable-operator` to 0.110.0 and `kube` to 3.1.0 ([#719]).
+- Support setting `clientAuthenticationMethod` for OIDC authentication. The value is passed through to the Flask-AppBuilder config as `token_endpoint_auth_method` ([#719]).
+- BREAKING: Rename `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `superset_config.py` for arbitrary Python code to `FILE_HEADER` and `FILE_FOOTER`  ([#719], [#721]).
+- Use an internal Secret for the Superset `SECRET_KEY`.
+  Going forward, the operator will automatically create the Secret in case it doesn't exist ([#722]).
+- BREAKING: The `.clusterConfig.credentialsSecret` field has been renamed to `.clusterConfig.credentialsSecretName` for consistency ([#722]).
+- BREAKING: Implement generic database connection.
+  This means you need to replace your simple database connection string with a typed struct.
+  This struct is consistent between different CRDs, so that you can easily copy/paste it between stacklets.
+  More information can be found in the [Superset database documentation](https://docs.stackable.tech/home/nightly/superset/usage-guide/database-connections) for details ([#722]).
+
+[#717]: https://github.com/stackabletech/superset-operator/pull/717
+[#719]: https://github.com/stackabletech/superset-operator/pull/719
+[#721]: https://github.com/stackabletech/superset-operator/pull/721
+[#722]: https://github.com/stackabletech/superset-operator/pull/722
+
+## [26.3.0] - 2026-03-16
+
+## [26.3.0-rc1] - 2026-03-16
+
 ### Added
 
 - Add conversion webhook ([#702]).
@@ -11,6 +35,7 @@
 
 ### Changed
 
+- Bump stackable-operator to 0.108.0, snafu to 0.9, strum to 0.28 ([#706], [#708]).
 - Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#699]).
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#691]).
 
@@ -18,12 +43,18 @@
 
 - Remove support for Superset 4.0.2 and 4.1.2 ([#695]).
 
+### Fixed
+
+- Fix "404 page not found" error for the initial object list ([#708]).
+
 [#680]: https://github.com/stackabletech/superset-operator/pull/680
 [#691]: https://github.com/stackabletech/superset-operator/pull/691
 [#693]: https://github.com/stackabletech/superset-operator/pull/693
 [#695]: https://github.com/stackabletech/superset-operator/pull/695
 [#699]: https://github.com/stackabletech/superset-operator/pull/699
 [#702]: https://github.com/stackabletech/superset-operator/pull/702
+[#706]: https://github.com/stackabletech/superset-operator/pull/706
+[#708]: https://github.com/stackabletech/superset-operator/pull/708
 
 ## [25.11.0] - 2025-11-07
 

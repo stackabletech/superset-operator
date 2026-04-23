@@ -1,7 +1,7 @@
 ---
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 600
+timeout: 300
 commands:
   #
   # Test envOverrides
@@ -16,9 +16,9 @@ commands:
       )
 
       # Config Test Assertions
-      echo "$SUPERSET_CONFIG" | grep 'COMMON_HEADER_VAR = "group-value"'
-      echo "$SUPERSET_CONFIG" | grep 'ROLE_FOOTER_VAR = "role-value"'
-      echo "$SUPERSET_CONFIG" | grep -v 'ROLE_HEADER_VAR = "role-value"'
+      echo "$SUPERSET_CONFIG" | grep '^COMMON_HEADER_VAR = "group-value"'
+      echo "$SUPERSET_CONFIG" | grep '^ROLE_FOOTER_VAR = "role-value"'
+      echo "$SUPERSET_CONFIG" | grep -v '^ROLE_HEADER_VAR = "role-value"'
 
       # STS Spec Test Data
       SUPERSET_NODE_DEFAULT_STS=$(kubectl -n "$NAMESPACE" get sts superset-node-default -o yaml)

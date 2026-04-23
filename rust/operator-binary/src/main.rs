@@ -17,7 +17,7 @@ use stackable_operator::{
         core::v1::{ConfigMap, Service},
     },
     kube::{
-        ResourceExt,
+        CustomResourceExt as _, ResourceExt,
         core::DeserializeGuard,
         runtime::{
             Controller,
@@ -29,7 +29,7 @@ use stackable_operator::{
     logging::controller::report_controller_reconciled,
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
-    utils::signal::SignalWatcher,
+    utils::signal::{self, SignalWatcher},
 };
 
 use crate::{
@@ -71,9 +71,9 @@ async fn main() -> anyhow::Result<()> {
     match opts.cmd {
         Command::Crd => {
             SupersetCluster::merged_crd(SupersetClusterVersion::V1Alpha1)?
-                .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
+                .print_yaml_schema(built_info::PKG_VERSION, &SerializeOptions::default())?;
             DruidConnection::merged_crd(DruidConnectionVersion::V1Alpha1)?
-                .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())?;
+                .print_yaml_schema(built_info::PKG_VERSION, &SerializeOptions::default())?;
         }
         Command::Run(RunArguments {
             operator_environment,
@@ -104,7 +104,7 @@ async fn main() -> anyhow::Result<()> {
             let sigterm_watcher = SignalWatcher::sigterm()?;
 
             let eos_checker =
-                EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, maintenance.end_of_support)?
+                EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, &maintenance.end_of_support)?
                     .run(sigterm_watcher.handle())
                     .map(anyhow::Ok);
 
@@ -286,10 +286,29 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .map(anyhow::Ok);
 
+            let delayed_druid_connection_controller = async {
+                signal::crd_established(
+                    &client,
+                    druidconnection::v1alpha1::DruidConnection::crd_name(),
+                    None,
+                )
+                .await?;
+                // The druid_controller also watches SupersetCluster
+                signal::crd_established(&client, v1alpha1::SupersetCluster::crd_name(), None)
+                    .await?;
+                druid_connection_controller.await
+            };
+
+            let delayed_superset_controller = async {
+                signal::crd_established(&client, v1alpha1::SupersetCluster::crd_name(), None)
+                    .await?;
+                superset_controller.await
+            };
+
             // kube-runtime's Controller will tokio::spawn each reconciliation, so this only concerns the internal watch machinery
             futures::try_join!(
-                druid_connection_controller,
-                superset_controller,
+                delayed_druid_connection_controller,
+                delayed_superset_controller,
                 webhook_server,
                 eos_checker
             )?;

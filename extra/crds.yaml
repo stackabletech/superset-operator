@@ -596,6 +596,16 @@ spec:
                           description: This field contains OIDC-specific configuration. It is only required in case OIDC is used.
                           nullable: true
                           properties:
+                            clientAuthenticationMethod:
+                              default: client_secret_basic
+                              description: 'The client authentication method used when communicating with the token endpoint. Defaults to `client_secret_basic`. The required contents of `clientCredentialsSecret` depend on the chosen method: secret-based methods (`client_secret_basic`, `client_secret_post`, `client_secret_jwt`) expect a client secret, while `private_key_jwt` expects a private key.'
+                              enum:
+                              - client_secret_basic
+                              - client_secret_post
+                              - client_secret_jwt
+                              - private_key_jwt
+                              - none
+                              type: string
                             clientCredentialsSecret:
                               description: |-
                                 A reference to the OIDC client credentials secret. The secret contains
@@ -714,9 +724,9 @@ spec:
                           and `stopped` will take no effect until `reconciliationPaused` is set to false or removed.
                         type: boolean
                     type: object
-                  credentialsSecret:
+                  credentialsSecretName:
                     description: |-
-                      The name of the Secret object containing the admin user credentials and database connection details.
+                      The name of the Secret object containing the admin user credentials.
                       Read the
                       [getting started guide first steps](https://docs.stackable.tech/home/nightly/superset/getting_started/first_steps)
                       to find out more.
@@ -729,6 +739,64 @@ spec:
                       The token should be in the JWT format.
                     nullable: true
                     type: string
+                  metadataDatabase:
+                    description: Configure the database where Superset stores all its internal metadata.
+                    oneOf:
+                    - required:
+                      - postgresql
+                    - required:
+                      - generic
+                    properties:
+                      generic:
+                        description: |-
+                          A generic SQLAlchemy database connection for database types not covered by a dedicated variant.
+
+                          Use this when you need to connect to a SQLAlchemy-compatible database that does not have a
+                          first-class connection type. The complete connection URL is read from a Secret, giving the user
+                          full control over the connection string including any driver-specific options.
+                        properties:
+                          connectionUrlSecretName:
+                            description: The name of the Secret that contains an `connectionUrl` key with the complete SQLAlchemy URL.
+                            type: string
+                        required:
+                        - connectionUrlSecretName
+                        type: object
+                      postgresql:
+                        description: Connection settings for a [PostgreSQL](https://www.postgresql.org/) database.
+                        properties:
+                          credentialsSecretName:
+                            description: |-
+                              Name of a Secret containing the `username` and `password` keys used to authenticate
+                              against the PostgreSQL server.
+                            type: string
+                          database:
+                            description: Name of the database (schema) to connect to.
+                            type: string
+                          host:
+                            description: Hostname or IP address of the PostgreSQL server.
+                            type: string
+                          parameters:
+                            additionalProperties:
+                              type: string
+                            default: {}
+                            description: |-
+                              Additional map of JDBC connection parameters to append to the connection URL. The given
+                              `HashMap<String, String>` will be converted to query parameters in the form of
+                              `?param1=value1&param2=value2`.
+                            type: object
+                          port:
+                            default: 5432
+                            description: Port the PostgreSQL server is listening on. Defaults to `5432`.
+                            format: uint16
+                            maximum: 65535.0
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - credentialsSecretName
+                        - database
+                        - host
+                        type: object
+                    type: object
                   vectorAggregatorConfigMapName:
                     description: |-
                       Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery).
@@ -738,7 +806,8 @@ spec:
                     nullable: true
                     type: string
                 required:
-                - credentialsSecret
+                - credentialsSecretName
+                - metadataDatabase
                 type: object
               image:
                 anyOf:
@@ -858,64 +927,19 @@ spec:
                         description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
                         properties:
                           containers:
-                            additionalProperties:
-                              anyOf:
-                              - required:
-                                - custom
-                              - {}
-                              description: Log configuration of the container
-                              properties:
-                                console:
-                                  description: Configuration for the console appender
-                                  nullable: true
-                                  properties:
-                                    level:
-                                      description: |-
-                                        The log level threshold.
-                                        Log events with a lower log level are discarded.
-                                      enum:
-                                      - TRACE
-                                      - DEBUG
-                                      - INFO
-                                      - WARN
-                                      - ERROR
-                                      - FATAL
-                                      - NONE
-                                      - null
-                                      nullable: true
-                                      type: string
-                                  type: object
-                                custom:
-                                  description: Custom log configuration provided in a ConfigMap
-                                  properties:
-                                    configMap:
-                                      description: ConfigMap containing the log configuration files
-                                      nullable: true
-                                      type: string
-                                  type: object
-                                file:
-                                  description: Configuration for the file appender
-                                  nullable: true
-                                  properties:
-                                    level:
-                                      description: |-
-                                        The log level threshold.
-                                        Log events with a lower log level are discarded.
-                                      enum:
-                                      - TRACE
-                                      - DEBUG
-                                      - INFO
-                                      - WARN
-                                      - ERROR
-                                      - FATAL
-                                      - NONE
-                                      - null
-                                      nullable: true
-                                      type: string
-                                  type: object
-                                loggers:
-                                  additionalProperties:
-                                    description: Configuration of a logger
+                            description: Log configuration per container.
+                            properties:
+                              superset:
+                                anyOf:
+                                - required:
+                                  - custom
+                                - {}
+                                - {}
+                                description: Log configuration of the container
+                                properties:
+                                  console:
+                                    description: Configuration for the console appender
+                                    nullable: true
                                     properties:
                                       level:
                                         description: |-
@@ -933,14 +957,141 @@ spec:
                                         nullable: true
                                         type: string
                                     type: object
-                                  default: {}
-                                  description: Configuration per logger
-                                  type: object
-                              type: object
-                            description: Log configuration per container.
+                                  custom:
+                                    description: Log configuration provided in a ConfigMap
+                                    properties:
+                                      configMap:
+                                        description: ConfigMap containing the log configuration files
+                                        nullable: true
+                                        type: string
+                                    type: object
+                                  file:
+                                    description: Configuration for the file appender
+                                    nullable: true
+                                    properties:
+                                      level:
+                                        description: |-
+                                          The log level threshold.
+                                          Log events with a lower log level are discarded.
+                                        enum:
+                                        - TRACE
+                                        - DEBUG
+                                        - INFO
+                                        - WARN
+                                        - ERROR
+                                        - FATAL
+                                        - NONE
+                                        - null
+                                        nullable: true
+                                        type: string
+                                    type: object
+                                  loggers:
+                                    additionalProperties:
+                                      description: Configuration of a logger
+                                      properties:
+                                        level:
+                                          description: |-
+                                            The log level threshold.
+                                            Log events with a lower log level are discarded.
+                                          enum:
+                                          - TRACE
+                                          - DEBUG
+                                          - INFO
+                                          - WARN
+                                          - ERROR
+                                          - FATAL
+                                          - NONE
+                                          - null
+                                          nullable: true
+                                          type: string
+                                      type: object
+                                    default: {}
+                                    description: Configuration per logger
+                                    type: object
+                                type: object
+                              vector:
+                                anyOf:
+                                - required:
+                                  - custom
+                                - {}
+                                - {}
+                                description: Log configuration of the container
+                                properties:
+                                  console:
+                                    description: Configuration for the console appender
+                                    nullable: true
+                                    properties:
+                                      level:
+                                        description: |-
+                                          The log level threshold.
+                                          Log events with a lower log level are discarded.
+                                        enum:
+                                        - TRACE
+                                        - DEBUG
+                                        - INFO
+                                        - WARN
+                                        - ERROR
+                                        - FATAL
+                                        - NONE
+                                        - null
+                                        nullable: true
+                                        type: string
+                                    type: object
+                                  custom:
+                                    description: Log configuration provided in a ConfigMap
+                                    properties:
+                                      configMap:
+                                        description: ConfigMap containing the log configuration files
+                                        nullable: true
+                                        type: string
+                                    type: object
+                                  file:
+                                    description: Configuration for the file appender
+                                    nullable: true
+                                    properties:
+                                      level:
+                                        description: |-
+                                          The log level threshold.
+                                          Log events with a lower log level are discarded.
+                                        enum:
+                                        - TRACE
+                                        - DEBUG
+                                        - INFO
+                                        - WARN
+                                        - ERROR
+                                        - FATAL
+                                        - NONE
+                                        - null
+                                        nullable: true
+                                        type: string
+                                    type: object
+                                  loggers:
+                                    additionalProperties:
+                                      description: Configuration of a logger
+                                      properties:
+                                        level:
+                                          description: |-
+                                            The log level threshold.
+                                            Log events with a lower log level are discarded.
+                                          enum:
+                                          - TRACE
+                                          - DEBUG
+                                          - INFO
+                                          - WARN
+                                          - ERROR
+                                          - FATAL
+                                          - NONE
+                                          - null
+                                          nullable: true
+                                          type: string
+                                      type: object
+                                    default: {}
+                                    description: Configuration per logger
+                                    type: object
+                                type: object
                             type: object
                           enableVectorAgent:
-                            description: Wether or not to deploy a container with the Vector log agent.
+                            description: Whether or not to deploy a container with the Vector log agent.
                             nullable: true
                             type: boolean
                         type: object
@@ -1014,17 +1165,23 @@ spec:
                         type: integer
                     type: object
                   configOverrides:
-                    additionalProperties:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    default: {}
                     description: |-
                       The `configOverrides` can be used to configure properties in product config files
                       that are not exposed in the CRD. Read the
                       [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                       and consult the operator specific usage guide documentation for details on the
                       available config files and settings for the specific product.
+                    properties:
+                      superset_config.py:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                          This is backwards-compatible with the existing flat key-value YAML format
+                          used by `HashMap<String, String>`.
+                        nullable: true
+                        type: object
                     type: object
                   envOverrides:
                     additionalProperties:
@@ -1147,64 +1304,19 @@ spec:
                               description: Logging configuration, learn more in the [logging concept documentation](https://docs.stackable.tech/home/nightly/concepts/logging).
                               properties:
                                 containers:
-                                  additionalProperties:
-                                    anyOf:
-                                    - required:
-                                      - custom
-                                    - {}
-                                    description: Log configuration of the container
-                                    properties:
-                                      console:
-                                        description: Configuration for the console appender
-                                        nullable: true
-                                        properties:
-                                          level:
-                                            description: |-
-                                              The log level threshold.
-                                              Log events with a lower log level are discarded.
-                                            enum:
-                                            - TRACE
-                                            - DEBUG
-                                            - INFO
-                                            - WARN
-                                            - ERROR
-                                            - FATAL
-                                            - NONE
-                                            - null
-                                            nullable: true
-                                            type: string
-                                        type: object
-                                      custom:
-                                        description: Custom log configuration provided in a ConfigMap
-                                        properties:
-                                          configMap:
-                                            description: ConfigMap containing the log configuration files
-                                            nullable: true
-                                            type: string
-                                        type: object
-                                      file:
-                                        description: Configuration for the file appender
-                                        nullable: true
-                                        properties:
-                                          level:
-                                            description: |-
-                                              The log level threshold.
-                                              Log events with a lower log level are discarded.
-                                            enum:
-                                            - TRACE
-                                            - DEBUG
-                                            - INFO
-                                            - WARN
-                                            - ERROR
-                                            - FATAL
-                                            - NONE
-                                            - null
-                                            nullable: true
-                                            type: string
-                                        type: object
-                                      loggers:
-                                        additionalProperties:
-                                          description: Configuration of a logger
+                                  description: Log configuration per container.
+                                  properties:
+                                    superset:
+                                      anyOf:
+                                      - required:
+                                        - custom
+                                      - {}
+                                      - {}
+                                      description: Log configuration of the container
+                                      properties:
+                                        console:
+                                          description: Configuration for the console appender
+                                          nullable: true
                                           properties:
                                             level:
                                               description: |-
@@ -1222,14 +1334,141 @@ spec:
                                               nullable: true
                                               type: string
                                           type: object
-                                        default: {}
-                                        description: Configuration per logger
-                                        type: object
-                                    type: object
-                                  description: Log configuration per container.
+                                        custom:
+                                          description: Log configuration provided in a ConfigMap
+                                          properties:
+                                            configMap:
+                                              description: ConfigMap containing the log configuration files
+                                              nullable: true
+                                              type: string
+                                          type: object
+                                        file:
+                                          description: Configuration for the file appender
+                                          nullable: true
+                                          properties:
+                                            level:
+                                              description: |-
+                                                The log level threshold.
+                                                Log events with a lower log level are discarded.
+                                              enum:
+                                              - TRACE
+                                              - DEBUG
+                                              - INFO
+                                              - WARN
+                                              - ERROR
+                                              - FATAL
+                                              - NONE
+                                              - null
+                                              nullable: true
+                                              type: string
+                                          type: object
+                                        loggers:
+                                          additionalProperties:
+                                            description: Configuration of a logger
+                                            properties:
+                                              level:
+                                                description: |-
+                                                  The log level threshold.
+                                                  Log events with a lower log level are discarded.
+                                                enum:
+                                                - TRACE
+                                                - DEBUG
+                                                - INFO
+                                                - WARN
+                                                - ERROR
+                                                - FATAL
+                                                - NONE
+                                                - null
+                                                nullable: true
+                                                type: string
+                                            type: object
+                                          default: {}
+                                          description: Configuration per logger
+                                          type: object
+                                      type: object
+                                    vector:
+                                      anyOf:
+                                      - required:
+                                        - custom
+                                      - {}
+                                      - {}
+                                      description: Log configuration of the container
+                                      properties:
+                                        console:
+                                          description: Configuration for the console appender
+                                          nullable: true
+                                          properties:
+                                            level:
+                                              description: |-
+                                                The log level threshold.
+                                                Log events with a lower log level are discarded.
+                                              enum:
+                                              - TRACE
+                                              - DEBUG
+                                              - INFO
+                                              - WARN
+                                              - ERROR
+                                              - FATAL
+                                              - NONE
+                                              - null
+                                              nullable: true
+                                              type: string
+                                          type: object
+                                        custom:
+                                          description: Log configuration provided in a ConfigMap
+                                          properties:
+                                            configMap:
+                                              description: ConfigMap containing the log configuration files
+                                              nullable: true
+                                              type: string
+                                          type: object
+                                        file:
+                                          description: Configuration for the file appender
+                                          nullable: true
+                                          properties:
+                                            level:
+                                              description: |-
+                                                The log level threshold.
+                                                Log events with a lower log level are discarded.
+                                              enum:
+                                              - TRACE
+                                              - DEBUG
+                                              - INFO
+                                              - WARN
+                                              - ERROR
+                                              - FATAL
+                                              - NONE
+                                              - null
+                                              nullable: true
+                                              type: string
+                                          type: object
+                                        loggers:
+                                          additionalProperties:
+                                            description: Configuration of a logger
+                                            properties:
+                                              level:
+                                                description: |-
+                                                  The log level threshold.
+                                                  Log events with a lower log level are discarded.
+                                                enum:
+                                                - TRACE
+                                                - DEBUG
+                                                - INFO
+                                                - WARN
+                                                - ERROR
+                                                - FATAL
+                                                - NONE
+                                                - null
+                                                nullable: true
+                                                type: string
+                                            type: object
+                                          default: {}
+                                          description: Configuration per logger
+                                          type: object
+                                      type: object
                                   type: object
                                 enableVectorAgent:
-                                  description: Wether or not to deploy a container with the Vector log agent.
+                                  description: Whether or not to deploy a container with the Vector log agent.
                                   nullable: true
                                   type: boolean
                               type: object
@@ -1303,17 +1542,23 @@ spec:
                               type: integer
                           type: object
                         configOverrides:
-                          additionalProperties:
-                            additionalProperties:
-                              type: string
-                            type: object
-                          default: {}
                           description: |-
                             The `configOverrides` can be used to configure properties in product config files
                             that are not exposed in the CRD. Read the
                             [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                             and consult the operator specific usage guide documentation for details on the
                             available config files and settings for the specific product.
+                          properties:
+                            superset_config.py:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
+
+                                This is backwards-compatible with the existing flat key-value YAML format
+                                used by `HashMap<String, String>`.
+                              nullable: true
+                              type: object
                           type: object
                         envOverrides:
                           additionalProperties:

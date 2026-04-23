@@ -48,6 +48,17 @@ exit 1
 ;;
 esac
 
+# TODO: Remove once https://github.com/stackabletech/issues/issues/828 has been
+# implemented (see that issue for details).
+until kubectl get crd supersetclusters.superset.stackable.tech >/dev/null 2>&1; do
+  echo "Waiting for CRDs to be installed"
+  sleep 1
+done
+until kubectl get crd druidconnections.superset.stackable.tech >/dev/null 2>&1; do
+  echo "Waiting for CRDs to be installed"
+  sleep 1
+done
+
 echo "Installing bitnami PostgreSQL"
 # tag::install-bitnami-psql[]
 helm install superset oci://registry-1.docker.io/bitnamicharts/postgresql \

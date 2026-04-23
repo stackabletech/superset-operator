@@ -1,9 +1,9 @@
 = Usage guide
 :page-aliases: usage.doc
-:description: Superset usage guide: configure resources, connect to Apache Druid, set up authentication, logging, and monitoring.
+:description: Superset usage guide: configure database connections, resources, connect to Apache Druid, set up authentication, logging, and monitoring.
 
 The usage guide covers various aspects of configuring Superset and interconnection with other tools.
 
-Learn about defining the amount of xref:usage-guide/storage-resource-configuration.adoc[resources] Superset uses or learn how to xref:usage-guide/connecting-druid.adoc[connect to Apache Druid] operated by the xref:druid:index.adoc[].
+Learn how to configure the xref:usage-guide/database-connections.adoc[metadata database connection], define the amount of xref:usage-guide/storage-resource-configuration.adoc[resources] Superset uses, or learn how to xref:usage-guide/connecting-druid.adoc[connect to Apache Druid] operated by the xref:druid:index.adoc[].
 
 Configure xref:usage-guide/security.adoc#authentication[authentication] with LDAP and xref:usage-guide/security.adoc#authorization[authorization]. Observe your Superset instance with xref:usage-guide/logging.adoc[log aggregation] and xref:usage-guide/monitoring.adoc[monitoring].
