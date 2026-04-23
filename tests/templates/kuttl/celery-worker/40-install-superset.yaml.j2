@@ -64,7 +64,7 @@ spec:
     configOverrides:
       # Add endpoints that need to be exempt from CSRF protection
       superset_config.py:
-        EXPERIMENTAL_FILE_FOOTER: |-
+        FILE_FOOTER: |-
           # Otherwise {"message": "400 Bad Request: The CSRF token is missing.", "error_type": "GENERIC_BACKEND_ERROR", "level": "error", "extra": {"issue_codes": [{"code": 1011, "message": "Issue 1011 - Superset encountered an unexpected error."}]}}
           WTF_CSRF_ENABLED = False
 
@@ -106,7 +106,7 @@ spec:
                 level: DEBUG
     configOverrides:
       superset_config.py:
-        EXPERIMENTAL_FILE_FOOTER: |-
+        FILE_FOOTER: |-
           ### CELERY ASYNC
           from flask_caching.backends.rediscache import RedisCache
           RESULTS_BACKEND = RedisCache(host='superset-redis-master', port=6379, key_prefix='superset_results', password='superset')
