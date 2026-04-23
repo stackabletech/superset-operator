@@ -18,9 +18,9 @@ ignore = [
     # https://rustsec.org/advisories/RUSTSEC-2023-0071
     # "rsa" crate: Marvin Attack: potential key recovery through timing sidechannel
     #
-    # No patch is yet available, however work is underway to migrate to a fully constant-time implementation
-    # So we need to accept this, as of SDP 25.3 we are not using the rsa crate to create certificates used in production
-    # setups.
+    # No patch is yet available, however work is underway to migrate to a fully constant-time implementation.
+    # So we need to accept this, as of SDP 26.3 we are "only" using the crate to create private +
+    # public key pairs used by webhooks, such as conversion or mutating webhooks.
     #
     # https://github.com/RustCrypto/RSA/issues/19 is the tracking issue
     "RUSTSEC-2023-0071",
@@ -63,7 +63,7 @@ allow = [
     "LicenseRef-webpki",
     "MIT",
     "MPL-2.0",
-    "OpenSSL",           # Needed for the ring and/or aws-lc-sys crate. See https://github.com/stackabletech/operator-templating/pull/464 for details
+    "OpenSSL", # Needed for the ring and/or aws-lc-sys crate. See https://github.com/stackabletech/operator-templating/pull/464 for details
     "Unicode-3.0",
     "Unicode-DFS-2016",
     "Zlib",
@@ -74,17 +74,23 @@ private = { ignore = true }
 [[licenses.clarify]]
 name = "ring"
 expression = "LicenseRef-ring"
-license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
+license-files = [
+    { path = "LICENSE", hash = 0xbd0eed23 },
+]
 
 [[licenses.clarify]]
 name = "webpki"
 expression = "LicenseRef-webpki"
-license-files = [{ path = "LICENSE", hash = 0x001c7e6c }]
+license-files = [
+    { path = "LICENSE", hash = 0x001c7e6c },
+]
 
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-allow-git = ["https://github.com/kube-rs/kube-rs"]
+allow-git = [
+    "https://github.com/kube-rs/kube-rs",
+]
 
 [sources.allow-org]
 github = ["stackabletech"]
