@@ -69,6 +69,8 @@ spec:
         connectionUrlSecretName: superset-redis-broker-url # <1>
 ----
 
+<1> A reference to a Secret which must contain the single key `connectionUrl` e.g. `redis://:redis@redis-master/0`
+
 == Results Backend
 
 Celery workers store their results in the configured results backend.
@@ -104,3 +106,5 @@ spec:
       generic:
         connectionUrlSecretName: superset-redis-results-backend-url # <1>
 ----
+
+<1> A reference to a Secret which must contain the single key `connectionUrl` e.g. `redis://:redis@redis-master/0`
