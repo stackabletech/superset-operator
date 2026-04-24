@@ -604,7 +604,12 @@ pub fn build_beat_rolegroup_deployment(
             )
             .build(),
         spec: Some(DeploymentSpec {
-            replicas: role_group.replicas.map(i32::from),
+            // Beat should always only be one Beat instance at a time.
+            // We ignore values > 1, 0 is a possible value still.
+            replicas: role_group
+                .replicas
+                .map(i32::from)
+                .map(|r| if r > 1 { 1 } else { 0 }),
             selector: LabelSelector {
                 match_labels: Some(
                     Labels::role_group_selector(
