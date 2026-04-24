@@ -1,7 +1,6 @@
 # Default values for superset-operator.
 ---
 image:
-  repository: oci.stackable.tech/sdp/superset-operator
   pullPolicy: IfNotPresent
   pullSecrets: []
 
