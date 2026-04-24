@@ -119,7 +119,6 @@ pub(crate) fn metadata_database_connection_details(
 pub(crate) fn celery_result_backend_connection_details(
     superset: &SupersetCluster,
 ) -> Option<CeleryDatabaseConnectionDetails> {
-    // Removed the &'a and reference
     superset
         .spec
         .cluster_config
@@ -136,7 +135,6 @@ pub(crate) fn celery_result_backend_connection_details(
 pub(crate) fn celery_broker_connection_details(
     superset: &SupersetCluster,
 ) -> Option<CeleryDatabaseConnectionDetails> {
-    // Removed the &'a and reference
     superset
         .spec
         .cluster_config
