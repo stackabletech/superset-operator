@@ -523,7 +523,7 @@ impl v1alpha1::SupersetConfig {
                         max: Some(Quantity("2000m".to_owned())),
                     },
                     memory: MemoryLimitsFragment {
-                        limit: Some(Quantity("3Gi".to_owned())),
+                        limit: Some(Quantity("4Gi".to_owned())),
                         runtime_limits: NoRuntimeLimitsFragment {},
                     },
                     storage: v1alpha1::SupersetStorageConfigFragment {},
@@ -537,7 +537,7 @@ impl v1alpha1::SupersetConfig {
             SupersetRole::Beat => v1alpha1::SupersetConfigFragment {
                 resources: ResourcesFragment {
                     cpu: CpuLimitsFragment {
-                        min: Some(Quantity("200m".to_owned())),
+                        min: Some(Quantity("100m".to_owned())),
                         max: Some(Quantity("500m".to_owned())),
                     },
                     memory: MemoryLimitsFragment {
