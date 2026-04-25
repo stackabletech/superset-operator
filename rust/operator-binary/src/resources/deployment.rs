@@ -603,7 +603,7 @@ pub fn build_beat_rolegroup_deployment(
             replicas: role_group
                 .replicas
                 .map(i32::from)
-                .map(|r| if r > 1 { 1 } else { 0 }),
+                .map(|r| if r >= 1 { 1 } else { 0 }),
             selector: LabelSelector {
                 match_labels: Some(
                     Labels::role_group_selector(
