@@ -151,9 +151,6 @@ pub fn build_worker_rolegroup_deployment(
     let mut superset_cb = ContainerBuilder::new(&Container::Superset.to_string())
         .context(InvalidContainerNameSnafu)?;
 
-    // "METADATA" is the prefix for the env vars that hold the database credentials
-    // (e.g. METADATA_DATABASE_USERNAME, METADATA_DATABASE_PASSWORD). It should match
-    // the prefix used by the airflow-operator for consistency.
     let metadata_database_connection_details =
         super::metadata_database_connection_details(superset);
     let celery_result_backend_connection_details =
@@ -411,9 +408,6 @@ pub fn build_beat_rolegroup_deployment(
     let mut superset_cb = ContainerBuilder::new(&Container::Superset.to_string())
         .context(InvalidContainerNameSnafu)?;
 
-    // "METADATA" is the prefix for the env vars that hold the database credentials
-    // (e.g. METADATA_DATABASE_USERNAME, METADATA_DATABASE_PASSWORD). It should match
-    // the prefix used by the airflow-operator for consistency.
     let metadata_database_connection_details =
         super::metadata_database_connection_details(superset);
     let celery_result_backend_connection_details =
