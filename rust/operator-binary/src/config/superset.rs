@@ -123,7 +123,6 @@ pub(crate) fn append_celery_worker_config(config_file: &mut Vec<u8>, superset: &
     let result_backend_url_template = celery_result_backend_connection_details.url_template;
     let broker_url_template = celery_broker_connection_details.url_template;
 
-    // os.environ.get('{env_client_id}')
     let celery_config = formatdoc!(
         r#"
         # CELERY ASYNC
