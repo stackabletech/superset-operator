@@ -18,7 +18,11 @@ use stackable_operator::{
     },
 };
 
-use crate::{OPERATOR_NAME, crd::APP_NAME, v1alpha1::SupersetCluster};
+use crate::{
+    OPERATOR_NAME,
+    crd::{APP_NAME, databases::CeleryResultsBackendConnectionDetails},
+    v1alpha1::SupersetCluster,
+};
 
 pub mod configmap;
 pub mod deployment;
@@ -118,18 +122,29 @@ pub(crate) fn metadata_database_connection_details(
 
 pub(crate) fn celery_result_backend_connection_details(
     superset: &SupersetCluster,
-) -> Option<CeleryDatabaseConnectionDetails> {
-    superset
-        .spec
-        .cluster_config
-        .celery_result_backend
-        .as_ref()
-        .map(|backend| {
-            backend.celery_connection_details_with_templating(
-                "CELERY_RESULT_BACKEND",
-                &TemplatingMechanism::BashEnvSubstitution,
-            )
-        })
+) -> (
+    Option<CeleryResultsBackendConnectionDetails>,
+    Option<CeleryDatabaseConnectionDetails>,
+) {
+    (
+        superset
+            .spec
+            .cluster_config
+            .celery_result_backend
+            .as_ref()
+            .map(|backend| backend.as_python_parameters()),
+        superset
+            .spec
+            .cluster_config
+            .celery_result_backend
+            .as_ref()
+            .map(|backend| {
+                backend.celery_connection_details_with_templating(
+                    "CELERY_RESULT_BACKEND",
+                    &TemplatingMechanism::BashEnvSubstitution,
+                )
+            }),
+    )
 }
 
 pub(crate) fn celery_broker_connection_details(

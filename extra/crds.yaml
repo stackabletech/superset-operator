@@ -949,24 +949,7 @@ spec:
                     oneOf:
                     - required:
                       - redis
-                    - required:
-                      - generic
                     properties:
-                      generic:
-                        description: |-
-                          A generic Celery database connection for broker or result backend types not covered by a
-                          dedicated variant.
-
-                          Use this when you need a Celery-compatible connection that does not have a first-class
-                          connection type. The complete connection URL is read from a Secret, giving the user full
-                          control over the connection string.
-                        properties:
-                          connectionUrlSecretName:
-                            description: The name of the Secret that contains an `connectionUrl` key with the complete Celery URL.
-                            type: string
-                        required:
-                        - connectionUrlSecretName
-                        type: object
                       redis:
                         description: |-
                           Connection settings for a [Redis](https://redis.io/) instance.

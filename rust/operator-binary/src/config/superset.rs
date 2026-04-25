@@ -1,11 +1,8 @@
-use std::{collections::BTreeMap, io::Write, str::FromStr};
+use std::{collections::BTreeMap, io::Write};
 
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
-use stackable_operator::{
-    commons::networking::{DomainName, HostName},
-    crd::authentication::{ldap, oidc},
-};
+use stackable_operator::crd::authentication::{ldap, oidc};
 
 use crate::{
     crd::{
@@ -14,7 +11,6 @@ use crate::{
             self, DEFAULT_OIDC_PROVIDER, SupersetAuthenticationClassResolved,
             SupersetClientAuthenticationDetailsResolved,
         },
-        databases::CeleryResultBackendConnection,
     },
     resources::{
         celery_broker_connection_details, celery_result_backend_connection_details,
@@ -89,8 +85,10 @@ pub fn add_superset_config(
 }
 
 pub(crate) fn append_celery_worker_config(config_file: &mut Vec<u8>, superset: &SupersetCluster) {
-    let Some(celery_result_backend_connection_details) =
-        celery_result_backend_connection_details(superset)
+    let (
+        Some(missing_result_backend_connection_details),
+        Some(celery_result_backend_connection_details),
+    ) = celery_result_backend_connection_details(superset)
     else {
         return;
     };
@@ -98,19 +96,6 @@ pub(crate) fn append_celery_worker_config(config_file: &mut Vec<u8>, superset: &
     let Some(celery_broker_connection_details) = celery_broker_connection_details(superset) else {
         return;
     };
-
-    // TODO: remove, unwrap hacky, only for redis. For testing.
-    let (celery_backend_host, celery_backend_port) =
-        if let Some(CeleryResultBackendConnection::Redis(redis)) =
-            &superset.spec.cluster_config.celery_result_backend
-        {
-            (redis.host.clone(), redis.port)
-        } else {
-            (
-                HostName::DomainName(DomainName::from_str("redis").unwrap()),
-                6379,
-            )
-        };
 
     let result_backend_username_env = celery_result_backend_connection_details
         .username_env
@@ -121,13 +106,15 @@ pub(crate) fn append_celery_worker_config(config_file: &mut Vec<u8>, superset: &
         .map(|env| env.name)
         .unwrap_or("".to_string());
     let result_backend_url_template = celery_result_backend_connection_details.url_template;
+    let result_backend_host = missing_result_backend_connection_details.host;
+    let result_backend_port = missing_result_backend_connection_details.port;
     let broker_url_template = celery_broker_connection_details.url_template;
 
     let celery_config = formatdoc!(
         r#"
         # CELERY ASYNC
         from flask_caching.backends.rediscache import RedisCache
-        RESULTS_BACKEND = RedisCache(host='{celery_backend_host}', port={celery_backend_port}, key_prefix='superset_results', username=os.path.expandvars('${{{result_backend_username_env}}}'), password=os.path.expandvars('${{{result_backend_password_env}}}'))
+        RESULTS_BACKEND = RedisCache(host='{result_backend_host}', port={result_backend_port}, key_prefix='superset_results', username=os.path.expandvars('${{{result_backend_username_env}}}'), password=os.path.expandvars('${{{result_backend_password_env}}}'))
         class CeleryConfig(object):
           broker_url = os.path.expandvars('{broker_url_template}')
           imports = (

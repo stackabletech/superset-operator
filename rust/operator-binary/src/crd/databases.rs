@@ -38,9 +38,6 @@ impl Deref for MetadataDatabaseConnection {
 pub enum CeleryResultBackendConnection {
     // Docs are on the struct
     Redis(RedisConnection),
-
-    // Docs are on the struct
-    Generic(GenericCeleryDatabaseConnection),
 }
 
 impl Deref for CeleryResultBackendConnection {
@@ -49,9 +46,30 @@ impl Deref for CeleryResultBackendConnection {
     fn deref(&self) -> &Self::Target {
         match self {
             Self::Redis(r) => r,
-            Self::Generic(g) => g,
         }
     }
+}
+
+impl CeleryResultBackendConnection {
+    pub fn as_python_parameters(&self) -> CeleryResultsBackendConnectionDetails {
+        match &self {
+            CeleryResultBackendConnection::Redis(redis_connection) => {
+                CeleryResultsBackendConnectionDetails {
+                    host: stackable_operator::commons::networking::HostName::from(
+                        redis_connection.host.clone(),
+                    ),
+                    port: redis_connection.port,
+                    database_id: redis_connection.database_id,
+                }
+            }
+        }
+    }
+}
+
+pub struct CeleryResultsBackendConnectionDetails {
+    pub host: stackable_operator::commons::networking::HostName,
+    pub port: u16,
+    pub database_id: u16,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]

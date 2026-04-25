@@ -161,7 +161,7 @@ pub fn build_worker_rolegroup_deployment(
     let celery_broker_connection_details = super::celery_broker_connection_details(superset);
 
     metadata_database_connection_details.add_to_container(&mut superset_cb);
-    if let Some(celery_result_backend_connection_details) =
+    if let (_, Some(celery_result_backend_connection_details)) =
         &celery_result_backend_connection_details
     {
         celery_result_backend_connection_details.add_to_container(&mut superset_cb);
@@ -421,7 +421,7 @@ pub fn build_beat_rolegroup_deployment(
     let celery_broker_connection_details = super::celery_broker_connection_details(superset);
 
     metadata_database_connection_details.add_to_container(&mut superset_cb);
-    if let Some(celery_result_backend_connection_details) =
+    if let (_, Some(celery_result_backend_connection_details)) =
         &celery_result_backend_connection_details
     {
         celery_result_backend_connection_details.add_to_container(&mut superset_cb);
