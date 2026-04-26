@@ -939,7 +939,7 @@ spec:
                         - host
                         type: object
                     type: object
-                  celeryResultBackend:
+                  celeryResultsBackend:
                     description: |-
                       Connection information for the celery backend database.
                       Only works if `workers` (and `beat`) roles are set.

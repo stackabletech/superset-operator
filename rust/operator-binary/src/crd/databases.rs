@@ -35,12 +35,12 @@ impl Deref for MetadataDatabaseConnection {
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum CeleryResultBackendConnection {
+pub enum CeleryResultsBackendConnection {
     // Docs are on the struct
     Redis(RedisConnection),
 }
 
-impl Deref for CeleryResultBackendConnection {
+impl Deref for CeleryResultsBackendConnection {
     type Target = dyn CeleryDatabaseConnection;
 
     fn deref(&self) -> &Self::Target {
@@ -50,10 +50,10 @@ impl Deref for CeleryResultBackendConnection {
     }
 }
 
-impl CeleryResultBackendConnection {
+impl CeleryResultsBackendConnection {
     pub fn as_python_parameters(&self) -> CeleryResultsBackendConnectionDetails {
         match &self {
-            CeleryResultBackendConnection::Redis(redis_connection) => {
+            CeleryResultsBackendConnection::Redis(redis_connection) => {
                 CeleryResultsBackendConnectionDetails {
                     host: stackable_operator::commons::networking::HostName::from(
                         redis_connection.host.clone(),

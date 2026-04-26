@@ -83,7 +83,7 @@ A redis broker can be configured in the `clusterConfig`:
 ----
 spec:
   clusterConfig:
-    celeryResultBackend:
+    celeryResultsBackend:
       redis:
         host: redis-master
         port: 6379
@@ -102,7 +102,7 @@ Alternatively, these connections can also be defined in full in a referenced Sec
 ----
 spec:
   clusterConfig:
-    celeryResultBackend:
+    celeryResultsBackend:
       generic:
         connectionUrlSecretName: superset-redis-results-backend-url # <1>
 ----

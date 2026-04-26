@@ -4,7 +4,7 @@
 In order to support long running queries that exceed the web requests timeout, an asynchronous backend has to be configured.
 This requires two more roles to be configured besides the existing `nodes`. The (celery) `workers` and a `beat` for scheduling.
 
-The beat role is limited to `1` or `0` replicas only. Replicas greater than one are ignored.
+The beat role is limited to `1` or `0` replicas only. Replicas greater than one are ignored and set to `1`.
 
 The following example shows additional required settings to enable async queries:
 
@@ -17,7 +17,7 @@ spec:
         host: superset-redis-master
         port: 6379
         credentialsSecretName: superset-redis-broker-credentials
-    celeryResultBackend:
+    celeryResultsBackend:
       redis:
         host: superset-redis-master
         port: 6379

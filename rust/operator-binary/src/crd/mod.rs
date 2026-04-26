@@ -37,7 +37,7 @@ use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 use crate::{
     crd::{
         databases::{
-            CeleryBrokerConnection, CeleryResultBackendConnection, MetadataDatabaseConnection,
+            CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
         },
         v1alpha1::SupersetRoleConfig,
     },
@@ -226,7 +226,7 @@ pub mod versioned {
         ///
         /// Ignored otherwise.
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub celery_result_backend: Option<CeleryResultBackendConnection>,
+        pub celery_results_backend: Option<CeleryResultsBackendConnection>,
 
         /// Connection information for the celery broker queue.
         ///

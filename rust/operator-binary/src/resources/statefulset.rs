@@ -195,15 +195,15 @@ pub fn build_server_rolegroup_statefulset(
 
     let metadata_database_connection_details =
         super::metadata_database_connection_details(superset);
-    let celery_result_backend_connection_details =
-        super::celery_result_backend_connection_details(superset);
+    let celery_results_backend_connection_details =
+        super::celery_results_backend_connection_details(superset);
     let celery_broker_connection_details = super::celery_broker_connection_details(superset);
 
     metadata_database_connection_details.add_to_container(&mut superset_cb);
-    if let (_, Some(celery_result_backend_connection_details)) =
-        &celery_result_backend_connection_details
+    if let (_, Some(celery_results_backend_connection_details)) =
+        &celery_results_backend_connection_details
     {
-        celery_result_backend_connection_details.add_to_container(&mut superset_cb);
+        celery_results_backend_connection_details.add_to_container(&mut superset_cb);
     }
     if let Some(celery_broker_connection_details) = celery_broker_connection_details {
         celery_broker_connection_details.add_to_container(&mut superset_cb);

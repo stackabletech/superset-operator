@@ -13,7 +13,7 @@ use crate::{
         },
     },
     resources::{
-        celery_broker_connection_details, celery_result_backend_connection_details,
+        celery_broker_connection_details, celery_results_backend_connection_details,
         metadata_database_connection_details,
     },
     v1alpha1::SupersetCluster,
@@ -87,8 +87,8 @@ pub fn add_superset_config(
 pub(crate) fn append_celery_worker_config(config_file: &mut Vec<u8>, superset: &SupersetCluster) {
     let (
         Some(missing_result_backend_connection_details),
-        Some(celery_result_backend_connection_details),
-    ) = celery_result_backend_connection_details(superset)
+        Some(celery_results_backend_connection_details),
+    ) = celery_results_backend_connection_details(superset)
     else {
         return;
     };
@@ -97,15 +97,15 @@ pub(crate) fn append_celery_worker_config(config_file: &mut Vec<u8>, superset: &
         return;
     };
 
-    let result_backend_username_env = celery_result_backend_connection_details
+    let result_backend_username_env = celery_results_backend_connection_details
         .username_env
         .map(|env| env.name)
         .unwrap_or("".to_string());
-    let result_backend_password_env = celery_result_backend_connection_details
+    let result_backend_password_env = celery_results_backend_connection_details
         .password_env
         .map(|env| env.name)
         .unwrap_or("".to_string());
-    let result_backend_url_template = celery_result_backend_connection_details.url_template;
+    let result_backend_url_template = celery_results_backend_connection_details.url_template;
     let result_backend_host = missing_result_backend_connection_details.host;
     let result_backend_port = missing_result_backend_connection_details.port;
     let broker_url_template = celery_broker_connection_details.url_template;

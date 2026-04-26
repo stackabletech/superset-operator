@@ -120,7 +120,7 @@ pub(crate) fn metadata_database_connection_details(
         )
 }
 
-pub(crate) fn celery_result_backend_connection_details(
+pub(crate) fn celery_results_backend_connection_details(
     superset: &SupersetCluster,
 ) -> (
     Option<CeleryResultsBackendConnectionDetails>,
@@ -130,17 +130,17 @@ pub(crate) fn celery_result_backend_connection_details(
         superset
             .spec
             .cluster_config
-            .celery_result_backend
+            .celery_results_backend
             .as_ref()
             .map(|backend| backend.as_python_parameters()),
         superset
             .spec
             .cluster_config
-            .celery_result_backend
+            .celery_results_backend
             .as_ref()
             .map(|backend| {
                 backend.celery_connection_details_with_templating(
-                    "CELERY_RESULT_BACKEND",
+                    "CELERY_RESULTS_BACKEND",
                     &TemplatingMechanism::BashEnvSubstitution,
                 )
             }),
