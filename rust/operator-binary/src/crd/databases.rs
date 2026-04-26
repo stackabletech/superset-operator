@@ -55,9 +55,7 @@ impl CeleryResultsBackendConnection {
         match &self {
             CeleryResultsBackendConnection::Redis(redis_connection) => {
                 CeleryResultsBackendConnectionDetails {
-                    host: stackable_operator::commons::networking::HostName::from(
-                        redis_connection.host.clone(),
-                    ),
+                    host: redis_connection.host.clone(),
                     port: redis_connection.port,
                     database_id: redis_connection.database_id,
                 }
