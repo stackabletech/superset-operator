@@ -80,32 +80,52 @@ fn create_superset_config(log_config: &AutomaticContainerLogConfig, log_dir: &st
         import os
         from superset.utils.logging_configurator import LoggingConfigurator
         from pythonjsonlogger import jsonlogger
+        from celery.signals import setup_logging
 
         os.makedirs('{log_dir}', exist_ok=True)
 
+        _LOGGING_CONFIGURED = False
+
+
+        def _configure_root_logger():
+            global _LOGGING_CONFIGURED
+            if _LOGGING_CONFIGURED:
+                return
+            _LOGGING_CONFIGURED = True
+
+            logFormat = '%(asctime)s:%(levelname)s:%(name)s:%(message)s'
+
+            plainTextFormatter = logging.Formatter(logFormat)
+            jsonFormatter = jsonlogger.JsonFormatter(logFormat)
+
+            consoleHandler = logging.StreamHandler()
+            consoleHandler.setLevel({console_log_level})
+            consoleHandler.setFormatter(plainTextFormatter)
+
+            fileHandler = logging.handlers.RotatingFileHandler(
+                '{log_dir}/{LOG_FILE}',
+                maxBytes=1048576,
+                backupCount=1,
+            )
+            fileHandler.setLevel({file_log_level})
+            fileHandler.setFormatter(jsonFormatter)
+
+            rootLogger = logging.getLogger()
+            # Clear any handlers Celery/Flask/etc. already attached
+            rootLogger.handlers.clear()
+            rootLogger.setLevel({root_log_level})
+            rootLogger.addHandler(consoleHandler)
+            rootLogger.addHandler(fileHandler)
+
+
+        @setup_logging.connect
+        def configure_celery_logging(**kwargs):
+            _configure_root_logger()
+
+
         class StackableLoggingConfigurator(LoggingConfigurator):
             def configure_logging(self, app_config: flask.config.Config, debug_mode: bool):
-                logFormat = '%(asctime)s:%(levelname)s:%(name)s:%(message)s'
-
-                plainTextFormatter = logging.Formatter(logFormat)
-                jsonFormatter = jsonlogger.JsonFormatter(logFormat)
-
-                consoleHandler = logging.StreamHandler()
-                consoleHandler.setLevel({console_log_level})
-                consoleHandler.setFormatter(plainTextFormatter)
-
-                fileHandler = logging.handlers.RotatingFileHandler(
-                    '{log_dir}/{LOG_FILE}',
-                    maxBytes=1048576,
-                    backupCount=1,
-                )
-                fileHandler.setLevel({file_log_level})
-                fileHandler.setFormatter(jsonFormatter)
-
-                rootLogger = logging.getLogger()
-                rootLogger.setLevel({root_log_level})
-                rootLogger.addHandler(consoleHandler)
-                rootLogger.addHandler(fileHandler)
+                _configure_root_logger()
 
         {loggers_config}
         ",

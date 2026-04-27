@@ -84,7 +84,10 @@ pub fn add_superset_config(
     Ok(())
 }
 
-pub(crate) fn append_celery_worker_config(config_file: &mut Vec<u8>, superset: &SupersetCluster) {
+pub(crate) fn append_celery_connection_config(
+    config_file: &mut Vec<u8>,
+    superset: &SupersetCluster,
+) {
     let (
         Some(missing_result_backend_connection_details),
         Some(celery_results_backend_connection_details),

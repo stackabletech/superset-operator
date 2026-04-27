@@ -232,7 +232,7 @@ pub fn build_worker_rolegroup_deployment(
             prepare_signal_handlers
             containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &
 
-            celery --app=superset.tasks.celery_app:app worker --loglevel=INFO --task-events &
+            celery --app=superset.tasks.celery_app:app worker --task-events &
 
             wait_for_termination $!
             {create_vector_shutdown_file_command}
@@ -489,7 +489,7 @@ pub fn build_beat_rolegroup_deployment(
             prepare_signal_handlers
             containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &
 
-            celery --app=superset.tasks.celery_app:app beat --pidfile /tmp/celerybeat.pid --loglevel=INFO &
+            celery --app=superset.tasks.celery_app:app beat --pidfile /tmp/celerybeat.pid &
 
             wait_for_termination $!
             {create_vector_shutdown_file_command}

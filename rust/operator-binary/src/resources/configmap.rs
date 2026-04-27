@@ -125,7 +125,7 @@ pub fn build_rolegroup_config_map(
     })?;
 
     // We have to add a python class (no key) and cannot use the superset::config machinery.
-    config::superset::append_celery_worker_config(&mut config_file, superset);
+    config::superset::append_celery_connection_config(&mut config_file, superset);
 
     if let Some(footer) = temp_file_footer {
         writeln!(config_file, "{footer}").context(WriteToConfigFileStringSnafu)?;
