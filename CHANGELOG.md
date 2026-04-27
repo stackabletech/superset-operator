@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support for Async Queries via Celery. Two new roles, `worker` and `beat` ([#724]).
+- Support for redis broker and results backend for celery workers in the CRD ([#724]).
+
 ### Changed
 
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#717]).
@@ -21,6 +26,7 @@
 [#719]: https://github.com/stackabletech/superset-operator/pull/719
 [#721]: https://github.com/stackabletech/superset-operator/pull/721
 [#722]: https://github.com/stackabletech/superset-operator/pull/722
+[#724]: https://github.com/stackabletech/superset-operator/pull/724
 
 ## [26.3.0] - 2026-03-16
 
