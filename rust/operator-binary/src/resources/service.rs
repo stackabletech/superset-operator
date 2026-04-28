@@ -9,9 +9,10 @@ use stackable_operator::{
 
 use crate::{
     crd::{APP_NAME, APP_PORT, APP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, v1alpha1},
+    resources::build_recommended_labels,
     superset_controller::SUPERSET_CONTROLLER_NAME,
-    util::build_recommended_labels,
 };
+
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("object is missing metadata to build owner reference"))]

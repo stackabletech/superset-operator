@@ -1,6 +1,4 @@
-use stackable_operator::{k8s_openapi::api::batch::v1::Job, kvp::ObjectLabels};
-
-use crate::{OPERATOR_NAME, crd::APP_NAME};
+use stackable_operator::k8s_openapi::api::batch::v1::Job;
 
 pub enum JobState {
     InProgress,
@@ -27,24 +25,5 @@ pub fn get_job_state(job: &Job) -> JobState {
         JobState::Complete
     } else {
         JobState::InProgress
-    }
-}
-
-/// Creates recommended `ObjectLabels` to be used in deployed resources
-pub fn build_recommended_labels<'a, T>(
-    owner: &'a T,
-    controller_name: &'a str,
-    app_version: &'a str,
-    role: &'a str,
-    role_group: &'a str,
-) -> ObjectLabels<'a, T> {
-    ObjectLabels {
-        owner,
-        app_name: APP_NAME,
-        app_version,
-        operator_name: OPERATOR_NAME,
-        controller_name,
-        role,
-        role_group,
     }
 }

@@ -30,9 +30,9 @@ use crate::{
     crd::{
         INTERNAL_SECRET_SECRET_KEY, PYTHONPATH, SUPERSET_CONFIG_FILENAME, druidconnection, v1alpha1,
     },
-    rbac,
+    operations::job_state::{JobState, get_job_state},
+    resources::rbac,
     superset_controller::DOCKER_IMAGE_BASE_NAME,
-    util::{JobState, get_job_state},
 };
 
 pub const DRUID_CONNECTION_CONTROLLER_NAME: &str = "druid-connection";

@@ -1,0 +1,5 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: kubectl exec -n $NAMESPACE test-celery-worker-0 -- /tmp/run-select-query.sh
