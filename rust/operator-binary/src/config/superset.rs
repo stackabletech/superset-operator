@@ -89,7 +89,7 @@ pub(crate) fn append_celery_connection_config(
     superset: &SupersetCluster,
 ) {
     let (
-        Some(missing_result_backend_connection_details),
+        Some(additional_celery_results_backend_connection_details),
         Some(celery_results_backend_connection_details),
     ) = celery_results_backend_connection_details(superset)
     else {
@@ -109,9 +109,9 @@ pub(crate) fn append_celery_connection_config(
         .map(|env| env.name)
         .unwrap_or("".to_string());
     let result_backend_url_template = celery_results_backend_connection_details.url_template;
-    let result_backend_host = missing_result_backend_connection_details.host;
-    let result_backend_port = missing_result_backend_connection_details.port;
-    let result_backend_db = missing_result_backend_connection_details.database_id;
+    let result_backend_host = additional_celery_results_backend_connection_details.host;
+    let result_backend_port = additional_celery_results_backend_connection_details.port;
+    let result_backend_db = additional_celery_results_backend_connection_details.database_id;
     let broker_url_template = celery_broker_connection_details.url_template;
 
     let celery_config = formatdoc!(
