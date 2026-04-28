@@ -7,6 +7,7 @@ use stackable_operator::{
         meta::ObjectMetaBuilder,
         pod::{container::ContainerBuilder, security::PodSecurityContextBuilder},
     },
+    cli::OperatorEnvironmentOptions,
     client::Client,
     commons::product_image_selection::{self, ResolvedProductImage},
     database_connections::TemplatingMechanism,
@@ -31,7 +32,7 @@ use crate::{
         INTERNAL_SECRET_SECRET_KEY, PYTHONPATH, SUPERSET_CONFIG_FILENAME, druidconnection, v1alpha1,
     },
     rbac,
-    superset_controller::DOCKER_IMAGE_BASE_NAME,
+    superset_controller::CONTAINER_IMAGE_BASE_NAME,
     util::{JobState, get_job_state},
 };
 
@@ -41,6 +42,7 @@ pub const DRUID_CONNECTION_FULL_CONTROLLER_NAME: &str =
 
 pub struct Ctx {
     pub client: Client,
+    pub operator_environment: OperatorEnvironmentOptions,
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -216,7 +218,11 @@ pub async fn reconcile_druid_connection(
                     let resolved_product_image = superset_cluster
                         .spec
                         .image
-                        .resolve(DOCKER_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION)
+                        .resolve(
+                            CONTAINER_IMAGE_BASE_NAME,
+                            &ctx.operator_environment.image_repository,
+                            crate::built_info::PKG_VERSION,
+                        )
                         .context(ResolveProductImageSnafu)?;
                     let job = build_import_job(
                         &superset_cluster,
