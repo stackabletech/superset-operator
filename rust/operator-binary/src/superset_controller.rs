@@ -1,9 +1,9 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
-use std::{str::FromStr, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use const_format::concatcp;
 use product_config::{ProductConfigManager, types::PropertyNameKind};
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
@@ -25,7 +25,7 @@ use stackable_operator::{
         operations::ClusterOperationsConditionBuilder, statefulset::StatefulSetConditionBuilder,
     },
 };
-use strum::{EnumDiscriminants, IntoStaticStr};
+use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
 
 use crate::{
     OPERATOR_NAME,
@@ -237,63 +237,29 @@ pub async fn reconcile_superset(
     .await
     .context(InvalidAuthenticationConfigSnafu)?;
 
-    let validated_config = validate_all_roles_and_groups_config(
+    let mut roles = HashMap::new();
+
+    // if the kubernetes executor is specified there will be no worker role as the pods
+    // are provisioned by airflow as defined by the task (default: one pod per task)
+    for role in SupersetRole::iter() {
+        if let Some(resolved_role) = superset.get_role(&role) {
+            roles.insert(
+                role.to_string(),
+                (
+                    vec![
+                        PropertyNameKind::Env,
+                        PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
+                    ],
+                    resolved_role.clone(),
+                ),
+            );
+        }
+    }
+
+    let role_config = transform_all_roles_to_config(superset, &roles);
+    let validated_role_config = validate_all_roles_and_groups_config(
         &resolved_product_image.product_version,
-        &transform_all_roles_to_config(
-            superset,
-            &[
-                (
-                    SupersetRole::Node.to_string(),
-                    (
-                        vec![
-                            PropertyNameKind::Env,
-                            PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
-                        ],
-                        superset
-                            .spec
-                            .nodes
-                            .clone()
-                            .with_context(|| MissingRoleSnafu {
-                                role: SupersetRole::Node.to_string(),
-                            })?,
-                    ),
-                ),
-                (
-                    SupersetRole::Worker.to_string(),
-                    (
-                        vec![
-                            PropertyNameKind::Env,
-                            PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
-                        ],
-                        superset
-                            .spec
-                            .workers
-                            .clone()
-                            .with_context(|| MissingRoleSnafu {
-                                role: SupersetRole::Worker.to_string(),
-                            })?,
-                    ),
-                ),
-                (
-                    SupersetRole::Beat.to_string(),
-                    (
-                        vec![
-                            PropertyNameKind::Env,
-                            PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
-                        ],
-                        superset
-                            .spec
-                            .beat
-                            .clone()
-                            .with_context(|| MissingRoleSnafu {
-                                role: SupersetRole::Beat.to_string(),
-                            })?,
-                    ),
-                ),
-            ]
-            .into(),
-        )
-        .context(GenerateProductConfigSnafu)?,
+        &role_config.context(GenerateProductConfigSnafu)?,
         &ctx.product_config,
         false,
         false,
@@ -350,8 +316,8 @@ pub async fn reconcile_superset(
     let mut statefulset_cond_builder = StatefulSetConditionBuilder::default();
     let mut deployment_cond_builder = DeploymentConditionBuilder::default();
 
-    for (superset_role_str, role_config) in validated_config {
-        let superset_role = SupersetRole::from_str(&superset_role_str).context(ParseRoleSnafu)?;
+    for (role_name, role_config) in validated_role_config.iter() {
+        let superset_role = SupersetRole::from_str(role_name).context(ParseRoleSnafu)?;
 
         for (rolegroup_name, rolegroup_config) in role_config.iter() {
             let rolegroup = superset.rolegroup_ref(&superset_role, rolegroup_name);
