@@ -239,8 +239,6 @@ pub async fn reconcile_superset(
 
     let mut roles = HashMap::new();
 
-    // if the kubernetes executor is specified there will be no worker role as the pods
-    // are provisioned by airflow as defined by the task (default: one pod per task)
     for role in SupersetRole::iter() {
         if let Some(resolved_role) = superset.get_role(&role) {
             roles.insert(
