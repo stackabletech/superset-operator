@@ -111,13 +111,14 @@ pub(crate) fn append_celery_connection_config(
     let result_backend_url_template = celery_results_backend_connection_details.url_template;
     let result_backend_host = missing_result_backend_connection_details.host;
     let result_backend_port = missing_result_backend_connection_details.port;
+    let result_backend_db = missing_result_backend_connection_details.database_id;
     let broker_url_template = celery_broker_connection_details.url_template;
 
     let celery_config = formatdoc!(
         r#"
         # CELERY ASYNC
         from flask_caching.backends.rediscache import RedisCache
-        RESULTS_BACKEND = RedisCache(host='{result_backend_host}', port={result_backend_port}, key_prefix='superset_results', username=os.path.expandvars('${{{result_backend_username_env}}}'), password=os.path.expandvars('${{{result_backend_password_env}}}'))
+        RESULTS_BACKEND = RedisCache(host='{result_backend_host}', port={result_backend_port}, db={result_backend_db}, key_prefix='superset_results', username=os.path.expandvars('${{{result_backend_username_env}}}'), password=os.path.expandvars('${{{result_backend_password_env}}}'))
         class CeleryConfig(object):
           broker_url = os.path.expandvars('{broker_url_template}')
           imports = (
