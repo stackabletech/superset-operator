@@ -614,3 +614,16 @@ impl v1alpha1::SupersetCluster {
         fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use stackable_operator::versioned::test_utils::RoundtripTestData;
+
+    use super::v1alpha1;
+
+    impl RoundtripTestData for v1alpha1::SupersetClusterSpec {
+        fn roundtrip_test_data() -> Vec<Self> {
+            vec![]
+        }
+    }
+}
