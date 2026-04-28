@@ -225,8 +225,6 @@ pub fn build_worker_rolegroup_deployment(
             "pipefail".to_string(),
             "-c".to_string(),
         ])
-        // TODO: Without --loglevel=INFO, the worker does not log anyhing.
-        //       This should be investigated and configurable.
         .args(vec![formatdoc! {"
             {COMMON_BASH_TRAP_FUNCTIONS}
 
@@ -488,8 +486,6 @@ pub fn build_beat_rolegroup_deployment(
             "pipefail".to_string(),
             "-c".to_string(),
         ])
-        // TODO: Without --loglevel=INFO, the beat does not log anyhing.
-        //       This should be investigated and configurable.
         .args(vec![formatdoc! {"
             {COMMON_BASH_TRAP_FUNCTIONS}
 
