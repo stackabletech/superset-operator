@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- BREAKING: Add required CLI argument and env var to set the image repository used to construct final product image names: `IMAGE_REPOSITORY` (`--image-repository`), eg. `oci.example.org/my/namespace` ([#xxx]).
+
 ### Changed
 
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#717]).
