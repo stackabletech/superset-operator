@@ -60,8 +60,8 @@ pub struct Ctx {
 #[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
-    #[snafu(display("object defines no node role"))]
-    NoNodeRole,
+    #[snafu(display("object defines no '{role}' role"))]
+    MissingRole { role: String },
 
     #[snafu(display("failed to parse role: {source}"))]
     ParseRole { source: strum::ParseError },
@@ -249,7 +249,13 @@ pub async fn reconcile_superset(
                             PropertyNameKind::Env,
                             PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
                         ],
-                        superset.spec.nodes.clone().context(NoNodeRoleSnafu)?,
+                        superset
+                            .spec
+                            .nodes
+                            .clone()
+                            .with_context(|| MissingRoleSnafu {
+                                role: SupersetRole::Node.to_string(),
+                            })?,
                     ),
                 ),
                 (
@@ -259,8 +265,13 @@ pub async fn reconcile_superset(
                             PropertyNameKind::Env,
                             PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
                         ],
-                        // TODO: improve error
-                        superset.spec.workers.clone().context(NoNodeRoleSnafu)?,
+                        superset
+                            .spec
+                            .workers
+                            .clone()
+                            .with_context(|| MissingRoleSnafu {
+                                role: SupersetRole::Worker.to_string(),
+                            })?,
                     ),
                 ),
                 (
@@ -270,8 +281,13 @@ pub async fn reconcile_superset(
                             PropertyNameKind::Env,
                             PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
                         ],
-                        // TODO: improve error
-                        superset.spec.beat.clone().context(NoNodeRoleSnafu)?,
+                        superset
+                            .spec
+                            .beat
+                            .clone()
+                            .with_context(|| MissingRoleSnafu {
+                                role: SupersetRole::Beat.to_string(),
+                            })?,
                     ),
                 ),
             ]

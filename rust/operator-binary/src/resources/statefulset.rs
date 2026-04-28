@@ -58,11 +58,11 @@ use crate::{
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("object defines no node role"))]
-    NoNodeRole,
+    #[snafu(display("object defines no '{role}' role"))]
+    MissingRole { role: String },
 
-    #[snafu(display("object defines no node role-group"))]
-    NoNodeRoleGroup,
+    #[snafu(display("object defines no '{role}' rolegroup"))]
+    MissingRoleGroup { role: String },
 
     #[snafu(display("invalid container name"))]
     InvalidContainerName {
@@ -148,11 +148,17 @@ pub fn build_server_rolegroup_statefulset(
     sa_name: &str,
     merged_config: &SupersetConfig,
 ) -> Result<StatefulSet> {
-    let role = superset.get_role(superset_role).context(NoNodeRoleSnafu)?;
+    let role = superset
+        .get_role(superset_role)
+        .with_context(|| MissingRoleSnafu {
+            role: superset_role.to_string(),
+        })?;
     let role_group = role
         .role_groups
         .get(&rolegroup_ref.role_group)
-        .context(NoNodeRoleGroupSnafu)?;
+        .with_context(|| MissingRoleGroupSnafu {
+            role: superset_role.to_string(),
+        })?;
 
     let recommended_object_labels = build_recommended_labels(
         superset,
