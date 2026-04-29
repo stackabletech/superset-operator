@@ -10,7 +10,7 @@
 
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#717]).
 - BREAKING: `configOverrides` now only accepts the supported config file name `superset_config.py`. Previously arbitrary keys were silently accepted but ignored ([#719]).
-- Bump `stackable-operator` to 0.111.1 and `kube` to 3.1.0 ([#719]).
+- Bump `stackable-operator` to 0.111.1 and `kube` to 3.1.0 ([#719], [#726]).
 - Support setting `clientAuthenticationMethod` for OIDC authentication. The value is passed through to the Flask-AppBuilder config as `token_endpoint_auth_method` ([#719]).
 - BREAKING: Rename `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `superset_config.py` for arbitrary Python code to `FILE_HEADER` and `FILE_FOOTER`  ([#719], [#721]).
 - Use an internal Secret for the Superset `SECRET_KEY`.
