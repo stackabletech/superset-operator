@@ -623,7 +623,59 @@ mod tests {
 
     impl RoundtripTestData for v1alpha1::SupersetClusterSpec {
         fn roundtrip_test_data() -> Vec<Self> {
-            vec![]
+            stackable_operator::utils::yaml_from_str_singleton_map(indoc::indoc! {r#"
+              - image:
+                  productVersion: 1.2.3
+                  pullPolicy: IfNotPresent
+                clusterOperation:
+                  reconciliationPaused: false
+                  stopped: true
+                clusterConfig:
+                  credentialsSecretName: superset-admin-credentials
+                  metadataDatabase:
+                    postgresql:
+                      host: superset-postgresql
+                      database: superset
+                      credentialsSecretName: superset-postgresql-credentials
+                  authentication:
+                    - authenticationClass: my-ldap
+                  authorization:
+                    roleMappingFromOpa:
+                      configMapName: opa
+                      package: superset
+                  vectorAggregatorConfigMapName: vector-aggregator-discovery
+                nodes:
+                  envOverrides:
+                    COMMON_VAR: role-value
+                    ROLE_VAR: role-value
+                  config:
+                    resources:
+                      cpu:
+                        min: 100m
+                        max: "1"
+                      memory:
+                        limit: 1Gi
+                    logging:
+                      enableVectorAgent: true
+                  configOverrides:
+                    superset_config.py:
+                      FILE_HEADER: |
+                        COMMON_HEADER_VAR = role-value
+                        ROLE_HEADER_VAR = role-value
+                      FILE_FOOTER: |
+                        ROLE_FOOTER_VAR = role-value
+                  roleGroups:
+                    default:
+                      replicas: 1
+                      configOverrides:
+                        superset_config.py:
+                          FILE_HEADER: |
+                            COMMON_HEADER_VAR = "group-value"
+                      envOverrides:
+                        COMMON_VAR: group-value # overrides role value
+                        GROUP_VAR: group-value # only defined here at group level
+        "#})
+            .expect("Failed to parse SupersetClusterSpec YAML")
         }
     }
 }
