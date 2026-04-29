@@ -672,8 +672,8 @@ mod tests {
                           FILE_HEADER: |
                             COMMON_HEADER_VAR = "group-value"
                       envOverrides:
-                        COMMON_VAR: group-value # overrides role value
-                        GROUP_VAR: group-value # only defined here at group level
+                        COMMON_VAR: group-value
+                        GROUP_VAR: group-value
         "#})
             .expect("Failed to parse SupersetClusterSpec YAML")
         }
