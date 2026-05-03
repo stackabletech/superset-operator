@@ -12,7 +12,7 @@ use stackable_operator::{
     crd::authentication::core,
     eos::EndOfSupportChecker,
     k8s_openapi::api::{
-        apps::v1::StatefulSet,
+        apps::v1::{Deployment, StatefulSet},
         batch::v1::Job,
         core::v1::{ConfigMap, Service},
     },
@@ -150,6 +150,11 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .owns(
                     watch_namespace.get_api::<DeserializeGuard<StatefulSet>>(&client),
+                    watcher::Config::default(),
+                )
+                // Required for workers and beat.
+                .owns(
+                    watch_namespace.get_api::<DeserializeGuard<Deployment>>(&client),
                     watcher::Config::default(),
                 )
                 .watches(
