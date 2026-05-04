@@ -6,9 +6,6 @@
 
 - Support for Async Queries via Celery. Two new roles, `worker` and `beat` ([#724]).
 - Support for redis broker and results backend for celery workers in the CRD ([#724]).
-
-### Added
-
 - BREAKING: Add required CLI argument and env var to set the image repository used to construct final product image names: `IMAGE_REPOSITORY` (`--image-repository`), eg. `oci.example.org/my/namespace` ([#726]).
 
 ### Changed
