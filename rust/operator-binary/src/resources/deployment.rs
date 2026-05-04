@@ -592,6 +592,15 @@ pub fn build_beat_rolegroup_deployment(
     pod_template.merge_from(role.config.pod_overrides.clone());
     pod_template.merge_from(role_group.config.pod_overrides.clone());
 
+    let replicas = if let Some(replicas) = role_group.replicas {
+        if replicas > 1 {
+            tracing::warn! {"replicas for role `beat` set to greater `1`. Multiple beat instances are not allowed. Setting to `1` replica."}
+        }
+        1
+    } else {
+        0
+    };
+
     Ok(Deployment {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(superset)
@@ -608,10 +617,7 @@ pub fn build_beat_rolegroup_deployment(
         spec: Some(DeploymentSpec {
             // Beat should always only be one Beat instance at a time.
             // We ignore values > 1, 0 is a possible value still.
-            replicas: role_group
-                .replicas
-                .map(i32::from)
-                .map(|r| if r >= 1 { 1 } else { 0 }),
+            replicas: Some(replicas),
             selector: LabelSelector {
                 match_labels: Some(
                     Labels::role_group_selector(
