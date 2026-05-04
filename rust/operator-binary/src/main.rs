@@ -187,6 +187,7 @@ async fn main() -> anyhow::Result<()> {
                     superset_controller::error_policy,
                     Arc::new(superset_controller::Ctx {
                         client: client.clone(),
+                        operator_environment: operator_environment.clone(),
                         product_config,
                     }),
                 )
@@ -270,6 +271,7 @@ async fn main() -> anyhow::Result<()> {
                     druid_connection_controller::error_policy,
                     Arc::new(druid_connection_controller::Ctx {
                         client: client.clone(),
+                        operator_environment,
                     }),
                 )
                 // We can let the reporting happen in the background

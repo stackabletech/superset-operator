@@ -143,3 +143,24 @@ impl Default for v1alpha1::DruidConnectionStatus {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use stackable_operator::versioned::test_utils::RoundtripTestData;
+
+    use super::v1alpha1;
+
+    impl RoundtripTestData for v1alpha1::DruidConnectionSpec {
+        fn roundtrip_test_data() -> Vec<Self> {
+            stackable_operator::utils::yaml_from_str_singleton_map(indoc::indoc! {"
+              - superset:
+                  name: superset
+                  namespace: default
+                druid:
+                  name: druid
+                  namespace: default
+        "})
+            .expect("Failed to parse DruidConnectionSpec YAML")
+        }
+    }
+}
