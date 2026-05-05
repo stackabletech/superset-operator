@@ -65,6 +65,8 @@ spec:
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
   nodes:
+    roleConfig:
+      listenerClass: external-unstable
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
