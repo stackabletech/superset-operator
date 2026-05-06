@@ -4,6 +4,8 @@
 
 ### Added
 
+- Support for Async Queries via Celery. Two new roles, `worker` and `beat` ([#724]).
+- Support for redis broker and results backend for celery workers in the CRD ([#724]).
 - BREAKING: Add required CLI argument and env var to set the image repository used to construct final product image names: `IMAGE_REPOSITORY` (`--image-repository`), eg. `oci.example.org/my/namespace` ([#726]).
 
 ### Changed
@@ -25,6 +27,7 @@
 [#719]: https://github.com/stackabletech/superset-operator/pull/719
 [#721]: https://github.com/stackabletech/superset-operator/pull/721
 [#722]: https://github.com/stackabletech/superset-operator/pull/722
+[#724]: https://github.com/stackabletech/superset-operator/pull/724
 [#726]: https://github.com/stackabletech/superset-operator/pull/726
 
 ## [26.3.0] - 2026-03-16

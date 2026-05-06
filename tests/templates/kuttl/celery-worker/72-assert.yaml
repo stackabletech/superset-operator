@@ -1,0 +1,9 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: check-redis
+timeout: 300
+commands:
+  - script: kubectl exec superset-redis-master-0 --namespace $NAMESPACE -- redis-cli -h 127.0.0.1 -p 6379 --pass 'superset' KEYS '*' | grep 'superset_results'
+  - script: kubectl exec superset-redis-master-0 --namespace $NAMESPACE -- redis-cli -h 127.0.0.1 -p 6379 --pass 'superset' KEYS '*' | grep 'celery-task-meta-'

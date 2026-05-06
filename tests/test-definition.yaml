@@ -64,6 +64,10 @@ tests:
     dimensions:
       - superset
       - openshift
+  - name: celery-worker
+    dimensions:
+      - superset
+      - openshift
 suites:
   - name: nightly
     patch:

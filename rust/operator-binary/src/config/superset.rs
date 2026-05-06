@@ -1,15 +1,22 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, io::Write};
 
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::crd::authentication::{ldap, oidc};
 
-use crate::crd::{
-    SupersetConfigOptions,
-    authentication::{
-        self, DEFAULT_OIDC_PROVIDER, SupersetAuthenticationClassResolved,
-        SupersetClientAuthenticationDetailsResolved,
+use crate::{
+    crd::{
+        SupersetConfigOptions,
+        authentication::{
+            self, DEFAULT_OIDC_PROVIDER, SupersetAuthenticationClassResolved,
+            SupersetClientAuthenticationDetailsResolved,
+        },
     },
+    resources::{
+        celery_broker_connection_details, celery_results_backend_connection_details,
+        metadata_database_connection_details,
+    },
+    v1alpha1::SupersetCluster,
 };
 
 #[derive(Snafu, Debug)]
@@ -39,15 +46,19 @@ pub const PYTHON_IMPORTS: &[&str] = &[
 
 pub fn add_superset_config(
     config: &mut BTreeMap<String, String>,
+    superset: &SupersetCluster,
     authentication_config: &SupersetClientAuthenticationDetailsResolved,
 ) -> Result<(), Error> {
+    let metadata_database_url_template =
+        metadata_database_connection_details(superset).url_template;
+
     config.insert(
         SupersetConfigOptions::SecretKey.to_string(),
         "os.environ.get('SECRET_KEY')".to_owned(),
     );
     config.insert(
         SupersetConfigOptions::SqlalchemyDatabaseUri.to_string(),
-        "os.path.expandvars(os.environ.get('SQLALCHEMY_DATABASE_URI'))".to_owned(),
+        format!("os.path.expandvars('{metadata_database_url_template}')"),
     );
     config.insert(
         SupersetConfigOptions::StatsLogger.to_string(),
@@ -70,8 +81,64 @@ pub fn add_superset_config(
     );
 
     append_authentication_config(config, authentication_config)?;
-
     Ok(())
+}
+
+pub(crate) fn append_celery_connection_config(
+    config_file: &mut Vec<u8>,
+    superset: &SupersetCluster,
+) {
+    let (
+        Some(additional_celery_results_backend_connection_details),
+        Some(celery_results_backend_connection_details),
+    ) = celery_results_backend_connection_details(superset)
+    else {
+        return;
+    };
+
+    let Some(celery_broker_connection_details) = celery_broker_connection_details(superset) else {
+        return;
+    };
+
+    let result_backend_username_env = celery_results_backend_connection_details
+        .username_env
+        .map(|env| env.name)
+        .unwrap_or("".to_string());
+    let result_backend_password_env = celery_results_backend_connection_details
+        .password_env
+        .map(|env| env.name)
+        .unwrap_or("".to_string());
+    let result_backend_url_template = celery_results_backend_connection_details.url_template;
+    let result_backend_host = additional_celery_results_backend_connection_details.host;
+    let result_backend_port = additional_celery_results_backend_connection_details.port;
+    let result_backend_db = additional_celery_results_backend_connection_details.database_id;
+    let broker_url_template = celery_broker_connection_details.url_template;
+
+    let celery_config = formatdoc!(
+        r#"
+        # CELERY ASYNC
+        from flask_caching.backends.rediscache import RedisCache
+        RESULTS_BACKEND = RedisCache(host='{result_backend_host}', port={result_backend_port}, db={result_backend_db}, key_prefix='superset_results', username=os.path.expandvars('${{{result_backend_username_env}}}'), password=os.path.expandvars('${{{result_backend_password_env}}}'))
+        class CeleryConfig(object):
+          broker_url = os.path.expandvars('{broker_url_template}')
+          imports = (
+            "superset.sql_lab",
+            "superset.tasks.scheduler",
+          )
+          result_backend = os.path.expandvars('{result_backend_url_template}')
+          worker_prefetch_multiplier = 10
+          task_acks_late = True
+          task_annotations = {{
+            "sql_lab.get_sql_results": {{
+              "rate_limit": "100/s",
+            }},
+          }}
+
+        CELERY_CONFIG = CeleryConfig
+    "#,
+    );
+
+    writeln!(config_file, "{celery_config}").expect("Writing to vec always works.");
 }
 
 fn append_authentication_config(

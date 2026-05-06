@@ -60,7 +60,10 @@ mod tests {
         let superset: v1alpha1::SupersetCluster =
             yaml_from_str_singleton_map(input).expect("illegal test input");
         let merged_config = superset
-            .merged_config(&SupersetRole::Node, &superset.node_rolegroup_ref("default"))
+            .merged_config(
+                &SupersetRole::Node,
+                &superset.rolegroup_ref(&SupersetRole::Node, "default"),
+            )
             .unwrap();
 
         assert_eq!(

@@ -3,8 +3,11 @@
 
 Superset requires a metadata database for storing slices, connections, tables, dashboards and other metadata.
 The actual connection string is calculated by the operator so that the user does not need to remember the exact structure.
+Using async queries with celery workers also requires a broker and a results backend.
 
-== Typed connections
+== Metadata database
+
+=== PostgreSQL
 
 [source,yaml]
 ----
@@ -19,7 +22,7 @@ spec:
 <1> A reference to one of the supported database backends (e.g. `postgresql`).
 <2> A reference to a Secret which must contain the two keys `username` and `password`.
 
-== Generic connections
+=== Generic connections
 
 Alternatively, these connections can also be defined in full in a referenced Secret:
 
@@ -33,3 +36,75 @@ spec:
 ----
 
 <1> A reference to a Secret which must contain the single key `connectionUrl` e.g. `postgresql://superset:superset@superset-postgresql/superset`
+
+== Broker
+
+The broker queue is required to schedule or pass queries on the celery workers.
+
+=== Redis
+
+A redis broker can be configured in the `clusterConfig`:
+
+[source,yaml]
+----
+spec:
+  clusterConfig:
+    celeryBroker:
+      redis:
+        host: redis-master
+        port: 6379
+        credentialsSecretName: superset-redis-credentials
+----
+
+=== Generic connections
+
+Alternatively, these connections can also be defined in full in a referenced Secret:
+
+[source,yaml]
+----
+spec:
+  clusterConfig:
+    celeryBroker:
+      generic:
+        connectionUrlSecretName: superset-redis-broker-url # <1>
+----
+
+<1> A reference to a Secret which must contain the single key `connectionUrl` e.g. `redis://:redis@redis-master/0`
+
+== Results Backend
+
+Celery workers store their results in the configured results backend.
+
+=== Redis
+
+A redis broker can be configured in the `clusterConfig`:
+
+[source,yaml]
+----
+spec:
+  clusterConfig:
+    celeryResultsBackend:
+      redis:
+        host: redis-master
+        port: 6379
+        credentialsSecretName: superset-redis-credentials
+----
+
+=== S3
+
+Currently not supported.
+
+=== Generic connections
+
+Alternatively, these connections can also be defined in full in a referenced Secret:
+
+[source,yaml]
+----
+spec:
+  clusterConfig:
+    celeryResultsBackend:
+      generic:
+        connectionUrlSecretName: superset-redis-results-backend-url # <1>
+----
+
+<1> A reference to a Secret which must contain the single key `connectionUrl` e.g. `redis://:redis@redis-master/0`

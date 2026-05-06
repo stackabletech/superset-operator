@@ -35,8 +35,13 @@ use stackable_operator::{
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
-    crd::{databases::MetadataDatabaseConnection, v1alpha1::SupersetRoleConfig},
-    listener::default_listener_class,
+    crd::{
+        databases::{
+            CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
+        },
+        v1alpha1::SupersetRoleConfig,
+    },
+    resources::listener::default_listener_class,
 };
 
 pub mod affinity;
@@ -162,6 +167,14 @@ pub mod versioned {
         // no doc - docs in the struct.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pub nodes: Option<SupersetRoleType>,
+
+        // no doc - docs in the struct.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub workers: Option<SupersetRoleType>,
+
+        // no doc - docs in the struct.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub beat: Option<SupersetRoleType>,
     }
 
     // TODO: move generic version to op-rs?
@@ -207,6 +220,20 @@ pub mod versioned {
 
         /// Configure the database where Superset stores all its internal metadata.
         pub metadata_database: MetadataDatabaseConnection,
+
+        /// Connection information for the celery backend database.
+        /// Only works if `workers` (and `beat`) roles are set.
+        ///
+        /// Ignored otherwise.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub celery_results_backend: Option<CeleryResultsBackendConnection>,
+
+        /// Connection information for the celery broker queue.
+        ///
+        /// Only works if `workers` (and `beat`) roles are set.
+        /// Ignored otherwise.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub celery_broker: Option<CeleryBrokerConnection>,
 
         /// The name of the Secret object containing the admin user credentials.
         /// Read the
@@ -359,11 +386,25 @@ impl KeyValueOverridesProvider for v1alpha1::SupersetConfigOverrides {
 }
 
 #[derive(
-    Clone, Debug, Deserialize, Display, EnumIter, Eq, Hash, JsonSchema, PartialEq, Serialize,
+    Clone,
+    Debug,
+    Deserialize,
+    Display,
+    EnumIter,
+    EnumString,
+    Eq,
+    Hash,
+    JsonSchema,
+    PartialEq,
+    Serialize,
 )]
 pub enum SupersetRole {
     #[strum(serialize = "node")]
     Node,
+    #[strum(serialize = "worker")]
+    Worker,
+    #[strum(serialize = "beat")]
+    Beat,
 }
 
 impl SupersetRole {
@@ -374,7 +415,16 @@ impl SupersetRole {
                 .nodes
                 .to_owned()
                 .map(|node| node.role_config.listener_class),
+            Self::Worker | Self::Beat => None,
         }
+    }
+
+    pub fn roles() -> Vec<String> {
+        let mut roles = vec![];
+        for role in Self::iter() {
+            roles.push(role.to_string())
+        }
+        roles
     }
 }
 
@@ -447,23 +497,61 @@ impl v1alpha1::SupersetConfig {
     pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
 
     fn default_config(cluster_name: &str, role: &SupersetRole) -> v1alpha1::SupersetConfigFragment {
-        v1alpha1::SupersetConfigFragment {
-            resources: ResourcesFragment {
-                cpu: CpuLimitsFragment {
-                    min: Some(Quantity("300m".to_owned())),
-                    max: Some(Quantity("1200m".to_owned())),
+        match role {
+            SupersetRole::Node => v1alpha1::SupersetConfigFragment {
+                resources: ResourcesFragment {
+                    cpu: CpuLimitsFragment {
+                        min: Some(Quantity("300m".to_owned())),
+                        max: Some(Quantity("1200m".to_owned())),
+                    },
+                    memory: MemoryLimitsFragment {
+                        limit: Some(Quantity("2Gi".to_owned())),
+                        runtime_limits: NoRuntimeLimitsFragment {},
+                    },
+                    storage: v1alpha1::SupersetStorageConfigFragment {},
                 },
-                memory: MemoryLimitsFragment {
-                    limit: Some(Quantity("2Gi".to_owned())),
-                    runtime_limits: NoRuntimeLimitsFragment {},
-                },
-                storage: v1alpha1::SupersetStorageConfigFragment {},
+                logging: product_logging::spec::default_logging(),
+                affinity: affinity::get_affinity(cluster_name, role),
+                graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
+                row_limit: None,
+                webserver_timeout: None,
             },
-            logging: product_logging::spec::default_logging(),
-            affinity: affinity::get_affinity(cluster_name, role),
-            graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
-            row_limit: None,
-            webserver_timeout: None,
+            SupersetRole::Worker => v1alpha1::SupersetConfigFragment {
+                resources: ResourcesFragment {
+                    cpu: CpuLimitsFragment {
+                        min: Some(Quantity("1000m".to_owned())),
+                        max: Some(Quantity("2000m".to_owned())),
+                    },
+                    memory: MemoryLimitsFragment {
+                        limit: Some(Quantity("4Gi".to_owned())),
+                        runtime_limits: NoRuntimeLimitsFragment {},
+                    },
+                    storage: v1alpha1::SupersetStorageConfigFragment {},
+                },
+                logging: product_logging::spec::default_logging(),
+                affinity: affinity::get_affinity(cluster_name, role),
+                graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
+                row_limit: None,
+                webserver_timeout: None,
+            },
+            SupersetRole::Beat => v1alpha1::SupersetConfigFragment {
+                resources: ResourcesFragment {
+                    cpu: CpuLimitsFragment {
+                        min: Some(Quantity("100m".to_owned())),
+                        max: Some(Quantity("500m".to_owned())),
+                    },
+                    memory: MemoryLimitsFragment {
+                        limit: Some(Quantity("1Gi".to_owned())),
+                        runtime_limits: NoRuntimeLimitsFragment {},
+                    },
+                    storage: v1alpha1::SupersetStorageConfigFragment {},
+                },
+                logging: product_logging::spec::default_logging(),
+                affinity: affinity::get_affinity(cluster_name, role),
+                graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
+                row_limit: None,
+                webserver_timeout: None,
+            },
         }
     }
 }
@@ -537,6 +625,7 @@ impl v1alpha1::SupersetCluster {
                 "{cluster_name}-{role}",
                 cluster_name = self.name_any()
             )),
+            SupersetRole::Worker | SupersetRole::Beat => None,
         }
     }
 
@@ -545,25 +634,26 @@ impl v1alpha1::SupersetCluster {
     }
 
     pub fn get_role_config(&self, role: &SupersetRole) -> Option<&SupersetRoleConfig> {
-        match role {
-            SupersetRole::Node => self.spec.nodes.as_ref().map(|c| &c.role_config),
-        }
+        self.get_role(role).as_ref().map(|c| &c.role_config)
     }
 
     pub fn get_role(&self, role: &SupersetRole) -> Option<&SupersetRoleType> {
         match role {
             SupersetRole::Node => self.spec.nodes.as_ref(),
+            SupersetRole::Worker => self.spec.workers.as_ref(),
+            SupersetRole::Beat => self.spec.beat.as_ref(),
         }
     }
 
     /// Metadata about a node rolegroup
-    pub fn node_rolegroup_ref(
+    pub fn rolegroup_ref(
         &self,
+        role: &SupersetRole,
         group_name: impl Into<String>,
     ) -> RoleGroupRef<v1alpha1::SupersetCluster> {
         RoleGroupRef {
             cluster: ObjectRef::from_obj(self),
-            role: SupersetRole::Node.to_string(),
+            role: role.to_string(),
             role_group: group_name.into(),
         }
     }
@@ -585,12 +675,10 @@ impl v1alpha1::SupersetCluster {
         // Initialize the result with all default values as baseline
         let conf_defaults = v1alpha1::SupersetConfig::default_config(&self.name_any(), role);
 
-        let role = match role {
-            SupersetRole::Node => self.spec.nodes.as_ref().context(UnknownSupersetRoleSnafu {
-                role: role.to_string(),
-                roles: vec![role.to_string()],
-            })?,
-        };
+        let role = self.get_role(role).context(UnknownSupersetRoleSnafu {
+            role: role.to_string(),
+            roles: SupersetRole::roles(),
+        })?;
 
         // Retrieve role resource config
         let mut conf_role = role.config.config.to_owned();

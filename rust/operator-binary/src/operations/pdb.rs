@@ -36,6 +36,8 @@ pub async fn add_pdbs(
     }
     let max_unavailable = pdb.max_unavailable.unwrap_or(match role {
         SupersetRole::Node => max_unavailable_nodes(),
+        SupersetRole::Worker => max_unavailable_workers(),
+        SupersetRole::Beat => max_unavailable_beat(),
     });
     let pdb = PodDisruptionBudgetBuilder::new_with_role(
         superset,
@@ -59,5 +61,13 @@ pub async fn add_pdbs(
 }
 
 fn max_unavailable_nodes() -> u16 {
+    1
+}
+
+fn max_unavailable_workers() -> u16 {
+    1
+}
+
+fn max_unavailable_beat() -> u16 {
     1
 }
