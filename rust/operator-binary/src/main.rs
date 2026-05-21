@@ -33,23 +33,23 @@ use stackable_operator::{
 };
 
 use crate::{
+    controller::SUPERSET_FULL_CONTROLLER_NAME,
     crd::{
         APP_NAME, SupersetCluster, SupersetClusterVersion,
         druidconnection::{self, DruidConnection, DruidConnectionVersion},
         v1alpha1,
     },
     druid_connection_controller::DRUID_CONNECTION_FULL_CONTROLLER_NAME,
-    controller::SUPERSET_FULL_CONTROLLER_NAME,
     webhooks::conversion::create_webhook_server,
 };
 
 mod authorization;
 mod config;
+mod controller;
 mod crd;
 mod druid_connection_controller;
 mod operations;
 mod resources;
-mod controller;
 mod webhooks;
 
 mod built_info {

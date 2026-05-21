@@ -31,6 +31,7 @@ use stackable_operator::{
 
 use crate::{
     config::product_logging::LOG_CONFIG_FILE,
+    controller::SUPERSET_CONTROLLER_NAME,
     crd::{
         APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
         STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
@@ -41,7 +42,6 @@ use crate::{
     resources::{
         CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME, build_recommended_labels,
     },
-    controller::SUPERSET_CONTROLLER_NAME,
 };
 
 #[derive(Snafu, Debug)]

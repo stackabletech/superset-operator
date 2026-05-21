@@ -39,6 +39,7 @@ use stackable_operator::{
 
 use crate::{
     config::{commands::add_cert_to_python_certifi_command, product_logging::LOG_CONFIG_FILE},
+    controller::SUPERSET_CONTROLLER_NAME,
     crd::{
         APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
         STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
@@ -53,7 +54,6 @@ use crate::{
         CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME, build_recommended_labels,
         listener::{LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
     },
-    controller::SUPERSET_CONTROLLER_NAME,
 };
 
 #[derive(Snafu, Debug)]
