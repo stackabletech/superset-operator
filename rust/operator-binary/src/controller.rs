@@ -57,9 +57,6 @@ pub struct Ctx {
 #[strum_discriminants(derive(IntoStaticStr))]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
-    #[snafu(display("object defines no '{role}' role"))]
-    MissingRole { role: String },
-
     #[snafu(display("failed to dereference external objects"))]
     Dereference { source: dereference::Error },
 
