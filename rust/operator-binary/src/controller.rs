@@ -1,4 +1,6 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
+pub mod dereference;
+pub mod validate;
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use const_format::concatcp;

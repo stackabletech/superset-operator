@@ -26,7 +26,7 @@ use crate::{
         v1alpha1::{Container, SupersetCluster},
     },
     resources::build_recommended_labels,
-    superset_controller::SUPERSET_CONTROLLER_NAME,
+    controller::SUPERSET_CONTROLLER_NAME,
 };
 
 #[derive(Snafu, Debug)]

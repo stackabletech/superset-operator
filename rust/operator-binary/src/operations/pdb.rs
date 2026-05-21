@@ -7,7 +7,7 @@ use stackable_operator::{
 use crate::{
     OPERATOR_NAME,
     crd::{APP_NAME, SupersetRole, v1alpha1},
-    superset_controller::SUPERSET_CONTROLLER_NAME,
+    controller::SUPERSET_CONTROLLER_NAME,
 };
 
 #[derive(Snafu, Debug)]

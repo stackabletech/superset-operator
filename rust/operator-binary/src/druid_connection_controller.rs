@@ -33,7 +33,7 @@ use crate::{
     },
     operations::job_state::{JobState, get_job_state},
     resources::rbac,
-    superset_controller::CONTAINER_IMAGE_BASE_NAME,
+    controller::CONTAINER_IMAGE_BASE_NAME,
 };
 
 pub const DRUID_CONNECTION_CONTROLLER_NAME: &str = "druid-connection";

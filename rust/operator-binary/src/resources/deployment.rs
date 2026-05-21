@@ -41,7 +41,7 @@ use crate::{
     resources::{
         CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME, build_recommended_labels,
     },
-    superset_controller::SUPERSET_CONTROLLER_NAME,
+    controller::SUPERSET_CONTROLLER_NAME,
 };
 
 #[derive(Snafu, Debug)]
