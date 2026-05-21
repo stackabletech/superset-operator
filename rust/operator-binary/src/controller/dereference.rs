@@ -8,12 +8,12 @@ use crate::{
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("invalid authentication configuration"))]
-    InvalidAuthenticationConfig {
+    AuthenticationConfig {
         source: crate::crd::authentication::Error,
     },
 
     #[snafu(display("invalid OPA configuration"))]
-    InvalidOpaConfig {
+    OpaConfig {
         source: stackable_operator::commons::opa::Error,
     },
 }
@@ -36,13 +36,13 @@ pub async fn dereference(
         client,
     )
     .await
-    .context(InvalidAuthenticationConfigSnafu)?;
+    .context(AuthenticationConfigSnafu)?;
 
     let opa_config = match superset.get_opa_config() {
         Some(opa_config) => Some(
             SupersetOpaConfigResolved::from_opa_config(client, superset, opa_config)
                 .await
-                .context(InvalidOpaConfigSnafu)?,
+                .context(OpaConfigSnafu)?,
         ),
         None => None,
     };
