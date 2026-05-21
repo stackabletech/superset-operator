@@ -1,41 +1,34 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
 pub mod dereference;
 pub mod validate;
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use const_format::concatcp;
-use product_config::{ProductConfigManager, types::PropertyNameKind};
+use product_config::ProductConfigManager;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cli::OperatorEnvironmentOptions,
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{
-        product_image_selection::{self, ResolvedProductImage},
-        random_secret_creation,
-        rbac::build_rbac_resources,
-    },
+    commons::{random_secret_creation, rbac::build_rbac_resources},
     kube::{
         Resource, ResourceExt,
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
     logging::controller::ReconcilerError,
-    product_config_utils::{transform_all_roles_to_config, validate_all_roles_and_groups_config},
-    role_utils::{GenericRoleConfig, RoleGroupRef},
+    role_utils::RoleGroupRef,
     shared::time::Duration,
     status::condition::{
         compute_conditions, deployment::DeploymentConditionBuilder,
         operations::ClusterOperationsConditionBuilder, statefulset::StatefulSetConditionBuilder,
     },
 };
-use strum::{EnumDiscriminants, IntoEnumIterator, IntoStaticStr};
+use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     OPERATOR_NAME,
-    authorization::opa::SupersetOpaConfigResolved,
     crd::{
-        APP_NAME, INTERNAL_SECRET_SECRET_KEY, SUPERSET_CONFIG_FILENAME, SupersetRole,
-        authentication::SupersetClientAuthenticationDetailsResolved,
+        APP_NAME, INTERNAL_SECRET_SECRET_KEY, SupersetRole,
         v1alpha1::{SupersetCluster, SupersetClusterStatus},
     },
     operations::pdb::add_pdbs,
@@ -67,8 +60,11 @@ pub enum Error {
     #[snafu(display("object defines no '{role}' role"))]
     MissingRole { role: String },
 
-    #[snafu(display("failed to parse role: {source}"))]
-    ParseRole { source: strum::ParseError },
+    #[snafu(display("failed to dereference external objects"))]
+    Dereference { source: dereference::Error },
+
+    #[snafu(display("failed to validate cluster"))]
+    Validate { source: validate::Error },
 
     #[snafu(display("failed to create cluster resources"))]
     CreateClusterResources {
@@ -103,24 +99,6 @@ pub enum Error {
         source: stackable_operator::cluster_resources::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
-
-    #[snafu(display("failed to generate product config"))]
-    GenerateProductConfig {
-        source: stackable_operator::product_config_utils::Error,
-    },
-
-    #[snafu(display("invalid product config"))]
-    InvalidProductConfig {
-        source: stackable_operator::product_config_utils::Error,
-    },
-
-    #[snafu(display("failed to apply authentication configuration"))]
-    InvalidAuthenticationConfig {
-        source: crate::crd::authentication::Error,
-    },
-
-    #[snafu(display("failed to resolve and merge config for role and role group"))]
-    FailedToResolveConfig { source: crate::crd::Error },
 
     #[snafu(display("failed to update status"))]
     ApplyStatus {
@@ -158,11 +136,6 @@ pub enum Error {
         source: error_boundary::InvalidObject,
     },
 
-    #[snafu(display("invalid OPA config"))]
-    InvalidOpaConfig {
-        source: stackable_operator::commons::opa::Error,
-    },
-
     #[snafu(display("failed to apply group listener"))]
     ApplyGroupListener {
         source: stackable_operator::cluster_resources::Error,
@@ -193,11 +166,6 @@ pub enum Error {
         source: crate::resources::configmap::Error,
     },
 
-    #[snafu(display("failed to resolve product image"))]
-    ResolveProductImage {
-        source: product_image_selection::Error,
-    },
-
     #[snafu(display("failed to create SECRET_KEY secret"))]
     CreateSecretKeySecret {
         source: random_secret_creation::Error,
@@ -225,52 +193,25 @@ pub async fn reconcile_superset(
         .context(InvalidSupersetClusterSnafu)?;
 
     let client = &ctx.client;
-    let resolved_product_image: ResolvedProductImage = superset
-        .spec
-        .image
-        .resolve(
-            CONTAINER_IMAGE_BASE_NAME,
-            &ctx.operator_environment.image_repository,
-            crate::built_info::PKG_VERSION,
-        )
-        .context(ResolveProductImageSnafu)?;
 
     let cluster_operation_cond_builder =
         ClusterOperationsConditionBuilder::new(&superset.spec.cluster_config.cluster_operation);
 
-    let auth_config = SupersetClientAuthenticationDetailsResolved::from(
-        &superset.spec.cluster_config.authentication,
-        client,
-    )
-    .await
-    .context(InvalidAuthenticationConfigSnafu)?;
+    let dereferenced = dereference::dereference(client, superset)
+        .await
+        .context(DereferenceSnafu)?;
+    let auth_config = &dereferenced.authentication_config;
+    let superset_opa_config = &dereferenced.opa_config;
 
-    let mut roles = HashMap::new();
-
-    for role in SupersetRole::iter() {
-        if let Some(resolved_role) = superset.get_role(&role) {
-            roles.insert(
-                role.to_string(),
-                (
-                    vec![
-                        PropertyNameKind::Env,
-                        PropertyNameKind::File(SUPERSET_CONFIG_FILENAME.into()),
-                    ],
-                    resolved_role.clone(),
-                ),
-            );
-        }
-    }
-
-    let role_config = transform_all_roles_to_config(superset, &roles);
-    let validated_role_config = validate_all_roles_and_groups_config(
-        &resolved_product_image.product_version,
-        &role_config.context(GenerateProductConfigSnafu)?,
+    let validated = validate::validate_cluster(
+        superset,
+        CONTAINER_IMAGE_BASE_NAME,
+        &ctx.operator_environment.image_repository,
+        crate::built_info::PKG_VERSION,
         &ctx.product_config,
-        false,
-        false,
     )
-    .context(InvalidProductConfigSnafu)?;
+    .context(ValidateSnafu)?;
+    let resolved_product_image = &validated.image;
 
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
@@ -281,15 +222,6 @@ pub async fn reconcile_superset(
         &superset.spec.object_overrides,
     )
     .context(CreateClusterResourcesSnafu)?;
-
-    let superset_opa_config = match superset.get_opa_config() {
-        Some(opa_config) => Some(
-            SupersetOpaConfigResolved::from_opa_config(client, superset, opa_config)
-                .await
-                .context(InvalidOpaConfigSnafu)?,
-        ),
-        None => None,
-    };
 
     let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
         superset,
@@ -322,37 +254,30 @@ pub async fn reconcile_superset(
     let mut statefulset_cond_builder = StatefulSetConditionBuilder::default();
     let mut deployment_cond_builder = DeploymentConditionBuilder::default();
 
-    for (role_name, role_config) in validated_role_config.iter() {
-        let superset_role = SupersetRole::from_str(role_name).context(ParseRoleSnafu)?;
-
-        for (rolegroup_name, rolegroup_config) in role_config.iter() {
-            let rolegroup = superset.rolegroup_ref(&superset_role, rolegroup_name);
-
-            let config = superset
-                .merged_config(&superset_role, &rolegroup)
-                .context(FailedToResolveConfigSnafu)?;
+    for (superset_role, rolegroup_configs) in validated.role_groups.iter() {
+        for (rolegroup_name, validated_rolegroup) in rolegroup_configs.iter() {
+            let rolegroup = superset.rolegroup_ref(superset_role, rolegroup_name);
+            let rolegroup_config = &validated_rolegroup.product_config_properties;
+            let config = &validated_rolegroup.merged_config;
 
             let rg_configmap = build_rolegroup_config_map(
                 superset,
-                &resolved_product_image,
+                resolved_product_image,
                 &rolegroup,
                 rolegroup_config,
-                &auth_config,
-                &superset_opa_config,
+                auth_config,
+                superset_opa_config,
                 &config.logging,
             )
             .context(BuildConfigMapSnafu)?;
 
             let rg_metrics_service =
-                build_node_rolegroup_metrics_service(superset, &resolved_product_image, &rolegroup)
+                build_node_rolegroup_metrics_service(superset, resolved_product_image, &rolegroup)
                     .context(BuildServiceSnafu)?;
 
-            let rg_headless_service = build_node_rolegroup_headless_service(
-                superset,
-                &resolved_product_image,
-                &rolegroup,
-            )
-            .context(BuildServiceSnafu)?;
+            let rg_headless_service =
+                build_node_rolegroup_headless_service(superset, resolved_product_image, &rolegroup)
+                    .context(BuildServiceSnafu)?;
 
             cluster_resources
                 .add(client, rg_metrics_service)
@@ -379,13 +304,13 @@ pub async fn reconcile_superset(
                 SupersetRole::Node => {
                     let rg_statefulset = build_server_rolegroup_statefulset(
                         superset,
-                        &resolved_product_image,
-                        &superset_role,
+                        resolved_product_image,
+                        superset_role,
                         &rolegroup,
                         rolegroup_config,
-                        &auth_config,
+                        auth_config,
                         &rbac_sa.name_any(),
-                        &config,
+                        config,
                     )
                     .context(BuildStatefulSetSnafu)?;
 
@@ -404,12 +329,12 @@ pub async fn reconcile_superset(
                 SupersetRole::Worker => {
                     let rg_worker_deployment = build_worker_rolegroup_deployment(
                         superset,
-                        &resolved_product_image,
-                        &superset_role,
+                        resolved_product_image,
+                        superset_role,
                         &rolegroup,
                         rolegroup_config,
                         &rbac_sa.name_any(),
-                        &config,
+                        config,
                     )
                     .context(BuildDeploymentSnafu)?;
 
@@ -428,12 +353,12 @@ pub async fn reconcile_superset(
                 SupersetRole::Beat => {
                     let rg_beat_deployment = build_beat_rolegroup_deployment(
                         superset,
-                        &resolved_product_image,
-                        &superset_role,
+                        resolved_product_image,
+                        superset_role,
                         &rolegroup,
                         rolegroup_config,
                         &rbac_sa.name_any(),
-                        &config,
+                        config,
                     )
                     .context(BuildDeploymentSnafu)?;
 
@@ -451,8 +376,11 @@ pub async fn reconcile_superset(
                 }
             }
 
-            if let Some(listener_class) = &superset_role.listener_class_name(superset) {
-                if let Some(listener_group_name) = superset.group_listener_name(&superset_role) {
+            if let Some(role_config) = validated.role_configs.get(superset_role) {
+                if let (Some(listener_class), Some(listener_group_name)) = (
+                    &role_config.listener_class,
+                    &role_config.group_listener_name,
+                ) {
                     let group_listener = build_group_listener(
                         superset,
                         build_recommended_labels(
@@ -462,8 +390,8 @@ pub async fn reconcile_superset(
                             &superset_role.to_string(),
                             "none",
                         ),
-                        listener_class.to_string(),
-                        listener_group_name,
+                        listener_class.clone(),
+                        listener_group_name.clone(),
                     )
                     .context(BuildListenerSnafu)?;
                     cluster_resources
@@ -471,22 +399,12 @@ pub async fn reconcile_superset(
                         .await
                         .context(ApplyGroupListenerSnafu)?;
                 }
-            }
 
-            let generic_role_config = superset.generic_role_config(&superset_role);
-            if let Some(GenericRoleConfig {
-                pod_disruption_budget: pdb,
-            }) = generic_role_config
-            {
-                add_pdbs(
-                    &pdb,
-                    superset,
-                    &superset_role,
-                    client,
-                    &mut cluster_resources,
-                )
-                .await
-                .context(FailedToCreatePdbSnafu)?;
+                if let Some(pdb) = &role_config.pdb {
+                    add_pdbs(pdb, superset, superset_role, client, &mut cluster_resources)
+                        .await
+                        .context(FailedToCreatePdbSnafu)?;
+                }
             }
         }
     }
