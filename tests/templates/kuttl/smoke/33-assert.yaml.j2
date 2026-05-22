@@ -1,0 +1,255 @@
+{# Templating flag used throughout this file. #}
+{% set vector_enabled = lookup('env', 'VECTOR_AGGREGATOR') | length > 0 %}
+---
+# Declarative shape assertions for every superset-managed resource in the smoke
+# test except ConfigMap *.data* (covered in 34-assert.yaml.j2).
+#
+# kuttl performs subset matching: any field omitted here is not checked, and
+# the live object may carry additional keys/labels. We therefore omit fields
+# that are random per install (uids, resourceVersion, clusterIP, the
+# `listener.stackable.tech/mnt.<UID>` selector label on the listener-managed
+# Service, the per-install namespace on RoleBinding subjects), container `env`
+# arrays (kuttl matches list elements positionally and the operator
+# interleaves additional env entries; env overrides are checked in
+# 31-assert.yaml instead), and the `app.kubernetes.io/version` label (varies
+# with the superset product version under test).
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: superset-node-default
+  generation: 1 # There should be no unneeded Pod restarts
+  labels:
+    app.kubernetes.io/component: node
+    app.kubernetes.io/instance: superset
+    app.kubernetes.io/managed-by: superset.stackable.tech_supersetcluster
+    app.kubernetes.io/name: superset
+    app.kubernetes.io/role-group: default
+    restarter.stackable.tech/enabled: "true"
+    stackable.tech/vendor: Stackable
+  ownerReferences:
+    - apiVersion: superset.stackable.tech/v1alpha1
+      controller: true
+      kind: SupersetCluster
+      name: superset
+spec:
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: node
+      app.kubernetes.io/instance: superset
+      app.kubernetes.io/name: superset
+      app.kubernetes.io/role-group: default
+  serviceName: superset-node-default-headless
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: node
+        app.kubernetes.io/instance: superset
+        app.kubernetes.io/managed-by: superset.stackable.tech_supersetcluster
+        app.kubernetes.io/name: superset
+        app.kubernetes.io/role-group: default
+        stackable.tech/vendor: Stackable
+    spec:
+      serviceAccount: superset-serviceaccount
+      serviceAccountName: superset-serviceaccount
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: superset
+        - name: metrics
+{% if vector_enabled %}
+        - name: vector
+{% endif %}
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+# Listener-managed Service. The selector contains a per-install
+# `listener.stackable.tech/mnt.<UID>` label, so it is intentionally omitted.
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset-node
+  labels:
+    app.kubernetes.io/component: node
+    app.kubernetes.io/instance: superset-node
+    app.kubernetes.io/managed-by: listeners.stackable.tech_listener
+    app.kubernetes.io/name: listener
+    app.kubernetes.io/role-group: none
+    stackable.tech/vendor: Stackable
+  ownerReferences:
+    - apiVersion: listeners.stackable.tech/v1alpha1
+      controller: true
+      kind: Listener
+      name: superset-node
+spec:
+  ports:
+    - name: http
+      port: 8088
+      protocol: TCP
+      targetPort: 8088
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset-node-default-headless
+  labels:
+    app.kubernetes.io/component: node
+    app.kubernetes.io/instance: superset
+    app.kubernetes.io/managed-by: superset.stackable.tech_supersetcluster
+    app.kubernetes.io/name: superset
+    app.kubernetes.io/role-group: default
+    stackable.tech/vendor: Stackable
+  ownerReferences:
+    - apiVersion: superset.stackable.tech/v1alpha1
+      controller: true
+      kind: SupersetCluster
+      name: superset
+spec:
+  clusterIP: None
+  ports:
+    - name: http
+      port: 8088
+      protocol: TCP
+      targetPort: 8088
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/component: node
+    app.kubernetes.io/instance: superset
+    app.kubernetes.io/name: superset
+    app.kubernetes.io/role-group: default
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset-node-default-metrics
+  annotations:
+    prometheus.io/path: /metrics
+    prometheus.io/port: "9102"
+    prometheus.io/scheme: http
+    prometheus.io/scrape: "true"
+  labels:
+    app.kubernetes.io/component: node
+    app.kubernetes.io/instance: superset
+    app.kubernetes.io/managed-by: superset.stackable.tech_supersetcluster
+    app.kubernetes.io/name: superset
+    app.kubernetes.io/role-group: default
+    prometheus.io/scrape: "true"
+    stackable.tech/vendor: Stackable
+  ownerReferences:
+    - apiVersion: superset.stackable.tech/v1alpha1
+      controller: true
+      kind: SupersetCluster
+      name: superset
+spec:
+  clusterIP: None
+  ports:
+    - name: metrics
+      port: 9102
+      protocol: TCP
+      targetPort: 9102
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/component: node
+    app.kubernetes.io/instance: superset
+    app.kubernetes.io/name: superset
+    app.kubernetes.io/role-group: default
+  type: ClusterIP
+---
+apiVersion: listeners.stackable.tech/v1alpha1
+kind: Listener
+metadata:
+  name: superset-node
+  labels:
+    app.kubernetes.io/component: node
+    app.kubernetes.io/instance: superset
+    app.kubernetes.io/managed-by: superset.stackable.tech_supersetcluster
+    app.kubernetes.io/name: superset
+    app.kubernetes.io/role-group: none
+    stackable.tech/vendor: Stackable
+  ownerReferences:
+    - apiVersion: superset.stackable.tech/v1alpha1
+      controller: true
+      kind: SupersetCluster
+      name: superset
+spec:
+  className: cluster-internal
+  ports:
+    - name: http
+      port: 8088
+      protocol: TCP
+---
+# Operator-generated Flask SECRET_KEY. Presence + ownership only; the value
+# is randomly generated per install.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-secret-key
+  ownerReferences:
+    - apiVersion: superset.stackable.tech/v1alpha1
+      controller: true
+      kind: SupersetCluster
+      name: superset
+type: Opaque
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: superset-serviceaccount
+  labels:
+    app.kubernetes.io/instance: superset
+    app.kubernetes.io/managed-by: superset.stackable.tech_supersetcluster
+    app.kubernetes.io/name: superset
+  ownerReferences:
+    - apiVersion: superset.stackable.tech/v1alpha1
+      controller: true
+      kind: SupersetCluster
+      name: superset
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: superset-rolebinding
+  labels:
+    app.kubernetes.io/instance: superset
+    app.kubernetes.io/managed-by: superset.stackable.tech_supersetcluster
+    app.kubernetes.io/name: superset
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: superset-clusterrole
+subjects:
+  - kind: ServiceAccount
+    name: superset-serviceaccount
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: superset-node
+  labels:
+    app.kubernetes.io/component: node
+    app.kubernetes.io/instance: superset
+    app.kubernetes.io/managed-by: superset.stackable.tech_supersetcluster
+    app.kubernetes.io/name: superset
+  ownerReferences:
+    - apiVersion: superset.stackable.tech/v1alpha1
+      controller: true
+      kind: SupersetCluster
+      name: superset
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: node
+      app.kubernetes.io/instance: superset
+      app.kubernetes.io/name: superset
+status:
+  currentHealthy: 1
+  disruptionsAllowed: 1
+  expectedPods: 1

@@ -22,6 +22,7 @@
   This means you need to replace your simple database connection string with a typed struct.
   This struct is consistent between different CRDs, so that you can easily copy/paste it between stacklets.
   More information can be found in the [Superset database documentation](https://docs.stackable.tech/home/nightly/superset/usage-guide/database-connections) for details ([#722]).
+- Internal operator refactoring: introduce dereference() and validate() steps in the reconciler ([#731]).
 
 [#717]: https://github.com/stackabletech/superset-operator/pull/717
 [#719]: https://github.com/stackabletech/superset-operator/pull/719
@@ -29,6 +30,7 @@
 [#722]: https://github.com/stackabletech/superset-operator/pull/722
 [#724]: https://github.com/stackabletech/superset-operator/pull/724
 [#726]: https://github.com/stackabletech/superset-operator/pull/726
+[#731]: https://github.com/stackabletech/superset-operator/pull/731
 
 ## [26.3.0] - 2026-03-16
 

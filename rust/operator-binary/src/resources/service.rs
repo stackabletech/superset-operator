@@ -8,9 +8,9 @@ use stackable_operator::{
 };
 
 use crate::{
+    controller::SUPERSET_CONTROLLER_NAME,
     crd::{APP_NAME, APP_PORT, APP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, v1alpha1},
     resources::build_recommended_labels,
-    superset_controller::SUPERSET_CONTROLLER_NAME,
 };
 
 #[derive(Debug, Snafu)]

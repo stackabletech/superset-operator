@@ -20,13 +20,13 @@ use stackable_operator::{
 use crate::{
     authorization::opa::{OPA_IMPORTS, SupersetOpaConfigResolved},
     config::{self, product_logging::extend_config_map_with_log_config, superset::PYTHON_IMPORTS},
+    controller::SUPERSET_CONTROLLER_NAME,
     crd::{
         SUPERSET_CONFIG_FILENAME, SupersetConfigOptions,
         authentication::SupersetClientAuthenticationDetailsResolved,
         v1alpha1::{Container, SupersetCluster},
     },
     resources::build_recommended_labels,
-    superset_controller::SUPERSET_CONTROLLER_NAME,
 };
 
 #[derive(Snafu, Debug)]

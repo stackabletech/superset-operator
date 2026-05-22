@@ -28,12 +28,12 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     APP_NAME, OPERATOR_NAME,
+    controller::CONTAINER_IMAGE_BASE_NAME,
     crd::{
         INTERNAL_SECRET_SECRET_KEY, PYTHONPATH, SUPERSET_CONFIG_FILENAME, druidconnection, v1alpha1,
     },
     operations::job_state::{JobState, get_job_state},
     resources::rbac,
-    superset_controller::CONTAINER_IMAGE_BASE_NAME,
 };
 
 pub const DRUID_CONNECTION_CONTROLLER_NAME: &str = "druid-connection";

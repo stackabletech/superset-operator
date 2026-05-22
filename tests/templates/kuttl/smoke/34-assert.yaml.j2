@@ -1,0 +1,109 @@
+{# Templating flag used throughout this file. #}
+{% set vector_enabled = lookup('env', 'VECTOR_AGGREGATOR') | length > 0 %}
+---
+# Snapshot the full `.data` of the operator-managed ConfigMap.
+# Any code change that alters rendered config values will fail this diff.
+#
+# Runs as its own step (after 30-33) so kuttl does not re-evaluate the heavy
+# heredoc on every 1-second readiness retry of the install step. By this point
+# the cluster is in steady state, so the script runs once.
+#
+# The heredoc is quoted (`<<'YAMLEOF'`) so shell substitution is disabled and
+# literal `${...}` in the rendered config survives verbatim. Both sides are
+# normalized to canonical JSON via `yq -o=json`; map keys are alphabetical on
+# both sides (operator stores BTreeMap; kubectl serializes maps sorted; the
+# heredoc is hand-sorted).
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 60
+commands:
+  - script: |
+      expected=$(cat <<'YAMLEOF' | yq -o=json
+      log_config.py: |+
+        import flask.config
+        import logging
+        import os
+        from superset.utils.logging_configurator import LoggingConfigurator
+        from pythonjsonlogger import jsonlogger
+        from celery.signals import setup_logging
+
+        os.makedirs('/stackable/log/superset', exist_ok=True)
+
+        _LOGGING_CONFIGURED = False
+
+
+        def _configure_root_logger():
+            global _LOGGING_CONFIGURED
+            if _LOGGING_CONFIGURED:
+                return
+            _LOGGING_CONFIGURED = True
+
+            logFormat = '%(asctime)s:%(levelname)s:%(name)s:%(message)s'
+
+            plainTextFormatter = logging.Formatter(logFormat)
+            jsonFormatter = jsonlogger.JsonFormatter(logFormat)
+
+            consoleHandler = logging.StreamHandler()
+            consoleHandler.setLevel(logging.INFO)
+            consoleHandler.setFormatter(plainTextFormatter)
+
+            fileHandler = logging.handlers.RotatingFileHandler(
+                '/stackable/log/superset/superset.py.json',
+                maxBytes=1048576,
+                backupCount=1,
+            )
+            fileHandler.setLevel(logging.INFO)
+            fileHandler.setFormatter(jsonFormatter)
+
+            rootLogger = logging.getLogger()
+            # Clear any handlers Celery/Flask/etc. already attached
+            rootLogger.handlers.clear()
+            rootLogger.setLevel(logging.INFO)
+            rootLogger.addHandler(consoleHandler)
+            rootLogger.addHandler(fileHandler)
+
+
+        @setup_logging.connect
+        def configure_celery_logging(**kwargs):
+            _configure_root_logger()
+
+
+        class StackableLoggingConfigurator(LoggingConfigurator):
+            def configure_logging(self, app_config: flask.config.Config, debug_mode: bool):
+                _configure_root_logger()
+
+
+      superset_config.py: |+
+        COMMON_HEADER_VAR = "group-value"
+
+        import os
+        from superset.stats_logger import StatsdStatsLogger
+        from flask_appbuilder.security.manager import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_REMOTE_USER)
+        from log_config import StackableLoggingConfigurator
+
+        AUTH_ROLES_SYNC_AT_LOGIN = False
+        AUTH_USER_REGISTRATION = True
+        AUTH_USER_REGISTRATION_ROLE = "Public"
+        LOGGING_CONFIGURATOR = StackableLoggingConfigurator()
+        MAPBOX_API_KEY = os.environ.get('MAPBOX_API_KEY', '')
+        RECAPTCHA_PUBLIC_KEY = ''
+        SECRET_KEY = os.environ.get('SECRET_KEY')
+        SQLALCHEMY_DATABASE_URI = os.path.expandvars('postgresql+psycopg2://${METADATA_DATABASE_USERNAME}:${METADATA_DATABASE_PASSWORD}@superset-postgresql:5432/superset')
+        STATS_LOGGER = StatsdStatsLogger(host='0.0.0.0', port=9125)
+        SUPERSET_WEBSERVER_TIMEOUT = 300
+        TALISMAN_ENABLED = False
+        ROLE_FOOTER_VAR = "role-value"
+
+      YAMLEOF
+      )
+      actual=$(kubectl -n $NAMESPACE get cm superset-node-default -o yaml | yq -o=json '.data')
+      expected_file=$(mktemp) && actual_file=$(mktemp)
+      printf '%s\n' "$expected" > "$expected_file"
+      printf '%s\n' "$actual" > "$actual_file"
+      if ! diff_out=$(diff -u "$expected_file" "$actual_file"); then
+        echo "ERROR: ConfigMap superset-node-default data drifted from snapshot."
+        printf '%s\n' "$diff_out"
+        rm -f "$expected_file" "$actual_file"
+        exit 1
+      fi
+      rm -f "$expected_file" "$actual_file"

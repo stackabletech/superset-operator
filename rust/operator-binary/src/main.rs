@@ -33,23 +33,23 @@ use stackable_operator::{
 };
 
 use crate::{
+    controller::SUPERSET_FULL_CONTROLLER_NAME,
     crd::{
         APP_NAME, SupersetCluster, SupersetClusterVersion,
         druidconnection::{self, DruidConnection, DruidConnectionVersion},
         v1alpha1,
     },
     druid_connection_controller::DRUID_CONNECTION_FULL_CONTROLLER_NAME,
-    superset_controller::SUPERSET_FULL_CONTROLLER_NAME,
     webhooks::conversion::create_webhook_server,
 };
 
 mod authorization;
 mod config;
+mod controller;
 mod crd;
 mod druid_connection_controller;
 mod operations;
 mod resources;
-mod superset_controller;
 mod webhooks;
 
 mod built_info {
@@ -183,9 +183,9 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .graceful_shutdown_on(sigterm_watcher.handle())
                 .run(
-                    superset_controller::reconcile_superset,
-                    superset_controller::error_policy,
-                    Arc::new(superset_controller::Ctx {
+                    controller::reconcile_superset,
+                    controller::error_policy,
+                    Arc::new(controller::Ctx {
                         client: client.clone(),
                         operator_environment: operator_environment.clone(),
                         product_config,
