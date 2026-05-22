@@ -197,16 +197,17 @@ pub async fn reconcile_superset(
     let dereferenced = dereference::dereference(client, superset)
         .await
         .context(DereferenceSnafu)?;
-    let auth_config = &dereferenced.authentication_config;
-    let superset_opa_config = &dereferenced.opa_config;
 
     let validated = validate::validate_cluster(
         superset,
+        dereferenced,
         &ctx.operator_environment.image_repository,
         &ctx.product_config,
     )
     .context(ValidateSnafu)?;
     let resolved_product_image = &validated.image;
+    let auth_config = &validated.authentication_config;
+    let superset_opa_config = &validated.opa_config;
 
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,

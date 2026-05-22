@@ -21,10 +21,12 @@ use stackable_operator::{
 use strum::IntoEnumIterator;
 
 use crate::{
+    authorization::opa::SupersetOpaConfigResolved,
     built_info::PKG_VERSION,
-    controller::CONTAINER_IMAGE_BASE_NAME,
+    controller::{CONTAINER_IMAGE_BASE_NAME, dereference::DereferencedObjects},
     crd::{
         SUPERSET_CONFIG_FILENAME, SupersetRole,
+        authentication::SupersetClientAuthenticationDetailsResolved,
         v1alpha1::{SupersetCluster, SupersetConfig},
     },
 };
@@ -73,18 +75,27 @@ pub struct ValidatedRoleGroupConfig {
 
 /// The validated cluster: proves that product-config validation and config merging
 /// succeeded for every role and role group before any Kubernetes resources are created.
-#[derive(Clone, Debug)]
+/// Carries the dereferenced external objects so downstream code has a single "ready to use"
+/// view of the cluster.
 pub struct ValidatedSupersetCluster {
     pub image: ResolvedProductImage,
     pub role_groups: HashMap<SupersetRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
     pub role_configs: HashMap<SupersetRole, ValidatedRoleConfig>,
+    pub authentication_config: SupersetClientAuthenticationDetailsResolved,
+    pub opa_config: Option<SupersetOpaConfigResolved>,
 }
 
 pub fn validate_cluster(
     superset: &SupersetCluster,
+    dereferenced: DereferencedObjects,
     image_repository: &str,
     product_config_manager: &ProductConfigManager,
 ) -> Result<ValidatedSupersetCluster, Error> {
+    let DereferencedObjects {
+        authentication_config,
+        opa_config,
+    } = dereferenced;
+
     let resolved_product_image = superset
         .spec
         .image
@@ -162,5 +173,7 @@ pub fn validate_cluster(
         image: resolved_product_image,
         role_groups,
         role_configs,
+        authentication_config,
+        opa_config,
     })
 }
