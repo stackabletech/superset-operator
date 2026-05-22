@@ -1,3 +1,10 @@
+//! The dereference step in the SupersetCluster controller.
+//!
+//! Fetches all Kubernetes objects referenced by the [`SupersetCluster`] spec and returns them
+//! in [`DereferencedObjects`]. Synchronous validation of the fetched objects (image resolution,
+//! product-config validation, per-rolegroup config merging) happens in the
+//! [validate](`super::validate`) step.
+
 use snafu::{ResultExt, Snafu};
 
 use crate::{

@@ -1,3 +1,8 @@
+//! The validate step in the SupersetCluster controller.
+//!
+//! Synchronously validates inputs that don't require a Kubernetes client. Produces
+//! [`ValidatedSupersetCluster`], consumed by the rest of `reconcile_superset`.
+
 use std::{
     collections::{BTreeMap, HashMap},
     str::FromStr,
