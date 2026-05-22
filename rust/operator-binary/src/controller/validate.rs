@@ -20,9 +20,13 @@ use stackable_operator::{
 };
 use strum::IntoEnumIterator;
 
-use crate::crd::{
-    SUPERSET_CONFIG_FILENAME, SupersetRole,
-    v1alpha1::{SupersetCluster, SupersetConfig},
+use crate::{
+    built_info::PKG_VERSION,
+    controller::CONTAINER_IMAGE_BASE_NAME,
+    crd::{
+        SUPERSET_CONFIG_FILENAME, SupersetRole,
+        v1alpha1::{SupersetCluster, SupersetConfig},
+    },
 };
 
 #[derive(Snafu, Debug)]
@@ -78,15 +82,13 @@ pub struct ValidatedSupersetCluster {
 
 pub fn validate_cluster(
     superset: &SupersetCluster,
-    image_base_name: &str,
     image_repository: &str,
-    pkg_version: &str,
     product_config_manager: &ProductConfigManager,
 ) -> Result<ValidatedSupersetCluster, Error> {
     let resolved_product_image = superset
         .spec
         .image
-        .resolve(image_base_name, image_repository, pkg_version)
+        .resolve(CONTAINER_IMAGE_BASE_NAME, image_repository, PKG_VERSION)
         .context(ResolveProductImageSnafu)?;
 
     let mut roles = HashMap::new();

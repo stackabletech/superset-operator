@@ -202,9 +202,7 @@ pub async fn reconcile_superset(
 
     let validated = validate::validate_cluster(
         superset,
-        CONTAINER_IMAGE_BASE_NAME,
         &ctx.operator_environment.image_repository,
-        crate::built_info::PKG_VERSION,
         &ctx.product_config,
     )
     .context(ValidateSnafu)?;
