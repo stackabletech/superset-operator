@@ -23,6 +23,7 @@
   This struct is consistent between different CRDs, so that you can easily copy/paste it between stacklets.
   More information can be found in the [Superset database documentation](https://docs.stackable.tech/home/nightly/superset/usage-guide/database-connections) for details ([#722]).
 - Internal operator refactoring: introduce dereference() and validate() steps in the reconciler ([#731]).
+- test: Bump vector-aggregator to 0.55.0, replace /graphql call with gRPC call ([#735]).
 
 [#717]: https://github.com/stackabletech/superset-operator/pull/717
 [#719]: https://github.com/stackabletech/superset-operator/pull/719
@@ -31,6 +32,7 @@
 [#724]: https://github.com/stackabletech/superset-operator/pull/724
 [#726]: https://github.com/stackabletech/superset-operator/pull/726
 [#731]: https://github.com/stackabletech/superset-operator/pull/731
+[#735]: https://github.com/stackabletech/superset-operator/pull/735
 
 ## [26.3.0] - 2026-03-16
 
