@@ -55,4 +55,3 @@ assert user_data["lastName"] == "Doe", (
 assert user_data["email"] == "jane.doe@stackable.tech", (
     "The email of the user in Superset should match the one provided by Keycloak"
 )
-

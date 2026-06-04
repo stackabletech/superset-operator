@@ -138,9 +138,7 @@ def seed():
         {"label": SAVED_QUERY_LABEL, "sql": SAVED_QUERY_SQL, "db_id": database_id},
     )
 
-    role_id = ensure(
-        session, "security/roles", "name", ROLE_NAME, {"name": ROLE_NAME}
-    )
+    role_id = ensure(session, "security/roles", "name", ROLE_NAME, {"name": ROLE_NAME})
     gamma_role = find_by(session, "security/roles", "name", "Gamma")
     assert gamma_role, "Built-in Gamma role not found."
 
