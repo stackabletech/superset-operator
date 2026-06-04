@@ -1,3 +1,4 @@
+{% if test_scenario['values']['authentication'] == 'oidc' %}
 ---
 # Log in via Keycloak again after the upgrade. The user record was created by
 # Flask-AppBuilder during the pre-upgrade login (step 60), so this exercises
@@ -10,3 +11,15 @@ metadata:
 timeout: 300
 commands:
   - script: kubectl exec -n $NAMESPACE python-0 -- python /stackable/60_login.py
+{% else %}
+---
+# Verify that the content seeded in step 60 survived the metadata database
+# migrations and that a real SQL query still works.
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: verify
+timeout: 300
+commands:
+  - script: kubectl exec -n $NAMESPACE python-0 -- python /tmp/upgrade-test.py verify
+{% endif %}

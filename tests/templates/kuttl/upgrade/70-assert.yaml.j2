@@ -10,8 +10,11 @@
 {%   set app_version = test_scenario['values']['superset-new'] ~ '-stackable0.0.0-dev' %}
 {% endif %}
 ---
-# Asserting the version label on the pod (not only on the StatefulSet) ensures
-# that the assertion cannot pass before the old pod was actually replaced.
+# A ready pod implies that `superset db upgrade`, `superset init` and the
+# gunicorn startup all succeeded on the new version, because they run before
+# the webserver can serve the /health readiness probe. Asserting the version
+# label on the pod (not only on the StatefulSet) ensures that the assertion
+# cannot pass before the old pod was actually replaced.
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:

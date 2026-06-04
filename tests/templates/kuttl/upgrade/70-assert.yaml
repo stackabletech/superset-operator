@@ -1,8 +1,0 @@
----
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-metadata:
-  name: verify
-timeout: 300
-commands:
-  - script: kubectl exec -n $NAMESPACE python-0 -- python /tmp/upgrade-test.py verify

@@ -1,41 +1,19 @@
-{# Compute the app.kubernetes.io/version label value which operator-rs derives #}
-{# from the product image: "<productVersion>-<imageTag>" for custom images and #}
-{# "<productVersion>-stackable<operatorVersion>" otherwise; tests always run   #}
-{# against a 0.0.0-dev operator.                                               #}
-{% if test_scenario['values']['superset-new'].find(",") > 0 %}
-{%   set product_version = test_scenario['values']['superset-new'].split(',')[0] %}
-{%   set image_tag = test_scenario['values']['superset-new'].split(',')[1].split(':')[-1] %}
-{%   set app_version = product_version ~ '-' ~ image_tag %}
-{% else %}
-{%   set app_version = test_scenario['values']['superset-new'] ~ '-stackable0.0.0-dev' %}
-{% endif %}
+{% if test_scenario['values']['authentication'] == 'oidc' %}
 ---
-# A ready pod implies that `superset db upgrade`, `superset init` and the
-# gunicorn startup all succeeded on the new version, because they run before
-# the webserver can serve the /health readiness probe. Asserting the version
-# label on the pod (not only on the StatefulSet) ensures that the assertion
-# cannot pass before the old pod was actually replaced.
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
-  name: upgrade-superset
-timeout: 600
+  name: login
+timeout: 300
+commands:
+  - script: kubectl exec -n $NAMESPACE python-0 -- python /stackable/60_login.py
+{% else %}
 ---
-apiVersion: apps/v1
-kind: StatefulSet
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
 metadata:
-  name: superset-node-default
-  labels:
-    app.kubernetes.io/version: "{{ app_version }}"
-status:
-  readyReplicas: 1
-  replicas: 1
----
-apiVersion: v1
-kind: Pod
-metadata:
-  name: superset-node-default-0
-  labels:
-    app.kubernetes.io/version: "{{ app_version }}"
-status:
-  phase: Running
+  name: seed
+timeout: 300
+commands:
+  - script: kubectl exec -n $NAMESPACE python-0 -- python /tmp/upgrade-test.py seed
+{% endif %}

@@ -29,6 +29,13 @@ dimensions:
       - no-tls
       - insecure-tls
       - server-verification-tls
+  # Authentication used in the upgrade test. "none" tests that seeded content
+  # survives the metadata database migrations, "oidc" tests that the OAuth
+  # login of an existing user still works after the upgrade.
+  - name: authentication
+    values:
+      - none
+      - oidc
   - name: opa-latest
     values:
       - 1.16.2
@@ -82,11 +89,7 @@ tests:
     dimensions:
       - superset-old
       - superset-new
-      - openshift
-  - name: upgrade-oidc
-    dimensions:
-      - superset-old
-      - superset-new
+      - authentication
       - openshift
 suites:
   - name: nightly

@@ -1,9 +1,4 @@
----
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-metadata:
-  name: install-superset
-timeout: 300
+# $NAMESPACE will be replaced with the namespace of the test case.
 ---
 apiVersion: v1
 kind: Secret
@@ -24,6 +19,16 @@ metadata:
 stringData:
   username: superset
   password: superset
+{% if test_scenario['values']['authentication'] == 'oidc' %}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-keycloak1-client
+stringData:
+  clientId: superset1
+  clientSecret: R1bxHUD569vHeQdw
+{% endif %}
 ---
 apiVersion: superset.stackable.tech/v1alpha1
 kind: SupersetCluster
@@ -39,6 +44,12 @@ spec:
 {% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
+{% if test_scenario['values']['authentication'] == 'oidc' %}
+    authentication:
+      - authenticationClass: keycloak1-$NAMESPACE
+        oidc:
+          clientCredentialsSecret: superset-keycloak1-client
+{% endif %}
     credentialsSecretName: superset-admin-credentials
     metadataDatabase:
       postgresql:
@@ -49,6 +60,9 @@ spec:
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
   nodes:
+{% if test_scenario['values']['authentication'] != 'oidc' %}
+{# upgrade-test.py requires database authentication which is replaced by    #}
+{# OAuth in the oidc scenario, so the override is not needed there.         #}
     configOverrides:
       superset_config.py:
         FILE_FOOTER: |
@@ -56,6 +70,7 @@ spec:
           # and a user. Superset versions before 6.0.0 do not enable it by
           # default.
           FAB_ADD_SECURITY_API = True
+{% endif %}
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}

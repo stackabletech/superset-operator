@@ -1,9 +1,0 @@
----
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-metadata:
-  name: login
-commands:
-  - script: >
-      envsubst '$NAMESPACE' < 60_login.py |
-      kubectl exec -n $NAMESPACE -i python-0 -- tee /stackable/60_login.py > /dev/null

@@ -1,3 +1,4 @@
+{% if test_scenario['values']['authentication'] == 'oidc' %}
 ---
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
@@ -13,3 +14,4 @@ commands:
       CLIENT_ID=superset1 \
       CLIENT_SECRET=R1bxHUD569vHeQdw \
       envsubst < 30_install-keycloak.yaml | kubectl apply -n $NAMESPACE -f -
+{% endif %}

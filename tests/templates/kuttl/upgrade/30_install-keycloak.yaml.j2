@@ -83,6 +83,16 @@ spec:
               value: admin
             - name: KEYCLOAK_ADMIN_PASSWORD
               value: admin
+          # Both requests and limits must be set and satisfy the ratios in
+          # 00-limit-range.yaml (memory ratio 1 requires request == limit),
+          # otherwise the LimitRanger admission controller rejects the pod.
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "2"
           ports:
             - name: https
               containerPort: 8443
