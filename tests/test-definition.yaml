@@ -6,16 +6,24 @@
 dimensions:
   - name: superset
     values:
-      - 4.1.4
-      - 6.0.0
+      # - 4.1.4
+      # - 6.0.0
       # Or use a custom image:
-      # - x.x.x,oci.stackable.tech/razvan/superset:x.x.x-stackable0.0.0-dev
-      - 6.1.0,oci.stackable.tech/sandbox/superset:6.1.0
+      - 6.0.0,oci.stackable.tech/sdp/superset:6.0.0-stackable0.0.0-dev
+      - 6.1.0,oci.stackable.tech/sdp/superset:6.1.0-stackable0.0.0-dev
+      # - 6.1.0,oci.stackable.tech/sandbox/superset:6.1.0
   - name: superset-latest
     values:
       # - 6.0.0
-      # - x.x.x,oci.stackable.tech/razvan/superset:x.x.x-stackable0.0.0-dev
-      - 6.1.0,oci.stackable.tech/sandbox/superset:6.1.0
+      - 6.1.0,oci.stackable.tech/sdp/superset:6.1.0-stackable0.0.0-dev
+      #- 6.0.0,oci.stackable.tech/sandbox/superset:6.0.0
+  - name: superset-old
+    values:
+      - 4.1.4,oci.stackable.tech/sdp/superset:4.1.4-stackable0.0.0-dev
+      - 6.0.0,oci.stackable.tech/sdp/superset:6.0.0-stackable0.0.0-dev
+  - name: superset-new
+    values:
+      - 6.1.0,oci.stackable.tech/sdp/superset:6.1.0-stackable0.0.0-dev
   - name: ldap-authentication
     values:
       - no-tls
@@ -69,6 +77,16 @@ tests:
   - name: celery-worker
     dimensions:
       - superset
+      - openshift
+  - name: upgrade
+    dimensions:
+      - superset-old
+      - superset-new
+      - openshift
+  - name: upgrade-oidc
+    dimensions:
+      - superset-old
+      - superset-new
       - openshift
 suites:
   - name: nightly

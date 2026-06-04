@@ -1,0 +1,7 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+metadata:
+  name: seed
+commands:
+  - script: kubectl cp -n $NAMESPACE ./upgrade-test.py python-0:/tmp

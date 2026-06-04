@@ -1,0 +1,14 @@
+---
+apiVersion: superset.stackable.tech/v1alpha1
+kind: SupersetCluster
+metadata:
+  name: superset
+spec:
+  image:
+{% if test_scenario['values']['superset-new'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['superset-new'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['superset-new'].split(',')[0] }}"
+{% else %}
+    custom: null
+    productVersion: "{{ test_scenario['values']['superset-new'] }}"
+{% endif %}
