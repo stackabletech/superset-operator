@@ -113,8 +113,13 @@ pub fn validate_cluster(
                 .merged_config(&role, &rolegroup_ref)
                 .context(FailedToResolveConfigSnafu)?;
 
-            let (config_file_properties, env_overrides) =
-                collect_role_group_config(superset, &role, resolved_role, rolegroup_name, &merged_config);
+            let (config_file_properties, env_overrides) = collect_role_group_config(
+                superset,
+                &role,
+                resolved_role,
+                rolegroup_name,
+                &merged_config,
+            );
 
             group_configs.insert(
                 rolegroup_name.clone(),
@@ -208,7 +213,11 @@ fn collect_role_group_config(
         .unwrap_or_default();
     let mut merged_overrides = role_overrides;
     merged_overrides.extend(rg_overrides);
-    config_file_properties.extend(merged_overrides.into_iter().filter_map(|(k, v)| v.map(|v| (k, v))));
+    config_file_properties.extend(
+        merged_overrides
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|v| (k, v))),
+    );
 
     // --- env_overrides ---
 

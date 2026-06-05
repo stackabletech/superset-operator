@@ -33,8 +33,7 @@ use crate::{
     controller::SUPERSET_CONTROLLER_NAME,
     crd::{
         APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
-        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
-        SupersetRole,
+        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SupersetRole,
         v1alpha1::{Container, SupersetCluster, SupersetConfig},
     },
     operations::graceful_shutdown::add_graceful_shutdown_config,

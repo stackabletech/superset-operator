@@ -14,7 +14,8 @@ use crate::{
     config::{product_logging::extend_config_map_with_log_config, superset_config},
     controller::SUPERSET_CONTROLLER_NAME,
     crd::{
-        SUPERSET_CONFIG_FILENAME, authentication::SupersetClientAuthenticationDetailsResolved,
+        SUPERSET_CONFIG_FILENAME,
+        authentication::SupersetClientAuthenticationDetailsResolved,
         v1alpha1::{Container, SupersetCluster},
     },
     resources::build_recommended_labels,

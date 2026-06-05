@@ -16,7 +16,6 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
-    v2::config_overrides::KeyValueConfigOverrides,
     deep_merger::ObjectOverrides,
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
@@ -26,6 +25,7 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
+    v2::config_overrides::KeyValueConfigOverrides,
     versioned::versioned,
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
@@ -415,7 +415,6 @@ impl SupersetRole {
         roles
     }
 }
-
 
 impl FlaskAppConfigOptions for SupersetConfigOptions {
     fn python_type(&self) -> PythonType {
