@@ -24,7 +24,6 @@ use crate::{
     v1alpha1::SupersetCluster,
 };
 
-pub mod configmap;
 pub mod deployment;
 pub mod listener;
 pub mod rbac;

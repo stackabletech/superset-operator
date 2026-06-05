@@ -1,4 +1,5 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
+pub(crate) mod build;
 pub mod dereference;
 pub mod validate;
 use std::sync::Arc;
@@ -33,7 +34,6 @@ use crate::{
     operations::pdb::add_pdbs,
     resources::{
         build_recommended_labels,
-        configmap::build_rolegroup_config_map,
         deployment::{build_beat_rolegroup_deployment, build_worker_rolegroup_deployment},
         listener::build_group_listener,
         service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
@@ -158,7 +158,7 @@ pub enum Error {
 
     #[snafu(display("failed to build configmap"))]
     BuildConfigMap {
-        source: crate::resources::configmap::Error,
+        source: crate::controller::build::config_map::Error,
     },
 
     #[snafu(display("failed to create SECRET_KEY secret"))]
@@ -252,7 +252,7 @@ pub async fn reconcile_superset(
             let rolegroup = superset.rolegroup_ref(superset_role, rolegroup_name);
             let config = &validated_rolegroup.merged_config;
 
-            let rg_configmap = build_rolegroup_config_map(
+            let rg_configmap = build::config_map::build_rolegroup_config_map(
                 superset,
                 resolved_product_image,
                 &rolegroup,
