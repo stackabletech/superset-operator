@@ -78,9 +78,9 @@ async fn main() -> anyhow::Result<()> {
         Command::Run(RunArguments {
             operator_environment,
             watch_namespace,
-            product_config,
             maintenance,
             common,
+            ..
         }) => {
             // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
             // - The console log level was set by `SUPERSET_OPERATOR_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).
@@ -124,11 +124,6 @@ async fn main() -> anyhow::Result<()> {
             let webhook_server = webhook_server
                 .run(sigterm_watcher.handle())
                 .map_err(|err| anyhow!(err).context("failed to run webhook server"));
-
-            let product_config = product_config.load(&[
-                "deploy/config-spec/properties.yaml",
-                "/etc/stackable/superset-operator/config-spec/properties.yaml",
-            ])?;
 
             let superset_event_recorder = Arc::new(Recorder::new(
                 client.as_kube_client(),
@@ -188,7 +183,6 @@ async fn main() -> anyhow::Result<()> {
                     Arc::new(controller::Ctx {
                         client: client.clone(),
                         operator_environment: operator_environment.clone(),
-                        product_config,
                     }),
                 )
                 // We can let the reporting happen in the background

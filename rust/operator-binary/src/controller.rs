@@ -4,7 +4,6 @@ pub mod validate;
 use std::sync::Arc;
 
 use const_format::concatcp;
-use product_config::ProductConfigManager;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cli::OperatorEnvironmentOptions,
@@ -49,7 +48,6 @@ pub const CONTAINER_IMAGE_BASE_NAME: &str = "superset";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
-    pub product_config: ProductConfigManager,
     pub operator_environment: OperatorEnvironmentOptions,
 }
 
@@ -202,7 +200,6 @@ pub async fn reconcile_superset(
         superset,
         dereferenced,
         &ctx.operator_environment.image_repository,
-        &ctx.product_config,
     )
     .context(ValidateSnafu)?;
     let resolved_product_image = &validated.image;
@@ -253,14 +250,13 @@ pub async fn reconcile_superset(
     for (superset_role, rolegroup_configs) in validated.role_groups.iter() {
         for (rolegroup_name, validated_rolegroup) in rolegroup_configs.iter() {
             let rolegroup = superset.rolegroup_ref(superset_role, rolegroup_name);
-            let rolegroup_config = &validated_rolegroup.product_config_properties;
             let config = &validated_rolegroup.merged_config;
 
             let rg_configmap = build_rolegroup_config_map(
                 superset,
                 resolved_product_image,
                 &rolegroup,
-                rolegroup_config,
+                &validated_rolegroup.config_file_properties,
                 auth_config,
                 superset_opa_config,
                 &config.logging,
@@ -303,7 +299,8 @@ pub async fn reconcile_superset(
                         resolved_product_image,
                         superset_role,
                         &rolegroup,
-                        rolegroup_config,
+                        &validated_rolegroup.config_file_properties,
+                        &validated_rolegroup.env_overrides,
                         auth_config,
                         &rbac_sa.name_any(),
                         config,
@@ -328,7 +325,7 @@ pub async fn reconcile_superset(
                         resolved_product_image,
                         superset_role,
                         &rolegroup,
-                        rolegroup_config,
+                        &validated_rolegroup.env_overrides,
                         &rbac_sa.name_any(),
                         config,
                     )
@@ -352,7 +349,7 @@ pub async fn reconcile_superset(
                         resolved_product_image,
                         superset_role,
                         &rolegroup,
-                        rolegroup_config,
+                        &validated_rolegroup.env_overrides,
                         &rbac_sa.name_any(),
                         config,
                     )

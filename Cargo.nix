@@ -9999,10 +9999,6 @@ rec {
             packageId = "indoc";
           }
           {
-            name = "product-config";
-            packageId = "product-config";
-          }
-          {
             name = "serde";
             packageId = "serde";
             features = [ "derive" ];

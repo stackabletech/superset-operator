@@ -1,7 +1,6 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use indoc::formatdoc;
-use product_config::types::PropertyNameKind;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
@@ -34,8 +33,8 @@ use crate::{
     controller::SUPERSET_CONTROLLER_NAME,
     crd::{
         APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
-        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
-        SupersetConfigOptions, SupersetRole,
+        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+        SupersetRole,
         v1alpha1::{Container, SupersetCluster, SupersetConfig},
     },
     operations::graceful_shutdown::add_graceful_shutdown_config,
@@ -80,14 +79,6 @@ pub enum Error {
         source: stackable_operator::builder::meta::Error,
     },
 
-    #[snafu(display(
-        "failed to get the {SUPERSET_CONFIG_FILENAME} file from node or product config"
-    ))]
-    MissingSupersetConfigInNodeConfig,
-
-    #[snafu(display("failed to get {timeout} from {SUPERSET_CONFIG_FILENAME} file. It should be set in the product config or by user input", timeout = SupersetConfigOptions::SupersetWebserverTimeout))]
-    MissingWebServerTimeoutInSupersetConfig,
-
     #[snafu(display("failed to configure logging"))]
     ConfigureLogging {
         source: product_logging::framework::LoggingError,
@@ -112,7 +103,7 @@ pub fn build_worker_rolegroup_deployment(
     resolved_product_image: &ResolvedProductImage,
     superset_role: &SupersetRole,
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
-    node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    env_overrides: &BTreeMap<String, String>,
     sa_name: &str,
     merged_config: &SupersetConfig,
 ) -> Result<Deployment> {
@@ -173,11 +164,7 @@ pub fn build_worker_rolegroup_deployment(
         celery_broker_connection_details.add_to_container(&mut superset_cb);
     }
 
-    for (name, value) in node_config
-        .get(&PropertyNameKind::Env)
-        .cloned()
-        .unwrap_or_default()
-    {
+    for (name, value) in env_overrides.clone() {
         if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
             superset_cb.add_env_var_from_secret(
                 "MAPBOX_API_KEY",
@@ -373,7 +360,7 @@ pub fn build_beat_rolegroup_deployment(
     resolved_product_image: &ResolvedProductImage,
     superset_role: &SupersetRole,
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
-    node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    env_overrides: &BTreeMap<String, String>,
     sa_name: &str,
     merged_config: &SupersetConfig,
 ) -> Result<Deployment> {
@@ -434,11 +421,7 @@ pub fn build_beat_rolegroup_deployment(
         celery_broker_connection_details.add_to_container(&mut superset_cb);
     }
 
-    for (name, value) in node_config
-        .get(&PropertyNameKind::Env)
-        .cloned()
-        .unwrap_or_default()
-    {
+    for (name, value) in env_overrides.clone() {
         if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
             superset_cb.add_env_var_from_secret(
                 "MAPBOX_API_KEY",

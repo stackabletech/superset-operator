@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -18,12 +16,11 @@ use stackable_operator::{
         fragment::{self, Fragment, ValidationError},
         merge::Merge,
     },
-    config_overrides::{KeyValueConfigOverrides, KeyValueOverridesProvider},
+    v2::config_overrides::KeyValueConfigOverrides,
     deep_merger::ObjectOverrides,
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config_utils::{self, Configuration},
     product_logging::{self, spec::Logging},
     role_utils::{GenericRoleConfig, Role, RoleGroupRef},
     schemars::{self, JsonSchema},
@@ -192,6 +189,8 @@ pub mod versioned {
     #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct SupersetConfigOverrides {
+        // Uses the v2 KeyValueConfigOverrides (Merge-capable, nullable values) to match
+        // trino/hdfs/airflow/kafka. Resolution happens in controller/validate.rs.
         #[serde(
             default,
             rename = "superset_config.py",
@@ -372,18 +371,7 @@ impl Default for v1alpha1::SupersetRoleConfig {
     }
 }
 
-impl KeyValueOverridesProvider for v1alpha1::SupersetConfigOverrides {
-    fn get_key_value_overrides(&self, file: &str) -> BTreeMap<String, Option<String>> {
-        match file {
-            SUPERSET_CONFIG_FILENAME => self
-                .superset_config_py
-                .as_ref()
-                .map(KeyValueConfigOverrides::as_product_config_overrides)
-                .unwrap_or_default(),
-            _ => BTreeMap::new(),
-        }
-    }
-}
+// KeyValueOverridesProvider impl removed — override resolution moved to controller/validate.rs::collect_role_group_config.
 
 #[derive(
     Clone,
@@ -428,23 +416,6 @@ impl SupersetRole {
     }
 }
 
-impl SupersetConfigOptions {
-    /// Mapping from `SupersetConfigOptions` to the values set in `SupersetConfigFragment`.
-    /// `None` is returned if either the according option is not set or is not exposed in the
-    /// `SupersetConfig`.
-    fn config_type_to_string(
-        &self,
-        superset_config: &v1alpha1::SupersetConfigFragment,
-    ) -> Option<String> {
-        match self {
-            SupersetConfigOptions::RowLimit => superset_config.row_limit.map(|v| v.to_string()),
-            SupersetConfigOptions::SupersetWebserverTimeout => {
-                superset_config.webserver_timeout.map(|v| v.to_string())
-            }
-            _ => None,
-        }
-    }
-}
 
 impl FlaskAppConfigOptions for SupersetConfigOptions {
     fn python_type(&self) -> PythonType {
@@ -556,51 +527,8 @@ impl v1alpha1::SupersetConfig {
     }
 }
 
-impl Configuration for v1alpha1::SupersetConfigFragment {
-    type Configurable = v1alpha1::SupersetCluster;
-
-    fn compute_env(
-        &self,
-        cluster: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        let mut result = BTreeMap::new();
-        if let Some(msec) = &cluster.spec.cluster_config.mapbox_secret {
-            result.insert(
-                v1alpha1::SupersetConfig::MAPBOX_SECRET_PROPERTY.to_string(),
-                Some(msec.clone()),
-            );
-        }
-        Ok(result)
-    }
-
-    fn compute_cli(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        Ok(BTreeMap::new())
-    }
-
-    fn compute_files(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-        file: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        let mut result = BTreeMap::new();
-
-        if file == SUPERSET_CONFIG_FILENAME {
-            for option in SupersetConfigOptions::iter() {
-                if let Some(value) = option.config_type_to_string(self) {
-                    result.insert(option.to_string(), Some(value));
-                }
-            }
-        }
-
-        Ok(result)
-    }
-}
+// Configuration::compute_env (mapbox secret injection) moved to controller/validate.rs::collect_role_group_config.
+// Configuration::compute_files (row_limit / webserver_timeout derivation) moved to controller/validate.rs::collect_role_group_config.
 
 impl HasStatusCondition for v1alpha1::SupersetCluster {
     fn conditions(&self) -> Vec<ClusterCondition> {

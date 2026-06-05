@@ -335,6 +335,7 @@ spec:
                     properties:
                       superset_config.py:
                         additionalProperties:
+                          nullable: true
                           type: string
                         description: |-
                           Flat key-value overrides for `*.properties`, Hadoop XML, etc.
@@ -712,6 +713,7 @@ spec:
                           properties:
                             superset_config.py:
                               additionalProperties:
+                                nullable: true
                                 type: string
                               description: |-
                                 Flat key-value overrides for `*.properties`, Hadoop XML, etc.
@@ -1470,6 +1472,7 @@ spec:
                     properties:
                       superset_config.py:
                         additionalProperties:
+                          nullable: true
                           type: string
                         description: |-
                           Flat key-value overrides for `*.properties`, Hadoop XML, etc.
@@ -1847,6 +1850,7 @@ spec:
                           properties:
                             superset_config.py:
                               additionalProperties:
+                                nullable: true
                                 type: string
                               description: |-
                                 Flat key-value overrides for `*.properties`, Hadoop XML, etc.
@@ -2213,6 +2217,7 @@ spec:
                     properties:
                       superset_config.py:
                         additionalProperties:
+                          nullable: true
                           type: string
                         description: |-
                           Flat key-value overrides for `*.properties`, Hadoop XML, etc.
@@ -2590,6 +2595,7 @@ spec:
                           properties:
                             superset_config.py:
                               additionalProperties:
+                                nullable: true
                                 type: string
                               description: |-
                                 Flat key-value overrides for `*.properties`, Hadoop XML, etc.

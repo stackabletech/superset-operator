@@ -1,9 +1,8 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     io::Write,
 };
 
-use product_config::types::PropertyNameKind;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
@@ -72,7 +71,7 @@ pub fn build_rolegroup_config_map(
     superset: &SupersetCluster,
     resolved_product_image: &ResolvedProductImage,
     rolegroup: &RoleGroupRef<SupersetCluster>,
-    rolegroup_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    config_file_properties: &BTreeMap<String, String>,
     authentication_config: &SupersetClientAuthenticationDetailsResolved,
     superset_opa_config: &Option<SupersetOpaConfigResolved>,
     logging: &Logging<Container>,
@@ -99,14 +98,7 @@ pub fn build_rolegroup_config_map(
 
     // The order here should be kept in order to preserve overrides.
     // No properties should be added after this extend.
-    config_properties.extend(
-        rolegroup_config
-            .get(&PropertyNameKind::File(
-                SUPERSET_CONFIG_FILENAME.to_string(),
-            ))
-            .cloned()
-            .unwrap_or_default(),
-    );
+    config_properties.extend(config_file_properties.clone());
 
     let mut config_file = Vec::new();
 

@@ -1,7 +1,6 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use indoc::formatdoc;
-use product_config::types::PropertyNameKind;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     builder::{
@@ -92,11 +91,6 @@ pub enum Error {
         source: stackable_operator::builder::meta::Error,
     },
 
-    #[snafu(display(
-        "failed to get the {SUPERSET_CONFIG_FILENAME} file from node or product config"
-    ))]
-    MissingSupersetConfigInNodeConfig,
-
     #[snafu(display("failed to get {timeout} from {SUPERSET_CONFIG_FILENAME} file. It should be set in the product config or by user input", timeout = SupersetConfigOptions::SupersetWebserverTimeout))]
     MissingWebServerTimeoutInSupersetConfig,
 
@@ -140,7 +134,8 @@ pub fn build_server_rolegroup_statefulset(
     resolved_product_image: &ResolvedProductImage,
     superset_role: &SupersetRole,
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
-    node_config: &HashMap<PropertyNameKind, BTreeMap<String, String>>,
+    config_file_properties: &BTreeMap<String, String>,
+    env_overrides: &BTreeMap<String, String>,
     authentication_config: &SupersetClientAuthenticationDetailsResolved,
     sa_name: &str,
     merged_config: &SupersetConfig,
@@ -212,11 +207,7 @@ pub fn build_server_rolegroup_statefulset(
         celery_broker_connection_details.add_to_container(&mut superset_cb);
     }
 
-    for (name, value) in node_config
-        .get(&PropertyNameKind::Env)
-        .cloned()
-        .unwrap_or_default()
-    {
+    for (name, value) in env_overrides.clone() {
         if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
             superset_cb.add_env_var_from_secret(
                 "MAPBOX_API_KEY",
@@ -237,11 +228,7 @@ pub fn build_server_rolegroup_statefulset(
 
     add_authentication_volumes_and_volume_mounts(authentication_config, &mut superset_cb, pb)?;
 
-    let webserver_timeout = node_config
-        .get(&PropertyNameKind::File(
-            SUPERSET_CONFIG_FILENAME.to_string(),
-        ))
-        .context(MissingSupersetConfigInNodeConfigSnafu)?
+    let webserver_timeout = config_file_properties
         .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
         .context(MissingWebServerTimeoutInSupersetConfigSnafu)?;
 
