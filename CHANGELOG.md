@@ -27,9 +27,9 @@
 - Removed the product-config based configuration validation. Config and environment overrides are
   now merged directly from the CRD into the validated cluster (including the formerly
   properties.yaml-provided `ROW_LIMIT` and `SUPERSET_WEBSERVER_TIMEOUT` recommended values), the
-  Flask config writer is vendored locally (identical to airflow-operator's, a shared-crate
-  candidate), and the `product-config` crate dependency is dropped. The `--product-config` CLI
-  flag and `PRODUCT_CONFIG` env var are now no-ops ([#738]).
+  Flask config writer is consumed from `stackable-operator` (`v2::flask_config_writer`), and the
+  `product-config` crate dependency is dropped. The `--product-config` CLI flag and
+  `PRODUCT_CONFIG` env var are now no-ops ([#738]).
 
 [#717]: https://github.com/stackabletech/superset-operator/pull/717
 [#719]: https://github.com/stackabletech/superset-operator/pull/719

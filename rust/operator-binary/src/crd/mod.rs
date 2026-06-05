@@ -25,13 +25,15 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
-    v2::config_overrides::KeyValueConfigOverrides,
+    v2::{
+        config_overrides::KeyValueConfigOverrides,
+        flask_config_writer::{FlaskAppConfigOptions, PythonType},
+    },
     versioned::versioned,
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
-    config::writer::{FlaskAppConfigOptions, PythonType},
     crd::{
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,

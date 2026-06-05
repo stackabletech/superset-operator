@@ -4,11 +4,9 @@
 use std::{collections::BTreeMap, io::Write};
 
 use snafu::{ResultExt, Snafu};
+use stackable_operator::v2::flask_config_writer;
 
-use super::{
-    superset::{self, PYTHON_IMPORTS, add_superset_config, append_celery_connection_config},
-    writer,
-};
+use super::superset::{self, PYTHON_IMPORTS, add_superset_config, append_celery_connection_config};
 use crate::{
     authorization::opa::{OPA_IMPORTS, SupersetOpaConfigResolved},
     crd::{
@@ -29,7 +27,7 @@ pub enum Error {
 
     #[snafu(display("failed to write the superset config file"))]
     WriteConfigFile {
-        source: writer::FlaskAppConfigWriterError,
+        source: flask_config_writer::FlaskAppConfigWriterError,
     },
 
     #[snafu(display("failed to write the header/footer to the superset config file"))]
@@ -78,7 +76,7 @@ pub fn build(
     }
     let temp_file_footer = config_properties.remove(CONFIG_OVERRIDE_FILE_FOOTER_KEY);
 
-    writer::write::<SupersetConfigOptions, _, _>(
+    flask_config_writer::write::<SupersetConfigOptions, _, _>(
         &mut config_file,
         config_properties.iter(),
         &imports,
