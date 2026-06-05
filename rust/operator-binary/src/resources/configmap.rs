@@ -3,10 +3,7 @@ use std::{
     io::Write,
 };
 
-use product_config::{
-    flask_app_config_writer::{self},
-    types::PropertyNameKind,
-};
+use product_config::types::PropertyNameKind;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
@@ -19,7 +16,12 @@ use stackable_operator::{
 
 use crate::{
     authorization::opa::{OPA_IMPORTS, SupersetOpaConfigResolved},
-    config::{self, product_logging::extend_config_map_with_log_config, superset::PYTHON_IMPORTS},
+    config::{
+        self,
+        product_logging::extend_config_map_with_log_config,
+        superset::PYTHON_IMPORTS,
+        writer::{self, FlaskAppConfigWriterError},
+    },
     controller::SUPERSET_CONTROLLER_NAME,
     crd::{
         SUPERSET_CONFIG_FILENAME, SupersetConfigOptions,
@@ -51,7 +53,7 @@ pub enum Error {
 
     #[snafu(display("failed to build config file for {rolegroup}"))]
     BuildRoleGroupConfigFile {
-        source: flask_app_config_writer::FlaskAppConfigWriterError,
+        source: FlaskAppConfigWriterError,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
 
@@ -115,7 +117,7 @@ pub fn build_rolegroup_config_map(
     }
     let temp_file_footer = config_properties.remove(CONFIG_OVERRIDE_FILE_FOOTER_KEY);
 
-    flask_app_config_writer::write::<SupersetConfigOptions, _, _>(
+    writer::write::<SupersetConfigOptions, _, _>(
         &mut config_file,
         config_properties.iter(),
         &imports,

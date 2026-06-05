@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -35,6 +34,7 @@ use stackable_operator::{
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 use crate::{
+    config::writer::{FlaskAppConfigOptions, PythonType},
     crd::{
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
