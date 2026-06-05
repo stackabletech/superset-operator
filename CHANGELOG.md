@@ -23,6 +23,12 @@
   This struct is consistent between different CRDs, so that you can easily copy/paste it between stacklets.
   More information can be found in the [Superset database documentation](https://docs.stackable.tech/home/nightly/superset/usage-guide/database-connections) for details ([#722]).
 - Internal operator refactoring: introduce dereference() and validate() steps in the reconciler ([#731]).
+- Removed the product-config based configuration validation. Config and environment overrides are
+  now merged directly from the CRD into the validated cluster (including the formerly
+  properties.yaml-provided `ROW_LIMIT` and `SUPERSET_WEBSERVER_TIMEOUT` recommended values), the
+  Flask config writer is vendored locally (identical to airflow-operator's, a shared-crate
+  candidate), and the `product-config` crate dependency is dropped. The `--product-config` CLI
+  flag and `PRODUCT_CONFIG` env var are now no-ops ([#XXX]).
 - test: Bump vector-aggregator to 0.55.0, replace /graphql call with gRPC call ([#735]).
 
 [#717]: https://github.com/stackabletech/superset-operator/pull/717
