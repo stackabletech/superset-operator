@@ -6,24 +6,22 @@
 dimensions:
   - name: superset
     values:
-      # - 4.1.4
-      # - 6.0.0
+      - 4.1.4
+      - 6.0.0
+      - 6.1.0
       # Or use a custom image:
-      - 6.0.0,oci.stackable.tech/sdp/superset:6.0.0-stackable0.0.0-dev
-      - 6.1.0,oci.stackable.tech/sdp/superset:6.1.0-stackable0.0.0-dev
       # - 6.1.0,oci.stackable.tech/sandbox/superset:6.1.0
   - name: superset-latest
     values:
-      # - 6.0.0
-      - 6.1.0,oci.stackable.tech/sdp/superset:6.1.0-stackable0.0.0-dev
+      - 6.1.0
       # - 6.0.0,oci.stackable.tech/sandbox/superset:6.0.0
   - name: superset-old
     values:
-      - 4.1.4,oci.stackable.tech/sdp/superset:4.1.4-stackable0.0.0-dev
-      - 6.0.0,oci.stackable.tech/sdp/superset:6.0.0-stackable0.0.0-dev
+      - 4.1.4
+      - 6.0.0
   - name: superset-new
     values:
-      - 6.1.0,oci.stackable.tech/sdp/superset:6.1.0-stackable0.0.0-dev
+      - 6.1.0
   - name: ldap-authentication
     values:
       - no-tls
