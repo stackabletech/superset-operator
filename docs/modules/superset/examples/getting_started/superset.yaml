@@ -13,7 +13,7 @@ metadata:
   name: simple-superset
 spec:
   image:
-    productVersion: 6.0.0
+    productVersion: 6.1.0
   clusterConfig:
     credentialsSecretName: superset-admin-credentials
     metadataDatabase:
