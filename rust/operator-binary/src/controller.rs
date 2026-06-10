@@ -2,14 +2,20 @@
 pub(crate) mod build;
 pub mod dereference;
 pub mod validate;
-use std::sync::Arc;
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 use const_format::concatcp;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cli::OperatorEnvironmentOptions,
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{random_secret_creation, rbac::build_rbac_resources},
+    commons::{
+        product_image_selection::ResolvedProductImage, random_secret_creation,
+        rbac::build_rbac_resources,
+    },
     kube::{
         Resource, ResourceExt,
         core::{DeserializeGuard, error_boundary},
@@ -27,9 +33,11 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     OPERATOR_NAME,
+    authorization::opa::SupersetOpaConfigResolved,
     crd::{
         APP_NAME, INTERNAL_SECRET_SECRET_KEY, SupersetRole,
-        v1alpha1::{SupersetCluster, SupersetClusterStatus},
+        authentication::SupersetClientAuthenticationDetailsResolved,
+        v1alpha1::{SupersetCluster, SupersetClusterStatus, SupersetConfig},
     },
     operations::pdb::add_pdbs,
     resources::{
@@ -49,6 +57,33 @@ pub const CONTAINER_IMAGE_BASE_NAME: &str = "superset";
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub operator_environment: OperatorEnvironmentOptions,
+}
+
+/// Per-role configuration extracted during validation.
+#[derive(Clone, Debug)]
+pub struct ValidatedRoleConfig {
+    pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
+    pub listener_class: Option<String>,
+    pub group_listener_name: Option<String>,
+}
+
+/// Per-rolegroup configuration: the merged CRD config plus the assembled property maps.
+#[derive(Clone, Debug)]
+pub struct ValidatedRoleGroupConfig {
+    pub merged_config: SupersetConfig,
+    pub config_file_properties: BTreeMap<String, String>,
+    pub env_overrides: BTreeMap<String, String>,
+}
+
+/// The validated cluster: proves that config merging succeeded for every role and role group
+/// before any Kubernetes resources are created. Carries the dereferenced external objects so
+/// downstream code has a single "ready to use" view of the cluster.
+pub struct ValidatedSupersetCluster {
+    pub image: ResolvedProductImage,
+    pub role_groups: HashMap<SupersetRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
+    pub role_configs: HashMap<SupersetRole, ValidatedRoleConfig>,
+    pub authentication_config: SupersetClientAuthenticationDetailsResolved,
+    pub opa_config: Option<SupersetOpaConfigResolved>,
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]

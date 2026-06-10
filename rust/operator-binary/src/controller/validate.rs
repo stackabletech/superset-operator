@@ -6,19 +6,17 @@
 use std::collections::{BTreeMap, HashMap};
 
 use snafu::{ResultExt, Snafu};
-use stackable_operator::{
-    commons::product_image_selection::{self, ResolvedProductImage},
-    role_utils::GenericRoleConfig,
-};
+use stackable_operator::{commons::product_image_selection, role_utils::GenericRoleConfig};
 use strum::IntoEnumIterator;
 
 use crate::{
-    authorization::opa::SupersetOpaConfigResolved,
     built_info::PKG_VERSION,
-    controller::{CONTAINER_IMAGE_BASE_NAME, dereference::DereferencedObjects},
+    controller::{
+        CONTAINER_IMAGE_BASE_NAME, ValidatedRoleConfig, ValidatedRoleGroupConfig,
+        ValidatedSupersetCluster, dereference::DereferencedObjects,
+    },
     crd::{
         SupersetConfigOptions, SupersetRole, SupersetRoleType,
-        authentication::SupersetClientAuthenticationDetailsResolved,
         v1alpha1::{SupersetCluster, SupersetConfig},
     },
 };
@@ -32,41 +30,6 @@ pub enum Error {
 
     #[snafu(display("failed to resolve and merge config for role and role group"))]
     FailedToResolveConfig { source: crate::crd::Error },
-}
-
-/// Per-role configuration extracted during validation.
-#[derive(Clone, Debug)]
-pub struct ValidatedRoleConfig {
-    pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
-    pub listener_class: Option<String>,
-    pub group_listener_name: Option<String>,
-}
-
-/// Per-rolegroup configuration: the merged CRD config plus the assembled property maps.
-#[derive(Clone, Debug)]
-pub struct ValidatedRoleGroupConfig {
-    pub merged_config: SupersetConfig,
-    // DESIGN DECISION: this is the COMPLETE superset_config.py key/value map (operator
-    // recommended values + config-derived values + user configOverrides), not just the
-    // user overrides. Superset differs from airflow/kafka here: the old product-config
-    // path injected role-scoped recommended values (ROW_LIMIT, SUPERSET_WEBSERVER_TIMEOUT
-    // from properties.yaml) and config-derived values (compute_files), and the
-    // statefulset reads SUPERSET_WEBSERVER_TIMEOUT back out of this map. Alternative:
-    // store only the user overrides and re-derive the rest at each consumer — rejected,
-    // it would duplicate the precedence logic and break the statefulset's read-back.
-    pub config_file_properties: BTreeMap<String, String>,
-    pub env_overrides: BTreeMap<String, String>,
-}
-
-/// The validated cluster: proves that config merging succeeded for every role and role group
-/// before any Kubernetes resources are created. Carries the dereferenced external objects so
-/// downstream code has a single "ready to use" view of the cluster.
-pub struct ValidatedSupersetCluster {
-    pub image: ResolvedProductImage,
-    pub role_groups: HashMap<SupersetRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
-    pub role_configs: HashMap<SupersetRole, ValidatedRoleConfig>,
-    pub authentication_config: SupersetClientAuthenticationDetailsResolved,
-    pub opa_config: Option<SupersetOpaConfigResolved>,
 }
 
 pub fn validate_cluster(
@@ -202,14 +165,18 @@ fn collect_role_group_config(
         .config
         .config_overrides
         .superset_config_py
-        .as_ref()
-        .map(|o| o.overrides.clone())
-        .unwrap_or_default();
+        .overrides
+        .clone();
     let rg_overrides: BTreeMap<String, Option<String>> = resolved_role
         .role_groups
         .get(rolegroup_name)
-        .and_then(|rg| rg.config.config_overrides.superset_config_py.as_ref())
-        .map(|o| o.overrides.clone())
+        .map(|rg| {
+            rg.config
+                .config_overrides
+                .superset_config_py
+                .overrides
+                .clone()
+        })
         .unwrap_or_default();
     let mut merged_overrides = role_overrides;
     merged_overrides.extend(rg_overrides);
@@ -252,4 +219,71 @@ fn collect_role_group_config(
     }
 
     (config_file_properties, env_overrides)
+}
+
+#[cfg(test)]
+mod tests {
+    use stackable_operator::utils::yaml_from_str_singleton_map;
+
+    use super::collect_role_group_config;
+    use crate::crd::{SupersetRole, v1alpha1};
+
+    /// Characterises the `superset_config.py` override resolution: role-level overrides are merged
+    /// with role-group overrides, the role group winning on shared keys, and unique keys from both
+    /// levels surviving.
+    #[test]
+    fn config_overrides_merge_role_group_over_role() {
+        let input = r#"
+        apiVersion: superset.stackable.tech/v1alpha1
+        kind: SupersetCluster
+        metadata:
+          name: simple-superset
+        spec:
+          image:
+            productVersion: 4.1.4
+          clusterConfig:
+            credentialsSecretName: superset-admin-credentials
+            metadataDatabase:
+              postgresql:
+                host: superset-postgresql
+                database: superset
+                credentialsSecretName: superset-postgresql-credentials
+          nodes:
+            configOverrides:
+              superset_config.py:
+                ROLE_ONLY: role
+                SHARED: role
+            roleGroups:
+              default:
+                replicas: 1
+                configOverrides:
+                  superset_config.py:
+                    GROUP_ONLY: group
+                    SHARED: group
+        "#;
+        let superset: v1alpha1::SupersetCluster =
+            yaml_from_str_singleton_map(input).expect("illegal test input");
+        let role = SupersetRole::Node;
+        let resolved_role = superset.get_role(&role).expect("node role");
+        let merged_config = superset
+            .merged_config(&role, &superset.rolegroup_ref(&role, "default"))
+            .expect("merged config");
+
+        let (config_file_properties, _env_overrides) =
+            collect_role_group_config(&superset, &role, resolved_role, "default", &merged_config);
+
+        assert_eq!(
+            config_file_properties.get("ROLE_ONLY"),
+            Some(&"role".to_string())
+        );
+        assert_eq!(
+            config_file_properties.get("GROUP_ONLY"),
+            Some(&"group".to_string())
+        );
+        assert_eq!(
+            config_file_properties.get("SHARED"),
+            Some(&"group".to_string()),
+            "role-group override should win over the role-level value"
+        );
+    }
 }

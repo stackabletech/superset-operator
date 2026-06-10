@@ -28,6 +28,7 @@ use stackable_operator::{
     v2::{
         config_overrides::KeyValueConfigOverrides,
         flask_config_writer::{FlaskAppConfigOptions, PythonType},
+        role_utils::GenericCommonConfig,
     },
     versioned::versioned,
 };
@@ -69,8 +70,12 @@ pub const METRICS_PORT: u16 = 9102;
 
 const DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 
-pub type SupersetRoleType =
-    Role<v1alpha1::SupersetConfigFragment, v1alpha1::SupersetConfigOverrides, SupersetRoleConfig>;
+pub type SupersetRoleType = Role<
+    v1alpha1::SupersetConfigFragment,
+    v1alpha1::SupersetConfigOverrides,
+    SupersetRoleConfig,
+    GenericCommonConfig,
+>;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -188,17 +193,13 @@ pub mod versioned {
         pub listener_class: String,
     }
 
-    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, Merge, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct SupersetConfigOverrides {
         // Uses the v2 KeyValueConfigOverrides (Merge-capable, nullable values) to match
         // trino/hdfs/airflow/kafka. Resolution happens in controller/validate.rs.
-        #[serde(
-            default,
-            rename = "superset_config.py",
-            skip_serializing_if = "Option::is_none"
-        )]
-        pub superset_config_py: Option<KeyValueConfigOverrides>,
+        #[serde(default, rename = "superset_config.py")]
+        pub superset_config_py: KeyValueConfigOverrides,
     }
 
     #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -468,7 +469,10 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
 impl v1alpha1::SupersetConfig {
     pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
 
-    fn default_config(cluster_name: &str, role: &SupersetRole) -> v1alpha1::SupersetConfigFragment {
+    pub(crate) fn default_config(
+        cluster_name: &str,
+        role: &SupersetRole,
+    ) -> v1alpha1::SupersetConfigFragment {
         match role {
             SupersetRole::Node => v1alpha1::SupersetConfigFragment {
                 resources: ResourcesFragment {
