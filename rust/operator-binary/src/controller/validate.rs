@@ -119,10 +119,10 @@ pub fn validate_cluster(
 }
 
 // DESIGN DECISION: `with_validated_config` (operator-rs) performs the config-fragment
-// merge+validate and the role<-role-group `Merge` of config/env overrides (a role-group
-// `null` inherits the role-level value). This function layers superset's product-specific
-// values on top to produce the COMPLETE superset_config.py map (operator recommended values
-// + config-derived values + the merged user overrides), which the statefulset reads back.
+// merge+validate and the role<-role-group `Merge` of config/env overrides (role-group wins
+// on conflicting keys). This function layers superset's product-specific values on top to
+// produce the COMPLETE superset_config.py map (operator recommended values + config-derived
+// values + the merged user overrides), which the statefulset reads back.
 fn collect_role_group_config(
     superset: &SupersetCluster,
     role: &SupersetRole,
@@ -163,17 +163,16 @@ fn collect_role_group_config(
         );
     }
 
-    // Step 3: User configOverrides — already merged role<-role-group with `Merge` semantics by
-    // `with_validated_config`. `None` values are dropped on render (a key that is `null` at all
-    // levels is omitted; a role-group `null` over a role value inherits the role value).
+    // Step 3: User configOverrides — plain string key/values, already merged role<-role-group
+    // (role-group wins) by `with_validated_config`. operator-rs #1219 removed the nullable
+    // `Option<String>` values, so there is no `null`/unset concept anymore.
     config_file_properties.extend(
         validated_rg
             .config
             .config_overrides
             .superset_config_py
             .overrides
-            .iter()
-            .filter_map(|(k, v)| v.clone().map(|v| (k.clone(), v))),
+            .clone(),
     );
 
     // --- env_overrides ---
@@ -286,8 +285,11 @@ mod tests {
         );
     }
 
+    /// A `null` configOverrides value is rejected by the CRD. Values are typed as `String`
+    /// (operator-rs `KeyValueConfigOverrides`; the `Option<String>` was removed in op-rs #1219),
+    /// so `null` can no longer express "unset"/"inherit".
     #[test]
-    fn config_overrides_null_inherits_role_value() {
+    fn config_overrides_null_value_is_rejected() {
         let input = r#"
         apiVersion: superset.stackable.tech/v1alpha1
         kind: SupersetCluster
@@ -306,30 +308,15 @@ mod tests {
           nodes:
             configOverrides:
               superset_config.py:
-                KEY: role
+                KEY: null
             roleGroups:
               default:
                 replicas: 1
-                configOverrides:
-                  superset_config.py:
-                    KEY: null
         "#;
-        let superset: v1alpha1::SupersetCluster =
-            yaml_from_str_singleton_map(input).expect("illegal test input");
-
-        let dereferenced = default_dereferenced();
-
-        let validated = validate_cluster(&superset, dereferenced, "test-repo").expect("validated");
-        let node = validated
-            .role_groups
-            .get(&SupersetRole::Node)
-            .and_then(|groups| groups.get("default"))
-            .expect("node default rolegroup");
-
-        // Merge semantics: a role-group `null` inherits the role-level value (not delete).
-        assert_eq!(
-            node.config_file_properties.get("KEY"),
-            Some(&"role".to_string())
+        let result: Result<v1alpha1::SupersetCluster, _> = yaml_from_str_singleton_map(input);
+        assert!(
+            result.is_err(),
+            "a `null` configOverrides value must be rejected: values are typed as String"
         );
     }
 }
