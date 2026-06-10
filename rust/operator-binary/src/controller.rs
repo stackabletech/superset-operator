@@ -408,7 +408,7 @@ pub async fn reconcile_superset(
                         build_recommended_labels(
                             superset,
                             SUPERSET_CONTROLLER_NAME,
-                            &validated.image.product_version,
+                            &validated.image.app_version_label_value,
                             &superset_role.to_string(),
                             "none",
                         ),
