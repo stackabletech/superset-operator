@@ -3,19 +3,16 @@ use std::collections::BTreeMap;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
-    commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::core::v1::ConfigMap,
     product_logging::spec::Logging,
     role_utils::RoleGroupRef,
 };
 
 use crate::{
-    authorization::opa::SupersetOpaConfigResolved,
     config::{product_logging::extend_config_map_with_log_config, superset_config},
-    controller::SUPERSET_CONTROLLER_NAME,
+    controller::{SUPERSET_CONTROLLER_NAME, ValidatedSupersetCluster},
     crd::{
         SUPERSET_CONFIG_FILENAME,
-        authentication::SupersetClientAuthenticationDetailsResolved,
         v1alpha1::{Container, SupersetCluster},
     },
     resources::build_recommended_labels,
@@ -49,20 +46,17 @@ pub enum Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
-#[allow(clippy::too_many_arguments)]
 pub fn build_rolegroup_config_map(
     superset: &SupersetCluster,
-    resolved_product_image: &ResolvedProductImage,
+    validated: &ValidatedSupersetCluster,
     rolegroup: &RoleGroupRef<SupersetCluster>,
     config_file_properties: &BTreeMap<String, String>,
-    authentication_config: &SupersetClientAuthenticationDetailsResolved,
-    superset_opa_config: &Option<SupersetOpaConfigResolved>,
     logging: &Logging<Container>,
 ) -> Result<ConfigMap, Error> {
     let config_file = superset_config::build(
         superset,
-        authentication_config,
-        superset_opa_config,
+        &validated.authentication_config,
+        &validated.opa_config,
         config_file_properties,
     )
     .with_context(|_| BuildSupersetConfigSnafu {
@@ -81,7 +75,7 @@ pub fn build_rolegroup_config_map(
                 .with_recommended_labels(&build_recommended_labels(
                     superset,
                     SUPERSET_CONTROLLER_NAME,
-                    &resolved_product_image.app_version_label_value,
+                    &validated.image.app_version_label_value,
                     &rolegroup.role,
                     &rolegroup.role_group,
                 ))

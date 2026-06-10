@@ -17,7 +17,6 @@ use stackable_operator::{
             },
         },
     },
-    commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::{
         DeepMerge,
         api::{
@@ -38,7 +37,7 @@ use stackable_operator::{
 
 use crate::{
     config::{commands::add_cert_to_python_certifi_command, product_logging::LOG_CONFIG_FILE},
-    controller::SUPERSET_CONTROLLER_NAME,
+    controller::{SUPERSET_CONTROLLER_NAME, ValidatedSupersetCluster},
     crd::{
         APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
         STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
@@ -131,12 +130,11 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 #[allow(clippy::too_many_arguments)]
 pub fn build_server_rolegroup_statefulset(
     superset: &SupersetCluster,
-    resolved_product_image: &ResolvedProductImage,
+    validated: &ValidatedSupersetCluster,
     superset_role: &SupersetRole,
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     config_file_properties: &BTreeMap<String, String>,
     env_overrides: &BTreeMap<String, String>,
-    authentication_config: &SupersetClientAuthenticationDetailsResolved,
     sa_name: &str,
     merged_config: &SupersetConfig,
 ) -> Result<StatefulSet> {
@@ -155,7 +153,7 @@ pub fn build_server_rolegroup_statefulset(
     let recommended_object_labels = build_recommended_labels(
         superset,
         SUPERSET_CONTROLLER_NAME,
-        &resolved_product_image.app_version_label_value,
+        &validated.image.app_version_label_value,
         &rolegroup_ref.role,
         &rolegroup_ref.role_group,
     );
@@ -179,7 +177,7 @@ pub fn build_server_rolegroup_statefulset(
 
     pb = pb
         .metadata(metadata)
-        .image_pull_secrets_from_product_image(resolved_product_image)
+        .image_pull_secrets_from_product_image(&validated.image)
         .security_context(
             PodSecurityContextBuilder::new()
                 .fs_group(1000) // Needed for secret-operator
@@ -226,7 +224,11 @@ pub fn build_server_rolegroup_statefulset(
         crate::crd::INTERNAL_SECRET_SECRET_KEY,
     );
 
-    add_authentication_volumes_and_volume_mounts(authentication_config, &mut superset_cb, pb)?;
+    add_authentication_volumes_and_volume_mounts(
+        &validated.authentication_config,
+        &mut superset_cb,
+        pb,
+    )?;
 
     let webserver_timeout = config_file_properties
         .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
@@ -235,7 +237,7 @@ pub fn build_server_rolegroup_statefulset(
     let secret = &superset.spec.cluster_config.credentials_secret_name;
 
     superset_cb
-        .image_from_product_image(resolved_product_image)
+        .image_from_product_image(&validated.image)
         .add_container_port("http", APP_PORT.into())
         .add_volume_mount(CONFIG_VOLUME_NAME, STACKABLE_CONFIG_DIR).context(AddVolumeMountSnafu)?
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME, STACKABLE_LOG_CONFIG_DIR).context(AddVolumeMountSnafu)?
@@ -248,7 +250,7 @@ pub fn build_server_rolegroup_statefulset(
         // Needed by the `containerdebug` process to log it's tracing information to.
         .add_env_var("CONTAINERDEBUG_LOG_DIRECTORY", format!("{STACKABLE_LOG_DIR}/containerdebug"))
         .add_env_var("SSL_CERT_DIR", "/stackable/certs/")
-        .add_env_vars(authentication_env_vars(authentication_config))
+        .add_env_vars(authentication_env_vars(&validated.authentication_config))
         .command(vec![
             "/bin/bash".to_string(),
             "-x".to_string(),
@@ -280,7 +282,7 @@ pub fn build_server_rolegroup_statefulset(
 
             {create_vector_shutdown_file_command}
         ",
-            auth_commands = authentication_start_commands(authentication_config),
+            auth_commands = authentication_start_commands(&validated.authentication_config),
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             create_vector_shutdown_file_command =
@@ -313,7 +315,7 @@ pub fn build_server_rolegroup_statefulset(
 
     let metrics_container = ContainerBuilder::new("metrics")
         .context(InvalidContainerNameSnafu)?
-        .image_from_product_image(resolved_product_image)
+        .image_from_product_image(&validated.image)
         .command(vec![
             "/bin/bash".to_string(),
             "-x".to_string(),
@@ -355,7 +357,7 @@ pub fn build_server_rolegroup_statefulset(
             Some(vector_aggregator_config_map_name) => {
                 pb.add_container(
                     product_logging::framework::vector_container(
-                        resolved_product_image,
+                        &validated.image,
                         CONFIG_VOLUME_NAME,
                         LOG_VOLUME_NAME,
                         merged_config.logging.containers.get(&Container::Vector),

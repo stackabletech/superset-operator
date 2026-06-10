@@ -237,9 +237,6 @@ pub async fn reconcile_superset(
         &ctx.operator_environment.image_repository,
     )
     .context(ValidateSnafu)?;
-    let resolved_product_image = &validated.image;
-    let auth_config = &validated.authentication_config;
-    let superset_opa_config = &validated.opa_config;
 
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
@@ -289,21 +286,19 @@ pub async fn reconcile_superset(
 
             let rg_configmap = build::config_map::build_rolegroup_config_map(
                 superset,
-                resolved_product_image,
+                &validated,
                 &rolegroup,
                 &validated_rolegroup.config_file_properties,
-                auth_config,
-                superset_opa_config,
                 &config.logging,
             )
             .context(BuildConfigMapSnafu)?;
 
             let rg_metrics_service =
-                build_node_rolegroup_metrics_service(superset, resolved_product_image, &rolegroup)
+                build_node_rolegroup_metrics_service(superset, &validated.image, &rolegroup)
                     .context(BuildServiceSnafu)?;
 
             let rg_headless_service =
-                build_node_rolegroup_headless_service(superset, resolved_product_image, &rolegroup)
+                build_node_rolegroup_headless_service(superset, &validated.image, &rolegroup)
                     .context(BuildServiceSnafu)?;
 
             cluster_resources
@@ -331,12 +326,11 @@ pub async fn reconcile_superset(
                 SupersetRole::Node => {
                     let rg_statefulset = build_server_rolegroup_statefulset(
                         superset,
-                        resolved_product_image,
+                        &validated,
                         superset_role,
                         &rolegroup,
                         &validated_rolegroup.config_file_properties,
                         &validated_rolegroup.env_overrides,
-                        auth_config,
                         &rbac_sa.name_any(),
                         config,
                     )
@@ -357,7 +351,7 @@ pub async fn reconcile_superset(
                 SupersetRole::Worker => {
                     let rg_worker_deployment = build_worker_rolegroup_deployment(
                         superset,
-                        resolved_product_image,
+                        &validated.image,
                         superset_role,
                         &rolegroup,
                         &validated_rolegroup.env_overrides,
@@ -381,7 +375,7 @@ pub async fn reconcile_superset(
                 SupersetRole::Beat => {
                     let rg_beat_deployment = build_beat_rolegroup_deployment(
                         superset,
-                        resolved_product_image,
+                        &validated.image,
                         superset_role,
                         &rolegroup,
                         &validated_rolegroup.env_overrides,
@@ -414,7 +408,7 @@ pub async fn reconcile_superset(
                         build_recommended_labels(
                             superset,
                             SUPERSET_CONTROLLER_NAME,
-                            &resolved_product_image.product_version,
+                            &validated.image.product_version,
                             &superset_role.to_string(),
                             "none",
                         ),
