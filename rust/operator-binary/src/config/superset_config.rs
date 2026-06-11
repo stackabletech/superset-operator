@@ -115,7 +115,7 @@ pub fn build(
 /// Assembles the product-specific `superset_config.py` key/value properties for a role group.
 ///
 /// Layered in precedence order (each step may override the previous one):
-/// 1. Operator recommended values — `Node` role only (matches the old `properties.yaml`
+/// 1. Operator recommended values — `Node` role only
 ///    role-scoping): `ROW_LIMIT` and `SUPERSET_WEBSERVER_TIMEOUT` (Superset's 60s default is too
 ///    low for "big data" queries).
 /// 2. Config-derived values (all roles) — user-set typed CRD fields override the recommended

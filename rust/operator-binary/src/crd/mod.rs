@@ -374,8 +374,6 @@ impl Default for v1alpha1::SupersetRoleConfig {
     }
 }
 
-// KeyValueOverridesProvider impl removed — override resolution moved to controller/validate.rs::collect_role_group_config.
-
 #[derive(
     Clone,
     Debug,
@@ -469,8 +467,6 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
 }
 
 impl v1alpha1::SupersetConfig {
-    pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
-
     pub(crate) fn default_config(
         cluster_name: &str,
         role: &SupersetRole,
@@ -533,9 +529,6 @@ impl v1alpha1::SupersetConfig {
         }
     }
 }
-
-// Configuration::compute_env (mapbox secret injection) moved to controller/validate.rs::collect_role_group_config.
-// Configuration::compute_files (row_limit / webserver_timeout derivation) moved to controller/validate.rs::collect_role_group_config.
 
 impl HasStatusCondition for v1alpha1::SupersetCluster {
     fn conditions(&self) -> Vec<ClusterCondition> {
