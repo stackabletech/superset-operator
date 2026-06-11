@@ -44,7 +44,6 @@ use crate::{
 };
 
 mod authorization;
-mod config;
 mod controller;
 mod crd;
 mod druid_connection_controller;

@@ -55,7 +55,6 @@ pub const STACKABLE_CONFIG_DIR: &str = "/stackable/config";
 pub const STACKABLE_LOG_CONFIG_DIR: &str = "/stackable/log_config";
 pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const PYTHONPATH: &str = "/stackable/app/pythonpath";
-pub const SUPERSET_CONFIG_FILENAME: &str = "superset_config.py";
 pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,

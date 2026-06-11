@@ -28,10 +28,8 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     APP_NAME, OPERATOR_NAME,
-    controller::CONTAINER_IMAGE_BASE_NAME,
-    crd::{
-        INTERNAL_SECRET_SECRET_KEY, PYTHONPATH, SUPERSET_CONFIG_FILENAME, druidconnection, v1alpha1,
-    },
+    controller::{CONTAINER_IMAGE_BASE_NAME, build::properties::ConfigFileName},
+    crd::{INTERNAL_SECRET_SECRET_KEY, PYTHONPATH, druidconnection, v1alpha1},
     operations::job_state::{JobState, get_job_state},
     resources::rbac,
 };
@@ -327,7 +325,8 @@ async fn build_import_job(
     let config = "import os; SQLALCHEMY_DATABASE_URI = os.path.expandvars(os.environ.get('SQLALCHEMY_DATABASE_URI'))";
     commands.push(format!("mkdir -p {PYTHONPATH}"));
     commands.push(format!(
-        "echo \"{config}\" > {PYTHONPATH}/{SUPERSET_CONFIG_FILENAME}"
+        "echo \"{config}\" > {PYTHONPATH}/{config_file}",
+        config_file = ConfigFileName::SupersetConfig
     ));
 
     let druid_info = build_druid_db_yaml(&druid_connection.spec.druid.name, sqlalchemy_str)?;

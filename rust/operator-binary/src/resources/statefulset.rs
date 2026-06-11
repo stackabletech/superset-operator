@@ -36,11 +36,13 @@ use stackable_operator::{
 };
 
 use crate::{
-    config::{
-        commands::add_cert_to_python_certifi_command, product_logging::LOG_CONFIG_FILE,
-        superset_config::DEFAULT_WEBSERVER_TIMEOUT,
+    controller::{
+        SUPERSET_CONTROLLER_NAME, SupersetRoleGroupConfig, ValidatedCluster,
+        build::{
+            command::add_cert_to_python_certifi_command,
+            properties::{ConfigFileName, superset_config::DEFAULT_WEBSERVER_TIMEOUT},
+        },
     },
-    controller::{SUPERSET_CONTROLLER_NAME, SupersetRoleGroupConfig, ValidatedCluster},
     crd::{
         APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
         STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SupersetRole,
@@ -211,7 +213,7 @@ pub fn build_server_rolegroup_statefulset(
     )?;
 
     // The gunicorn worker timeout mirrors the `SUPERSET_WEBSERVER_TIMEOUT` written into
-    // `superset_config.py` (see `config::superset_config`).
+    // `superset_config.py` (see `controller::build::properties::superset_config`).
     let webserver_timeout = merged_config
         .webserver_timeout
         .unwrap_or(DEFAULT_WEBSERVER_TIMEOUT);
@@ -245,7 +247,7 @@ pub fn build_server_rolegroup_statefulset(
 
             mkdir --parents {PYTHONPATH}
             cp {STACKABLE_CONFIG_DIR}/* {PYTHONPATH}
-            cp {STACKABLE_LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH}
+            cp {STACKABLE_LOG_CONFIG_DIR}/{log_config_file} {PYTHONPATH}
 
             {auth_commands}
 
@@ -264,6 +266,7 @@ pub fn build_server_rolegroup_statefulset(
 
             {create_vector_shutdown_file_command}
         ",
+            log_config_file = ConfigFileName::LogConfig,
             auth_commands = authentication_start_commands(&validated.cluster_config.authentication_config),
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),

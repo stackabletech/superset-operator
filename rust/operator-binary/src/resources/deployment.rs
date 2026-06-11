@@ -26,8 +26,10 @@ use stackable_operator::{
 };
 
 use crate::{
-    config::product_logging::LOG_CONFIG_FILE,
-    controller::{SUPERSET_CONTROLLER_NAME, SupersetRoleGroupConfig, ValidatedCluster},
+    controller::{
+        SUPERSET_CONTROLLER_NAME, SupersetRoleGroupConfig, ValidatedCluster,
+        build::properties::ConfigFileName,
+    },
     crd::{
         APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
         STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
@@ -196,7 +198,7 @@ pub fn build_worker_rolegroup_deployment(
 
             mkdir --parents {PYTHONPATH}
             cp {STACKABLE_CONFIG_DIR}/* {PYTHONPATH}
-            cp {STACKABLE_LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH}
+            cp {STACKABLE_LOG_CONFIG_DIR}/{log_config_file} {PYTHONPATH}
 
             {remove_vector_shutdown_file_command}
             prepare_signal_handlers
@@ -207,6 +209,7 @@ pub fn build_worker_rolegroup_deployment(
             wait_for_termination $!
             {create_vector_shutdown_file_command}
         ",
+            log_config_file = ConfigFileName::LogConfig,
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             create_vector_shutdown_file_command =
@@ -437,7 +440,7 @@ pub fn build_beat_rolegroup_deployment(
 
             mkdir --parents {PYTHONPATH}
             cp {STACKABLE_CONFIG_DIR}/* {PYTHONPATH}
-            cp {STACKABLE_LOG_CONFIG_DIR}/{LOG_CONFIG_FILE} {PYTHONPATH}
+            cp {STACKABLE_LOG_CONFIG_DIR}/{log_config_file} {PYTHONPATH}
 
             {remove_vector_shutdown_file_command}
             prepare_signal_handlers
@@ -448,6 +451,7 @@ pub fn build_beat_rolegroup_deployment(
             wait_for_termination $!
             {create_vector_shutdown_file_command}
         ",
+            log_config_file = ConfigFileName::LogConfig,
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             create_vector_shutdown_file_command =

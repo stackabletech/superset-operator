@@ -2,15 +2,17 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
     k8s_openapi::api::core::v1::ConfigMap,
-    product_logging::spec::Logging,
+    product_logging::{framework::VECTOR_CONFIG_FILE, spec::Logging},
     role_utils::RoleGroupRef,
 };
 
 use crate::{
-    config::{product_logging::extend_config_map_with_log_config, superset_config},
-    controller::{SUPERSET_CONTROLLER_NAME, ValidatedCluster},
+    controller::{
+        SUPERSET_CONTROLLER_NAME, ValidatedCluster,
+        build::properties::{ConfigFileName, logging, superset_config},
+    },
     crd::{
-        SUPERSET_CONFIG_FILENAME, SupersetRole,
+        SupersetRole,
         v1alpha1::{Container, SupersetCluster, SupersetConfig, SupersetConfigOverrides},
     },
     resources::build_recommended_labels,
@@ -23,7 +25,7 @@ pub enum Error {
         source: stackable_operator::builder::meta::Error,
     },
 
-    #[snafu(display("failed to build superset_config.py for {rolegroup}"))]
+    #[snafu(display("failed to build {config_file} for {rolegroup}", config_file = ConfigFileName::SupersetConfig))]
     BuildSupersetConfig {
         source: superset_config::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
@@ -76,15 +78,14 @@ pub fn build_rolegroup_config_map(
                 .context(BuildMetadataSnafu)?
                 .build(),
         )
-        .add_data(SUPERSET_CONFIG_FILENAME, config_file);
+        .add_data(ConfigFileName::SupersetConfig.to_string(), config_file);
 
-    extend_config_map_with_log_config(
-        rolegroup,
-        logging,
-        &Container::Superset,
-        &Container::Vector,
-        &mut cm_builder,
-    );
+    if let Some(log_config) = logging::build_log_config(logging) {
+        cm_builder.add_data(ConfigFileName::LogConfig.to_string(), log_config);
+    }
+    if let Some(vector_config) = logging::build_vector_config(rolegroup, logging) {
+        cm_builder.add_data(VECTOR_CONFIG_FILE, vector_config);
+    }
 
     cm_builder
         .build()

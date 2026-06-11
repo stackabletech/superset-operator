@@ -1,6 +1,7 @@
 //! Per-file builders for the Superset config files.
 
 pub mod authentication;
+pub mod logging;
 pub mod superset_config;
 
 /// The names of the Superset config files assembled into the rolegroup `ConfigMap`.

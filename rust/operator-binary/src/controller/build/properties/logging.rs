@@ -1,9 +1,10 @@
-use std::fmt::{Display, Write};
+//! Renders the logging config files (`log_config.py` and the Vector agent config)
+//! assembled into the rolegroup `ConfigMap`.
+
+use std::fmt::Write;
 
 use indoc::formatdoc;
 use stackable_operator::{
-    builder::configmap::ConfigMapBuilder,
-    kube::Resource,
     product_logging::{
         self,
         spec::{
@@ -13,49 +14,56 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
 };
 
-use crate::crd::STACKABLE_LOG_DIR;
+use crate::crd::{
+    STACKABLE_LOG_DIR,
+    v1alpha1::{Container, SupersetCluster},
+};
 
-pub const LOG_CONFIG_FILE: &str = "log_config.py";
-
+/// The rotating log file the generated `log_config.py` writes to (consumed by the Vector agent).
 const LOG_FILE: &str = "superset.py.json";
 
-/// Extend the ConfigMap with logging and Vector configurations
-pub fn extend_config_map_with_log_config<C, K>(
-    rolegroup: &RoleGroupRef<K>,
-    logging: &Logging<C>,
-    main_container: &C,
-    vector_container: &C,
-    cm_builder: &mut ConfigMapBuilder,
-) where
-    C: Clone + Ord + Display,
-    K: Resource,
-{
-    if let Some(ContainerLogConfig {
-        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(main_container)
-    {
-        let log_dir = format!("{STACKABLE_LOG_DIR}/{main_container}");
-        cm_builder.add_data(
-            LOG_CONFIG_FILE,
-            create_superset_config(log_config, &log_dir),
-        );
+/// Renders `log_config.py` for the Superset container.
+///
+/// Returns `None` when the Superset container does not use the operator's automatic logging
+/// configuration (e.g. a custom log ConfigMap is referenced instead), in which case no
+/// `log_config.py` should be added to the rolegroup `ConfigMap`.
+pub fn build_log_config(logging: &Logging<Container>) -> Option<String> {
+    match logging.containers.get(&Container::Superset) {
+        Some(ContainerLogConfig {
+            choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
+        }) => {
+            let log_dir = format!(
+                "{STACKABLE_LOG_DIR}/{container}",
+                container = Container::Superset
+            );
+            Some(create_superset_config(log_config, &log_dir))
+        }
+        _ => None,
+    }
+}
+
+/// Renders the Vector agent config (`vector.yaml`).
+///
+/// Returns `None` when the Vector agent is disabled for this role group.
+pub fn build_vector_config(
+    rolegroup: &RoleGroupRef<SupersetCluster>,
+    logging: &Logging<Container>,
+) -> Option<String> {
+    if !logging.enable_vector_agent {
+        return None;
     }
 
-    let vector_log_config = if let Some(ContainerLogConfig {
-        choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-    }) = logging.containers.get(vector_container)
-    {
-        Some(log_config)
-    } else {
-        None
+    let vector_log_config = match logging.containers.get(&Container::Vector) {
+        Some(ContainerLogConfig {
+            choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
+        }) => Some(log_config),
+        _ => None,
     };
 
-    if logging.enable_vector_agent {
-        cm_builder.add_data(
-            product_logging::framework::VECTOR_CONFIG_FILE,
-            product_logging::framework::create_vector_config(rolegroup, vector_log_config),
-        );
-    }
+    Some(product_logging::framework::create_vector_config(
+        rolegroup,
+        vector_log_config,
+    ))
 }
 
 fn create_superset_config(log_config: &AutomaticContainerLogConfig, log_dir: &str) -> String {
