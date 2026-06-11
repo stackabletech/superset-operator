@@ -1,14 +1,13 @@
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
-    commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::core::v1::{Service, ServicePort, ServiceSpec},
     kvp::{Annotations, Labels},
     role_utils::RoleGroupRef,
 };
 
 use crate::{
-    controller::SUPERSET_CONTROLLER_NAME,
+    controller::{SUPERSET_CONTROLLER_NAME, ValidatedCluster},
     crd::{APP_NAME, APP_PORT, APP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, v1alpha1},
     resources::build_recommended_labels,
 };
@@ -33,20 +32,19 @@ pub enum Error {
 ///
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
 pub fn build_node_rolegroup_headless_service(
-    superset: &v1alpha1::SupersetCluster,
-    resolved_product_image: &ResolvedProductImage,
+    validated: &ValidatedCluster,
     rolegroup_ref: &RoleGroupRef<v1alpha1::SupersetCluster>,
 ) -> Result<Service, Error> {
     let headless_service = Service {
         metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(superset)
+            .name_and_namespace(validated)
             .name(rolegroup_ref.rolegroup_headless_service_name())
-            .ownerreference_from_resource(superset, None, Some(true))
+            .ownerreference_from_resource(validated, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(&build_recommended_labels(
-                superset,
+                validated,
                 SUPERSET_CONTROLLER_NAME,
-                &resolved_product_image.app_version_label_value,
+                &validated.image.app_version_label_value,
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
             ))
@@ -59,7 +57,7 @@ pub fn build_node_rolegroup_headless_service(
             ports: Some(service_ports()),
             selector: Some(
                 Labels::role_group_selector(
-                    superset,
+                    validated,
                     APP_NAME,
                     &rolegroup_ref.role,
                     &rolegroup_ref.role_group,
@@ -77,20 +75,19 @@ pub fn build_node_rolegroup_headless_service(
 
 /// The rolegroup metrics [`Service`] is a service that exposes metrics and a prometheus scraping label
 pub fn build_node_rolegroup_metrics_service(
-    superset: &v1alpha1::SupersetCluster,
-    resolved_product_image: &ResolvedProductImage,
+    validated: &ValidatedCluster,
     rolegroup_ref: &RoleGroupRef<v1alpha1::SupersetCluster>,
 ) -> Result<Service, Error> {
     let metrics_service = Service {
         metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(superset)
+            .name_and_namespace(validated)
             .name(rolegroup_ref.rolegroup_metrics_service_name())
-            .ownerreference_from_resource(superset, None, Some(true))
+            .ownerreference_from_resource(validated, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(&build_recommended_labels(
-                superset,
+                validated,
                 SUPERSET_CONTROLLER_NAME,
-                &resolved_product_image.app_version_label_value,
+                &validated.image.app_version_label_value,
                 &rolegroup_ref.role,
                 &rolegroup_ref.role_group,
             ))
@@ -105,7 +102,7 @@ pub fn build_node_rolegroup_metrics_service(
             ports: Some(metrics_ports()),
             selector: Some(
                 Labels::role_group_selector(
-                    superset,
+                    validated,
                     APP_NAME,
                     &rolegroup_ref.role,
                     &rolegroup_ref.role_group,

@@ -35,6 +35,9 @@ use crate::{
     crd::{
         APP_NAME, INTERNAL_SECRET_SECRET_KEY, SupersetRole,
         authentication::SupersetClientAuthenticationDetailsResolved,
+        databases::{
+            CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
+        },
         v1alpha1::{SupersetCluster, SupersetClusterStatus, SupersetConfig},
     },
     operations::pdb::add_pdbs,
@@ -86,6 +89,20 @@ pub type SupersetRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroup
 pub struct ValidatedClusterConfig {
     pub authentication_config: SupersetClientAuthenticationDetailsResolved,
     pub opa_config: Option<SupersetOpaConfigResolved>,
+    /// Name of the Secret holding the admin user credentials.
+    pub credentials_secret_name: String,
+    /// Name of the auto-generated Secret holding the Flask `SECRET_KEY`.
+    pub secret_key_secret_name: String,
+    /// Name of the Secret holding the Mapbox API key, if configured.
+    pub mapbox_secret: Option<String>,
+    /// Name of the Vector aggregator discovery ConfigMap, if logging aggregation is enabled.
+    pub vector_aggregator_config_map_name: Option<String>,
+    /// Connection to the metadata database.
+    pub metadata_database: MetadataDatabaseConnection,
+    /// Connection to the Celery results backend, if configured.
+    pub celery_results_backend: Option<CeleryResultsBackendConnection>,
+    /// Connection to the Celery broker, if configured.
+    pub celery_broker: Option<CeleryBrokerConnection>,
 }
 
 /// The validated cluster: proves that config merging succeeded for every role and role group
@@ -356,7 +373,6 @@ pub async fn reconcile_superset(
             let config = &validated_rolegroup.config;
 
             let rg_configmap = build::config_map::build_rolegroup_config_map(
-                superset,
                 &validated,
                 superset_role,
                 &rolegroup,
@@ -366,13 +382,11 @@ pub async fn reconcile_superset(
             )
             .context(BuildConfigMapSnafu)?;
 
-            let rg_metrics_service =
-                build_node_rolegroup_metrics_service(superset, &validated.image, &rolegroup)
-                    .context(BuildServiceSnafu)?;
+            let rg_metrics_service = build_node_rolegroup_metrics_service(&validated, &rolegroup)
+                .context(BuildServiceSnafu)?;
 
-            let rg_headless_service =
-                build_node_rolegroup_headless_service(superset, &validated.image, &rolegroup)
-                    .context(BuildServiceSnafu)?;
+            let rg_headless_service = build_node_rolegroup_headless_service(&validated, &rolegroup)
+                .context(BuildServiceSnafu)?;
 
             cluster_resources
                 .add(client, rg_metrics_service)
@@ -398,13 +412,11 @@ pub async fn reconcile_superset(
             match superset_role {
                 SupersetRole::Node => {
                     let rg_statefulset = build_server_rolegroup_statefulset(
-                        superset,
                         &validated,
                         superset_role,
                         &rolegroup,
-                        &validated_rolegroup.env_overrides,
+                        validated_rolegroup,
                         &rbac_sa.name_any(),
-                        config,
                     )
                     .context(BuildStatefulSetSnafu)?;
 
@@ -422,13 +434,10 @@ pub async fn reconcile_superset(
                 }
                 SupersetRole::Worker => {
                     let rg_worker_deployment = build_worker_rolegroup_deployment(
-                        superset,
-                        &validated.image,
-                        superset_role,
+                        &validated,
                         &rolegroup,
-                        &validated_rolegroup.env_overrides,
+                        validated_rolegroup,
                         &rbac_sa.name_any(),
-                        config,
                     )
                     .context(BuildDeploymentSnafu)?;
 
@@ -446,13 +455,10 @@ pub async fn reconcile_superset(
                 }
                 SupersetRole::Beat => {
                     let rg_beat_deployment = build_beat_rolegroup_deployment(
-                        superset,
-                        &validated.image,
-                        superset_role,
+                        &validated,
                         &rolegroup,
-                        &validated_rolegroup.env_overrides,
+                        validated_rolegroup,
                         &rbac_sa.name_any(),
-                        config,
                     )
                     .context(BuildDeploymentSnafu)?;
 
@@ -476,9 +482,9 @@ pub async fn reconcile_superset(
                     &role_config.group_listener_name,
                 ) {
                     let group_listener = build_group_listener(
-                        superset,
+                        &validated,
                         build_recommended_labels(
-                            superset,
+                            &validated,
                             SUPERSET_CONTROLLER_NAME,
                             &validated.image.app_version_label_value,
                             &superset_role.to_string(),
@@ -495,9 +501,15 @@ pub async fn reconcile_superset(
                 }
 
                 if let Some(pdb) = &role_config.pdb {
-                    add_pdbs(pdb, superset, superset_role, client, &mut cluster_resources)
-                        .await
-                        .context(FailedToCreatePdbSnafu)?;
+                    add_pdbs(
+                        pdb,
+                        &validated,
+                        superset_role,
+                        client,
+                        &mut cluster_resources,
+                    )
+                    .await
+                    .context(FailedToCreatePdbSnafu)?;
                 }
             }
         }

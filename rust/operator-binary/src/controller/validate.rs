@@ -128,12 +128,22 @@ pub fn validate_cluster(
         role_groups.insert(role, group_configs);
     }
 
+    let cluster_config = &superset.spec.cluster_config;
     Ok(ValidatedCluster::new(
         superset,
         resolved_product_image,
         ValidatedClusterConfig {
             authentication_config,
             opa_config,
+            credentials_secret_name: cluster_config.credentials_secret_name.clone(),
+            secret_key_secret_name: superset.shared_secret_key_secret_name(),
+            mapbox_secret: cluster_config.mapbox_secret.clone(),
+            vector_aggregator_config_map_name: cluster_config
+                .vector_aggregator_config_map_name
+                .clone(),
+            metadata_database: cluster_config.metadata_database.clone(),
+            celery_results_backend: cluster_config.celery_results_backend.clone(),
+            celery_broker: cluster_config.celery_broker.clone(),
         },
         role_groups,
         role_configs,

@@ -1,7 +1,10 @@
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{builder::meta::ObjectMetaBuilder, crd::listener, kvp::ObjectLabels};
 
-use crate::crd::{APP_PORT, APP_PORT_NAME, v1alpha1};
+use crate::{
+    controller::ValidatedCluster,
+    crd::{APP_PORT, APP_PORT_NAME},
+};
 
 pub const LISTENER_VOLUME_NAME: &str = "listener";
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
@@ -19,15 +22,15 @@ pub enum Error {
 }
 
 pub fn build_group_listener(
-    superset: &v1alpha1::SupersetCluster,
-    object_labels: ObjectLabels<v1alpha1::SupersetCluster>,
+    validated: &ValidatedCluster,
+    object_labels: ObjectLabels<ValidatedCluster>,
     listener_class: String,
     listener_group_name: String,
 ) -> Result<listener::v1alpha1::Listener, Error> {
     let metadata = ObjectMetaBuilder::new()
-        .name_and_namespace(superset)
+        .name_and_namespace(validated)
         .name(listener_group_name)
-        .ownerreference_from_resource(superset, None, Some(true))
+        .ownerreference_from_resource(validated, None, Some(true))
         .context(ObjectMissingMetadataForOwnerRefSnafu)?
         .with_recommended_labels(&object_labels)
         .context(MetadataBuildSnafu)?

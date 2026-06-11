@@ -45,7 +45,6 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
 pub fn build_rolegroup_config_map(
-    superset: &SupersetCluster,
     validated: &ValidatedCluster,
     role: &SupersetRole,
     rolegroup: &RoleGroupRef<SupersetCluster>,
@@ -53,29 +52,22 @@ pub fn build_rolegroup_config_map(
     config_overrides: &SupersetConfigOverrides,
     logging: &Logging<Container>,
 ) -> Result<ConfigMap, Error> {
-    let config_file = superset_config::build(
-        superset,
-        &validated.cluster_config.authentication_config,
-        &validated.cluster_config.opa_config,
-        role,
-        merged_config,
-        config_overrides,
-    )
-    .with_context(|_| BuildSupersetConfigSnafu {
-        rolegroup: rolegroup.clone(),
-    })?;
+    let config_file = superset_config::build(validated, role, merged_config, config_overrides)
+        .with_context(|_| BuildSupersetConfigSnafu {
+            rolegroup: rolegroup.clone(),
+        })?;
 
     let mut cm_builder = ConfigMapBuilder::new();
 
     cm_builder
         .metadata(
             ObjectMetaBuilder::new()
-                .name_and_namespace(superset)
+                .name_and_namespace(validated)
                 .name(rolegroup.object_name())
-                .ownerreference_from_resource(superset, None, Some(true))
+                .ownerreference_from_resource(validated, None, Some(true))
                 .context(ObjectMissingMetadataForOwnerRefSnafu)?
                 .with_recommended_labels(&build_recommended_labels(
-                    superset,
+                    validated,
                     SUPERSET_CONTROLLER_NAME,
                     &validated.image.app_version_label_value,
                     &rolegroup.role,

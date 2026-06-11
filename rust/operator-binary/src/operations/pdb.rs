@@ -6,8 +6,8 @@ use stackable_operator::{
 
 use crate::{
     OPERATOR_NAME,
-    controller::SUPERSET_CONTROLLER_NAME,
-    crd::{APP_NAME, SupersetRole, v1alpha1},
+    controller::{SUPERSET_CONTROLLER_NAME, ValidatedCluster},
+    crd::{APP_NAME, SupersetRole},
 };
 
 #[derive(Snafu, Debug)]
@@ -26,7 +26,7 @@ pub enum Error {
 
 pub async fn add_pdbs(
     pdb: &PdbConfig,
-    superset: &v1alpha1::SupersetCluster,
+    validated: &ValidatedCluster,
     role: &SupersetRole,
     client: &Client,
     cluster_resources: &mut ClusterResources<'_>,
@@ -40,7 +40,7 @@ pub async fn add_pdbs(
         SupersetRole::Beat => max_unavailable_beat(),
     });
     let pdb = PodDisruptionBudgetBuilder::new_with_role(
-        superset,
+        validated,
         APP_NAME,
         &role.to_string(),
         OPERATOR_NAME,

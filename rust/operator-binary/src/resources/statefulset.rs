@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use indoc::formatdoc;
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{
         meta::ObjectMetaBuilder,
@@ -33,7 +33,6 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
     shared::time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
-    v2::builder::pod::container::EnvVarSet,
 };
 
 use crate::{
@@ -41,14 +40,14 @@ use crate::{
         commands::add_cert_to_python_certifi_command, product_logging::LOG_CONFIG_FILE,
         superset_config::DEFAULT_WEBSERVER_TIMEOUT,
     },
-    controller::{SUPERSET_CONTROLLER_NAME, ValidatedCluster},
+    controller::{SUPERSET_CONTROLLER_NAME, SupersetRoleGroupConfig, ValidatedCluster},
     crd::{
         APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
         STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SupersetRole,
         authentication::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
         },
-        v1alpha1::{Container, SupersetCluster, SupersetConfig},
+        v1alpha1::{Container, SupersetCluster},
     },
     operations::graceful_shutdown::add_graceful_shutdown_config,
     resources::{
@@ -59,12 +58,6 @@ use crate::{
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("object defines no '{role}' role"))]
-    MissingRole { role: String },
-
-    #[snafu(display("object defines no '{role}' rolegroup"))]
-    MissingRoleGroup { role: String },
-
     #[snafu(display("invalid container name"))]
     InvalidContainerName {
         source: stackable_operator::builder::pod::container::Error,
@@ -127,30 +120,18 @@ pub enum Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
-#[allow(clippy::too_many_arguments)]
 pub fn build_server_rolegroup_statefulset(
-    superset: &SupersetCluster,
     validated: &ValidatedCluster,
     superset_role: &SupersetRole,
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
-    env_overrides: &EnvVarSet,
+    rolegroup_config: &SupersetRoleGroupConfig,
     sa_name: &str,
-    merged_config: &SupersetConfig,
 ) -> Result<StatefulSet> {
-    let role = superset
-        .get_role(superset_role)
-        .with_context(|| MissingRoleSnafu {
-            role: superset_role.to_string(),
-        })?;
-    let role_group = role
-        .role_groups
-        .get(&rolegroup_ref.role_group)
-        .with_context(|| MissingRoleGroupSnafu {
-            role: superset_role.to_string(),
-        })?;
+    let merged_config = &rolegroup_config.config;
+    let env_overrides = &rolegroup_config.env_overrides;
 
     let recommended_object_labels = build_recommended_labels(
-        superset,
+        validated,
         SUPERSET_CONTROLLER_NAME,
         &validated.image.app_version_label_value,
         &rolegroup_ref.role,
@@ -158,7 +139,7 @@ pub fn build_server_rolegroup_statefulset(
     );
     // Used for PVC templates that cannot be modified once they are deployed
     let unversioned_recommended_labels = Labels::recommended(&build_recommended_labels(
-        superset,
+        validated,
         SUPERSET_CONTROLLER_NAME,
         // A version value is required, and we do want to use the "recommended" format for the other desired labels
         "none",
@@ -189,10 +170,13 @@ pub fn build_server_rolegroup_statefulset(
         .context(InvalidContainerNameSnafu)?;
 
     let metadata_database_connection_details =
-        super::metadata_database_connection_details(superset);
+        super::metadata_database_connection_details(&validated.cluster_config.metadata_database);
     let celery_results_backend_connection_details =
-        super::celery_results_backend_connection_details(superset);
-    let celery_broker_connection_details = super::celery_broker_connection_details(superset);
+        super::celery_results_backend_connection_details(
+            validated.cluster_config.celery_results_backend.as_ref(),
+        );
+    let celery_broker_connection_details =
+        super::celery_broker_connection_details(validated.cluster_config.celery_broker.as_ref());
 
     metadata_database_connection_details.add_to_container(&mut superset_cb);
     if let (_, Some(celery_results_backend_connection_details)) =
@@ -205,7 +189,7 @@ pub fn build_server_rolegroup_statefulset(
     }
 
     superset_cb.add_env_vars(env_overrides.clone());
-    if let Some(mapbox_secret) = &superset.spec.cluster_config.mapbox_secret {
+    if let Some(mapbox_secret) = &validated.cluster_config.mapbox_secret {
         superset_cb.add_env_var_from_secret(
             "MAPBOX_API_KEY",
             mapbox_secret,
@@ -216,7 +200,7 @@ pub fn build_server_rolegroup_statefulset(
     // SECRET_KEY from auto-generated secret
     superset_cb.add_env_var_from_secret(
         "SECRET_KEY",
-        superset.shared_secret_key_secret_name(),
+        validated.cluster_config.secret_key_secret_name.clone(),
         crate::crd::INTERNAL_SECRET_SECRET_KEY,
     );
 
@@ -232,7 +216,7 @@ pub fn build_server_rolegroup_statefulset(
         .webserver_timeout
         .unwrap_or(DEFAULT_WEBSERVER_TIMEOUT);
 
-    let secret = &superset.spec.cluster_config.credentials_secret_name;
+    let secret = &validated.cluster_config.credentials_secret_name;
 
     superset_cb
         .image_from_product_image(&validated.image)
@@ -292,7 +276,11 @@ pub fn build_server_rolegroup_statefulset(
     // listener endpoints will use persistent volumes
     // so that load balancers can hard-code the target addresses and
     // that it is possible to connect to a consistent address
-    let pvcs = if let Some(group_listener_name) = superset.group_listener_name(superset_role) {
+    let pvcs = if let Some(group_listener_name) = validated
+        .role_configs
+        .get(superset_role)
+        .and_then(|role_config| role_config.group_listener_name.clone())
+    {
         let pvc = ListenerOperatorVolumeSourceBuilder::new(
             &ListenerReference::ListenerName(group_listener_name),
             &unversioned_recommended_labels,
@@ -347,11 +335,7 @@ pub fn build_server_rolegroup_statefulset(
     pb.add_container(metrics_container);
 
     if merged_config.logging.enable_vector_agent {
-        match &superset
-            .spec
-            .cluster_config
-            .vector_aggregator_config_map_name
-        {
+        match &validated.cluster_config.vector_aggregator_config_map_name {
             Some(vector_aggregator_config_map_name) => {
                 pb.add_container(
                     product_logging::framework::vector_container(
@@ -377,14 +361,13 @@ pub fn build_server_rolegroup_statefulset(
     }
 
     let mut pod_template = pb.build_template();
-    pod_template.merge_from(role.config.pod_overrides.clone());
-    pod_template.merge_from(role_group.config.pod_overrides.clone());
+    pod_template.merge_from(rolegroup_config.pod_overrides.clone());
 
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(superset)
+            .name_and_namespace(validated)
             .name(rolegroup_ref.object_name())
-            .ownerreference_from_resource(superset, None, Some(true))
+            .ownerreference_from_resource(validated, None, Some(true))
             .context(ObjectMissingMetadataForOwnerRefSnafu)?
             .with_recommended_labels(&recommended_object_labels)
             .context(MetadataBuildSnafu)?
@@ -396,11 +379,11 @@ pub fn build_server_rolegroup_statefulset(
         spec: Some(StatefulSetSpec {
             // Set to `OrderedReady`, to make sure Pods start after another and the init commands don't run in parallel
             pod_management_policy: Some("OrderedReady".to_string()),
-            replicas: role_group.replicas.map(i32::from),
+            replicas: Some(i32::from(rolegroup_config.replicas)),
             selector: LabelSelector {
                 match_labels: Some(
                     Labels::role_group_selector(
-                        superset,
+                        validated,
                         APP_NAME,
                         &rolegroup_ref.role,
                         &rolegroup_ref.role_group,

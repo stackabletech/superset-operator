@@ -20,8 +20,13 @@ use stackable_operator::{
 
 use crate::{
     OPERATOR_NAME,
-    crd::{APP_NAME, databases::CeleryResultsBackendConnectionDetails},
-    v1alpha1::SupersetCluster,
+    crd::{
+        APP_NAME,
+        databases::{
+            CeleryBrokerConnection, CeleryResultsBackendConnection,
+            CeleryResultsBackendConnectionDetails, MetadataDatabaseConnection,
+        },
+    },
 };
 
 pub mod deployment;
@@ -107,57 +112,38 @@ pub(crate) fn create_volumes(
 }
 
 pub(crate) fn metadata_database_connection_details(
-    superset: &SupersetCluster,
+    metadata_database: &MetadataDatabaseConnection,
 ) -> SqlAlchemyDatabaseConnectionDetails {
-    superset
-        .spec
-        .cluster_config
-        .metadata_database
-        .sqlalchemy_connection_details_with_templating(
-            "METADATA",
-            &TemplatingMechanism::BashEnvSubstitution,
-        )
+    metadata_database.sqlalchemy_connection_details_with_templating(
+        "METADATA",
+        &TemplatingMechanism::BashEnvSubstitution,
+    )
 }
 
 pub(crate) fn celery_results_backend_connection_details(
-    superset: &SupersetCluster,
+    celery_results_backend: Option<&CeleryResultsBackendConnection>,
 ) -> (
     Option<CeleryResultsBackendConnectionDetails>,
     Option<CeleryDatabaseConnectionDetails>,
 ) {
     (
-        superset
-            .spec
-            .cluster_config
-            .celery_results_backend
-            .as_ref()
-            .map(|backend| backend.as_python_parameters()),
-        superset
-            .spec
-            .cluster_config
-            .celery_results_backend
-            .as_ref()
-            .map(|backend| {
-                backend.celery_connection_details_with_templating(
-                    "CELERY_RESULTS_BACKEND",
-                    &TemplatingMechanism::BashEnvSubstitution,
-                )
-            }),
+        celery_results_backend.map(|backend| backend.as_python_parameters()),
+        celery_results_backend.map(|backend| {
+            backend.celery_connection_details_with_templating(
+                "CELERY_RESULTS_BACKEND",
+                &TemplatingMechanism::BashEnvSubstitution,
+            )
+        }),
     )
 }
 
 pub(crate) fn celery_broker_connection_details(
-    superset: &SupersetCluster,
+    celery_broker: Option<&CeleryBrokerConnection>,
 ) -> Option<CeleryDatabaseConnectionDetails> {
-    superset
-        .spec
-        .cluster_config
-        .celery_broker
-        .as_ref()
-        .map(|broker| {
-            broker.celery_connection_details_with_templating(
-                "CELERY_BROKER",
-                &TemplatingMechanism::BashEnvSubstitution,
-            )
-        })
+    celery_broker.map(|broker| {
+        broker.celery_connection_details_with_templating(
+            "CELERY_BROKER",
+            &TemplatingMechanism::BashEnvSubstitution,
+        )
+    })
 }

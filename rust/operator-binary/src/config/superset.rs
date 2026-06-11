@@ -11,12 +11,14 @@ use crate::{
             self, DEFAULT_OIDC_PROVIDER, SupersetAuthenticationClassResolved,
             SupersetClientAuthenticationDetailsResolved,
         },
+        databases::{
+            CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
+        },
     },
     resources::{
         celery_broker_connection_details, celery_results_backend_connection_details,
         metadata_database_connection_details,
     },
-    v1alpha1::SupersetCluster,
 };
 
 #[derive(Snafu, Debug)]
@@ -46,11 +48,11 @@ pub const PYTHON_IMPORTS: &[&str] = &[
 
 pub fn add_superset_config(
     config: &mut BTreeMap<String, String>,
-    superset: &SupersetCluster,
+    metadata_database: &MetadataDatabaseConnection,
     authentication_config: &SupersetClientAuthenticationDetailsResolved,
 ) -> Result<(), Error> {
     let metadata_database_url_template =
-        metadata_database_connection_details(superset).url_template;
+        metadata_database_connection_details(metadata_database).url_template;
 
     config.insert(
         SupersetConfigOptions::SecretKey.to_string(),
@@ -86,17 +88,19 @@ pub fn add_superset_config(
 
 pub(crate) fn append_celery_connection_config(
     config_file: &mut Vec<u8>,
-    superset: &SupersetCluster,
+    celery_results_backend: Option<&CeleryResultsBackendConnection>,
+    celery_broker: Option<&CeleryBrokerConnection>,
 ) {
     let (
         Some(additional_celery_results_backend_connection_details),
         Some(celery_results_backend_connection_details),
-    ) = celery_results_backend_connection_details(superset)
+    ) = celery_results_backend_connection_details(celery_results_backend)
     else {
         return;
     };
 
-    let Some(celery_broker_connection_details) = celery_broker_connection_details(superset) else {
+    let Some(celery_broker_connection_details) = celery_broker_connection_details(celery_broker)
+    else {
         return;
     };
 
