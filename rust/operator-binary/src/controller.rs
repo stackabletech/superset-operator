@@ -31,10 +31,10 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     OPERATOR_NAME,
-    authorization::opa::SupersetOpaConfigResolved,
     crd::{
         APP_NAME, INTERNAL_SECRET_SECRET_KEY, SupersetRole,
         authentication::SupersetClientAuthenticationDetailsResolved,
+        authorization::SupersetOpaConfigResolved,
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
         },

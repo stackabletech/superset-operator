@@ -8,8 +8,10 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::v2::flask_config_writer;
 
 use crate::{
-    authorization::opa::OPA_IMPORTS,
-    controller::{ValidatedCluster, build::properties::authentication},
+    controller::{
+        ValidatedCluster,
+        build::properties::{authentication, authorization},
+    },
     crd::{
         SupersetConfigOptions, SupersetRole,
         databases::{
@@ -81,9 +83,9 @@ pub fn build(
     // This will be injected as key/value pair in superset_config.py
     if let Some(opa_config) = &validated.cluster_config.opa_config {
         // If opa role mapping is configured, insert CustomOpaSecurityManager import
-        imports.extend(OPA_IMPORTS);
+        imports.extend(authorization::OPA_IMPORTS);
 
-        config_properties.extend(opa_config.as_config());
+        config_properties.extend(authorization::opa_properties(opa_config));
     }
 
     // The order here should be kept in order to preserve overrides.

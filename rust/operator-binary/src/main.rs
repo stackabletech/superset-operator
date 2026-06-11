@@ -43,7 +43,6 @@ use crate::{
     webhooks::conversion::create_webhook_server,
 };
 
-mod authorization;
 mod controller;
 mod crd;
 mod druid_connection_controller;

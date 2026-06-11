@@ -1,6 +1,7 @@
 //! Per-file builders for the Superset config files.
 
 pub mod authentication;
+pub mod authorization;
 pub mod logging;
 pub mod superset_config;
 

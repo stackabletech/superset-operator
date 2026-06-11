@@ -6,9 +6,9 @@
 
 use snafu::{ResultExt, Snafu};
 
-use crate::{
-    authorization::opa::SupersetOpaConfigResolved,
-    crd::{authentication::SupersetClientAuthenticationDetailsResolved, v1alpha1::SupersetCluster},
+use crate::crd::{
+    authentication::SupersetClientAuthenticationDetailsResolved,
+    authorization::SupersetOpaConfigResolved, v1alpha1::SupersetCluster,
 };
 
 #[derive(Snafu, Debug)]

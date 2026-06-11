@@ -46,6 +46,7 @@ use crate::{
 
 pub mod affinity;
 pub mod authentication;
+pub mod authorization;
 pub mod databases;
 pub mod druidconnection;
 
