@@ -3,26 +3,29 @@
 //! Synchronously validates inputs that don't require a Kubernetes client. Produces
 //! [`ValidatedCluster`], consumed by the rest of `reconcile_superset`.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     commons::product_image_selection,
     config::fragment,
     kube::ResourceExt,
-    role_utils::{GenericRoleConfig, RoleGroup},
-    v2::role_utils::{GenericCommonConfig, with_validated_config},
+    role_utils::GenericRoleConfig,
+    v2::{
+        builder::pod::container::{EnvVarName, EnvVarSet},
+        role_utils::{GenericCommonConfig, with_validated_config},
+    },
 };
 use strum::IntoEnumIterator;
 
 use crate::{
     built_info::PKG_VERSION,
     controller::{
-        CONTAINER_IMAGE_BASE_NAME, ValidatedCluster, ValidatedClusterConfig, ValidatedRoleConfig,
-        ValidatedRoleGroupConfig, dereference::DereferencedObjects,
+        CONTAINER_IMAGE_BASE_NAME, SupersetRoleGroupConfig, ValidatedCluster,
+        ValidatedClusterConfig, ValidatedRoleConfig, dereference::DereferencedObjects,
     },
     crd::{
-        SupersetConfigOptions, SupersetRole,
+        SupersetRole,
         v1alpha1::{SupersetCluster, SupersetConfig, SupersetConfigFragment, SupersetRoleConfig},
     },
 };
@@ -38,6 +41,11 @@ pub enum Error {
     FailedToResolveConfig {
         source: fragment::ValidationError,
         role_group: String,
+    },
+
+    #[snafu(display("failed to parse environment variable name"))]
+    ParseEnvVarName {
+        source: stackable_operator::v2::builder::pod::container::Error,
     },
 }
 
@@ -93,15 +101,26 @@ pub fn validate_cluster(
                 role_group: rolegroup_name.clone(),
             })?;
 
-            let (config_file_properties, env_overrides) =
-                collect_role_group_config(superset, &role, &validated_rg);
+            let mut env_overrides = EnvVarSet::new();
+            for (name, value) in validated_rg.config.env_overrides {
+                env_overrides = env_overrides.with_value(
+                    &EnvVarName::from_str(&name).context(ParseEnvVarNameSnafu)?,
+                    value,
+                );
+            }
 
             group_configs.insert(
                 rolegroup_name.clone(),
-                ValidatedRoleGroupConfig {
-                    merged_config: validated_rg.config.config,
-                    config_file_properties,
+                SupersetRoleGroupConfig {
+                    replicas: validated_rg.replicas.unwrap_or(1),
+                    config: validated_rg.config.config,
+                    config_overrides: validated_rg.config.config_overrides,
                     env_overrides,
+                    cli_overrides: validated_rg.config.cli_overrides,
+                    pod_overrides: validated_rg.config.pod_overrides,
+                    product_specific_common_config: validated_rg
+                        .config
+                        .product_specific_common_config,
                 },
             );
         }
@@ -119,85 +138,6 @@ pub fn validate_cluster(
         role_groups,
         role_configs,
     ))
-}
-
-// DESIGN DECISION: `with_validated_config` (operator-rs) performs the config-fragment
-// merge+validate and the role<-role-group `Merge` of config/env overrides (role-group wins
-// on conflicting keys). This function layers superset's product-specific values on top to
-// produce the COMPLETE superset_config.py map (operator recommended values + config-derived
-// values + the merged user overrides), which the statefulset reads back.
-fn collect_role_group_config(
-    superset: &SupersetCluster,
-    role: &SupersetRole,
-    validated_rg: &RoleGroup<
-        SupersetConfig,
-        GenericCommonConfig,
-        crate::crd::v1alpha1::SupersetConfigOverrides,
-    >,
-) -> (BTreeMap<String, String>, BTreeMap<String, String>) {
-    let merged_config = &validated_rg.config.config;
-
-    // --- config_file_properties ---
-    let mut config_file_properties: BTreeMap<String, String> = BTreeMap::new();
-
-    // Step 1: Operator recommended values — Node role only (matches the old properties.yaml
-    // role-scoping). ROW_LIMIT and SUPERSET_WEBSERVER_TIMEOUT; the latter because Superset's
-    // 60s default is too low for "big data" queries.
-    if *role == SupersetRole::Node {
-        config_file_properties.insert(
-            SupersetConfigOptions::RowLimit.to_string(),
-            "50000".to_string(),
-        );
-        config_file_properties.insert(
-            SupersetConfigOptions::SupersetWebserverTimeout.to_string(),
-            "300".to_string(),
-        );
-    }
-
-    // Step 2: Config-derived values (all roles) — user-set typed CRD fields override the
-    // recommended values above.
-    if let Some(v) = merged_config.row_limit {
-        config_file_properties.insert(SupersetConfigOptions::RowLimit.to_string(), v.to_string());
-    }
-    if let Some(v) = merged_config.webserver_timeout {
-        config_file_properties.insert(
-            SupersetConfigOptions::SupersetWebserverTimeout.to_string(),
-            v.to_string(),
-        );
-    }
-
-    // Step 3: User configOverrides — plain string key/values, already merged role<-role-group
-    // (role-group wins) by `with_validated_config`. operator-rs #1219 removed the nullable
-    // `Option<String>` values, so there is no `null`/unset concept anymore.
-    config_file_properties.extend(
-        validated_rg
-            .config
-            .config_overrides
-            .superset_config_py
-            .overrides
-            .clone(),
-    );
-
-    // --- env_overrides ---
-    // The MAPBOX secret is injected first, then the merged user envOverrides extend on top so a
-    // user-set key wins — the same precedence as before. Collected into a BTreeMap for a
-    // deterministic order.
-    let mut env_overrides: BTreeMap<String, String> = BTreeMap::new();
-    if let Some(mapbox_secret) = &superset.spec.cluster_config.mapbox_secret {
-        env_overrides.insert(
-            SupersetConfig::MAPBOX_SECRET_PROPERTY.to_string(),
-            mapbox_secret.clone(),
-        );
-    }
-    env_overrides.extend(
-        validated_rg
-            .config
-            .env_overrides
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone())),
-    );
-
-    (config_file_properties, env_overrides)
 }
 
 #[cfg(test)]
@@ -272,17 +212,12 @@ mod tests {
             .get(&SupersetRole::Node)
             .and_then(|groups| groups.get("default"))
             .expect("node default rolegroup");
+        let overrides = &node.config_overrides.superset_config_py.overrides;
 
+        assert_eq!(overrides.get("ROLE_ONLY"), Some(&"role".to_string()));
+        assert_eq!(overrides.get("GROUP_ONLY"), Some(&"group".to_string()));
         assert_eq!(
-            node.config_file_properties.get("ROLE_ONLY"),
-            Some(&"role".to_string())
-        );
-        assert_eq!(
-            node.config_file_properties.get("GROUP_ONLY"),
-            Some(&"group".to_string())
-        );
-        assert_eq!(
-            node.config_file_properties.get("SHARED"),
+            overrides.get("SHARED"),
             Some(&"group".to_string()),
             "role-group override should win over the role-level value"
         );

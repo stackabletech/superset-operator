@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -26,6 +24,7 @@ use stackable_operator::{
     },
     role_utils::RoleGroupRef,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
+    v2::builder::pod::container::EnvVarSet,
 };
 
 use crate::{
@@ -102,7 +101,7 @@ pub fn build_worker_rolegroup_deployment(
     resolved_product_image: &ResolvedProductImage,
     superset_role: &SupersetRole,
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
-    env_overrides: &BTreeMap<String, String>,
+    env_overrides: &EnvVarSet,
     sa_name: &str,
     merged_config: &SupersetConfig,
 ) -> Result<Deployment> {
@@ -163,16 +162,13 @@ pub fn build_worker_rolegroup_deployment(
         celery_broker_connection_details.add_to_container(&mut superset_cb);
     }
 
-    for (name, value) in env_overrides.clone() {
-        if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
-            superset_cb.add_env_var_from_secret(
-                "MAPBOX_API_KEY",
-                &value,
-                "connections.mapboxApiKey",
-            );
-        } else {
-            superset_cb.add_env_var(name, value);
-        };
+    superset_cb.add_env_vars(env_overrides.clone());
+    if let Some(mapbox_secret) = &superset.spec.cluster_config.mapbox_secret {
+        superset_cb.add_env_var_from_secret(
+            "MAPBOX_API_KEY",
+            mapbox_secret,
+            "connections.mapboxApiKey",
+        );
     }
 
     // SECRET_KEY from auto-generated secret
@@ -359,7 +355,7 @@ pub fn build_beat_rolegroup_deployment(
     resolved_product_image: &ResolvedProductImage,
     superset_role: &SupersetRole,
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
-    env_overrides: &BTreeMap<String, String>,
+    env_overrides: &EnvVarSet,
     sa_name: &str,
     merged_config: &SupersetConfig,
 ) -> Result<Deployment> {
@@ -420,16 +416,13 @@ pub fn build_beat_rolegroup_deployment(
         celery_broker_connection_details.add_to_container(&mut superset_cb);
     }
 
-    for (name, value) in env_overrides.clone() {
-        if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
-            superset_cb.add_env_var_from_secret(
-                "MAPBOX_API_KEY",
-                &value,
-                "connections.mapboxApiKey",
-            );
-        } else {
-            superset_cb.add_env_var(name, value);
-        };
+    superset_cb.add_env_vars(env_overrides.clone());
+    if let Some(mapbox_secret) = &superset.spec.cluster_config.mapbox_secret {
+        superset_cb.add_env_var_from_secret(
+            "MAPBOX_API_KEY",
+            mapbox_secret,
+            "connections.mapboxApiKey",
+        );
     }
 
     // SECRET_KEY from auto-generated secret

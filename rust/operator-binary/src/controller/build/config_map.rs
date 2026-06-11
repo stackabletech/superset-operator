@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
@@ -12,8 +10,8 @@ use crate::{
     config::{product_logging::extend_config_map_with_log_config, superset_config},
     controller::{SUPERSET_CONTROLLER_NAME, ValidatedCluster},
     crd::{
-        SUPERSET_CONFIG_FILENAME,
-        v1alpha1::{Container, SupersetCluster},
+        SUPERSET_CONFIG_FILENAME, SupersetRole,
+        v1alpha1::{Container, SupersetCluster, SupersetConfig, SupersetConfigOverrides},
     },
     resources::build_recommended_labels,
 };
@@ -49,15 +47,19 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 pub fn build_rolegroup_config_map(
     superset: &SupersetCluster,
     validated: &ValidatedCluster,
+    role: &SupersetRole,
     rolegroup: &RoleGroupRef<SupersetCluster>,
-    config_file_properties: &BTreeMap<String, String>,
+    merged_config: &SupersetConfig,
+    config_overrides: &SupersetConfigOverrides,
     logging: &Logging<Container>,
 ) -> Result<ConfigMap, Error> {
     let config_file = superset_config::build(
         superset,
         &validated.cluster_config.authentication_config,
         &validated.cluster_config.opa_config,
-        config_file_properties,
+        role,
+        merged_config,
+        config_overrides,
     )
     .with_context(|_| BuildSupersetConfigSnafu {
         rolegroup: rolegroup.clone(),

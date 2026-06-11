@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -33,15 +33,18 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
     shared::time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
+    v2::builder::pod::container::EnvVarSet,
 };
 
 use crate::{
-    config::{commands::add_cert_to_python_certifi_command, product_logging::LOG_CONFIG_FILE},
+    config::{
+        commands::add_cert_to_python_certifi_command, product_logging::LOG_CONFIG_FILE,
+        superset_config::DEFAULT_WEBSERVER_TIMEOUT,
+    },
     controller::{SUPERSET_CONTROLLER_NAME, ValidatedCluster},
     crd::{
         APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
-        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
-        SupersetConfigOptions, SupersetRole,
+        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SupersetRole,
         authentication::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
         },
@@ -90,9 +93,6 @@ pub enum Error {
         source: stackable_operator::builder::meta::Error,
     },
 
-    #[snafu(display("failed to get {timeout} from {SUPERSET_CONFIG_FILENAME} file. It should be set in the product config or by user input", timeout = SupersetConfigOptions::SupersetWebserverTimeout))]
-    MissingWebServerTimeoutInSupersetConfig,
-
     #[snafu(display("failed to configure logging"))]
     ConfigureLogging {
         source: product_logging::framework::LoggingError,
@@ -133,8 +133,7 @@ pub fn build_server_rolegroup_statefulset(
     validated: &ValidatedCluster,
     superset_role: &SupersetRole,
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
-    config_file_properties: &BTreeMap<String, String>,
-    env_overrides: &BTreeMap<String, String>,
+    env_overrides: &EnvVarSet,
     sa_name: &str,
     merged_config: &SupersetConfig,
 ) -> Result<StatefulSet> {
@@ -205,16 +204,13 @@ pub fn build_server_rolegroup_statefulset(
         celery_broker_connection_details.add_to_container(&mut superset_cb);
     }
 
-    for (name, value) in env_overrides.clone() {
-        if name == SupersetConfig::MAPBOX_SECRET_PROPERTY {
-            superset_cb.add_env_var_from_secret(
-                "MAPBOX_API_KEY",
-                &value,
-                "connections.mapboxApiKey",
-            );
-        } else {
-            superset_cb.add_env_var(name, value);
-        };
+    superset_cb.add_env_vars(env_overrides.clone());
+    if let Some(mapbox_secret) = &superset.spec.cluster_config.mapbox_secret {
+        superset_cb.add_env_var_from_secret(
+            "MAPBOX_API_KEY",
+            mapbox_secret,
+            "connections.mapboxApiKey",
+        );
     }
 
     // SECRET_KEY from auto-generated secret
@@ -230,9 +226,11 @@ pub fn build_server_rolegroup_statefulset(
         pb,
     )?;
 
-    let webserver_timeout = config_file_properties
-        .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
-        .context(MissingWebServerTimeoutInSupersetConfigSnafu)?;
+    // The gunicorn worker timeout mirrors the `SUPERSET_WEBSERVER_TIMEOUT` written into
+    // `superset_config.py` (see `config::superset_config`).
+    let webserver_timeout = merged_config
+        .webserver_timeout
+        .unwrap_or(DEFAULT_WEBSERVER_TIMEOUT);
 
     let secret = &superset.spec.cluster_config.credentials_secret_name;
 

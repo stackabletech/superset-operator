@@ -65,13 +65,18 @@ pub struct ValidatedRoleConfig {
     pub group_listener_name: Option<String>,
 }
 
-/// Per-rolegroup configuration: the merged CRD config plus the assembled property maps.
-#[derive(Clone, Debug)]
-pub struct ValidatedRoleGroupConfig {
-    pub merged_config: SupersetConfig,
-    pub config_file_properties: BTreeMap<String, String>,
-    pub env_overrides: BTreeMap<String, String>,
-}
+/// Per-rolegroup configuration: the merged CRD config plus the overrides.
+///
+/// This is the generic [`stackable_operator::v2::role_utils::RoleGroupConfig`]: the merged config
+/// fragment in `config`, the typed `config_overrides` (role-group merged over role) and the merged
+/// `env_overrides`/`cli_overrides`/`pod_overrides`. The config overrides are kept typed
+/// ([`SupersetConfigOverrides`](crate::crd::v1alpha1::SupersetConfigOverrides)) and assembled into
+/// the rendered `superset_config.py` later, in the build step.
+pub type SupersetRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupConfig<
+    SupersetConfig,
+    stackable_operator::v2::role_utils::GenericCommonConfig,
+    crate::crd::v1alpha1::SupersetConfigOverrides,
+>;
 
 /// Cluster-wide configuration that applies to every role and role group.
 ///
@@ -92,7 +97,7 @@ pub struct ValidatedCluster {
     metadata: ObjectMeta,
     pub image: ResolvedProductImage,
     pub cluster_config: ValidatedClusterConfig,
-    pub role_groups: BTreeMap<SupersetRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
+    pub role_groups: BTreeMap<SupersetRole, BTreeMap<String, SupersetRoleGroupConfig>>,
     pub role_configs: BTreeMap<SupersetRole, ValidatedRoleConfig>,
 }
 
@@ -101,7 +106,7 @@ impl ValidatedCluster {
         superset: &SupersetCluster,
         image: ResolvedProductImage,
         cluster_config: ValidatedClusterConfig,
-        role_groups: BTreeMap<SupersetRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
+        role_groups: BTreeMap<SupersetRole, BTreeMap<String, SupersetRoleGroupConfig>>,
         role_configs: BTreeMap<SupersetRole, ValidatedRoleConfig>,
     ) -> Self {
         Self {
@@ -348,13 +353,15 @@ pub async fn reconcile_superset(
     for (superset_role, rolegroup_configs) in validated.role_groups.iter() {
         for (rolegroup_name, validated_rolegroup) in rolegroup_configs.iter() {
             let rolegroup = superset.rolegroup_ref(superset_role, rolegroup_name);
-            let config = &validated_rolegroup.merged_config;
+            let config = &validated_rolegroup.config;
 
             let rg_configmap = build::config_map::build_rolegroup_config_map(
                 superset,
                 &validated,
+                superset_role,
                 &rolegroup,
-                &validated_rolegroup.config_file_properties,
+                config,
+                &validated_rolegroup.config_overrides,
                 &config.logging,
             )
             .context(BuildConfigMapSnafu)?;
@@ -395,7 +402,6 @@ pub async fn reconcile_superset(
                         &validated,
                         superset_role,
                         &rolegroup,
-                        &validated_rolegroup.config_file_properties,
                         &validated_rolegroup.env_overrides,
                         &rbac_sa.name_any(),
                         config,
