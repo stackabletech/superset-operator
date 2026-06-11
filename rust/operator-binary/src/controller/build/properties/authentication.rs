@@ -1,0 +1,341 @@
+//! Renders the authentication-related `superset_config.py` properties (LDAP / OIDC).
+
+use std::collections::BTreeMap;
+
+use indoc::formatdoc;
+use snafu::{ResultExt, Snafu};
+use stackable_operator::crd::authentication::{ldap, oidc};
+
+use crate::crd::{
+    SupersetConfigOptions,
+    authentication::{
+        self, DEFAULT_OIDC_PROVIDER, SupersetAuthenticationClassResolved,
+        SupersetClientAuthenticationDetailsResolved,
+    },
+};
+
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display("Failed to create LDAP endpoint url."))]
+    FailedToCreateLdapEndpointUrl {
+        source: stackable_operator::crd::authentication::ldap::v1alpha1::Error,
+    },
+
+    #[snafu(display("invalid OIDC endpoint"))]
+    InvalidOidcEndpoint {
+        source: stackable_operator::crd::authentication::oidc::v1alpha1::Error,
+    },
+
+    #[snafu(display("invalid well-known OIDC configuration URL"))]
+    InvalidWellKnownConfigUrl {
+        source: stackable_operator::crd::authentication::oidc::v1alpha1::Error,
+    },
+}
+
+/// Renders the authentication key/value properties for `superset_config.py`.
+pub fn authentication_properties(
+    auth_config: &SupersetClientAuthenticationDetailsResolved,
+) -> Result<BTreeMap<String, String>, Error> {
+    // SupersetClientAuthenticationDetailsResolved ensures that there
+    // are either only LDAP or OIDC providers configured. It is not
+    // necessary to check this here again.
+
+    let mut config = BTreeMap::new();
+
+    let ldap_providers = auth_config
+        .authentication_classes_resolved
+        .iter()
+        .filter_map(|auth_class| {
+            if let SupersetAuthenticationClassResolved::Ldap { provider } = auth_class {
+                Some(provider)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let oidc_providers = auth_config
+        .authentication_classes_resolved
+        .iter()
+        .filter_map(|auth_class| {
+            if let SupersetAuthenticationClassResolved::Oidc {
+                provider,
+                client_auth_options: oidc,
+            } = auth_class
+            {
+                Some((provider, oidc))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if let Some(ldap_provider) = ldap_providers.first() {
+        config.extend(ldap_properties(ldap_provider)?);
+    }
+
+    if !oidc_providers.is_empty() {
+        config.extend(oidc_properties(&oidc_providers)?);
+    }
+
+    config.insert(
+        SupersetConfigOptions::AuthUserRegistration.to_string(),
+        auth_config.user_registration.to_string(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthUserRegistrationRole.to_string(),
+        auth_config.user_registration_role.to_string(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthRolesSyncAtLogin.to_string(),
+        (auth_config.sync_roles_at == authentication::v1alpha1::FlaskRolesSyncMoment::Login)
+            .to_string(),
+    );
+
+    Ok(config)
+}
+
+fn ldap_properties(
+    ldap: &ldap::v1alpha1::AuthenticationProvider,
+) -> Result<BTreeMap<String, String>, Error> {
+    let mut config = BTreeMap::new();
+
+    config.insert(
+        SupersetConfigOptions::AuthType.to_string(),
+        "AUTH_LDAP".into(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthLdapServer.to_string(),
+        ldap.endpoint_url()
+            .context(FailedToCreateLdapEndpointUrlSnafu)?
+            .into(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthLdapSearch.to_string(),
+        ldap.search_base.clone(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthLdapSearchFilter.to_string(),
+        ldap.search_filter.clone(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthLdapUidField.to_string(),
+        ldap.ldap_field_names.uid.clone(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthLdapGroupField.to_string(),
+        ldap.ldap_field_names.group.clone(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthLdapFirstnameField.to_string(),
+        ldap.ldap_field_names.given_name.clone(),
+    );
+    config.insert(
+        SupersetConfigOptions::AuthLdapLastnameField.to_string(),
+        ldap.ldap_field_names.surname.clone(),
+    );
+
+    config.insert(
+        SupersetConfigOptions::AuthLdapTlsDemand.to_string(),
+        ldap.tls.uses_tls().to_string(),
+    );
+
+    if ldap.tls.uses_tls() {
+        if ldap.tls.uses_tls_verification() {
+            if let Some(ca_cert_path) = ldap.tls.tls_ca_cert_mount_path() {
+                config.insert(
+                    SupersetConfigOptions::AuthLdapTlsCacertfile.to_string(),
+                    ca_cert_path,
+                );
+            }
+        } else {
+            config.insert(
+                SupersetConfigOptions::AuthLdapAllowSelfSigned.to_string(),
+                true.to_string(),
+            );
+        }
+    }
+
+    if let Some((user_path, password_path)) = ldap.bind_credentials_mount_paths() {
+        config.insert(
+            SupersetConfigOptions::AuthLdapBindUser.to_string(),
+            format!("open('{user_path}').read()"),
+        );
+        config.insert(
+            SupersetConfigOptions::AuthLdapBindPassword.to_string(),
+            format!("open('{password_path}').read()"),
+        );
+    }
+
+    Ok(config)
+}
+
+fn oidc_properties(
+    providers: &[(
+        &oidc::v1alpha1::AuthenticationProvider,
+        &oidc::v1alpha1::ClientAuthenticationOptions<
+            oidc::v1alpha1::ClientAuthenticationMethodOption,
+        >,
+    )],
+) -> Result<BTreeMap<String, String>, Error> {
+    let mut config = BTreeMap::new();
+
+    config.insert(
+        SupersetConfigOptions::AuthType.to_string(),
+        "AUTH_OAUTH".into(),
+    );
+
+    let mut oauth_providers_config = Vec::new();
+
+    for (oidc, client_options) in providers {
+        let (env_client_id, env_client_secret) =
+            oidc::v1alpha1::AuthenticationProvider::client_credentials_env_names(
+                &client_options.client_credentials_secret_ref,
+            );
+        let mut scopes = oidc.scopes.clone();
+        scopes.extend_from_slice(&client_options.extra_scopes);
+
+        let oidc_provider = oidc
+            .provider_hint
+            .as_ref()
+            .unwrap_or(&DEFAULT_OIDC_PROVIDER);
+
+        let oauth_providers_config_entry = match oidc_provider {
+            oidc::v1alpha1::IdentityProviderHint::Keycloak => {
+                let endpoint_url = oidc.endpoint_url().context(InvalidOidcEndpointSnafu)?;
+                let mut api_base_url = endpoint_url.as_str().trim_end_matches('/').to_owned();
+                api_base_url.push_str("/protocol/");
+                let well_known_config_url = oidc
+                    .well_known_config_url()
+                    .context(InvalidWellKnownConfigUrlSnafu)?;
+                let client_auth_method = serde_json::to_value(
+                    client_options
+                        .product_specific_fields
+                        .client_authentication_method,
+                )
+                .expect("ClientAuthenticationMethod should serialize to JSON");
+                let client_auth_method = client_auth_method
+                    .as_str()
+                    .expect("ClientAuthenticationMethod should serialize to a string");
+
+                formatdoc!(
+                    "
+                      {{ 'name': 'keycloak',
+                        'icon': 'fa-key',
+                        'token_key': 'access_token',
+                        'remote_app': {{
+                          'client_id': os.environ.get('{env_client_id}'),
+                          'client_secret': os.environ.get('{env_client_secret}'),
+                          'client_kwargs': {{
+                            'scope': '{scopes}'
+                          }},
+                          'api_base_url': '{api_base_url}',
+                          'server_metadata_url': '{well_known_config_url}',
+                          'token_endpoint_auth_method': '{client_auth_method}',
+                        }},
+                      }}",
+                    scopes = scopes.join(" "),
+                )
+            }
+        };
+
+        oauth_providers_config.push(oauth_providers_config_entry);
+    }
+
+    config.insert(
+        SupersetConfigOptions::OauthProviders.to_string(),
+        formatdoc!(
+            "[
+             {joined_oauth_providers_config}
+             ]
+             ",
+            joined_oauth_providers_config = oauth_providers_config.join(",\n")
+        ),
+    );
+
+    Ok(config)
+}
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+    use stackable_operator::commons::tls_verification::{TlsClientDetails, TlsVerification};
+
+    use super::*;
+
+    #[rstest]
+    #[case(
+        "/",
+        "https://keycloak.mycorp.org/protocol/",
+        "https://keycloak.mycorp.org/.well-known/openid-configuration"
+    )]
+    #[case(
+        "",
+        "https://keycloak.mycorp.org/protocol/",
+        "https://keycloak.mycorp.org/.well-known/openid-configuration"
+    )]
+    #[case(
+        "/realms/sdp",
+        "https://keycloak.mycorp.org/realms/sdp/protocol/",
+        "https://keycloak.mycorp.org/realms/sdp/.well-known/openid-configuration"
+    )]
+    #[case(
+        "/realms/sdp/",
+        "https://keycloak.mycorp.org/realms/sdp/protocol/",
+        "https://keycloak.mycorp.org/realms/sdp/.well-known/openid-configuration"
+    )]
+    #[case(
+        "/realms/sdp/////",
+        "https://keycloak.mycorp.org/realms/sdp/protocol/",
+        "https://keycloak.mycorp.org/realms/sdp/.well-known/openid-configuration"
+    )]
+    fn test_oidc_properties(
+        #[case] root_path: String,
+        #[case] expected_api_base_url: &str,
+        #[case] expected_server_metadata_url: &str,
+    ) {
+        use stackable_operator::commons::tls_verification::{CaCert, Tls, TlsServerVerification};
+
+        let provider = oidc::v1alpha1::AuthenticationProvider::new(
+            "keycloak.mycorp.org".to_owned().try_into().unwrap(),
+            Some(443),
+            root_path,
+            TlsClientDetails {
+                tls: Some(Tls {
+                    verification: TlsVerification::Server(TlsServerVerification {
+                        ca_cert: CaCert::WebPki {},
+                    }),
+                }),
+            },
+            "preferred_username".to_owned(),
+            vec!["openid".to_owned()],
+            None,
+        );
+        let oidc = oidc::v1alpha1::ClientAuthenticationOptions {
+            client_credentials_secret_ref: "nifi-keycloak-client".to_owned(),
+            extra_scopes: vec![],
+            product_specific_fields: oidc::v1alpha1::ClientAuthenticationMethodOption {
+                client_authentication_method: Default::default(),
+            },
+        };
+
+        let properties = oidc_properties(&[(&provider, &oidc)]).expect("OIDC config adding failed");
+
+        assert_eq!(properties.get("AUTH_TYPE"), Some(&"AUTH_OAUTH".to_owned()));
+        let oauth_providers = properties
+            .get("OAUTH_PROVIDERS")
+            .expect("OAUTH_PROVIDERS missing");
+
+        // This is neither valid yaml or json (it's Python code), so we can not easily parse it and have nice assertions.
+        // As we don't want to have a Python runtime just for this test, let's grep a bit...
+        assert!(oauth_providers.contains("'name': 'keycloak'"));
+        assert!(oauth_providers.contains("client_id': os.environ.get("));
+        assert!(oauth_providers.contains("client_secret': os.environ.get("));
+        assert!(oauth_providers.contains("'scope': 'openid'"));
+        assert!(oauth_providers.contains("'token_endpoint_auth_method': 'client_secret_basic'"));
+        assert!(oauth_providers.contains(&format!("'api_base_url': '{expected_api_base_url}'")));
+        assert!(oauth_providers.contains(&format!(
+            "'server_metadata_url': '{expected_server_metadata_url}'"
+        )));
+    }
+}

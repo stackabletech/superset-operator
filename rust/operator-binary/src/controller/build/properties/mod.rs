@@ -1,5 +1,8 @@
 //! Per-file builders for the Superset config files.
 
+pub mod authentication;
+pub mod superset_config;
+
 /// The names of the Superset config files assembled into the rolegroup `ConfigMap`.
 ///
 /// This is the single source of truth for the on-disk file names; nothing else should
