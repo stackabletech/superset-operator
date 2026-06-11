@@ -10,7 +10,7 @@ use stackable_operator::{
 
 use crate::{
     config::{product_logging::extend_config_map_with_log_config, superset_config},
-    controller::{SUPERSET_CONTROLLER_NAME, ValidatedSupersetCluster},
+    controller::{SUPERSET_CONTROLLER_NAME, ValidatedCluster},
     crd::{
         SUPERSET_CONFIG_FILENAME,
         v1alpha1::{Container, SupersetCluster},
@@ -48,15 +48,15 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 /// The rolegroup [`ConfigMap`] configures the rolegroup based on the configuration given by the administrator
 pub fn build_rolegroup_config_map(
     superset: &SupersetCluster,
-    validated: &ValidatedSupersetCluster,
+    validated: &ValidatedCluster,
     rolegroup: &RoleGroupRef<SupersetCluster>,
     config_file_properties: &BTreeMap<String, String>,
     logging: &Logging<Container>,
 ) -> Result<ConfigMap, Error> {
     let config_file = superset_config::build(
         superset,
-        &validated.authentication_config,
-        &validated.opa_config,
+        &validated.cluster_config.authentication_config,
+        &validated.cluster_config.opa_config,
         config_file_properties,
     )
     .with_context(|_| BuildSupersetConfigSnafu {

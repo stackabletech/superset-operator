@@ -386,7 +386,9 @@ impl Default for v1alpha1::SupersetRoleConfig {
     Eq,
     Hash,
     JsonSchema,
+    Ord,
     PartialEq,
+    PartialOrd,
     Serialize,
 )]
 pub enum SupersetRole {

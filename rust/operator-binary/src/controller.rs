@@ -2,10 +2,7 @@
 pub(crate) mod build;
 pub mod dereference;
 pub mod validate;
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
 use const_format::concatcp;
 use snafu::{ResultExt, Snafu};
@@ -18,6 +15,7 @@ use stackable_operator::{
     },
     kube::{
         Resource, ResourceExt,
+        api::ObjectMeta,
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
@@ -75,15 +73,83 @@ pub struct ValidatedRoleGroupConfig {
     pub env_overrides: BTreeMap<String, String>,
 }
 
-/// The validated cluster: proves that config merging succeeded for every role and role group
-/// before any Kubernetes resources are created. Carries the dereferenced external objects so
-/// downstream code has a single "ready to use" view of the cluster.
-pub struct ValidatedSupersetCluster {
-    pub image: ResolvedProductImage,
-    pub role_groups: HashMap<SupersetRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
-    pub role_configs: HashMap<SupersetRole, ValidatedRoleConfig>,
+/// Cluster-wide configuration that applies to every role and role group.
+///
+/// Carries the dereferenced external references, so every downstream build step reads them from
+/// here rather than from the raw cluster object.
+#[derive(Clone, Debug)]
+pub struct ValidatedClusterConfig {
     pub authentication_config: SupersetClientAuthenticationDetailsResolved,
     pub opa_config: Option<SupersetOpaConfigResolved>,
+}
+
+/// The validated cluster: proves that config merging succeeded for every role and role group
+/// before any Kubernetes resources are created.
+#[derive(Clone, Debug)]
+pub struct ValidatedCluster {
+    /// `ObjectMeta` carrying `name`, `namespace` and `uid`, captured during validation, so this
+    /// struct can stand in as the owner [`Resource`] for child objects.
+    metadata: ObjectMeta,
+    pub image: ResolvedProductImage,
+    pub cluster_config: ValidatedClusterConfig,
+    pub role_groups: BTreeMap<SupersetRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
+    pub role_configs: BTreeMap<SupersetRole, ValidatedRoleConfig>,
+}
+
+impl ValidatedCluster {
+    pub fn new(
+        superset: &SupersetCluster,
+        image: ResolvedProductImage,
+        cluster_config: ValidatedClusterConfig,
+        role_groups: BTreeMap<SupersetRole, BTreeMap<String, ValidatedRoleGroupConfig>>,
+        role_configs: BTreeMap<SupersetRole, ValidatedRoleConfig>,
+    ) -> Self {
+        Self {
+            // Capture only the identity fields needed to own child objects.
+            metadata: ObjectMeta {
+                name: Some(superset.name_any()),
+                namespace: superset.namespace(),
+                uid: superset.uid(),
+                ..ObjectMeta::default()
+            },
+            image,
+            cluster_config,
+            role_groups,
+            role_configs,
+        }
+    }
+}
+
+/// Lets [`ValidatedCluster`] stand in for the raw [`SupersetCluster`] when building owner
+/// references and metadata for child objects. Kind/group/version are delegated to the CRD; the
+/// `metadata` (name, namespace, uid) is captured during validation.
+impl Resource for ValidatedCluster {
+    type DynamicType = <SupersetCluster as Resource>::DynamicType;
+    type Scope = <SupersetCluster as Resource>::Scope;
+
+    fn kind(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        SupersetCluster::kind(dt)
+    }
+
+    fn group(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        SupersetCluster::group(dt)
+    }
+
+    fn version(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        SupersetCluster::version(dt)
+    }
+
+    fn plural(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        SupersetCluster::plural(dt)
+    }
+
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
+
+    fn meta_mut(&mut self) -> &mut ObjectMeta {
+        &mut self.metadata
+    }
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]

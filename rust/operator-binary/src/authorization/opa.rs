@@ -7,6 +7,7 @@ use crate::crd::v1alpha1;
 pub const OPA_IMPORTS: &[&str] =
     &["from opa_authorizer.opa_manager import OpaSupersetSecurityManager"];
 
+#[derive(Clone, Debug)]
 pub struct SupersetOpaConfigResolved {
     opa_endpoint: String,
     cache_max_entries: u32,

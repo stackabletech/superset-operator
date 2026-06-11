@@ -37,7 +37,7 @@ use stackable_operator::{
 
 use crate::{
     config::{commands::add_cert_to_python_certifi_command, product_logging::LOG_CONFIG_FILE},
-    controller::{SUPERSET_CONTROLLER_NAME, ValidatedSupersetCluster},
+    controller::{SUPERSET_CONTROLLER_NAME, ValidatedCluster},
     crd::{
         APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
         STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SUPERSET_CONFIG_FILENAME,
@@ -130,7 +130,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 #[allow(clippy::too_many_arguments)]
 pub fn build_server_rolegroup_statefulset(
     superset: &SupersetCluster,
-    validated: &ValidatedSupersetCluster,
+    validated: &ValidatedCluster,
     superset_role: &SupersetRole,
     rolegroup_ref: &RoleGroupRef<SupersetCluster>,
     config_file_properties: &BTreeMap<String, String>,
@@ -225,7 +225,7 @@ pub fn build_server_rolegroup_statefulset(
     );
 
     add_authentication_volumes_and_volume_mounts(
-        &validated.authentication_config,
+        &validated.cluster_config.authentication_config,
         &mut superset_cb,
         pb,
     )?;
@@ -250,7 +250,7 @@ pub fn build_server_rolegroup_statefulset(
         // Needed by the `containerdebug` process to log it's tracing information to.
         .add_env_var("CONTAINERDEBUG_LOG_DIRECTORY", format!("{STACKABLE_LOG_DIR}/containerdebug"))
         .add_env_var("SSL_CERT_DIR", "/stackable/certs/")
-        .add_env_vars(authentication_env_vars(&validated.authentication_config))
+        .add_env_vars(authentication_env_vars(&validated.cluster_config.authentication_config))
         .command(vec![
             "/bin/bash".to_string(),
             "-x".to_string(),
@@ -282,7 +282,7 @@ pub fn build_server_rolegroup_statefulset(
 
             {create_vector_shutdown_file_command}
         ",
-            auth_commands = authentication_start_commands(&validated.authentication_config),
+            auth_commands = authentication_start_commands(&validated.cluster_config.authentication_config),
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             create_vector_shutdown_file_command =

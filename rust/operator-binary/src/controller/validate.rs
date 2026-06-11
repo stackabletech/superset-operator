@@ -1,9 +1,9 @@
 //! The validate step in the SupersetCluster controller.
 //!
 //! Synchronously validates inputs that don't require a Kubernetes client. Produces
-//! [`ValidatedSupersetCluster`], consumed by the rest of `reconcile_superset`.
+//! [`ValidatedCluster`], consumed by the rest of `reconcile_superset`.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -18,8 +18,8 @@ use strum::IntoEnumIterator;
 use crate::{
     built_info::PKG_VERSION,
     controller::{
-        CONTAINER_IMAGE_BASE_NAME, ValidatedRoleConfig, ValidatedRoleGroupConfig,
-        ValidatedSupersetCluster, dereference::DereferencedObjects,
+        CONTAINER_IMAGE_BASE_NAME, ValidatedCluster, ValidatedClusterConfig, ValidatedRoleConfig,
+        ValidatedRoleGroupConfig, dereference::DereferencedObjects,
     },
     crd::{
         SupersetConfigOptions, SupersetRole,
@@ -45,7 +45,7 @@ pub fn validate_cluster(
     superset: &SupersetCluster,
     dereferenced: DereferencedObjects,
     image_repository: &str,
-) -> Result<ValidatedSupersetCluster, Error> {
+) -> Result<ValidatedCluster, Error> {
     let DereferencedObjects {
         authentication_config,
         opa_config,
@@ -57,8 +57,8 @@ pub fn validate_cluster(
         .resolve(CONTAINER_IMAGE_BASE_NAME, image_repository, PKG_VERSION)
         .context(ResolveProductImageSnafu)?;
 
-    let mut role_groups = HashMap::new();
-    let mut role_configs = HashMap::new();
+    let mut role_groups = BTreeMap::new();
+    let mut role_configs = BTreeMap::new();
 
     for role in SupersetRole::iter() {
         let Some(resolved_role) = superset.get_role(&role) else {
@@ -109,13 +109,16 @@ pub fn validate_cluster(
         role_groups.insert(role, group_configs);
     }
 
-    Ok(ValidatedSupersetCluster {
-        image: resolved_product_image,
+    Ok(ValidatedCluster::new(
+        superset,
+        resolved_product_image,
+        ValidatedClusterConfig {
+            authentication_config,
+            opa_config,
+        },
         role_groups,
         role_configs,
-        authentication_config,
-        opa_config,
-    })
+    ))
 }
 
 // DESIGN DECISION: `with_validated_config` (operator-rs) performs the config-fragment
