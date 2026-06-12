@@ -1,5 +1,8 @@
 use snafu::{ResultExt, Snafu};
-use stackable_operator::{builder::meta::ObjectMetaBuilder, crd::listener, kvp::ObjectLabels};
+use stackable_operator::{
+    builder::meta::ObjectMetaBuilder, crd::listener, kvp::ObjectLabels,
+    v2::builder::meta::ownerreference_from_resource,
+};
 
 use crate::{
     controller::ValidatedCluster,
@@ -11,10 +14,6 @@ pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("object is missing metadata to build owner reference"))]
-    ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::builder::meta::Error,
-    },
     #[snafu(display("failed to build Metadata"))]
     MetadataBuild {
         source: stackable_operator::builder::meta::Error,
@@ -30,8 +29,7 @@ pub fn build_group_listener(
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(validated)
         .name(listener_group_name)
-        .ownerreference_from_resource(validated, None, Some(true))
-        .context(ObjectMissingMetadataForOwnerRefSnafu)?
+        .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
         .with_recommended_labels(&object_labels)
         .context(MetadataBuildSnafu)?
         .build();

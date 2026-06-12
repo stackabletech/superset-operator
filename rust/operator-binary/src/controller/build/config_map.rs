@@ -4,6 +4,7 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::ConfigMap,
     product_logging::{framework::VECTOR_CONFIG_FILE, spec::Logging},
     role_utils::RoleGroupRef,
+    v2::builder::meta::ownerreference_from_resource,
 };
 
 use crate::{
@@ -20,24 +21,19 @@ use crate::{
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("object is missing metadata to build owner reference"))]
-    ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::builder::meta::Error,
-    },
-
     #[snafu(display("failed to build {config_file} for {rolegroup}", config_file = ConfigFileName::SupersetConfig))]
-    BuildSupersetConfig {
+    SupersetConfig {
         source: superset_config::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
 
     #[snafu(display("failed to build Metadata"))]
-    BuildMetadata {
+    Metadata {
         source: stackable_operator::builder::meta::Error,
     },
 
     #[snafu(display("failed to build ConfigMap for {rolegroup}"))]
-    BuildRoleGroupConfig {
+    RoleGroupConfig {
         source: stackable_operator::builder::configmap::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
     },
@@ -55,7 +51,7 @@ pub fn build_rolegroup_config_map(
     logging: &Logging<Container>,
 ) -> Result<ConfigMap, Error> {
     let config_file = superset_config::build(validated, role, merged_config, config_overrides)
-        .with_context(|_| BuildSupersetConfigSnafu {
+        .with_context(|_| SupersetConfigSnafu {
             rolegroup: rolegroup.clone(),
         })?;
 
@@ -66,8 +62,7 @@ pub fn build_rolegroup_config_map(
             ObjectMetaBuilder::new()
                 .name_and_namespace(validated)
                 .name(rolegroup.object_name())
-                .ownerreference_from_resource(validated, None, Some(true))
-                .context(ObjectMissingMetadataForOwnerRefSnafu)?
+                .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
                 .with_recommended_labels(&build_recommended_labels(
                     validated,
                     SUPERSET_CONTROLLER_NAME,
@@ -75,7 +70,7 @@ pub fn build_rolegroup_config_map(
                     &rolegroup.role,
                     &rolegroup.role_group,
                 ))
-                .context(BuildMetadataSnafu)?
+                .context(MetadataSnafu)?
                 .build(),
         )
         .add_data(ConfigFileName::SupersetConfig.to_string(), config_file);
@@ -87,9 +82,7 @@ pub fn build_rolegroup_config_map(
         cm_builder.add_data(VECTOR_CONFIG_FILE, vector_config);
     }
 
-    cm_builder
-        .build()
-        .with_context(|_| BuildRoleGroupConfigSnafu {
-            rolegroup: rolegroup.clone(),
-        })
+    cm_builder.build().with_context(|_| RoleGroupConfigSnafu {
+        rolegroup: rolegroup.clone(),
+    })
 }

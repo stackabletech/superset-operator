@@ -2,7 +2,7 @@
 pub(crate) mod build;
 pub mod dereference;
 pub mod validate;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, str::FromStr, sync::Arc};
 
 use const_format::concatcp;
 use snafu::{ResultExt, Snafu};
@@ -26,6 +26,7 @@ use stackable_operator::{
         compute_conditions, deployment::DeploymentConditionBuilder,
         operations::ClusterOperationsConditionBuilder, statefulset::StatefulSetConditionBuilder,
     },
+    v2::{HasName, HasUid, types::kubernetes::Uid},
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -171,6 +172,25 @@ impl Resource for ValidatedCluster {
 
     fn meta_mut(&mut self) -> &mut ObjectMeta {
         &mut self.metadata
+    }
+}
+
+impl HasName for ValidatedCluster {
+    fn to_name(&self) -> String {
+        self.name_any()
+    }
+}
+
+impl HasUid for ValidatedCluster {
+    fn to_uid(&self) -> Uid {
+        Uid::from_str(
+            &self
+                .metadata
+                .uid
+                .clone()
+                .expect("the uid is captured during validation"),
+        )
+        .expect("the uid is a valid Kubernetes UID")
     }
 }
 

@@ -962,9 +962,9 @@ rec {
       };
       "cc" = rec {
         crateName = "cc";
-        version = "1.2.63";
+        version = "1.2.64";
         edition = "2018";
-        sha256 = "0zy2bqc4nvj6bv2cipx4h4bn65wf1zqf1fw1hsh64mmvg1hh2vjm";
+        sha256 = "07shcd8faxw7csz13m3cg2mj6i8z07pqs960k181pscbjpyqgn6s";
         authors = [
           "Alex Crichton <alex@alexcrichton.com>"
         ];
@@ -1740,14 +1740,6 @@ rec {
         authors = [
           "Jacob Pratt <jacob@jhpratt.dev>"
         ];
-        dependencies = [
-          {
-            name = "powerfmt";
-            packageId = "powerfmt";
-            optional = true;
-            usesDefaultFeatures = false;
-          }
-        ];
         features = {
           "macros" = [ "dep:deranged-macros" ];
           "num" = [ "dep:num-traits" ];
@@ -1759,7 +1751,7 @@ rec {
           "rand09" = [ "dep:rand09" ];
           "serde" = [ "dep:serde_core" ];
         };
-        resolvedDefaultFeatures = [ "default" "powerfmt" ];
+        resolvedDefaultFeatures = [ "default" ];
       };
       "derive_more" = rec {
         crateName = "derive_more";
@@ -4826,8 +4818,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "451088f77acee6c3d296754698260256c250ecb2";
-          sha256 = "1ifdpn0jvrf3xbgqldqxrq9ig1dc34d4fip7qxn38526k8004p4b";
+          rev = "1e8099fd157b06f27d93854b0838f67871448c4e";
+          sha256 = "0s5giiz1zhz644s2fy9bfvd1hybm4smz75ak33fkvh2flvjfqba3";
         };
         libName = "k8s_version";
         authors = [
@@ -5690,9 +5682,9 @@ rec {
       };
       "memchr" = rec {
         crateName = "memchr";
-        version = "2.8.1";
+        version = "2.8.2";
         edition = "2021";
-        sha256 = "1n448jx01h5z2xknj6x2dhxgr8s8fb717cf6vfqj5lmhkpj7m53b";
+        sha256 = "1i33wr49pcz2sbd12nds3n9fszay8kq5bk78gwciz462mcs49448";
         authors = [
           "Andrew Gallant <jamslam@gmail.com>"
           "bluss"
@@ -9200,9 +9192,9 @@ rec {
       };
       "smallvec" = rec {
         crateName = "smallvec";
-        version = "1.15.1";
+        version = "1.15.2";
         edition = "2018";
-        sha256 = "00xxdxxpgyq5vjnpljvkmy99xij5rxgh913ii1v16kzynnivgcb7";
+        sha256 = "143wzbqf6vgapdp2z4qpl0yvlqcn17s8cnk8m28rqly808zsdmlf";
         authors = [
           "The Servo Project Developers"
         ];
@@ -9509,8 +9501,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "451088f77acee6c3d296754698260256c250ecb2";
-          sha256 = "1ifdpn0jvrf3xbgqldqxrq9ig1dc34d4fip7qxn38526k8004p4b";
+          rev = "1e8099fd157b06f27d93854b0838f67871448c4e";
+          sha256 = "0s5giiz1zhz644s2fy9bfvd1hybm4smz75ak33fkvh2flvjfqba3";
         };
         libName = "stackable_certs";
         authors = [
@@ -9612,8 +9604,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "451088f77acee6c3d296754698260256c250ecb2";
-          sha256 = "1ifdpn0jvrf3xbgqldqxrq9ig1dc34d4fip7qxn38526k8004p4b";
+          rev = "1e8099fd157b06f27d93854b0838f67871448c4e";
+          sha256 = "0s5giiz1zhz644s2fy9bfvd1hybm4smz75ak33fkvh2flvjfqba3";
         };
         libName = "stackable_operator";
         authors = [
@@ -9806,8 +9798,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "451088f77acee6c3d296754698260256c250ecb2";
-          sha256 = "1ifdpn0jvrf3xbgqldqxrq9ig1dc34d4fip7qxn38526k8004p4b";
+          rev = "1e8099fd157b06f27d93854b0838f67871448c4e";
+          sha256 = "0s5giiz1zhz644s2fy9bfvd1hybm4smz75ak33fkvh2flvjfqba3";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
@@ -9841,8 +9833,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "451088f77acee6c3d296754698260256c250ecb2";
-          sha256 = "1ifdpn0jvrf3xbgqldqxrq9ig1dc34d4fip7qxn38526k8004p4b";
+          rev = "1e8099fd157b06f27d93854b0838f67871448c4e";
+          sha256 = "0s5giiz1zhz644s2fy9bfvd1hybm4smz75ak33fkvh2flvjfqba3";
         };
         libName = "stackable_shared";
         authors = [
@@ -10024,8 +10016,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "451088f77acee6c3d296754698260256c250ecb2";
-          sha256 = "1ifdpn0jvrf3xbgqldqxrq9ig1dc34d4fip7qxn38526k8004p4b";
+          rev = "1e8099fd157b06f27d93854b0838f67871448c4e";
+          sha256 = "0s5giiz1zhz644s2fy9bfvd1hybm4smz75ak33fkvh2flvjfqba3";
         };
         libName = "stackable_telemetry";
         authors = [
@@ -10134,8 +10126,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "451088f77acee6c3d296754698260256c250ecb2";
-          sha256 = "1ifdpn0jvrf3xbgqldqxrq9ig1dc34d4fip7qxn38526k8004p4b";
+          rev = "1e8099fd157b06f27d93854b0838f67871448c4e";
+          sha256 = "0s5giiz1zhz644s2fy9bfvd1hybm4smz75ak33fkvh2flvjfqba3";
         };
         libName = "stackable_versioned";
         authors = [
@@ -10184,8 +10176,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "451088f77acee6c3d296754698260256c250ecb2";
-          sha256 = "1ifdpn0jvrf3xbgqldqxrq9ig1dc34d4fip7qxn38526k8004p4b";
+          rev = "1e8099fd157b06f27d93854b0838f67871448c4e";
+          sha256 = "0s5giiz1zhz644s2fy9bfvd1hybm4smz75ak33fkvh2flvjfqba3";
         };
         procMacro = true;
         libName = "stackable_versioned_macros";
@@ -10252,8 +10244,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech//operator-rs.git";
-          rev = "451088f77acee6c3d296754698260256c250ecb2";
-          sha256 = "1ifdpn0jvrf3xbgqldqxrq9ig1dc34d4fip7qxn38526k8004p4b";
+          rev = "1e8099fd157b06f27d93854b0838f67871448c4e";
+          sha256 = "0s5giiz1zhz644s2fy9bfvd1hybm4smz75ak33fkvh2flvjfqba3";
         };
         libName = "stackable_webhook";
         authors = [
@@ -10692,9 +10684,9 @@ rec {
       };
       "time" = rec {
         crateName = "time";
-        version = "0.3.47";
+        version = "0.3.48";
         edition = "2024";
-        sha256 = "0b7g9ly2iabrlgizliz6v5x23yq5d6bpp0mqz6407z1s526d8fvl";
+        sha256 = "1cjx3rbbh95jlap223vdwh5mppmp5jraq5y05vxnyy778j8ah6pw";
         authors = [
           "Jacob Pratt <open-source@jhpratt.dev>"
           "Time contributors"
@@ -10703,12 +10695,6 @@ rec {
           {
             name = "deranged";
             packageId = "deranged";
-            features = [ "powerfmt" ];
-          }
-          {
-            name = "itoa";
-            packageId = "itoa";
-            optional = true;
           }
           {
             name = "num-conv";
@@ -10748,13 +10734,14 @@ rec {
         features = {
           "alloc" = [ "serde_core?/alloc" ];
           "default" = [ "std" ];
-          "formatting" = [ "dep:itoa" "std" "time-macros?/formatting" ];
+          "formatting" = [ "std" "time-macros?/formatting" ];
           "large-dates" = [ "time-core/large-dates" "time-macros?/large-dates" ];
           "local-offset" = [ "std" "dep:libc" "dep:num_threads" ];
           "macros" = [ "dep:time-macros" ];
           "parsing" = [ "time-macros?/parsing" ];
           "quickcheck" = [ "dep:quickcheck" "alloc" "deranged/quickcheck" ];
-          "rand" = [ "rand08" "rand09" ];
+          "rand" = [ "rand08" "rand09" "rand010" ];
+          "rand010" = [ "dep:rand010" "deranged/rand010" ];
           "rand08" = [ "dep:rand08" "deranged/rand08" ];
           "rand09" = [ "dep:rand09" "deranged/rand09" ];
           "serde" = [ "dep:serde_core" "time-macros?/serde" "deranged/serde" ];
@@ -10767,9 +10754,9 @@ rec {
       };
       "time-core" = rec {
         crateName = "time-core";
-        version = "0.1.8";
+        version = "0.1.9";
         edition = "2024";
-        sha256 = "1jidl426mw48i7hjj4hs9vxgd9lwqq4vyalm4q8d7y4iwz7y353n";
+        sha256 = "028ix0ax7ixp1h1k5zsqwgw85w6y1q32irslma7ci6ddd5kr074y";
         libName = "time_core";
         authors = [
           "Jacob Pratt <open-source@jhpratt.dev>"
@@ -10780,9 +10767,9 @@ rec {
       };
       "time-macros" = rec {
         crateName = "time-macros";
-        version = "0.2.27";
+        version = "0.2.28";
         edition = "2024";
-        sha256 = "058ja265waq275wxvnfwavbz9r1hd4dgwpfn7a1a9a70l32y8w1f";
+        sha256 = "15fn0wxcmcq90dxhrwr6ix0k5k9w60k1xw46ymcwc33z6j3gwfwx";
         procMacro = true;
         libName = "time_macros";
         authors = [

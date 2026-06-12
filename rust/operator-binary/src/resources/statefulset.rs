@@ -33,6 +33,7 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
     shared::time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
+    v2::builder::meta::ownerreference_from_resource,
 };
 
 use crate::{
@@ -63,11 +64,6 @@ pub enum Error {
     #[snafu(display("invalid container name"))]
     InvalidContainerName {
         source: stackable_operator::builder::pod::container::Error,
-    },
-
-    #[snafu(display("object is missing metadata to build owner reference"))]
-    ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::builder::meta::Error,
     },
 
     #[snafu(display("vector agent is enabled but vector aggregator ConfigMap is missing"))]
@@ -370,8 +366,7 @@ pub fn build_server_rolegroup_statefulset(
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(validated)
             .name(rolegroup_ref.object_name())
-            .ownerreference_from_resource(validated, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
+            .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
             .with_recommended_labels(&recommended_object_labels)
             .context(MetadataBuildSnafu)?
             .with_label(

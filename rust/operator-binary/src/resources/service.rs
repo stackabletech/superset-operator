@@ -4,6 +4,7 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::{Service, ServicePort, ServiceSpec},
     kvp::{Annotations, Labels},
     role_utils::RoleGroupRef,
+    v2::builder::meta::ownerreference_from_resource,
 };
 
 use crate::{
@@ -14,10 +15,6 @@ use crate::{
 
 #[derive(Debug, Snafu)]
 pub enum Error {
-    #[snafu(display("object is missing metadata to build owner reference"))]
-    ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::builder::meta::Error,
-    },
     #[snafu(display("failed to build Metadata"))]
     MetadataBuild {
         source: stackable_operator::builder::meta::Error,
@@ -39,8 +36,7 @@ pub fn build_node_rolegroup_headless_service(
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(validated)
             .name(rolegroup_ref.rolegroup_headless_service_name())
-            .ownerreference_from_resource(validated, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
+            .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
             .with_recommended_labels(&build_recommended_labels(
                 validated,
                 SUPERSET_CONTROLLER_NAME,
@@ -82,8 +78,7 @@ pub fn build_node_rolegroup_metrics_service(
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(validated)
             .name(rolegroup_ref.rolegroup_metrics_service_name())
-            .ownerreference_from_resource(validated, None, Some(true))
-            .context(ObjectMissingMetadataForOwnerRefSnafu)?
+            .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
             .with_recommended_labels(&build_recommended_labels(
                 validated,
                 SUPERSET_CONTROLLER_NAME,
