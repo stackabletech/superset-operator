@@ -8,7 +8,6 @@ use stackable_operator::{
         },
     },
     k8s_openapi::api::core::v1::{ConfigMapVolumeSource, EmptyDirVolumeSource, Volume},
-    kvp::ObjectLabels,
     product_logging::{
         self,
         spec::{
@@ -18,15 +17,9 @@ use stackable_operator::{
     },
 };
 
-use crate::{
-    OPERATOR_NAME,
-    crd::{
-        APP_NAME,
-        databases::{
-            CeleryBrokerConnection, CeleryResultsBackendConnection,
-            CeleryResultsBackendConnectionDetails, MetadataDatabaseConnection,
-        },
-    },
+use crate::crd::databases::{
+    CeleryBrokerConnection, CeleryResultsBackendConnection, CeleryResultsBackendConnectionDetails,
+    MetadataDatabaseConnection,
 };
 
 pub mod deployment;
@@ -40,25 +33,6 @@ use crate::crd::MAX_LOG_FILES_SIZE;
 pub const CONFIG_VOLUME_NAME: &str = "config";
 pub const LOG_CONFIG_VOLUME_NAME: &str = "log-config";
 pub const LOG_VOLUME_NAME: &str = "log";
-
-/// Creates recommended `ObjectLabels` to be used in deployed resources
-pub fn build_recommended_labels<'a, T>(
-    owner: &'a T,
-    controller_name: &'a str,
-    app_version: &'a str,
-    role: &'a str,
-    role_group: &'a str,
-) -> ObjectLabels<'a, T> {
-    ObjectLabels {
-        owner,
-        app_name: APP_NAME,
-        app_version,
-        operator_name: OPERATOR_NAME,
-        controller_name,
-        role,
-        role_group,
-    }
-}
 
 pub(crate) fn create_volumes(
     config_map_name: &str,

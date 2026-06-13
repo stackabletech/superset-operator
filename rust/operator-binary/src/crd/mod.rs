@@ -417,6 +417,12 @@ impl SupersetRole {
         }
         roles
     }
+
+    pub fn role_name(&self) -> stackable_operator::v2::types::operator::RoleName {
+        self.to_string()
+            .parse()
+            .expect("a Superset serialises to a valid RoleName")
+    }
 }
 
 impl FlaskAppConfigOptions for SupersetConfigOptions {

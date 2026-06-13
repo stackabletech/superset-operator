@@ -1,37 +1,32 @@
-use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    builder::meta::ObjectMetaBuilder, crd::listener, kvp::ObjectLabels,
+    builder::meta::ObjectMetaBuilder, crd::listener,
     v2::builder::meta::ownerreference_from_resource,
 };
 
 use crate::{
     controller::ValidatedCluster,
-    crd::{APP_PORT, APP_PORT_NAME},
+    crd::{APP_PORT, APP_PORT_NAME, SupersetRole},
 };
 
 pub const LISTENER_VOLUME_NAME: &str = "listener";
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display("failed to build Metadata"))]
-    MetadataBuild {
-        source: stackable_operator::builder::meta::Error,
-    },
-}
-
 pub fn build_group_listener(
     validated: &ValidatedCluster,
-    object_labels: ObjectLabels<ValidatedCluster>,
+    role: &SupersetRole,
     listener_class: String,
     listener_group_name: String,
-) -> Result<listener::v1alpha1::Listener, Error> {
+) -> listener::v1alpha1::Listener {
     let metadata = ObjectMetaBuilder::new()
         .name_and_namespace(validated)
         .name(listener_group_name)
         .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-        .with_recommended_labels(&object_labels)
-        .context(MetadataBuildSnafu)?
+        // The group listener is a role-level object, so a constant `none` role-group is used as the
+        // role-group label value.
+        .with_labels(validated.recommended_labels_for(
+            &role.role_name(),
+            &"none".parse().expect("'none' is a valid role group name"),
+        ))
         .build();
 
     let spec = listener::v1alpha1::ListenerSpec {
@@ -40,13 +35,11 @@ pub fn build_group_listener(
         ..Default::default()
     };
 
-    let listener = listener::v1alpha1::Listener {
+    listener::v1alpha1::Listener {
         metadata,
         spec,
         status: None,
-    };
-
-    Ok(listener)
+    }
 }
 
 pub fn listener_ports() -> Vec<listener::v1alpha1::ListenerPort> {

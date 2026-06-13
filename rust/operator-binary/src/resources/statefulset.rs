@@ -25,7 +25,7 @@ use stackable_operator::{
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
-    kvp::{Label, Labels},
+    kvp::Label,
     product_logging::{
         self,
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
@@ -33,19 +33,19 @@ use stackable_operator::{
     role_utils::RoleGroupRef,
     shared::time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
-    v2::builder::meta::ownerreference_from_resource,
+    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
 };
 
 use crate::{
     controller::{
-        SUPERSET_CONTROLLER_NAME, SupersetRoleGroupConfig, ValidatedCluster,
+        SupersetRoleGroupConfig, ValidatedCluster,
         build::{
             command::add_cert_to_python_certifi_command,
             properties::{ConfigFileName, superset_config::DEFAULT_WEBSERVER_TIMEOUT},
         },
     },
     crd::{
-        APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
+        APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
         STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SupersetRole,
         authentication::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
@@ -54,7 +54,7 @@ use crate::{
     },
     operations::graceful_shutdown::add_graceful_shutdown_config,
     resources::{
-        CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME, build_recommended_labels,
+        CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
         listener::{LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
     },
 };
@@ -128,27 +128,19 @@ pub fn build_server_rolegroup_statefulset(
     let merged_config = &rolegroup_config.config;
     let env_overrides = &rolegroup_config.env_overrides;
 
-    let recommended_object_labels = build_recommended_labels(
-        validated,
-        SUPERSET_CONTROLLER_NAME,
-        &validated.image.app_version_label_value,
-        &rolegroup_ref.role,
-        &rolegroup_ref.role_group,
-    );
-    // Used for PVC templates that cannot be modified once they are deployed
-    let unversioned_recommended_labels = Labels::recommended(&build_recommended_labels(
-        validated,
-        SUPERSET_CONTROLLER_NAME,
-        // A version value is required, and we do want to use the "recommended" format for the other desired labels
-        "none",
-        &rolegroup_ref.role,
-        &rolegroup_ref.role_group,
-    ))
-    .context(LabelBuildSnafu)?;
+    let role_group_name: RoleGroupName = rolegroup_ref
+        .role_group
+        .parse()
+        .expect("the role group name was validated during cluster validation");
+    let resource_names = validated.resource_names(superset_role, &role_group_name);
+    let recommended_object_labels = validated.recommended_labels(superset_role, &role_group_name);
+    // Used for PVC templates that cannot be modified once they are deployed (a constant "none"
+    // version keeps the labels stable across version upgrades).
+    let unversioned_recommended_labels =
+        validated.unversioned_recommended_labels(superset_role, &role_group_name);
 
     let metadata = ObjectMetaBuilder::new()
-        .with_recommended_labels(&recommended_object_labels)
-        .context(MetadataBuildSnafu)?
+        .with_labels(recommended_object_labels.clone())
         .build();
 
     let mut pb = &mut PodBuilder::new();
@@ -327,7 +319,7 @@ pub fn build_server_rolegroup_statefulset(
         .build();
 
     pb.add_volumes(crate::resources::create_volumes(
-        &rolegroup_ref.object_name(),
+        resource_names.role_group_config_map().as_ref(),
         merged_config.logging.containers.get(&Container::Superset),
     ))
     .context(AddVolumeSnafu)?;
@@ -365,10 +357,9 @@ pub fn build_server_rolegroup_statefulset(
     Ok(StatefulSet {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(validated)
-            .name(rolegroup_ref.object_name())
+            .name(resource_names.stateful_set_name().to_string())
             .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-            .with_recommended_labels(&recommended_object_labels)
-            .context(MetadataBuildSnafu)?
+            .with_labels(recommended_object_labels)
             .with_label(
                 Label::try_from(("restarter.stackable.tech/enabled", "true"))
                     .context(LabelBuildSnafu)?,
@@ -380,18 +371,13 @@ pub fn build_server_rolegroup_statefulset(
             replicas: Some(i32::from(rolegroup_config.replicas)),
             selector: LabelSelector {
                 match_labels: Some(
-                    Labels::role_group_selector(
-                        validated,
-                        APP_NAME,
-                        &rolegroup_ref.role,
-                        &rolegroup_ref.role_group,
-                    )
-                    .context(LabelBuildSnafu)?
-                    .into(),
+                    validated
+                        .role_group_selector(superset_role, &role_group_name)
+                        .into(),
                 ),
                 ..LabelSelector::default()
             },
-            service_name: Some(rolegroup_ref.rolegroup_headless_service_name()),
+            service_name: Some(resource_names.headless_service_name().to_string()),
             template: pod_template,
             volume_claim_templates: pvcs,
             ..StatefulSetSpec::default()

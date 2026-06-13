@@ -1,29 +1,15 @@
-use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::{Service, ServicePort, ServiceSpec},
     kvp::{Annotations, Labels},
     role_utils::RoleGroupRef,
-    v2::builder::meta::ownerreference_from_resource,
+    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
 };
 
 use crate::{
-    controller::{SUPERSET_CONTROLLER_NAME, ValidatedCluster},
-    crd::{APP_NAME, APP_PORT, APP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, v1alpha1},
-    resources::build_recommended_labels,
+    controller::ValidatedCluster,
+    crd::{APP_PORT, APP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, SupersetRole, v1alpha1},
 };
-
-#[derive(Debug, Snafu)]
-pub enum Error {
-    #[snafu(display("failed to build Metadata"))]
-    MetadataBuild {
-        source: stackable_operator::builder::meta::Error,
-    },
-    #[snafu(display("failed to build Labels"))]
-    LabelBuild {
-        source: stackable_operator::kvp::LabelError,
-    },
-}
 
 /// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a certain rolegroup
 ///
@@ -31,20 +17,22 @@ pub enum Error {
 pub fn build_node_rolegroup_headless_service(
     validated: &ValidatedCluster,
     rolegroup_ref: &RoleGroupRef<v1alpha1::SupersetCluster>,
-) -> Result<Service, Error> {
-    let headless_service = Service {
+) -> Service {
+    let role_group_name: RoleGroupName = rolegroup_ref
+        .role_group
+        .parse()
+        .expect("the role group name was validated during cluster validation");
+    Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(validated)
-            .name(rolegroup_ref.rolegroup_headless_service_name())
+            .name(
+                validated
+                    .resource_names(&SupersetRole::Node, &role_group_name)
+                    .headless_service_name()
+                    .to_string(),
+            )
             .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-            .with_recommended_labels(&build_recommended_labels(
-                validated,
-                SUPERSET_CONTROLLER_NAME,
-                &validated.image.app_version_label_value,
-                &rolegroup_ref.role,
-                &rolegroup_ref.role_group,
-            ))
-            .context(MetadataBuildSnafu)?
+            .with_labels(validated.recommended_labels(&SupersetRole::Node, &role_group_name))
             .build(),
         spec: Some(ServiceSpec {
             // Internal communication does not need to be exposed
@@ -52,41 +40,35 @@ pub fn build_node_rolegroup_headless_service(
             cluster_ip: Some("None".to_owned()),
             ports: Some(service_ports()),
             selector: Some(
-                Labels::role_group_selector(
-                    validated,
-                    APP_NAME,
-                    &rolegroup_ref.role,
-                    &rolegroup_ref.role_group,
-                )
-                .context(LabelBuildSnafu)?
-                .into(),
+                validated
+                    .role_group_selector(&SupersetRole::Node, &role_group_name)
+                    .into(),
             ),
             publish_not_ready_addresses: Some(true),
             ..ServiceSpec::default()
         }),
         status: None,
-    };
-    Ok(headless_service)
+    }
 }
 
 /// The rolegroup metrics [`Service`] is a service that exposes metrics and a prometheus scraping label
 pub fn build_node_rolegroup_metrics_service(
     validated: &ValidatedCluster,
     rolegroup_ref: &RoleGroupRef<v1alpha1::SupersetCluster>,
-) -> Result<Service, Error> {
-    let metrics_service = Service {
+) -> Service {
+    let role_group_name: RoleGroupName = rolegroup_ref
+        .role_group
+        .parse()
+        .expect("the role group name was validated during cluster validation");
+    let resource_names = validated.resource_names(&SupersetRole::Node, &role_group_name);
+    Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(validated)
-            .name(rolegroup_ref.rolegroup_metrics_service_name())
+            // `ResourceNames` has no metrics-service helper, so the `-metrics` suffix is appended to
+            // the qualified role-group name (which is also the StatefulSet name).
+            .name(format!("{}-metrics", resource_names.stateful_set_name()))
             .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-            .with_recommended_labels(&build_recommended_labels(
-                validated,
-                SUPERSET_CONTROLLER_NAME,
-                &validated.image.app_version_label_value,
-                &rolegroup_ref.role,
-                &rolegroup_ref.role_group,
-            ))
-            .context(MetadataBuildSnafu)?
+            .with_labels(validated.recommended_labels(&SupersetRole::Node, &role_group_name))
             .with_labels(prometheus_labels())
             .with_annotations(prometheus_annotations())
             .build(),
@@ -96,22 +78,15 @@ pub fn build_node_rolegroup_metrics_service(
             cluster_ip: Some("None".to_owned()),
             ports: Some(metrics_ports()),
             selector: Some(
-                Labels::role_group_selector(
-                    validated,
-                    APP_NAME,
-                    &rolegroup_ref.role,
-                    &rolegroup_ref.role_group,
-                )
-                .context(LabelBuildSnafu)?
-                .into(),
+                validated
+                    .role_group_selector(&SupersetRole::Node, &role_group_name)
+                    .into(),
             ),
             publish_not_ready_addresses: Some(true),
             ..ServiceSpec::default()
         }),
         status: None,
-    };
-
-    Ok(metrics_service)
+    }
 }
 
 fn metrics_ports() -> Vec<ServicePort> {

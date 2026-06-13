@@ -16,30 +16,25 @@ use stackable_operator::{
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
-    kvp::{Label, Labels},
+    kvp::Label,
     product_logging::{
         self,
         framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
     },
     role_utils::RoleGroupRef,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
-    v2::builder::meta::ownerreference_from_resource,
+    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
 };
 
 use crate::{
-    controller::{
-        SUPERSET_CONTROLLER_NAME, SupersetRoleGroupConfig, ValidatedCluster,
-        build::properties::ConfigFileName,
-    },
+    controller::{SupersetRoleGroupConfig, ValidatedCluster, build::properties::ConfigFileName},
     crd::{
-        APP_NAME, APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
-        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+        APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
+        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SupersetRole,
         v1alpha1::{Container, SupersetCluster},
     },
     operations::graceful_shutdown::add_graceful_shutdown_config,
-    resources::{
-        CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME, build_recommended_labels,
-    },
+    resources::{CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
 };
 
 #[derive(Snafu, Debug)]
@@ -96,17 +91,19 @@ pub fn build_worker_rolegroup_deployment(
     let merged_config = &rolegroup_config.config;
     let env_overrides = &rolegroup_config.env_overrides;
 
-    let recommended_object_labels = build_recommended_labels(
-        validated,
-        SUPERSET_CONTROLLER_NAME,
-        &resolved_product_image.app_version_label_value,
-        &rolegroup_ref.role,
-        &rolegroup_ref.role_group,
-    );
+    let role: SupersetRole = rolegroup_ref
+        .role
+        .parse()
+        .expect("the role group ref carries a valid role");
+    let role_group_name: RoleGroupName = rolegroup_ref
+        .role_group
+        .parse()
+        .expect("the role group name was validated during cluster validation");
+    let resource_names = validated.resource_names(&role, &role_group_name);
+    let recommended_object_labels = validated.recommended_labels(&role, &role_group_name);
 
     let metadata = ObjectMetaBuilder::new()
-        .with_recommended_labels(&recommended_object_labels)
-        .context(MetadataBuildSnafu)?
+        .with_labels(recommended_object_labels.clone())
         .build();
 
     let mut pb = &mut PodBuilder::new();
@@ -257,7 +254,7 @@ pub fn build_worker_rolegroup_deployment(
         .build();
 
     pb.add_volumes(crate::resources::create_volumes(
-        &rolegroup_ref.object_name(),
+        resource_names.role_group_config_map().as_ref(),
         merged_config.logging.containers.get(&Container::Superset),
     ))
     .context(AddVolumeSnafu)?;
@@ -295,10 +292,11 @@ pub fn build_worker_rolegroup_deployment(
     Ok(Deployment {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(validated)
-            .name(rolegroup_ref.object_name())
+            // `ResourceNames` has no Deployment helper; the qualified name (which is also the
+            // StatefulSet name) is the correct `<cluster>-<role>-<rolegroup>` Deployment name.
+            .name(resource_names.stateful_set_name().to_string())
             .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-            .with_recommended_labels(&recommended_object_labels)
-            .context(MetadataBuildSnafu)?
+            .with_labels(recommended_object_labels)
             .with_label(
                 Label::try_from(("restarter.stackable.tech/enabled", "true"))
                     .context(LabelBuildSnafu)?,
@@ -308,14 +306,9 @@ pub fn build_worker_rolegroup_deployment(
             replicas: Some(i32::from(rolegroup_config.replicas)),
             selector: LabelSelector {
                 match_labels: Some(
-                    Labels::role_group_selector(
-                        validated,
-                        APP_NAME,
-                        &rolegroup_ref.role,
-                        &rolegroup_ref.role_group,
-                    )
-                    .context(LabelBuildSnafu)?
-                    .into(),
+                    validated
+                        .role_group_selector(&role, &role_group_name)
+                        .into(),
                 ),
                 ..LabelSelector::default()
             },
@@ -337,17 +330,19 @@ pub fn build_beat_rolegroup_deployment(
     let merged_config = &rolegroup_config.config;
     let env_overrides = &rolegroup_config.env_overrides;
 
-    let recommended_object_labels = build_recommended_labels(
-        validated,
-        SUPERSET_CONTROLLER_NAME,
-        &resolved_product_image.app_version_label_value,
-        &rolegroup_ref.role,
-        &rolegroup_ref.role_group,
-    );
+    let role: SupersetRole = rolegroup_ref
+        .role
+        .parse()
+        .expect("the role group ref carries a valid role");
+    let role_group_name: RoleGroupName = rolegroup_ref
+        .role_group
+        .parse()
+        .expect("the role group name was validated during cluster validation");
+    let resource_names = validated.resource_names(&role, &role_group_name);
+    let recommended_object_labels = validated.recommended_labels(&role, &role_group_name);
 
     let metadata = ObjectMetaBuilder::new()
-        .with_recommended_labels(&recommended_object_labels)
-        .context(MetadataBuildSnafu)?
+        .with_labels(recommended_object_labels.clone())
         .build();
 
     let mut pb = &mut PodBuilder::new();
@@ -497,7 +492,7 @@ pub fn build_beat_rolegroup_deployment(
         .build();
 
     pb.add_volumes(crate::resources::create_volumes(
-        &rolegroup_ref.object_name(),
+        resource_names.role_group_config_map().as_ref(),
         merged_config.logging.containers.get(&Container::Superset),
     ))
     .context(AddVolumeSnafu)?;
@@ -542,10 +537,11 @@ pub fn build_beat_rolegroup_deployment(
     Ok(Deployment {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(validated)
-            .name(rolegroup_ref.object_name())
+            // `ResourceNames` has no Deployment helper; the qualified name (which is also the
+            // StatefulSet name) is the correct `<cluster>-<role>-<rolegroup>` Deployment name.
+            .name(resource_names.stateful_set_name().to_string())
             .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-            .with_recommended_labels(&recommended_object_labels)
-            .context(MetadataBuildSnafu)?
+            .with_labels(recommended_object_labels)
             .with_label(
                 Label::try_from(("restarter.stackable.tech/enabled", "true"))
                     .context(LabelBuildSnafu)?,
@@ -557,14 +553,9 @@ pub fn build_beat_rolegroup_deployment(
             replicas: Some(i32::from(replicas)),
             selector: LabelSelector {
                 match_labels: Some(
-                    Labels::role_group_selector(
-                        validated,
-                        APP_NAME,
-                        &rolegroup_ref.role,
-                        &rolegroup_ref.role_group,
-                    )
-                    .context(LabelBuildSnafu)?
-                    .into(),
+                    validated
+                        .role_group_selector(&role, &role_group_name)
+                        .into(),
                 ),
                 ..LabelSelector::default()
             },

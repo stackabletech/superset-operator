@@ -14,6 +14,7 @@ use stackable_operator::{
     v2::{
         builder::pod::container::{EnvVarName, EnvVarSet},
         role_utils::{GenericCommonConfig, with_validated_config},
+        types::operator::{ClusterName, RoleGroupName},
     },
 };
 use strum::IntoEnumIterator;
@@ -37,6 +38,12 @@ pub enum Error {
         source: product_image_selection::Error,
     },
 
+    #[snafu(display("invalid cluster name {cluster_name}"))]
+    ParseClusterName {
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
+        cluster_name: String,
+    },
+
     #[snafu(display("failed to resolve and merge config for role group {role_group}"))]
     FailedToResolveConfig {
         source: fragment::ValidationError,
@@ -46,6 +53,12 @@ pub enum Error {
     #[snafu(display("failed to parse environment variable name"))]
     ParseEnvVarName {
         source: stackable_operator::v2::builder::pod::container::Error,
+    },
+
+    #[snafu(display("invalid role group name {role_group}"))]
+    ParseRoleGroupName {
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
+        role_group: String,
     },
 }
 
@@ -109,8 +122,14 @@ pub fn validate_cluster(
                 );
             }
 
+            let role_group_name = RoleGroupName::from_str(rolegroup_name).with_context(|_| {
+                ParseRoleGroupNameSnafu {
+                    role_group: rolegroup_name.clone(),
+                }
+            })?;
+
             group_configs.insert(
-                rolegroup_name.clone(),
+                role_group_name,
                 SupersetRoleGroupConfig {
                     replicas: validated_rg.replicas.unwrap_or(1),
                     config: validated_rg.config.config,
@@ -129,8 +148,15 @@ pub fn validate_cluster(
     }
 
     let cluster_config = &superset.spec.cluster_config;
+
+    let cluster_name =
+        ClusterName::from_str(&superset.name_any()).with_context(|_| ParseClusterNameSnafu {
+            cluster_name: superset.name_any(),
+        })?;
+
     Ok(ValidatedCluster::new(
         superset,
+        cluster_name,
         resolved_product_image,
         ValidatedClusterConfig {
             authentication_config,
@@ -152,6 +178,7 @@ pub fn validate_cluster(
 
 #[cfg(test)]
 mod tests {
+
     use stackable_operator::utils::yaml_from_str_singleton_map;
 
     use super::validate_cluster;
@@ -220,7 +247,7 @@ mod tests {
         let node = validated
             .role_groups
             .get(&SupersetRole::Node)
-            .and_then(|groups| groups.get("default"))
+            .and_then(|groups| groups.get(&"default".parse().expect("valid role group name")))
             .expect("node default rolegroup");
         let overrides = &node.config_overrides.superset_config_py.overrides;
 

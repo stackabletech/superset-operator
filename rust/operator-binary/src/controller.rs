@@ -19,6 +19,7 @@ use stackable_operator::{
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
+    kvp::Labels,
     logging::controller::ReconcilerError,
     role_utils::RoleGroupRef,
     shared::time::Duration,
@@ -26,7 +27,18 @@ use stackable_operator::{
         compute_conditions, deployment::DeploymentConditionBuilder,
         operations::ClusterOperationsConditionBuilder, statefulset::StatefulSetConditionBuilder,
     },
-    v2::{HasName, HasUid, types::kubernetes::Uid},
+    v2::{
+        HasName, HasUid, NameIsValidLabelValue,
+        kvp::label::{recommended_labels, role_group_selector},
+        role_group_utils::ResourceNames,
+        types::{
+            kubernetes::Uid,
+            operator::{
+                ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
+                RoleGroupName, RoleName,
+            },
+        },
+    },
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -43,7 +55,6 @@ use crate::{
     },
     operations::pdb::add_pdbs,
     resources::{
-        build_recommended_labels,
         deployment::{build_beat_rolegroup_deployment, build_worker_rolegroup_deployment},
         listener::build_group_listener,
         service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
@@ -113,20 +124,25 @@ pub struct ValidatedCluster {
     /// `ObjectMeta` carrying `name`, `namespace` and `uid`, captured during validation, so this
     /// struct can stand in as the owner [`Resource`] for child objects.
     metadata: ObjectMeta,
+    pub name: ClusterName,
+    pub product_version: ProductVersion,
     pub image: ResolvedProductImage,
     pub cluster_config: ValidatedClusterConfig,
-    pub role_groups: BTreeMap<SupersetRole, BTreeMap<String, SupersetRoleGroupConfig>>,
+    pub role_groups: BTreeMap<SupersetRole, BTreeMap<RoleGroupName, SupersetRoleGroupConfig>>,
     pub role_configs: BTreeMap<SupersetRole, ValidatedRoleConfig>,
 }
 
 impl ValidatedCluster {
     pub fn new(
         superset: &SupersetCluster,
+        name: ClusterName,
         image: ResolvedProductImage,
         cluster_config: ValidatedClusterConfig,
-        role_groups: BTreeMap<SupersetRole, BTreeMap<String, SupersetRoleGroupConfig>>,
+        role_groups: BTreeMap<SupersetRole, BTreeMap<RoleGroupName, SupersetRoleGroupConfig>>,
         role_configs: BTreeMap<SupersetRole, ValidatedRoleConfig>,
     ) -> Self {
+        let product_version = ProductVersion::from_str(&image.app_version_label_value)
+            .expect("the app version label value is a valid product version");
         Self {
             // Capture only the identity fields needed to own child objects.
             metadata: ObjectMeta {
@@ -139,7 +155,76 @@ impl ValidatedCluster {
             cluster_config,
             role_groups,
             role_configs,
+            name,
+            product_version,
         }
+    }
+
+    pub fn resource_names(
+        &self,
+        role: &SupersetRole,
+        role_group_name: &RoleGroupName,
+    ) -> ResourceNames {
+        ResourceNames {
+            cluster_name: self.name.clone(),
+            role_name: role.role_name(),
+            role_group_name: role_group_name.clone(),
+        }
+    }
+
+    pub fn recommended_labels(
+        &self,
+        role: &SupersetRole,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        self.recommended_labels_for(&role.role_name(), role_group_name)
+    }
+
+    pub fn recommended_labels_for(
+        &self,
+        role_name: &RoleName,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        self.recommended_labels_with(&self.product_version, role_name, role_group_name)
+    }
+
+    /// Recommended labels with a constant `none` version, for PVC templates that cannot be modified
+    /// after deployment (keeps the labels stable across version upgrades).
+    pub fn unversioned_recommended_labels(
+        &self,
+        role: &SupersetRole,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        self.recommended_labels_with(
+            &ProductVersion::from_str("none").expect("'none' is a valid product version"),
+            &role.role_name(),
+            role_group_name,
+        )
+    }
+
+    fn recommended_labels_with(
+        &self,
+        product_version: &ProductVersion,
+        role_name: &RoleName,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        recommended_labels(
+            self,
+            &product_name(),
+            product_version,
+            &operator_name(),
+            &controller_name(),
+            role_name,
+            role_group_name,
+        )
+    }
+
+    pub fn role_group_selector(
+        &self,
+        role: &SupersetRole,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        role_group_selector(self, &product_name(), &role.role_name(), role_group_name)
     }
 }
 
@@ -192,6 +277,28 @@ impl HasUid for ValidatedCluster {
         )
         .expect("the uid is a valid Kubernetes UID")
     }
+}
+
+impl NameIsValidLabelValue for ValidatedCluster {
+    fn to_label_value(&self) -> String {
+        self.name.to_label_value()
+    }
+}
+
+/// The product name (`superset`) as a type-safe label value.
+fn product_name() -> ProductName {
+    ProductName::from_str(APP_NAME).expect("'superset' is a valid product name")
+}
+
+/// The operator name as a type-safe label value.
+fn operator_name() -> OperatorName {
+    OperatorName::from_str(OPERATOR_NAME).expect("the operator name is a valid label value")
+}
+
+/// The controller name as a type-safe label value.
+fn controller_name() -> ControllerName {
+    ControllerName::from_str(SUPERSET_CONTROLLER_NAME)
+        .expect("the controller name is a valid label value")
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -277,16 +384,6 @@ pub enum Error {
     #[snafu(display("failed to apply group listener"))]
     ApplyGroupListener {
         source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to build listener"))]
-    BuildListener {
-        source: crate::resources::listener::Error,
-    },
-
-    #[snafu(display("failed to build service"))]
-    BuildService {
-        source: crate::resources::service::Error,
     },
 
     #[snafu(display("failed to build statefulset"))]
@@ -402,11 +499,9 @@ pub async fn reconcile_superset(
             )
             .context(BuildConfigMapSnafu)?;
 
-            let rg_metrics_service = build_node_rolegroup_metrics_service(&validated, &rolegroup)
-                .context(BuildServiceSnafu)?;
+            let rg_metrics_service = build_node_rolegroup_metrics_service(&validated, &rolegroup);
 
-            let rg_headless_service = build_node_rolegroup_headless_service(&validated, &rolegroup)
-                .context(BuildServiceSnafu)?;
+            let rg_headless_service = build_node_rolegroup_headless_service(&validated, &rolegroup);
 
             cluster_resources
                 .add(client, rg_metrics_service)
@@ -503,17 +598,10 @@ pub async fn reconcile_superset(
                 ) {
                     let group_listener = build_group_listener(
                         &validated,
-                        build_recommended_labels(
-                            &validated,
-                            SUPERSET_CONTROLLER_NAME,
-                            &validated.image.app_version_label_value,
-                            &superset_role.to_string(),
-                            "none",
-                        ),
+                        superset_role,
                         listener_class.clone(),
                         listener_group_name.clone(),
-                    )
-                    .context(BuildListenerSnafu)?;
+                    );
                     cluster_resources
                         .add(client, group_listener)
                         .await

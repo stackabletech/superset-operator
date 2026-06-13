@@ -4,19 +4,18 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::ConfigMap,
     product_logging::{framework::VECTOR_CONFIG_FILE, spec::Logging},
     role_utils::RoleGroupRef,
-    v2::builder::meta::ownerreference_from_resource,
+    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
 };
 
 use crate::{
     controller::{
-        SUPERSET_CONTROLLER_NAME, ValidatedCluster,
+        ValidatedCluster,
         build::properties::{ConfigFileName, logging, superset_config},
     },
     crd::{
         SupersetRole,
         v1alpha1::{Container, SupersetCluster, SupersetConfig, SupersetConfigOverrides},
     },
-    resources::build_recommended_labels,
 };
 
 #[derive(Snafu, Debug)]
@@ -25,11 +24,6 @@ pub enum Error {
     SupersetConfig {
         source: superset_config::Error,
         rolegroup: RoleGroupRef<SupersetCluster>,
-    },
-
-    #[snafu(display("failed to build Metadata"))]
-    Metadata {
-        source: stackable_operator::builder::meta::Error,
     },
 
     #[snafu(display("failed to build ConfigMap for {rolegroup}"))]
@@ -55,22 +49,25 @@ pub fn build_rolegroup_config_map(
             rolegroup: rolegroup.clone(),
         })?;
 
+    let role_group_name: RoleGroupName = rolegroup
+        .role_group
+        .parse()
+        .expect("the role group name was validated during cluster validation");
+
     let mut cm_builder = ConfigMapBuilder::new();
 
     cm_builder
         .metadata(
             ObjectMetaBuilder::new()
                 .name_and_namespace(validated)
-                .name(rolegroup.object_name())
+                .name(
+                    validated
+                        .resource_names(role, &role_group_name)
+                        .role_group_config_map()
+                        .to_string(),
+                )
                 .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-                .with_recommended_labels(&build_recommended_labels(
-                    validated,
-                    SUPERSET_CONTROLLER_NAME,
-                    &validated.image.app_version_label_value,
-                    &rolegroup.role,
-                    &rolegroup.role_group,
-                ))
-                .context(MetadataSnafu)?
+                .with_labels(validated.recommended_labels(role, &role_group_name))
                 .build(),
         )
         .add_data(ConfigFileName::SupersetConfig.to_string(), config_file);
