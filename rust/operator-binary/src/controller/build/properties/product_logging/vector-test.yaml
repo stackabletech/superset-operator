@@ -1,0 +1,157 @@
+# Run tests with `./test-vector.sh`
+#
+# A downside of these test cases is that they compare the whole event and that the message can
+# contain source code positions in vector.yaml. Please adapt the tests if you change VRL code in
+# vector.yaml.
+---
+tests:
+  - name: Test stdout log entry
+    inputs:
+      - type: log
+        insert_at: processed_files_stdout
+        log_fields:
+          file: /stackable/log/superset/superset.stdout.log
+          message: Starting gunicorn
+          pod: superset-node-default-0
+          source_type: file
+          timestamp: 2025-10-02T09:27:28.582Z
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "superset",
+                "container": "superset",
+                "file": "superset.stdout.log",
+                "level": "INFO",
+                "logger": "ROOT",
+                "message": "Starting gunicorn",
+                "namespace": "default",
+                "pod": "superset-node-default-0",
+                "role": "node",
+                "roleGroup": "default",
+                "timestamp": "2025-10-02T09:27:28.582Z"
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test stderr log entry
+    inputs:
+      - type: log
+        insert_at: processed_files_stderr
+        log_fields:
+          file: /stackable/log/superset/superset.stderr.log
+          message: "Traceback (most recent call last):"
+          pod: superset-node-default-0
+          source_type: file
+          timestamp: 2025-10-02T09:27:28.582Z
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "superset",
+                "container": "superset",
+                "file": "superset.stderr.log",
+                "level": "ERROR",
+                "logger": "ROOT",
+                "message": "Traceback (most recent call last):",
+                "namespace": "default",
+                "pod": "superset-node-default-0",
+                "role": "node",
+                "roleGroup": "default",
+                "timestamp": "2025-10-02T09:27:28.582Z"
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test Python JSON log entry
+    inputs:
+      - type: log
+        insert_at: processed_files_py
+        log_fields:
+          file: /stackable/log/superset/superset.py.json
+          message: '{"asctime": "2025-10-02 09:27:28,582", "levelname": "INFO", "name": "superset.app", "message": "Loading app"}'
+          pod: superset-node-default-0
+          source_type: file
+          timestamp: 2025-10-02T09:27:29.473487331Z
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "superset",
+                "container": "superset",
+                "file": "superset.py.json",
+                "level": "INFO",
+                "logger": "superset.app",
+                "message": "Loading app",
+                "namespace": "default",
+                "pod": "superset-node-default-0",
+                "role": "node",
+                "roleGroup": "default",
+                "timestamp": t'2025-10-02T09:27:28.582Z'
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test Vector internal logs
+    inputs:
+      - type: log
+        insert_at: filtered_logs_vector
+        log_fields:
+          arch: x86_64
+          message: Vector has started.
+          metadata:
+            kind: event
+            level: INFO
+            module_path: vector::internal_events::process
+            target: vector
+          pid: 14
+          pod: superset-node-default-0
+          source_type: internal_logs
+          timestamp: 2025-10-02T09:46:14.479381097Z
+          version: 0.56.0
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "arch": "x86_64",
+                "cluster": "superset",
+                "container": "vector",
+                "level": "INFO",
+                "logger": "vector::internal_events::process",
+                "message": "Vector has started.",
+                "namespace": "default",
+                "pod": "superset-node-default-0",
+                "role": "node",
+                "roleGroup": "default",
+                "timestamp": "2025-10-02T09:46:14.479381097Z",
+                "version": "0.56.0"
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test Vector internal log level filtering - INFO passes
+    inputs:
+      - type: log
+        insert_at: filtered_logs_vector
+        log_fields:
+          metadata:
+            level: INFO
+    outputs:
+      - extract_from: filtered_logs_vector
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!("INFO", .metadata.level)
+  - name: Test Vector internal log level filtering - DEBUG dropped
+    inputs:
+      - type: log
+        insert_at: filtered_logs_vector
+        log_fields:
+          metadata:
+            level: DEBUG
+    no_outputs_from:
+      - filtered_logs_vector
