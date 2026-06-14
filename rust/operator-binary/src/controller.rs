@@ -45,7 +45,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::{
     OPERATOR_NAME,
     controller::build::resource::{
-        deployment::{build_beat_rolegroup_deployment, build_worker_rolegroup_deployment},
+        deployment::build_rolegroup_deployment,
         listener::build_group_listener,
         pdb::build_pdb,
         service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
@@ -552,8 +552,8 @@ pub async fn reconcile_superset(
                             })?,
                     );
                 }
-                SupersetRole::Worker => {
-                    let rg_worker_deployment = build_worker_rolegroup_deployment(
+                SupersetRole::Worker | SupersetRole::Beat => {
+                    let rg_deployment = build_rolegroup_deployment(
                         &validated,
                         &rolegroup,
                         validated_rolegroup,
@@ -566,28 +566,7 @@ pub async fn reconcile_superset(
                     // See https://github.com/stackabletech/commons-operator/issues/111 for details.
                     deployment_cond_builder.add(
                         cluster_resources
-                            .add(client, rg_worker_deployment.clone())
-                            .await
-                            .with_context(|_| ApplyRoleGroupDeploymentSnafu {
-                                rolegroup: rolegroup.clone(),
-                            })?,
-                    );
-                }
-                SupersetRole::Beat => {
-                    let rg_beat_deployment = build_beat_rolegroup_deployment(
-                        &validated,
-                        &rolegroup,
-                        validated_rolegroup,
-                        &rbac_sa.name_any(),
-                    )
-                    .context(BuildDeploymentSnafu)?;
-
-                    // Note: The Deployment needs to be applied after all ConfigMaps and Secrets it mounts
-                    // to prevent unnecessary Pod restarts.
-                    // See https://github.com/stackabletech/commons-operator/issues/111 for details.
-                    deployment_cond_builder.add(
-                        cluster_resources
-                            .add(client, rg_beat_deployment.clone())
+                            .add(client, rg_deployment.clone())
                             .await
                             .with_context(|_| ApplyRoleGroupDeploymentSnafu {
                                 rolegroup: rolegroup.clone(),
