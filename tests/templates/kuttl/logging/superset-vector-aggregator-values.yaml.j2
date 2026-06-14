@@ -28,25 +28,25 @@ customConfig:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "superset-node-automatic-log-config-0" &&
+        .pod == "superset-node-automatic-log-0" &&
         .container == "superset"
     filteredAutomaticLogConfigVector:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "superset-node-automatic-log-config-0" &&
+        .pod == "superset-node-automatic-log-0" &&
         .container == "vector"
     filteredCustomLogConfigSuperset:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "superset-node-custom-log-config-0" &&
+        .pod == "superset-node-custom-log-0" &&
         .container == "superset"
     filteredCustomLogConfigVector:
       type: filter
       inputs: [validEvents]
       condition: >-
-        .pod == "superset-node-custom-log-config-0" &&
+        .pod == "superset-node-custom-log-0" &&
         .container == "vector"
     filteredInvalidEvents:
       type: filter
