@@ -17,6 +17,7 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::{
         ConfigMapVolumeSource, Container as K8sContainer, EmptyDirVolumeSource, Volume,
     },
+    kvp::Label,
     product_logging::{
         self,
         spec::{
@@ -38,8 +39,8 @@ use stackable_operator::{
 use crate::{
     controller::{SupersetRoleGroupConfig, ValidatedCluster},
     crd::{
-        APP_PORT, MAX_LOG_FILES_SIZE, METRICS_PORT, METRICS_PORT_NAME, STACKABLE_CONFIG_DIR,
-        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SupersetRole,
+        APP_PORT, APP_PORT_NAME, MAX_LOG_FILES_SIZE, METRICS_PORT, METRICS_PORT_NAME,
+        STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SupersetRole,
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection,
             CeleryResultsBackendConnectionDetails, MetadataDatabaseConnection,
@@ -66,6 +67,27 @@ stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
 // config and log volumes). Their values match the `&str` constants used by `create_volumes`.
 stackable_operator::constant!(CONFIG_VOLUME_NAME_TYPED: VolumeName = "config");
 stackable_operator::constant!(LOG_VOLUME_NAME_TYPED: VolumeName = "log");
+
+/// The `fsGroup` the Pods run as, required by secret-operator-provided volumes.
+pub(crate) const SECRET_OPERATOR_FS_GROUP: i64 = 1000;
+
+/// The shell wrapper used to launch the long-running product containers
+/// (`/bin/bash -x -euo pipefail -c <args>`).
+pub(crate) fn bash_wrapper_command() -> Vec<String> {
+    vec![
+        "/bin/bash".to_string(),
+        "-x".to_string(),
+        "-euo".to_string(),
+        "pipefail".to_string(),
+        "-c".to_string(),
+    ]
+}
+
+/// The label that opts a workload into the Stackable restart controller (so it restarts on mounted
+/// ConfigMap/Secret changes).
+pub(crate) fn restarter_enabled_label() -> Result<Label, stackable_operator::kvp::LabelError> {
+    Label::try_from(("restarter.stackable.tech/enabled", "true"))
+}
 
 /// Errors shared by the container builders below.
 #[derive(Snafu, Debug)]
@@ -175,7 +197,7 @@ pub(crate) fn build_superset_container_builder(
     let secret = &validated.cluster_config.credentials_secret_name;
     superset_cb
         .image_from_product_image(&validated.image)
-        .add_container_port("http", APP_PORT.into())
+        .add_container_port(APP_PORT_NAME, APP_PORT.into())
         .add_volume_mount(CONFIG_VOLUME_NAME, STACKABLE_CONFIG_DIR)
         .context(AddVolumeMountSnafu)?
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME, STACKABLE_LOG_CONFIG_DIR)
@@ -204,13 +226,7 @@ pub(crate) fn build_metrics_container(
 ) -> K8sContainer {
     new_container_builder(&METRICS_CONTAINER_NAME)
         .image_from_product_image(resolved_product_image)
-        .command(vec![
-            "/bin/bash".to_string(),
-            "-x".to_string(),
-            "-euo".to_string(),
-            "pipefail".to_string(),
-            "-c".to_string(),
-        ])
+        .command(bash_wrapper_command())
         .args(vec![formatdoc! {"
             {COMMON_BASH_TRAP_FUNCTIONS}
             prepare_signal_handlers
@@ -258,7 +274,7 @@ pub(crate) fn metadata_database_connection_details(
     metadata_database: &MetadataDatabaseConnection,
 ) -> SqlAlchemyDatabaseConnectionDetails {
     metadata_database.sqlalchemy_connection_details_with_templating(
-        "METADATA",
+        crate::crd::METADATA_DATABASE_ENV_PREFIX,
         &TemplatingMechanism::BashEnvSubstitution,
     )
 }

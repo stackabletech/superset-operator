@@ -62,6 +62,9 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
 
 pub const INTERNAL_SECRET_SECRET_KEY: &str = "SECRET_KEY";
 
+/// Env-var prefix for the metadata database connection credentials (e.g. `METADATA_DATABASE_*`).
+pub const METADATA_DATABASE_ENV_PREFIX: &str = "METADATA";
+
 pub const APP_PORT_NAME: &str = "http";
 pub const APP_PORT: u16 = 8088;
 pub const METRICS_PORT_NAME: &str = "metrics";

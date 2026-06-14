@@ -13,7 +13,6 @@ use stackable_operator::{
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
-    kvp::Label,
     product_logging::framework::{
         create_vector_shutdown_file_command, remove_vector_shutdown_file_command,
     },
@@ -119,7 +118,7 @@ pub fn build_rolegroup_deployment(
         .image_pull_secrets_from_product_image(resolved_product_image)
         .security_context(
             PodSecurityContextBuilder::new()
-                .fs_group(1000) // Needed for secret-operator
+                .fs_group(super::SECRET_OPERATOR_FS_GROUP) // Needed for secret-operator
                 .build(),
         )
         .affinity(&merged_config.affinity)
@@ -129,13 +128,7 @@ pub fn build_rolegroup_deployment(
         .context(BuildContainerSnafu)?;
 
     superset_cb
-        .command(vec![
-            "/bin/bash".to_string(),
-            "-x".to_string(),
-            "-euo".to_string(),
-            "pipefail".to_string(),
-            "-c".to_string(),
-        ])
+        .command(super::bash_wrapper_command())
         .args(vec![formatdoc! {"
             {COMMON_BASH_TRAP_FUNCTIONS}
 
@@ -188,10 +181,7 @@ pub fn build_rolegroup_deployment(
             .name(resource_names.stateful_set_name().to_string())
             .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
             .with_labels(recommended_object_labels)
-            .with_label(
-                Label::try_from(("restarter.stackable.tech/enabled", "true"))
-                    .context(LabelBuildSnafu)?,
-            )
+            .with_label(super::restarter_enabled_label().context(LabelBuildSnafu)?)
             .build(),
         spec: Some(DeploymentSpec {
             replicas: Some(i32::from(replicas)),

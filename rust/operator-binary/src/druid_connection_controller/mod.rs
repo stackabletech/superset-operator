@@ -337,15 +337,18 @@ async fn build_import_job(
         "superset import_datasources -p /tmp/druids.yaml",
     ));
 
-    // "METADATA" is the prefix for the env vars that hold the database credentials
-    // (e.g. METADATA_DATABASE_USERNAME, METADATA_DATABASE_PASSWORD). It should match
+    // `METADATA_DATABASE_ENV_PREFIX` is the prefix for the env vars that hold the database
+    // credentials (e.g. METADATA_DATABASE_USERNAME, METADATA_DATABASE_PASSWORD). It should match
     // the prefix used by the airflow-operator for consistency.
     let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
     let metadata_database_connection_details = superset_cluster
         .spec
         .cluster_config
         .metadata_database
-        .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism);
+        .sqlalchemy_connection_details_with_templating(
+            crate::crd::METADATA_DATABASE_ENV_PREFIX,
+            &templating_mechanism,
+        );
 
     let mut container_builder = ContainerBuilder::new("superset-import-druid-connection")
         .expect("ContainerBuilder not created");
