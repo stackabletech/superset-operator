@@ -1,7 +1,7 @@
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    builder::pdb::PodDisruptionBudgetBuilder, client::Client, cluster_resources::ClusterResources,
-    commons::pdb::PdbConfig, kube::ResourceExt,
+    builder::pdb::PodDisruptionBudgetBuilder, commons::pdb::PdbConfig,
+    k8s_openapi::api::policy::v1::PodDisruptionBudget,
 };
 
 use crate::{
@@ -17,22 +17,16 @@ pub enum Error {
         source: stackable_operator::builder::pdb::Error,
         role: String,
     },
-    #[snafu(display("Cannot apply PodDisruptionBudget [{name}]"))]
-    ApplyPdb {
-        source: stackable_operator::cluster_resources::Error,
-        name: String,
-    },
 }
 
-pub async fn add_pdbs(
+/// Builds the [`PodDisruptionBudget`] for the given `role`, or `None` if PDBs are disabled.
+pub fn build_pdb(
     pdb: &PdbConfig,
     validated: &ValidatedCluster,
     role: &SupersetRole,
-    client: &Client,
-    cluster_resources: &mut ClusterResources<'_>,
-) -> Result<(), Error> {
+) -> Result<Option<PodDisruptionBudget>, Error> {
     if !pdb.enabled {
-        return Ok(());
+        return Ok(None);
     }
     let max_unavailable = pdb.max_unavailable.unwrap_or(match role {
         SupersetRole::Node => max_unavailable_nodes(),
@@ -51,13 +45,8 @@ pub async fn add_pdbs(
     })?
     .with_max_unavailable(max_unavailable)
     .build();
-    let pdb_name = pdb.name_any();
-    cluster_resources
-        .add(client, pdb)
-        .await
-        .with_context(|_| ApplyPdbSnafu { name: pdb_name })?;
 
-    Ok(())
+    Ok(Some(pdb))
 }
 
 fn max_unavailable_nodes() -> u16 {

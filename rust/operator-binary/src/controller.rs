@@ -47,7 +47,7 @@ use crate::{
     controller::build::resource::{
         deployment::{build_beat_rolegroup_deployment, build_worker_rolegroup_deployment},
         listener::build_group_listener,
-        pdb::add_pdbs,
+        pdb::build_pdb,
         service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
         statefulset::build_server_rolegroup_statefulset,
     },
@@ -370,6 +370,11 @@ pub enum Error {
         source: crate::controller::build::resource::pdb::Error,
     },
 
+    #[snafu(display("failed to apply PodDisruptionBudget"))]
+    ApplyPdb {
+        source: stackable_operator::cluster_resources::Error,
+    },
+
     #[snafu(display("failed to get required Labels"))]
     GetRequiredLabels {
         source:
@@ -590,35 +595,35 @@ pub async fn reconcile_superset(
                     );
                 }
             }
+        }
 
-            if let Some(role_config) = validated.role_configs.get(superset_role) {
-                if let (Some(listener_class), Some(listener_group_name)) = (
-                    &role_config.listener_class,
-                    &role_config.group_listener_name,
-                ) {
-                    let group_listener = build_group_listener(
-                        &validated,
-                        superset_role,
-                        listener_class.clone(),
-                        listener_group_name.clone(),
-                    );
-                    cluster_resources
-                        .add(client, group_listener)
-                        .await
-                        .context(ApplyGroupListenerSnafu)?;
-                }
-
-                if let Some(pdb) = &role_config.pdb {
-                    add_pdbs(
-                        pdb,
-                        &validated,
-                        superset_role,
-                        client,
-                        &mut cluster_resources,
-                    )
+        // Role-level resources (group listener, PDB) are built once per role, after
+        // its role groups — not once per role group.
+        if let Some(role_config) = validated.role_configs.get(superset_role) {
+            if let (Some(listener_class), Some(listener_group_name)) = (
+                &role_config.listener_class,
+                &role_config.group_listener_name,
+            ) {
+                let group_listener = build_group_listener(
+                    &validated,
+                    superset_role,
+                    listener_class.clone(),
+                    listener_group_name.clone(),
+                );
+                cluster_resources
+                    .add(client, group_listener)
                     .await
-                    .context(FailedToCreatePdbSnafu)?;
-                }
+                    .context(ApplyGroupListenerSnafu)?;
+            }
+
+            if let Some(pdb) = &role_config.pdb
+                && let Some(pdb) =
+                    build_pdb(pdb, &validated, superset_role).context(FailedToCreatePdbSnafu)?
+            {
+                cluster_resources
+                    .add(client, pdb)
+                    .await
+                    .context(ApplyPdbSnafu)?;
             }
         }
     }
