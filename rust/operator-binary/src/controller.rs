@@ -44,6 +44,13 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     OPERATOR_NAME,
+    controller::build::resource::{
+        deployment::{build_beat_rolegroup_deployment, build_worker_rolegroup_deployment},
+        listener::build_group_listener,
+        pdb::add_pdbs,
+        service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
+        statefulset::build_server_rolegroup_statefulset,
+    },
     crd::{
         APP_NAME, INTERNAL_SECRET_SECRET_KEY, SupersetRole,
         authentication::SupersetClientAuthenticationDetailsResolved,
@@ -52,13 +59,6 @@ use crate::{
             CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
         },
         v1alpha1::{SupersetCluster, SupersetClusterStatus, SupersetConfig},
-    },
-    operations::pdb::add_pdbs,
-    resources::{
-        deployment::{build_beat_rolegroup_deployment, build_worker_rolegroup_deployment},
-        listener::build_group_listener,
-        service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
-        statefulset::build_server_rolegroup_statefulset,
     },
 };
 
@@ -367,7 +367,7 @@ pub enum Error {
 
     #[snafu(display("failed to create PodDisruptionBudget"))]
     FailedToCreatePdb {
-        source: crate::operations::pdb::Error,
+        source: crate::controller::build::resource::pdb::Error,
     },
 
     #[snafu(display("failed to get required Labels"))]
@@ -388,17 +388,17 @@ pub enum Error {
 
     #[snafu(display("failed to build statefulset"))]
     BuildStatefulSet {
-        source: crate::resources::statefulset::Error,
+        source: crate::controller::build::resource::statefulset::Error,
     },
 
     #[snafu(display("failed to build deployment"))]
     BuildDeployment {
-        source: crate::resources::deployment::Error,
+        source: crate::controller::build::resource::deployment::Error,
     },
 
     #[snafu(display("failed to build configmap"))]
     BuildConfigMap {
-        source: crate::controller::build::config_map::Error,
+        source: crate::controller::build::resource::config_map::Error,
     },
 
     #[snafu(display("failed to create SECRET_KEY secret"))]
@@ -489,7 +489,7 @@ pub async fn reconcile_superset(
             let rolegroup = superset.rolegroup_ref(superset_role, rolegroup_name);
             let config = &validated_rolegroup.config;
 
-            let rg_configmap = build::config_map::build_rolegroup_config_map(
+            let rg_configmap = build::resource::config_map::build_rolegroup_config_map(
                 &validated,
                 superset_role,
                 &rolegroup,

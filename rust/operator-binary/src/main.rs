@@ -46,8 +46,6 @@ use crate::{
 mod controller;
 mod crd;
 mod druid_connection_controller;
-mod operations;
-mod resources;
 mod webhooks;
 
 mod built_info {

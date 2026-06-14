@@ -27,14 +27,19 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::{SupersetRoleGroupConfig, ValidatedCluster, build::properties::ConfigFileName},
+    controller::{
+        SupersetRoleGroupConfig, ValidatedCluster,
+        build::{
+            graceful_shutdown::add_graceful_shutdown_config,
+            properties::ConfigFileName,
+            resource::{CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
+        },
+    },
     crd::{
         APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
         STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SupersetRole,
         v1alpha1::{Container, SupersetCluster},
     },
-    operations::graceful_shutdown::add_graceful_shutdown_config,
-    resources::{CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
 };
 
 #[derive(Snafu, Debug)]
@@ -49,7 +54,7 @@ pub enum Error {
 
     #[snafu(display("failed to configure graceful shutdown"))]
     GracefulShutdown {
-        source: crate::operations::graceful_shutdown::Error,
+        source: crate::controller::build::graceful_shutdown::Error,
     },
 
     #[snafu(display("failed to build Labels"))]
@@ -253,7 +258,7 @@ pub fn build_worker_rolegroup_deployment(
         )
         .build();
 
-    pb.add_volumes(crate::resources::create_volumes(
+    pb.add_volumes(super::create_volumes(
         resource_names.role_group_config_map().as_ref(),
         merged_config.logging.containers.get(&Container::Superset),
     ))
@@ -491,7 +496,7 @@ pub fn build_beat_rolegroup_deployment(
         )
         .build();
 
-    pb.add_volumes(crate::resources::create_volumes(
+    pb.add_volumes(super::create_volumes(
         resource_names.role_group_config_map().as_ref(),
         merged_config.logging.containers.get(&Container::Superset),
     ))

@@ -30,9 +30,11 @@ use crate::{
     APP_NAME, OPERATOR_NAME,
     controller::{CONTAINER_IMAGE_BASE_NAME, build::properties::ConfigFileName},
     crd::{INTERNAL_SECRET_SECRET_KEY, PYTHONPATH, druidconnection, v1alpha1},
-    operations::job_state::{JobState, get_job_state},
-    resources::rbac,
+    druid_connection_controller::job_state::{JobState, get_job_state},
 };
+
+mod job_state;
+mod rbac;
 
 pub const DRUID_CONNECTION_CONTROLLER_NAME: &str = "druid-connection";
 pub const DRUID_CONNECTION_FULL_CONTROLLER_NAME: &str =

@@ -41,7 +41,12 @@ use crate::{
         SupersetRoleGroupConfig, ValidatedCluster,
         build::{
             command::add_cert_to_python_certifi_command,
+            graceful_shutdown::add_graceful_shutdown_config,
             properties::{ConfigFileName, superset_config::DEFAULT_WEBSERVER_TIMEOUT},
+            resource::{
+                CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
+                listener::{LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
+            },
         },
     },
     crd::{
@@ -51,11 +56,6 @@ use crate::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
         },
         v1alpha1::{Container, SupersetCluster},
-    },
-    operations::graceful_shutdown::add_graceful_shutdown_config,
-    resources::{
-        CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
-        listener::{LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
     },
 };
 
@@ -71,7 +71,7 @@ pub enum Error {
 
     #[snafu(display("failed to configure graceful shutdown"))]
     GracefulShutdown {
-        source: crate::operations::graceful_shutdown::Error,
+        source: crate::controller::build::graceful_shutdown::Error,
     },
 
     #[snafu(display("failed to build Labels"))]
@@ -318,7 +318,7 @@ pub fn build_server_rolegroup_statefulset(
         )
         .build();
 
-    pb.add_volumes(crate::resources::create_volumes(
+    pb.add_volumes(super::create_volumes(
         resource_names.role_group_config_map().as_ref(),
         merged_config.logging.containers.get(&Container::Superset),
     ))

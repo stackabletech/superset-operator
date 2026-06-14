@@ -10,7 +10,13 @@ use stackable_operator::v2::flask_config_writer;
 use crate::{
     controller::{
         ValidatedCluster,
-        build::properties::{authentication, authorization},
+        build::{
+            properties::{authentication, authorization},
+            resource::{
+                celery_broker_connection_details, celery_results_backend_connection_details,
+                metadata_database_connection_details,
+            },
+        },
     },
     crd::{
         SupersetConfigOptions, SupersetRole,
@@ -18,10 +24,6 @@ use crate::{
             CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
         },
         v1alpha1::{SupersetConfig, SupersetConfigOverrides},
-    },
-    resources::{
-        celery_broker_connection_details, celery_results_backend_connection_details,
-        metadata_database_connection_details,
     },
 };
 

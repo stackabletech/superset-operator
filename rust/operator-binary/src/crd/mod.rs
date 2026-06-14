@@ -34,15 +34,17 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
-use crate::{
-    crd::{
-        databases::{
-            CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
-        },
-        v1alpha1::SupersetRoleConfig,
+use crate::crd::{
+    databases::{
+        CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
     },
-    resources::listener::default_listener_class,
+    v1alpha1::SupersetRoleConfig,
 };
+
+/// Default listener class used by the rolegroup listener.
+fn default_listener_class() -> String {
+    "cluster-internal".to_string()
+}
 
 pub mod affinity;
 pub mod authentication;

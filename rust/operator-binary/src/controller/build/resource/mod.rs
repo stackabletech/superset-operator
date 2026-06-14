@@ -22,9 +22,10 @@ use crate::crd::databases::{
     MetadataDatabaseConnection,
 };
 
+pub mod config_map;
 pub mod deployment;
 pub mod listener;
-pub mod rbac;
+pub mod pdb;
 pub mod service;
 pub mod statefulset;
 

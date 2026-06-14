@@ -49,7 +49,3 @@ pub fn listener_ports() -> Vec<listener::v1alpha1::ListenerPort> {
         protocol: Some("TCP".to_owned()),
     }]
 }
-
-pub fn default_listener_class() -> String {
-    "cluster-internal".to_string()
-}
