@@ -41,10 +41,7 @@ use crate::{
             command::add_cert_to_python_certifi_command,
             graceful_shutdown::add_graceful_shutdown_config,
             properties::{ConfigFileName, superset_config::DEFAULT_WEBSERVER_TIMEOUT},
-            resource::{
-                CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
-                listener::{LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
-            },
+            resource::listener::{LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
         },
     },
     crd::{
@@ -64,8 +61,8 @@ pub enum Error {
         source: stackable_operator::builder::pod::container::Error,
     },
 
-    #[snafu(display("failed to build sidecar container"))]
-    BuildSidecar { source: super::Error },
+    #[snafu(display("failed to build container"))]
+    BuildContainer { source: super::Error },
 
     #[snafu(display("failed to configure graceful shutdown"))]
     GracefulShutdown {
@@ -119,7 +116,6 @@ pub fn build_server_rolegroup_statefulset(
     sa_name: &str,
 ) -> Result<StatefulSet> {
     let merged_config = &rolegroup_config.config;
-    let env_overrides = &rolegroup_config.env_overrides;
 
     let role_group_name: RoleGroupName = rolegroup_ref
         .role_group
@@ -149,44 +145,12 @@ pub fn build_server_rolegroup_statefulset(
         .affinity(&merged_config.affinity)
         .service_account_name(sa_name);
 
-    let mut superset_cb = ContainerBuilder::new(&Container::Superset.to_string())
-        .context(InvalidContainerNameSnafu)?;
+    let mut superset_cb = super::build_superset_container_builder(validated, rolegroup_config)
+        .context(BuildContainerSnafu)?;
 
-    let metadata_database_connection_details =
-        super::metadata_database_connection_details(&validated.cluster_config.metadata_database);
-    let celery_results_backend_connection_details =
-        super::celery_results_backend_connection_details(
-            validated.cluster_config.celery_results_backend.as_ref(),
-        );
-    let celery_broker_connection_details =
-        super::celery_broker_connection_details(validated.cluster_config.celery_broker.as_ref());
-
-    metadata_database_connection_details.add_to_container(&mut superset_cb);
-    if let (_, Some(celery_results_backend_connection_details)) =
-        &celery_results_backend_connection_details
-    {
-        celery_results_backend_connection_details.add_to_container(&mut superset_cb);
-    }
-    if let Some(celery_broker_connection_details) = celery_broker_connection_details {
-        celery_broker_connection_details.add_to_container(&mut superset_cb);
-    }
-
-    superset_cb.add_env_vars(env_overrides.clone());
-    if let Some(mapbox_secret) = &validated.cluster_config.mapbox_secret {
-        superset_cb.add_env_var_from_secret(
-            "MAPBOX_API_KEY",
-            mapbox_secret,
-            "connections.mapboxApiKey",
-        );
-    }
-
-    // SECRET_KEY from auto-generated secret
-    superset_cb.add_env_var_from_secret(
-        "SECRET_KEY",
-        validated.cluster_config.secret_key_secret_name.clone(),
-        crate::crd::INTERNAL_SECRET_SECRET_KEY,
-    );
-
+    // The `Node` role serves the Superset web UI, so it additionally mounts the authentication
+    // volumes and sets the authentication env vars. These mounts are added after the common config
+    // volume mounts (volume mount order is not significant).
     add_authentication_volumes_and_volume_mounts(
         &validated.cluster_config.authentication_config,
         &mut superset_cb,
@@ -199,22 +163,7 @@ pub fn build_server_rolegroup_statefulset(
         .webserver_timeout
         .unwrap_or(DEFAULT_WEBSERVER_TIMEOUT);
 
-    let secret = &validated.cluster_config.credentials_secret_name;
-
     superset_cb
-        .image_from_product_image(&validated.image)
-        .add_container_port("http", APP_PORT.into())
-        .add_volume_mount(CONFIG_VOLUME_NAME, STACKABLE_CONFIG_DIR).context(AddVolumeMountSnafu)?
-        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, STACKABLE_LOG_CONFIG_DIR).context(AddVolumeMountSnafu)?
-        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR).context(AddVolumeMountSnafu)?
-        .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
-        .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
-        .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
-        .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
-        .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
-        // Needed by the `containerdebug` process to log it's tracing information to.
-        .add_env_var("CONTAINERDEBUG_LOG_DIRECTORY", format!("{STACKABLE_LOG_DIR}/containerdebug"))
-        .add_env_var("SSL_CERT_DIR", "/stackable/certs/")
         .add_env_vars(authentication_env_vars(&validated.cluster_config.authentication_config))
         .command(vec![
             "/bin/bash".to_string(),
@@ -288,10 +237,12 @@ pub fn build_server_rolegroup_statefulset(
         merged_config.logging.containers.get(&Container::Superset),
     ))
     .context(AddVolumeSnafu)?;
-    pb.add_container(super::build_metrics_container(&validated.image).context(BuildSidecarSnafu)?);
+    pb.add_container(
+        super::build_metrics_container(&validated.image).context(BuildContainerSnafu)?,
+    );
 
     if let Some(vector_container) = super::build_vector_container(validated, &merged_config.logging)
-        .context(BuildSidecarSnafu)?
+        .context(BuildContainerSnafu)?
     {
         pb.add_container(vector_container);
     }

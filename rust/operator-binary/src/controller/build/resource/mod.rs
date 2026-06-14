@@ -26,9 +26,10 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::ValidatedCluster,
+    controller::{SupersetRoleGroupConfig, ValidatedCluster},
     crd::{
-        MAX_LOG_FILES_SIZE, METRICS_PORT, METRICS_PORT_NAME,
+        APP_PORT, MAX_LOG_FILES_SIZE, METRICS_PORT, METRICS_PORT_NAME, STACKABLE_CONFIG_DIR,
+        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection,
             CeleryResultsBackendConnectionDetails, MetadataDatabaseConnection,
@@ -62,6 +63,11 @@ pub enum Error {
     #[snafu(display("failed to configure logging"))]
     ConfigureLogging {
         source: product_logging::framework::LoggingError,
+    },
+
+    #[snafu(display("failed to add needed volumeMount"))]
+    AddVolumeMount {
+        source: stackable_operator::builder::pod::container::Error,
     },
 }
 
@@ -114,6 +120,77 @@ pub(crate) fn create_volumes(
     }
 
     volumes
+}
+
+/// Builds the `superset` main container builder with the configuration shared by every role:
+/// database/celery connection details, env overrides, the optional Mapbox key, the Flask
+/// `SECRET_KEY`, the product image, the HTTP port, the config/log volume mounts, the
+/// admin-credential env vars and the `containerdebug`/SSL env vars.
+///
+/// The returned builder is finished by the caller with the role-specific command, args and probes
+/// (and, for the `Node` role, the authentication volumes/mounts and listener volume mount).
+pub(crate) fn build_superset_container_builder(
+    validated: &ValidatedCluster,
+    rolegroup_config: &SupersetRoleGroupConfig,
+) -> Result<ContainerBuilder, Error> {
+    let mut superset_cb = ContainerBuilder::new(&Container::Superset.to_string())
+        .context(InvalidContainerNameSnafu)?;
+
+    metadata_database_connection_details(&validated.cluster_config.metadata_database)
+        .add_to_container(&mut superset_cb);
+    let celery_results_backend_connection_details = celery_results_backend_connection_details(
+        validated.cluster_config.celery_results_backend.as_ref(),
+    );
+    if let (_, Some(celery_results_backend_connection_details)) =
+        &celery_results_backend_connection_details
+    {
+        celery_results_backend_connection_details.add_to_container(&mut superset_cb);
+    }
+    if let Some(celery_broker_connection_details) =
+        celery_broker_connection_details(validated.cluster_config.celery_broker.as_ref())
+    {
+        celery_broker_connection_details.add_to_container(&mut superset_cb);
+    }
+
+    superset_cb.add_env_vars(rolegroup_config.env_overrides.clone());
+    if let Some(mapbox_secret) = &validated.cluster_config.mapbox_secret {
+        superset_cb.add_env_var_from_secret(
+            "MAPBOX_API_KEY",
+            mapbox_secret,
+            "connections.mapboxApiKey",
+        );
+    }
+
+    // SECRET_KEY from auto-generated secret
+    superset_cb.add_env_var_from_secret(
+        "SECRET_KEY",
+        validated.cluster_config.secret_key_secret_name.clone(),
+        crate::crd::INTERNAL_SECRET_SECRET_KEY,
+    );
+
+    let secret = &validated.cluster_config.credentials_secret_name;
+    superset_cb
+        .image_from_product_image(&validated.image)
+        .add_container_port("http", APP_PORT.into())
+        .add_volume_mount(CONFIG_VOLUME_NAME, STACKABLE_CONFIG_DIR)
+        .context(AddVolumeMountSnafu)?
+        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, STACKABLE_LOG_CONFIG_DIR)
+        .context(AddVolumeMountSnafu)?
+        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
+        .context(AddVolumeMountSnafu)?
+        .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
+        .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
+        .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
+        .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
+        .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
+        // Needed by the `containerdebug` process to log it's tracing information to.
+        .add_env_var(
+            "CONTAINERDEBUG_LOG_DIRECTORY",
+            format!("{STACKABLE_LOG_DIR}/containerdebug"),
+        )
+        .add_env_var("SSL_CERT_DIR", "/stackable/certs/");
+
+    Ok(superset_cb)
 }
 
 /// Builds the `metrics` (statsd exporter) sidecar container, shared by the StatefulSet and

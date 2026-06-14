@@ -3,7 +3,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::{
         meta::ObjectMetaBuilder,
-        pod::{PodBuilder, container::ContainerBuilder, security::PodSecurityContextBuilder},
+        pod::{PodBuilder, security::PodSecurityContextBuilder},
     },
     k8s_openapi::{
         DeepMerge,
@@ -25,14 +25,10 @@ use stackable_operator::{
 use crate::{
     controller::{
         SupersetRoleGroupConfig, ValidatedCluster,
-        build::{
-            graceful_shutdown::add_graceful_shutdown_config,
-            properties::ConfigFileName,
-            resource::{CONFIG_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME},
-        },
+        build::{graceful_shutdown::add_graceful_shutdown_config, properties::ConfigFileName},
     },
     crd::{
-        APP_PORT, PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+        PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
         SupersetRole,
         v1alpha1::{Container, SupersetCluster},
     },
@@ -45,8 +41,8 @@ pub enum Error {
         source: stackable_operator::builder::pod::container::Error,
     },
 
-    #[snafu(display("failed to build sidecar container"))]
-    BuildSidecar { source: super::Error },
+    #[snafu(display("failed to build container"))]
+    BuildContainer { source: super::Error },
 
     #[snafu(display("failed to configure graceful shutdown"))]
     GracefulShutdown {
@@ -87,7 +83,6 @@ pub fn build_rolegroup_deployment(
 ) -> Result<Deployment> {
     let resolved_product_image = &validated.image;
     let merged_config = &rolegroup_config.config;
-    let env_overrides = &rolegroup_config.env_overrides;
 
     let role: SupersetRole = rolegroup_ref
         .role
@@ -144,66 +139,10 @@ pub fn build_rolegroup_deployment(
         .affinity(&merged_config.affinity)
         .service_account_name(sa_name);
 
-    let mut superset_cb = ContainerBuilder::new(&Container::Superset.to_string())
-        .context(InvalidContainerNameSnafu)?;
-
-    let metadata_database_connection_details =
-        super::metadata_database_connection_details(&validated.cluster_config.metadata_database);
-    let celery_results_backend_connection_details =
-        super::celery_results_backend_connection_details(
-            validated.cluster_config.celery_results_backend.as_ref(),
-        );
-    let celery_broker_connection_details =
-        super::celery_broker_connection_details(validated.cluster_config.celery_broker.as_ref());
-
-    metadata_database_connection_details.add_to_container(&mut superset_cb);
-    if let (_, Some(celery_results_backend_connection_details)) =
-        &celery_results_backend_connection_details
-    {
-        celery_results_backend_connection_details.add_to_container(&mut superset_cb);
-    }
-    if let Some(celery_broker_connection_details) = celery_broker_connection_details {
-        celery_broker_connection_details.add_to_container(&mut superset_cb);
-    }
-
-    superset_cb.add_env_vars(env_overrides.clone());
-    if let Some(mapbox_secret) = &validated.cluster_config.mapbox_secret {
-        superset_cb.add_env_var_from_secret(
-            "MAPBOX_API_KEY",
-            mapbox_secret,
-            "connections.mapboxApiKey",
-        );
-    }
-
-    // SECRET_KEY from auto-generated secret
-    superset_cb.add_env_var_from_secret(
-        "SECRET_KEY",
-        validated.cluster_config.secret_key_secret_name.clone(),
-        crate::crd::INTERNAL_SECRET_SECRET_KEY,
-    );
-
-    let secret = &validated.cluster_config.credentials_secret_name;
+    let mut superset_cb = super::build_superset_container_builder(validated, rolegroup_config)
+        .context(BuildContainerSnafu)?;
 
     superset_cb
-        .image_from_product_image(resolved_product_image)
-        .add_container_port("http", APP_PORT.into())
-        .add_volume_mount(CONFIG_VOLUME_NAME, STACKABLE_CONFIG_DIR)
-        .context(AddVolumeMountSnafu)?
-        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, STACKABLE_LOG_CONFIG_DIR)
-        .context(AddVolumeMountSnafu)?
-        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
-        .context(AddVolumeMountSnafu)?
-        .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
-        .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
-        .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
-        .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
-        .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
-        // Needed by the `containerdebug` process to log it's tracing information to.
-        .add_env_var(
-            "CONTAINERDEBUG_LOG_DIRECTORY",
-            format!("{STACKABLE_LOG_DIR}/containerdebug"),
-        )
-        .add_env_var("SSL_CERT_DIR", "/stackable/certs/")
         .command(vec![
             "/bin/bash".to_string(),
             "-x".to_string(),
@@ -245,11 +184,11 @@ pub fn build_rolegroup_deployment(
     ))
     .context(AddVolumeSnafu)?;
     pb.add_container(
-        super::build_metrics_container(resolved_product_image).context(BuildSidecarSnafu)?,
+        super::build_metrics_container(resolved_product_image).context(BuildContainerSnafu)?,
     );
 
     if let Some(vector_container) = super::build_vector_container(validated, &merged_config.logging)
-        .context(BuildSidecarSnafu)?
+        .context(BuildContainerSnafu)?
     {
         pb.add_container(vector_container);
     }
