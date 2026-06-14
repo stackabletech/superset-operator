@@ -9,7 +9,6 @@ use stackable_operator::{
             PodBuilder,
             container::ContainerBuilder,
             probe::ProbeBuilder,
-            resources::ResourceRequirementsBuilder,
             security::PodSecurityContextBuilder,
             volume::{
                 ListenerOperatorVolumeSourceBuilder, ListenerOperatorVolumeSourceBuilderError,
@@ -26,9 +25,8 @@ use stackable_operator::{
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
     kvp::Label,
-    product_logging::{
-        self,
-        framework::{create_vector_shutdown_file_command, remove_vector_shutdown_file_command},
+    product_logging::framework::{
+        create_vector_shutdown_file_command, remove_vector_shutdown_file_command,
     },
     role_utils::RoleGroupRef,
     shared::time::Duration,
@@ -50,8 +48,8 @@ use crate::{
         },
     },
     crd::{
-        APP_PORT, METRICS_PORT, METRICS_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR,
-        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SupersetRole,
+        APP_PORT, PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+        SupersetRole,
         authentication::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
         },
@@ -66,8 +64,8 @@ pub enum Error {
         source: stackable_operator::builder::pod::container::Error,
     },
 
-    #[snafu(display("vector agent is enabled but vector aggregator ConfigMap is missing"))]
-    VectorAggregatorConfigMapMissing,
+    #[snafu(display("failed to build sidecar container"))]
+    BuildSidecar { source: super::Error },
 
     #[snafu(display("failed to configure graceful shutdown"))]
     GracefulShutdown {
@@ -82,11 +80,6 @@ pub enum Error {
     #[snafu(display("failed to build Metadata"))]
     MetadataBuild {
         source: stackable_operator::builder::meta::Error,
-    },
-
-    #[snafu(display("failed to configure logging"))]
-    ConfigureLogging {
-        source: product_logging::framework::LoggingError,
     },
 
     #[snafu(display("failed to add LDAP Volumes and VolumeMounts"))]
@@ -290,65 +283,17 @@ pub fn build_server_rolegroup_statefulset(
     pb.add_container(superset_cb.build());
     add_graceful_shutdown_config(merged_config, pb).context(GracefulShutdownSnafu)?;
 
-    let metrics_container = ContainerBuilder::new("metrics")
-        .context(InvalidContainerNameSnafu)?
-        .image_from_product_image(&validated.image)
-        .command(vec![
-            "/bin/bash".to_string(),
-            "-x".to_string(),
-            "-euo".to_string(),
-            "pipefail".to_string(),
-            "-c".to_string(),
-        ])
-        .args(vec![formatdoc! {"
-            {COMMON_BASH_TRAP_FUNCTIONS}
-
-            prepare_signal_handlers
-            /stackable/statsd_exporter &
-            wait_for_termination $!
-        "}])
-        .add_container_port(METRICS_PORT_NAME, METRICS_PORT.into())
-        .resources(
-            ResourceRequirementsBuilder::new()
-                .with_cpu_request("100m")
-                .with_cpu_limit("200m")
-                .with_memory_request("64Mi")
-                .with_memory_limit("64Mi")
-                .build(),
-        )
-        .build();
-
     pb.add_volumes(super::create_volumes(
         resource_names.role_group_config_map().as_ref(),
         merged_config.logging.containers.get(&Container::Superset),
     ))
     .context(AddVolumeSnafu)?;
-    pb.add_container(metrics_container);
+    pb.add_container(super::build_metrics_container(&validated.image).context(BuildSidecarSnafu)?);
 
-    if merged_config.logging.enable_vector_agent {
-        match &validated.cluster_config.vector_aggregator_config_map_name {
-            Some(vector_aggregator_config_map_name) => {
-                pb.add_container(
-                    product_logging::framework::vector_container(
-                        &validated.image,
-                        CONFIG_VOLUME_NAME,
-                        LOG_VOLUME_NAME,
-                        merged_config.logging.containers.get(&Container::Vector),
-                        ResourceRequirementsBuilder::new()
-                            .with_cpu_request("250m")
-                            .with_cpu_limit("500m")
-                            .with_memory_request("128Mi")
-                            .with_memory_limit("128Mi")
-                            .build(),
-                        vector_aggregator_config_map_name,
-                    )
-                    .context(ConfigureLoggingSnafu)?,
-                );
-            }
-            None => {
-                VectorAggregatorConfigMapMissingSnafu.fail()?;
-            }
-        }
+    if let Some(vector_container) = super::build_vector_container(validated, &merged_config.logging)
+        .context(BuildSidecarSnafu)?
+    {
+        pb.add_container(vector_container);
     }
 
     let mut pod_template = pb.build_template();

@@ -1,5 +1,10 @@
+use indoc::formatdoc;
+use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    builder::pod::volume::VolumeBuilder,
+    builder::pod::{
+        container::ContainerBuilder, resources::ResourceRequirementsBuilder, volume::VolumeBuilder,
+    },
+    commons::product_image_selection::ResolvedProductImage,
     database_connections::{
         TemplatingMechanism,
         drivers::{
@@ -7,19 +12,29 @@ use stackable_operator::{
             sqlalchemy::SqlAlchemyDatabaseConnectionDetails,
         },
     },
-    k8s_openapi::api::core::v1::{ConfigMapVolumeSource, EmptyDirVolumeSource, Volume},
+    k8s_openapi::api::core::v1::{
+        ConfigMapVolumeSource, Container as K8sContainer, EmptyDirVolumeSource, Volume,
+    },
     product_logging::{
         self,
         spec::{
             ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
-            CustomContainerLogConfig,
+            CustomContainerLogConfig, Logging,
         },
     },
+    utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
 
-use crate::crd::databases::{
-    CeleryBrokerConnection, CeleryResultsBackendConnection, CeleryResultsBackendConnectionDetails,
-    MetadataDatabaseConnection,
+use crate::{
+    controller::ValidatedCluster,
+    crd::{
+        MAX_LOG_FILES_SIZE, METRICS_PORT, METRICS_PORT_NAME,
+        databases::{
+            CeleryBrokerConnection, CeleryResultsBackendConnection,
+            CeleryResultsBackendConnectionDetails, MetadataDatabaseConnection,
+        },
+        v1alpha1::Container,
+    },
 };
 
 pub mod config_map;
@@ -29,11 +44,26 @@ pub mod pdb;
 pub mod service;
 pub mod statefulset;
 
-use crate::crd::MAX_LOG_FILES_SIZE;
-
 pub const CONFIG_VOLUME_NAME: &str = "config";
 pub const LOG_CONFIG_VOLUME_NAME: &str = "log-config";
 pub const LOG_VOLUME_NAME: &str = "log";
+
+/// Errors shared by the sidecar-container builders below.
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display("invalid container name"))]
+    InvalidContainerName {
+        source: stackable_operator::builder::pod::container::Error,
+    },
+
+    #[snafu(display("vector agent is enabled but vector aggregator ConfigMap is missing"))]
+    VectorAggregatorConfigMapMissing,
+
+    #[snafu(display("failed to configure logging"))]
+    ConfigureLogging {
+        source: product_logging::framework::LoggingError,
+    },
+}
 
 pub(crate) fn create_volumes(
     config_map_name: &str,
@@ -84,6 +114,73 @@ pub(crate) fn create_volumes(
     }
 
     volumes
+}
+
+/// Builds the `metrics` (statsd exporter) sidecar container, shared by the StatefulSet and
+/// Deployment rolegroup builders.
+pub(crate) fn build_metrics_container(
+    resolved_product_image: &ResolvedProductImage,
+) -> Result<K8sContainer, Error> {
+    Ok(ContainerBuilder::new("metrics")
+        .context(InvalidContainerNameSnafu)?
+        .image_from_product_image(resolved_product_image)
+        .command(vec![
+            "/bin/bash".to_string(),
+            "-x".to_string(),
+            "-euo".to_string(),
+            "pipefail".to_string(),
+            "-c".to_string(),
+        ])
+        .args(vec![formatdoc! {"
+            {COMMON_BASH_TRAP_FUNCTIONS}
+            prepare_signal_handlers
+            /stackable/statsd_exporter &
+            wait_for_termination $!
+        "}])
+        .add_container_port(METRICS_PORT_NAME, METRICS_PORT.into())
+        .resources(
+            ResourceRequirementsBuilder::new()
+                .with_cpu_request("100m")
+                .with_cpu_limit("200m")
+                .with_memory_request("64Mi")
+                .with_memory_limit("64Mi")
+                .build(),
+        )
+        .build())
+}
+
+/// Builds the Vector agent sidecar container for the rolegroup, or `None` if vector logging is
+/// disabled. Shared by the StatefulSet and Deployment rolegroup builders.
+pub(crate) fn build_vector_container(
+    validated: &ValidatedCluster,
+    logging: &Logging<Container>,
+) -> Result<Option<K8sContainer>, Error> {
+    if !logging.enable_vector_agent {
+        return Ok(None);
+    }
+
+    let vector_aggregator_config_map_name = validated
+        .cluster_config
+        .vector_aggregator_config_map_name
+        .as_ref()
+        .context(VectorAggregatorConfigMapMissingSnafu)?;
+
+    let container = product_logging::framework::vector_container(
+        &validated.image,
+        CONFIG_VOLUME_NAME,
+        LOG_VOLUME_NAME,
+        logging.containers.get(&Container::Vector),
+        ResourceRequirementsBuilder::new()
+            .with_cpu_request("250m")
+            .with_cpu_limit("500m")
+            .with_memory_request("128Mi")
+            .with_memory_limit("128Mi")
+            .build(),
+        vector_aggregator_config_map_name,
+    )
+    .context(ConfigureLoggingSnafu)?;
+
+    Ok(Some(container))
 }
 
 pub(crate) fn metadata_database_connection_details(
