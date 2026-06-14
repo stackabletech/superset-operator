@@ -11,12 +11,12 @@ use stackable_operator::{
             AutomaticContainerLogConfig, ContainerLogConfig, ContainerLogConfigChoice, Logging,
         },
     },
-    role_utils::RoleGroupRef,
+    v2::types::operator::RoleGroupName,
 };
 
-use crate::crd::{
-    STACKABLE_LOG_DIR,
-    v1alpha1::{Container, SupersetCluster},
+use crate::{
+    controller::ValidatedCluster,
+    crd::{STACKABLE_LOG_DIR, SupersetRole, v1alpha1::Container},
 };
 
 /// The rotating log file the generated `log_config.py` writes to (consumed by the Vector agent).
@@ -46,7 +46,9 @@ pub fn build_log_config(logging: &Logging<Container>) -> Option<String> {
 ///
 /// Returns `None` when the Vector agent is disabled for this role group.
 pub fn build_vector_config(
-    rolegroup: &RoleGroupRef<SupersetCluster>,
+    validated: &ValidatedCluster,
+    superset_role: &SupersetRole,
+    role_group_name: &RoleGroupName,
     logging: &Logging<Container>,
 ) -> Option<String> {
     if !logging.enable_vector_agent {
@@ -60,8 +62,11 @@ pub fn build_vector_config(
         _ => None,
     };
 
+    // `create_vector_config` ignores the role-group ref (it only globs `STACKABLE_LOG_DIR`), but the
+    // upstream signature still requires one. Constructed here so callers stay on typed names.
+    let rolegroup_ref = validated.rolegroup_ref(superset_role, role_group_name);
     Some(product_logging::framework::create_vector_config(
-        rolegroup,
+        &rolegroup_ref,
         vector_log_config,
     ))
 }

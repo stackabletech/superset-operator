@@ -17,7 +17,6 @@ use stackable_operator::{
     product_logging::framework::{
         create_vector_shutdown_file_command, remove_vector_shutdown_file_command,
     },
-    role_utils::RoleGroupRef,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
 };
@@ -29,8 +28,7 @@ use crate::{
     },
     crd::{
         PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
-        SupersetRole,
-        v1alpha1::{Container, SupersetCluster},
+        SupersetRole, v1alpha1::Container,
     },
 };
 
@@ -72,27 +70,20 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 /// [`StatefulSet`](super::statefulset::build_server_rolegroup_statefulset) instead.
 pub fn build_rolegroup_deployment(
     validated: &ValidatedCluster,
-    rolegroup_ref: &RoleGroupRef<SupersetCluster>,
+    superset_role: &SupersetRole,
+    role_group_name: &RoleGroupName,
     rolegroup_config: &SupersetRoleGroupConfig,
     sa_name: &str,
 ) -> Result<Deployment> {
     let resolved_product_image = &validated.image;
     let merged_config = &rolegroup_config.config;
 
-    let role: SupersetRole = rolegroup_ref
-        .role
-        .parse()
-        .expect("the role group ref carries a valid role");
-    let role_group_name: RoleGroupName = rolegroup_ref
-        .role_group
-        .parse()
-        .expect("the role group name was validated during cluster validation");
-    let resource_names = validated.resource_names(&role, &role_group_name);
-    let recommended_object_labels = validated.recommended_labels(&role, &role_group_name);
+    let resource_names = validated.resource_names(superset_role, role_group_name);
+    let recommended_object_labels = validated.recommended_labels(superset_role, role_group_name);
 
     // The Celery process command, liveness probe and replica policy are the only differences
     // between the `worker` and `beat` rolegroups.
-    let (celery_command, liveness_probe, replicas) = match role {
+    let (celery_command, liveness_probe, replicas) = match superset_role {
         SupersetRole::Worker => (
             "celery --app=superset.tasks.celery_app:app worker --task-events",
             worker_liveness_probe(),
@@ -207,7 +198,7 @@ pub fn build_rolegroup_deployment(
             selector: LabelSelector {
                 match_labels: Some(
                     validated
-                        .role_group_selector(&role, &role_group_name)
+                        .role_group_selector(superset_role, role_group_name)
                         .into(),
                 ),
                 ..LabelSelector::default()

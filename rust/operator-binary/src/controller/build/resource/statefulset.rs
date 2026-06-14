@@ -28,7 +28,6 @@ use stackable_operator::{
     product_logging::framework::{
         create_vector_shutdown_file_command, remove_vector_shutdown_file_command,
     },
-    role_utils::RoleGroupRef,
     shared::time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
@@ -50,7 +49,7 @@ use crate::{
         authentication::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
         },
-        v1alpha1::{Container, SupersetCluster},
+        v1alpha1::Container,
     },
 };
 
@@ -106,22 +105,18 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 pub fn build_server_rolegroup_statefulset(
     validated: &ValidatedCluster,
     superset_role: &SupersetRole,
-    rolegroup_ref: &RoleGroupRef<SupersetCluster>,
+    role_group_name: &RoleGroupName,
     rolegroup_config: &SupersetRoleGroupConfig,
     sa_name: &str,
 ) -> Result<StatefulSet> {
     let merged_config = &rolegroup_config.config;
 
-    let role_group_name: RoleGroupName = rolegroup_ref
-        .role_group
-        .parse()
-        .expect("the role group name was validated during cluster validation");
-    let resource_names = validated.resource_names(superset_role, &role_group_name);
-    let recommended_object_labels = validated.recommended_labels(superset_role, &role_group_name);
+    let resource_names = validated.resource_names(superset_role, role_group_name);
+    let recommended_object_labels = validated.recommended_labels(superset_role, role_group_name);
     // Used for PVC templates that cannot be modified once they are deployed (a constant "none"
     // version keeps the labels stable across version upgrades).
     let unversioned_recommended_labels =
-        validated.unversioned_recommended_labels(superset_role, &role_group_name);
+        validated.unversioned_recommended_labels(superset_role, role_group_name);
 
     let metadata = ObjectMetaBuilder::new()
         .with_labels(recommended_object_labels.clone())
@@ -261,7 +256,7 @@ pub fn build_server_rolegroup_statefulset(
             selector: LabelSelector {
                 match_labels: Some(
                     validated
-                        .role_group_selector(superset_role, &role_group_name)
+                        .role_group_selector(superset_role, role_group_name)
                         .into(),
                 ),
                 ..LabelSelector::default()

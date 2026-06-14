@@ -17,7 +17,7 @@ use stackable_operator::{
         Resource, ResourceExt,
         api::ObjectMeta,
         core::{DeserializeGuard, error_boundary},
-        runtime::controller::Action,
+        runtime::{controller::Action, reflector::ObjectRef},
     },
     kvp::Labels,
     logging::controller::ReconcilerError,
@@ -172,6 +172,21 @@ impl ValidatedCluster {
         }
     }
 
+    /// Builds a [`RoleGroupRef`] pointing at this cluster, used for the few upstream APIs that
+    /// still require one (e.g. `product_logging::framework::create_vector_config`).
+    pub fn rolegroup_ref(
+        &self,
+        role: &SupersetRole,
+        role_group_name: &RoleGroupName,
+    ) -> RoleGroupRef<SupersetCluster> {
+        RoleGroupRef {
+            cluster: ObjectRef::<SupersetCluster>::new(&self.name_any())
+                .within(&self.namespace().unwrap_or_default()),
+            role: role.to_string(),
+            role_group: role_group_name.to_string(),
+        }
+    }
+
     pub fn recommended_labels(
         &self,
         role: &SupersetRole,
@@ -321,28 +336,28 @@ pub enum Error {
         source: stackable_operator::cluster_resources::Error,
     },
 
-    #[snafu(display("failed to apply Service for {rolegroup}"))]
+    #[snafu(display("failed to apply Service for role group {role_group_name}"))]
     ApplyRoleGroupService {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<SupersetCluster>,
+        role_group_name: RoleGroupName,
     },
 
-    #[snafu(display("failed to apply ConfigMap for {rolegroup}"))]
+    #[snafu(display("failed to apply ConfigMap for role group {role_group_name}"))]
     ApplyRoleGroupConfig {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<SupersetCluster>,
+        role_group_name: RoleGroupName,
     },
 
-    #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
+    #[snafu(display("failed to apply StatefulSet for role group {role_group_name}"))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<SupersetCluster>,
+        role_group_name: RoleGroupName,
     },
 
-    #[snafu(display("failed to apply Deployment for {rolegroup}"))]
+    #[snafu(display("failed to apply Deployment for role group {role_group_name}"))]
     ApplyRoleGroupDeployment {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<SupersetCluster>,
+        role_group_name: RoleGroupName,
     },
 
     #[snafu(display("failed to update status"))]
@@ -491,42 +506,43 @@ pub async fn reconcile_superset(
 
     for (superset_role, rolegroup_configs) in validated.role_groups.iter() {
         for (rolegroup_name, validated_rolegroup) in rolegroup_configs.iter() {
-            let rolegroup = superset.rolegroup_ref(superset_role, rolegroup_name);
             let config = &validated_rolegroup.config;
 
             let rg_configmap = build::resource::config_map::build_rolegroup_config_map(
                 &validated,
                 superset_role,
-                &rolegroup,
+                rolegroup_name,
                 config,
                 &validated_rolegroup.config_overrides,
                 &config.logging,
             )
             .context(BuildConfigMapSnafu)?;
 
-            let rg_metrics_service = build_node_rolegroup_metrics_service(&validated, &rolegroup);
+            let rg_metrics_service =
+                build_node_rolegroup_metrics_service(&validated, rolegroup_name);
 
-            let rg_headless_service = build_node_rolegroup_headless_service(&validated, &rolegroup);
+            let rg_headless_service =
+                build_node_rolegroup_headless_service(&validated, rolegroup_name);
 
             cluster_resources
                 .add(client, rg_metrics_service)
                 .await
                 .with_context(|_| ApplyRoleGroupServiceSnafu {
-                    rolegroup: rolegroup.clone(),
+                    role_group_name: rolegroup_name.clone(),
                 })?;
 
             cluster_resources
                 .add(client, rg_headless_service)
                 .await
                 .with_context(|_| ApplyRoleGroupServiceSnafu {
-                    rolegroup: rolegroup.clone(),
+                    role_group_name: rolegroup_name.clone(),
                 })?;
 
             cluster_resources
                 .add(client, rg_configmap)
                 .await
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
-                    rolegroup: rolegroup.clone(),
+                    role_group_name: rolegroup_name.clone(),
                 })?;
 
             match superset_role {
@@ -534,7 +550,7 @@ pub async fn reconcile_superset(
                     let rg_statefulset = build_server_rolegroup_statefulset(
                         &validated,
                         superset_role,
-                        &rolegroup,
+                        rolegroup_name,
                         validated_rolegroup,
                         &rbac_sa.name_any(),
                     )
@@ -548,14 +564,15 @@ pub async fn reconcile_superset(
                             .add(client, rg_statefulset.clone())
                             .await
                             .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
-                                rolegroup: rolegroup.clone(),
+                                role_group_name: rolegroup_name.clone(),
                             })?,
                     );
                 }
                 SupersetRole::Worker | SupersetRole::Beat => {
                     let rg_deployment = build_rolegroup_deployment(
                         &validated,
-                        &rolegroup,
+                        superset_role,
+                        rolegroup_name,
                         validated_rolegroup,
                         &rbac_sa.name_any(),
                     )
@@ -569,7 +586,7 @@ pub async fn reconcile_superset(
                             .add(client, rg_deployment.clone())
                             .await
                             .with_context(|_| ApplyRoleGroupDeploymentSnafu {
-                                rolegroup: rolegroup.clone(),
+                                role_group_name: rolegroup_name.clone(),
                             })?,
                     );
                 }

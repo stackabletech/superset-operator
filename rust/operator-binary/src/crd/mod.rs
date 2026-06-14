@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::Snafu;
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
@@ -12,16 +12,13 @@ use stackable_operator::{
             Resources, ResourcesFragment,
         },
     },
-    config::{
-        fragment::{self, Fragment, ValidationError},
-        merge::Merge,
-    },
+    config::{fragment::Fragment, merge::Merge},
     deep_merger::ObjectOverrides,
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
-    kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
+    kube::{CustomResource, ResourceExt},
     memory::{BinaryMultiple, MemoryQuantity},
     product_logging::{self, spec::Logging},
-    role_utils::{GenericRoleConfig, Role, RoleGroupRef},
+    role_utils::{GenericRoleConfig, Role},
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
@@ -32,7 +29,7 @@ use stackable_operator::{
     },
     versioned::versioned,
 };
-use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+use strum::{Display, EnumIter, EnumString};
 
 use crate::crd::{
     databases::{
@@ -81,12 +78,6 @@ pub type SupersetRoleType = Role<
 
 #[derive(Debug, Snafu)]
 pub enum Error {
-    #[snafu(display("unknown Superset role found {role}. Should be one of {roles:?}"))]
-    UnknownSupersetRole { role: String, roles: Vec<String> },
-
-    #[snafu(display("fragment validation failure"))]
-    FragmentValidationFailure { source: ValidationError },
-
     #[snafu(display("Configuration/Executor conflict!"))]
     NoRoleForExecutorFailure,
 
@@ -412,14 +403,6 @@ impl SupersetRole {
         }
     }
 
-    pub fn roles() -> Vec<String> {
-        let mut roles = vec![];
-        for role in Self::iter() {
-            roles.push(role.to_string())
-        }
-        roles
-    }
-
     pub fn role_name(&self) -> stackable_operator::v2::types::operator::RoleName {
         self.to_string()
             .parse()
@@ -581,61 +564,12 @@ impl v1alpha1::SupersetCluster {
         }
     }
 
-    /// Metadata about a node rolegroup
-    pub fn rolegroup_ref(
-        &self,
-        role: &SupersetRole,
-        group_name: impl Into<String>,
-    ) -> RoleGroupRef<v1alpha1::SupersetCluster> {
-        RoleGroupRef {
-            cluster: ObjectRef::from_obj(self),
-            role: role.to_string(),
-            role_group: group_name.into(),
-        }
-    }
-
     pub fn get_opa_config(&self) -> Option<&v1alpha1::SupersetOpaRoleMappingConfig> {
         self.spec
             .cluster_config
             .authorization
             .as_ref()
             .map(|a| &a.role_mapping_from_opa)
-    }
-
-    /// Retrieve and merge resource configs for role and role groups
-    pub fn merged_config(
-        &self,
-        role: &SupersetRole,
-        rolegroup_ref: &RoleGroupRef<v1alpha1::SupersetCluster>,
-    ) -> Result<v1alpha1::SupersetConfig, Error> {
-        // Initialize the result with all default values as baseline
-        let conf_defaults = v1alpha1::SupersetConfig::default_config(&self.name_any(), role);
-
-        let role = self.get_role(role).context(UnknownSupersetRoleSnafu {
-            role: role.to_string(),
-            roles: SupersetRole::roles(),
-        })?;
-
-        // Retrieve role resource config
-        let mut conf_role = role.config.config.to_owned();
-
-        // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup = role
-            .role_groups
-            .get(&rolegroup_ref.role_group)
-            .map(|rg| rg.config.config.clone())
-            .unwrap_or_default();
-
-        // Merge more specific configs into default config
-        // Hierarchy is:
-        // 1. RoleGroup
-        // 2. Role
-        // 3. Default
-        conf_role.merge(&conf_defaults);
-        conf_rolegroup.merge(&conf_role);
-
-        tracing::debug!("Merged config: {:?}", conf_rolegroup);
-        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 }
 

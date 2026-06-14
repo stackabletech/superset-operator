@@ -2,13 +2,12 @@ use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::{Service, ServicePort, ServiceSpec},
     kvp::{Annotations, Labels},
-    role_utils::RoleGroupRef,
     v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
 };
 
 use crate::{
     controller::ValidatedCluster,
-    crd::{APP_PORT, APP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, SupersetRole, v1alpha1},
+    crd::{APP_PORT, APP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, SupersetRole},
 };
 
 /// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a certain rolegroup
@@ -16,23 +15,19 @@ use crate::{
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
 pub fn build_node_rolegroup_headless_service(
     validated: &ValidatedCluster,
-    rolegroup_ref: &RoleGroupRef<v1alpha1::SupersetCluster>,
+    role_group_name: &RoleGroupName,
 ) -> Service {
-    let role_group_name: RoleGroupName = rolegroup_ref
-        .role_group
-        .parse()
-        .expect("the role group name was validated during cluster validation");
     Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(validated)
             .name(
                 validated
-                    .resource_names(&SupersetRole::Node, &role_group_name)
+                    .resource_names(&SupersetRole::Node, role_group_name)
                     .headless_service_name()
                     .to_string(),
             )
             .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-            .with_labels(validated.recommended_labels(&SupersetRole::Node, &role_group_name))
+            .with_labels(validated.recommended_labels(&SupersetRole::Node, role_group_name))
             .build(),
         spec: Some(ServiceSpec {
             // Internal communication does not need to be exposed
@@ -41,7 +36,7 @@ pub fn build_node_rolegroup_headless_service(
             ports: Some(service_ports()),
             selector: Some(
                 validated
-                    .role_group_selector(&SupersetRole::Node, &role_group_name)
+                    .role_group_selector(&SupersetRole::Node, role_group_name)
                     .into(),
             ),
             publish_not_ready_addresses: Some(true),
@@ -54,13 +49,9 @@ pub fn build_node_rolegroup_headless_service(
 /// The rolegroup metrics [`Service`] is a service that exposes metrics and a prometheus scraping label
 pub fn build_node_rolegroup_metrics_service(
     validated: &ValidatedCluster,
-    rolegroup_ref: &RoleGroupRef<v1alpha1::SupersetCluster>,
+    role_group_name: &RoleGroupName,
 ) -> Service {
-    let role_group_name: RoleGroupName = rolegroup_ref
-        .role_group
-        .parse()
-        .expect("the role group name was validated during cluster validation");
-    let resource_names = validated.resource_names(&SupersetRole::Node, &role_group_name);
+    let resource_names = validated.resource_names(&SupersetRole::Node, role_group_name);
     Service {
         metadata: ObjectMetaBuilder::new()
             .name_and_namespace(validated)
@@ -68,7 +59,7 @@ pub fn build_node_rolegroup_metrics_service(
             // the qualified role-group name (which is also the StatefulSet name).
             .name(format!("{}-metrics", resource_names.stateful_set_name()))
             .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-            .with_labels(validated.recommended_labels(&SupersetRole::Node, &role_group_name))
+            .with_labels(validated.recommended_labels(&SupersetRole::Node, role_group_name))
             .with_labels(prometheus_labels())
             .with_annotations(prometheus_annotations())
             .build(),
@@ -79,7 +70,7 @@ pub fn build_node_rolegroup_metrics_service(
             ports: Some(metrics_ports()),
             selector: Some(
                 validated
-                    .role_group_selector(&SupersetRole::Node, &role_group_name)
+                    .role_group_selector(&SupersetRole::Node, role_group_name)
                     .into(),
             ),
             publish_not_ready_addresses: Some(true),
