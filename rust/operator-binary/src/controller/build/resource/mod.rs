@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use indoc::formatdoc;
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::pod::{
         container::ContainerBuilder, resources::ResourceRequirementsBuilder, volume::VolumeBuilder,
@@ -21,23 +21,29 @@ use stackable_operator::{
         self,
         spec::{
             ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
-            CustomContainerLogConfig, Logging,
+            CustomContainerLogConfig,
         },
     },
     utils::COMMON_BASH_TRAP_FUNCTIONS,
-    v2::{builder::pod::container::new_container_builder, types::kubernetes::ContainerName},
+    v2::{
+        builder::pod::container::{EnvVarSet, new_container_builder},
+        product_logging::framework::vector_container,
+        types::{
+            kubernetes::{ContainerName, VolumeName},
+            operator::RoleGroupName,
+        },
+    },
 };
 
 use crate::{
     controller::{SupersetRoleGroupConfig, ValidatedCluster},
     crd::{
         APP_PORT, MAX_LOG_FILES_SIZE, METRICS_PORT, METRICS_PORT_NAME, STACKABLE_CONFIG_DIR,
-        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
+        STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SupersetRole,
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection,
             CeleryResultsBackendConnectionDetails, MetadataDatabaseConnection,
         },
-        v1alpha1::Container,
     },
 };
 
@@ -54,18 +60,16 @@ pub const LOG_VOLUME_NAME: &str = "log";
 
 stackable_operator::constant!(SUPERSET_CONTAINER_NAME: ContainerName = "superset");
 stackable_operator::constant!(METRICS_CONTAINER_NAME: ContainerName = "metrics");
+stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
+
+// Typed volume-name constants required by the v2 `vector_container` (which mounts the Vector
+// config and log volumes). Their values match the `&str` constants used by `create_volumes`.
+stackable_operator::constant!(CONFIG_VOLUME_NAME_TYPED: VolumeName = "config");
+stackable_operator::constant!(LOG_VOLUME_NAME_TYPED: VolumeName = "log");
 
 /// Errors shared by the container builders below.
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("vector agent is enabled but vector aggregator ConfigMap is missing"))]
-    VectorAggregatorConfigMapMissing,
-
-    #[snafu(display("failed to configure logging"))]
-    ConfigureLogging {
-        source: product_logging::framework::LoggingError,
-    },
-
     #[snafu(display("failed to add needed volumeMount"))]
     AddVolumeMount {
         source: stackable_operator::builder::pod::container::Error,
@@ -229,34 +233,25 @@ pub(crate) fn build_metrics_container(
 /// disabled. Shared by the StatefulSet and Deployment rolegroup builders.
 pub(crate) fn build_vector_container(
     validated: &ValidatedCluster,
-    logging: &Logging<Container>,
-) -> Result<Option<K8sContainer>, Error> {
-    if !logging.enable_vector_agent {
-        return Ok(None);
-    }
-
-    let vector_aggregator_config_map_name = validated
-        .cluster_config
-        .vector_aggregator_config_map_name
+    superset_role: &SupersetRole,
+    role_group_name: &RoleGroupName,
+    rolegroup_config: &SupersetRoleGroupConfig,
+) -> Option<K8sContainer> {
+    rolegroup_config
+        .logging
+        .vector_container
         .as_ref()
-        .context(VectorAggregatorConfigMapMissingSnafu)?;
-
-    let container = product_logging::framework::vector_container(
-        &validated.image,
-        CONFIG_VOLUME_NAME,
-        LOG_VOLUME_NAME,
-        logging.containers.get(&Container::Vector),
-        ResourceRequirementsBuilder::new()
-            .with_cpu_request("250m")
-            .with_cpu_limit("500m")
-            .with_memory_request("128Mi")
-            .with_memory_limit("128Mi")
-            .build(),
-        vector_aggregator_config_map_name,
-    )
-    .context(ConfigureLoggingSnafu)?;
-
-    Ok(Some(container))
+        .map(|vector_log_config| {
+            vector_container(
+                &VECTOR_CONTAINER_NAME,
+                &validated.image,
+                vector_log_config,
+                &validated.resource_names(superset_role, role_group_name),
+                &CONFIG_VOLUME_NAME_TYPED,
+                &LOG_VOLUME_NAME_TYPED,
+                EnvVarSet::new(),
+            )
+        })
 }
 
 pub(crate) fn metadata_database_connection_details(

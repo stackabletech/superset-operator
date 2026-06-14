@@ -189,8 +189,6 @@ pub mod versioned {
     #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, Merge, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct SupersetConfigOverrides {
-        // Uses the v2 KeyValueConfigOverrides (Merge-capable, plain string values) to match
-        // trino/hdfs/airflow/kafka. Resolution happens in controller/validate.rs.
         #[serde(default, rename = "superset_config.py")]
         pub superset_config_py: KeyValueConfigOverrides,
     }

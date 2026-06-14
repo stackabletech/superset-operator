@@ -171,8 +171,8 @@ pub fn build_rolegroup_deployment(
     .context(AddVolumeSnafu)?;
     pb.add_container(super::build_metrics_container(resolved_product_image));
 
-    if let Some(vector_container) = super::build_vector_container(validated, &merged_config.logging)
-        .context(BuildContainerSnafu)?
+    if let Some(vector_container) =
+        super::build_vector_container(validated, superset_role, role_group_name, rolegroup_config)
     {
         pb.add_container(vector_container);
     }

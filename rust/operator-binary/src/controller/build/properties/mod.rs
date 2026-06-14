@@ -2,7 +2,7 @@
 
 pub mod authentication;
 pub mod authorization;
-pub mod logging;
+pub mod product_logging;
 pub mod superset_config;
 
 /// The names of the Superset config files assembled into the rolegroup `ConfigMap`.

@@ -13,15 +13,15 @@ use stackable_operator::{
         product_image_selection::ResolvedProductImage, random_secret_creation,
         rbac::build_rbac_resources,
     },
+    k8s_openapi::api::core::v1::PodTemplateSpec,
     kube::{
         Resource, ResourceExt,
         api::ObjectMeta,
         core::{DeserializeGuard, error_boundary},
-        runtime::{controller::Action, reflector::ObjectRef},
+        runtime::controller::Action,
     },
     kvp::Labels,
     logging::controller::ReconcilerError,
-    role_utils::RoleGroupRef,
     shared::time::Duration,
     status::condition::{
         compute_conditions, deployment::DeploymentConditionBuilder,
@@ -29,7 +29,9 @@ use stackable_operator::{
     },
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
+        builder::pod::container::EnvVarSet,
         kvp::label::{recommended_labels, role_group_selector},
+        product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
         types::{
             kubernetes::Uid,
@@ -58,7 +60,9 @@ use crate::{
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
         },
-        v1alpha1::{SupersetCluster, SupersetClusterStatus, SupersetConfig},
+        v1alpha1::{
+            SupersetCluster, SupersetClusterStatus, SupersetConfig, SupersetConfigOverrides,
+        },
     },
 };
 
@@ -82,16 +86,32 @@ pub struct ValidatedRoleConfig {
 
 /// Per-rolegroup configuration: the merged CRD config plus the overrides.
 ///
-/// This is the generic [`stackable_operator::v2::role_utils::RoleGroupConfig`]: the merged config
-/// fragment in `config`, the typed `config_overrides` (role-group merged over role) and the merged
-/// `env_overrides`/`cli_overrides`/`pod_overrides`. The config overrides are kept typed
+/// Holds the merged config fragment in `config`, the typed `config_overrides` (role-group merged
+/// over role), the merged `env_overrides`/`pod_overrides` and the validated `logging`. The config
+/// overrides are kept typed
 /// ([`SupersetConfigOverrides`](crate::crd::v1alpha1::SupersetConfigOverrides)) and assembled into
 /// the rendered `superset_config.py` later, in the build step.
-pub type SupersetRoleGroupConfig = stackable_operator::v2::role_utils::RoleGroupConfig<
-    SupersetConfig,
-    stackable_operator::v2::role_utils::GenericCommonConfig,
-    crate::crd::v1alpha1::SupersetConfigOverrides,
->;
+#[derive(Clone, Debug)]
+pub struct SupersetRoleGroupConfig {
+    pub replicas: u16,
+    pub config: SupersetConfig,
+    pub config_overrides: SupersetConfigOverrides,
+    pub env_overrides: EnvVarSet,
+    pub pod_overrides: PodTemplateSpec,
+    pub logging: ValidatedLogging,
+}
+
+/// Validated logging configuration for the Superset and (optional) Vector container.
+///
+/// Produced up-front by `validate_logging` (mirroring the hive-operator) so that an invalid custom
+/// log ConfigMap name or a missing Vector aggregator discovery ConfigMap name fails reconciliation
+/// during validation rather than at resource-build time.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ValidatedLogging {
+    pub superset_container: ValidatedContainerLogConfigChoice,
+    pub vector_container: Option<VectorContainerLogConfig>,
+    pub enable_vector_agent: bool,
+}
 
 /// Cluster-wide configuration that applies to every role and role group.
 ///
@@ -107,8 +127,6 @@ pub struct ValidatedClusterConfig {
     pub secret_key_secret_name: String,
     /// Name of the Secret holding the Mapbox API key, if configured.
     pub mapbox_secret: Option<String>,
-    /// Name of the Vector aggregator discovery ConfigMap, if logging aggregation is enabled.
-    pub vector_aggregator_config_map_name: Option<String>,
     /// Connection to the metadata database.
     pub metadata_database: MetadataDatabaseConnection,
     /// Connection to the Celery results backend, if configured.
@@ -169,21 +187,6 @@ impl ValidatedCluster {
             cluster_name: self.name.clone(),
             role_name: role.role_name(),
             role_group_name: role_group_name.clone(),
-        }
-    }
-
-    /// Builds a [`RoleGroupRef`] pointing at this cluster, used for the few upstream APIs that
-    /// still require one (e.g. `product_logging::framework::create_vector_config`).
-    pub fn rolegroup_ref(
-        &self,
-        role: &SupersetRole,
-        role_group_name: &RoleGroupName,
-    ) -> RoleGroupRef<SupersetCluster> {
-        RoleGroupRef {
-            cluster: ObjectRef::<SupersetCluster>::new(&self.name_any())
-                .within(&self.namespace().unwrap_or_default()),
-            role: role.to_string(),
-            role_group: role_group_name.to_string(),
         }
     }
 

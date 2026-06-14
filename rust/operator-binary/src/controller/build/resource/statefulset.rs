@@ -229,8 +229,8 @@ pub fn build_server_rolegroup_statefulset(
     .context(AddVolumeSnafu)?;
     pb.add_container(super::build_metrics_container(&validated.image));
 
-    if let Some(vector_container) = super::build_vector_container(validated, &merged_config.logging)
-        .context(BuildContainerSnafu)?
+    if let Some(vector_container) =
+        super::build_vector_container(validated, superset_role, role_group_name, rolegroup_config)
     {
         pb.add_container(vector_container);
     }

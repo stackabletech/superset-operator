@@ -4,23 +4,22 @@
 use std::fmt::Write;
 
 use indoc::formatdoc;
-use stackable_operator::{
-    product_logging::{
-        self,
-        spec::{
-            AutomaticContainerLogConfig, ContainerLogConfig, ContainerLogConfigChoice, Logging,
-        },
-    },
-    v2::types::operator::RoleGroupName,
+use stackable_operator::product_logging::spec::{
+    AutomaticContainerLogConfig, ContainerLogConfig, ContainerLogConfigChoice, Logging,
 };
 
-use crate::{
-    controller::ValidatedCluster,
-    crd::{STACKABLE_LOG_DIR, SupersetRole, v1alpha1::Container},
-};
+use crate::crd::{STACKABLE_LOG_DIR, v1alpha1::Container};
 
 /// The rotating log file the generated `log_config.py` writes to (consumed by the Vector agent).
 const LOG_FILE: &str = "superset.py.json";
+
+/// The Vector agent configuration (`vector.yaml`).
+const VECTOR_CONFIG: &str = include_str!("vector.yaml");
+
+/// Returns the Vector agent config (`vector.yaml`) content.
+pub fn vector_config_file_content() -> String {
+    VECTOR_CONFIG.to_owned()
+}
 
 /// Renders `log_config.py` for the Superset container.
 ///
@@ -44,31 +43,11 @@ pub fn build_log_config(logging: &Logging<Container>) -> Option<String> {
 
 /// Renders the Vector agent config (`vector.yaml`).
 ///
-/// Returns `None` when the Vector agent is disabled for this role group.
-pub fn build_vector_config(
-    validated: &ValidatedCluster,
-    superset_role: &SupersetRole,
-    role_group_name: &RoleGroupName,
-    logging: &Logging<Container>,
-) -> Option<String> {
-    if !logging.enable_vector_agent {
-        return None;
-    }
-
-    let vector_log_config = match logging.containers.get(&Container::Vector) {
-        Some(ContainerLogConfig {
-            choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-        }) => Some(log_config),
-        _ => None,
-    };
-
-    // `create_vector_config` ignores the role-group ref (it only globs `STACKABLE_LOG_DIR`), but the
-    // upstream signature still requires one. Constructed here so callers stay on typed names.
-    let rolegroup_ref = validated.rolegroup_ref(superset_role, role_group_name);
-    Some(product_logging::framework::create_vector_config(
-        &rolegroup_ref,
-        vector_log_config,
-    ))
+/// Returns `None` when the Vector agent is disabled for this role group. The returned config is the
+/// vendored, env-var-parameterized `vector.yaml`; the parameterizing env vars are injected into the
+/// Vector container by the v2 `vector_container`.
+pub fn build_vector_config(logging: &Logging<Container>) -> Option<String> {
+    logging.enable_vector_agent.then(vector_config_file_content)
 }
 
 fn create_superset_config(log_config: &AutomaticContainerLogConfig, log_dir: &str) -> String {
@@ -156,4 +135,37 @@ fn create_superset_config(log_config: &AutomaticContainerLogConfig, log_dir: &st
             .unwrap_or_default()
             .to_python_expression(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The vendored `vector.yaml` keeps only the sources Superset produces and drops the ones it
+    /// does not (log4j/log4j2/airlift/opa/tracing). Guards against accidental drift.
+    #[test]
+    fn test_vector_config_file_content() {
+        let content = vector_config_file_content();
+        assert!(!content.is_empty());
+        // Superset logs JSON to `superset.py.json`, so the Python-JSON source must be present.
+        assert!(content.contains("files_py"));
+        assert!(content.contains("*.py.json"));
+        // Sources Superset does not emit must have been trimmed out.
+        for dropped in [
+            "files_log4j",
+            "files_log4j2",
+            "files_airlift",
+            "files_opa_json",
+            "files_tracing_rs",
+        ] {
+            assert!(
+                !content.contains(dropped),
+                "vendored vector.yaml should not contain the dropped source {dropped}"
+            );
+        }
+        // The config is env-var-parameterized (resolved at runtime by the Vector container), not
+        // baked, so the role-group identity must appear as placeholders.
+        assert!(content.contains("${ROLE_NAME}"));
+        assert!(content.contains("${VECTOR_AGGREGATOR_ADDRESS}"));
+    }
 }

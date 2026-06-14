@@ -9,7 +9,7 @@ use stackable_operator::{
 use crate::{
     controller::{
         ValidatedCluster,
-        build::properties::{ConfigFileName, logging, superset_config},
+        build::properties::{ConfigFileName, product_logging, superset_config},
     },
     crd::{
         SupersetRole,
@@ -66,16 +66,100 @@ pub fn build_rolegroup_config_map(
         )
         .add_data(ConfigFileName::SupersetConfig.to_string(), config_file);
 
-    if let Some(log_config) = logging::build_log_config(logging) {
+    if let Some(log_config) = product_logging::build_log_config(logging) {
         cm_builder.add_data(ConfigFileName::LogConfig.to_string(), log_config);
     }
-    if let Some(vector_config) =
-        logging::build_vector_config(validated, role, role_group_name, logging)
-    {
+    if let Some(vector_config) = product_logging::build_vector_config(logging) {
         cm_builder.add_data(VECTOR_CONFIG_FILE, vector_config);
     }
 
     cm_builder.build().with_context(|_| RoleGroupConfigSnafu {
         role_group_name: role_group_name.clone(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use stackable_operator::utils::yaml_from_str_singleton_map;
+
+    use super::*;
+    use crate::{
+        controller::{dereference::DereferencedObjects, validate::validate_cluster},
+        crd::{
+            authentication::{
+                SupersetClientAuthenticationDetailsResolved, v1alpha1::FlaskRolesSyncMoment,
+            },
+            v1alpha1,
+        },
+    };
+
+    fn default_dereferenced() -> DereferencedObjects {
+        DereferencedObjects {
+            authentication_config: SupersetClientAuthenticationDetailsResolved {
+                authentication_classes_resolved: vec![],
+                user_registration: true,
+                user_registration_role: "Public".to_string(),
+                sync_roles_at: FlaskRolesSyncMoment::default(),
+            },
+            opa_config: None,
+        }
+    }
+
+    /// The rolegroup ConfigMap carries `superset_config.py` and (for automatic logging)
+    /// `log_config.py`, and omits `vector.yaml` while the Vector agent is disabled (the default).
+    #[test]
+    fn build_rolegroup_config_map_renders_expected_data() {
+        let input = r#"
+        apiVersion: superset.stackable.tech/v1alpha1
+        kind: SupersetCluster
+        metadata:
+          name: simple-superset
+          uid: 01234567-89ab-cdef-0123-456789abcdef
+        spec:
+          image:
+            productVersion: 4.1.4
+          clusterConfig:
+            credentialsSecretName: superset-admin-credentials
+            metadataDatabase:
+              postgresql:
+                host: superset-postgresql
+                database: superset
+                credentialsSecretName: superset-postgresql-credentials
+          nodes:
+            roleGroups:
+              default:
+                replicas: 1
+        "#;
+        let superset: v1alpha1::SupersetCluster =
+            yaml_from_str_singleton_map(input).expect("illegal test input");
+        let validated =
+            validate_cluster(&superset, default_dereferenced(), "test-repo").expect("validated");
+
+        let role_group_name: RoleGroupName = "default".parse().expect("valid role group name");
+        let rolegroup_config = validated
+            .role_groups
+            .get(&SupersetRole::Node)
+            .and_then(|groups| groups.get(&role_group_name))
+            .expect("node default rolegroup");
+
+        let config_map = build_rolegroup_config_map(
+            &validated,
+            &SupersetRole::Node,
+            &role_group_name,
+            &rolegroup_config.config,
+            &rolegroup_config.config_overrides,
+            &rolegroup_config.config.logging,
+        )
+        .expect("config map built");
+
+        let data = config_map.data.expect("config map has data");
+        assert!(data.contains_key("superset_config.py"));
+        assert!(data.contains_key("log_config.py"));
+        // The Vector agent is disabled by default, so no `vector.yaml` is rendered.
+        assert!(!data.contains_key("vector.yaml"));
+
+        let superset_config = &data["superset_config.py"];
+        assert!(superset_config.contains("SQLALCHEMY_DATABASE_URI"));
+        assert!(superset_config.contains("StatsdStatsLogger"));
+    }
 }
