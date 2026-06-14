@@ -24,6 +24,9 @@
   More information can be found in the [Superset database documentation](https://docs.stackable.tech/home/nightly/superset/usage-guide/database-connections) for details ([#722]).
 - Internal operator refactoring: introduce dereference() and validate() steps in the reconciler ([#731]).
 - test: Bump vector-aggregator to 0.55.0, replace /graphql call with gRPC call ([#735]).
+- BREAKING: Removed product-config machinery. This is a breaking change in terms of configuration.
+￼ Users relying on the product-config `properties.yaml` file have to set these properties via the CRD.
+  The `--product-config` CLI flag and `PRODUCT_CONFIG` env var are now no-ops ([#738]).
 
 [#717]: https://github.com/stackabletech/superset-operator/pull/717
 [#719]: https://github.com/stackabletech/superset-operator/pull/719
@@ -33,6 +36,7 @@
 [#726]: https://github.com/stackabletech/superset-operator/pull/726
 [#731]: https://github.com/stackabletech/superset-operator/pull/731
 [#735]: https://github.com/stackabletech/superset-operator/pull/735
+[#738]: https://github.com/stackabletech/superset-operator/pull/738
 
 ## [26.3.0] - 2026-03-16
 

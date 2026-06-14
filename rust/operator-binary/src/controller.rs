@@ -1,44 +1,68 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
+pub(crate) mod build;
 pub mod dereference;
 pub mod validate;
-use std::sync::Arc;
+use std::{collections::BTreeMap, str::FromStr, sync::Arc};
 
 use const_format::concatcp;
-use product_config::ProductConfigManager;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cli::OperatorEnvironmentOptions,
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
-    commons::{random_secret_creation, rbac::build_rbac_resources},
+    commons::{
+        product_image_selection::ResolvedProductImage, random_secret_creation,
+        rbac::build_rbac_resources,
+    },
+    k8s_openapi::api::core::v1::PodTemplateSpec,
     kube::{
         Resource, ResourceExt,
+        api::ObjectMeta,
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
+    kvp::Labels,
     logging::controller::ReconcilerError,
-    role_utils::RoleGroupRef,
     shared::time::Duration,
     status::condition::{
         compute_conditions, deployment::DeploymentConditionBuilder,
         operations::ClusterOperationsConditionBuilder, statefulset::StatefulSetConditionBuilder,
+    },
+    v2::{
+        HasName, HasUid, NameIsValidLabelValue,
+        builder::pod::container::EnvVarSet,
+        kvp::label::{recommended_labels, role_group_selector},
+        product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
+        role_group_utils::ResourceNames,
+        types::{
+            kubernetes::Uid,
+            operator::{
+                ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
+                RoleGroupName, RoleName,
+            },
+        },
     },
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     OPERATOR_NAME,
-    crd::{
-        APP_NAME, INTERNAL_SECRET_SECRET_KEY, SupersetRole,
-        v1alpha1::{SupersetCluster, SupersetClusterStatus},
-    },
-    operations::pdb::add_pdbs,
-    resources::{
-        build_recommended_labels,
-        configmap::build_rolegroup_config_map,
-        deployment::{build_beat_rolegroup_deployment, build_worker_rolegroup_deployment},
+    controller::build::resource::{
+        deployment::build_rolegroup_deployment,
         listener::build_group_listener,
+        pdb::build_pdb,
         service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
         statefulset::build_server_rolegroup_statefulset,
+    },
+    crd::{
+        APP_NAME, INTERNAL_SECRET_SECRET_KEY, SupersetRole,
+        authentication::SupersetClientAuthenticationDetailsResolved,
+        authorization::SupersetOpaConfigResolved,
+        databases::{
+            CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
+        },
+        v1alpha1::{
+            SupersetCluster, SupersetClusterStatus, SupersetConfig, SupersetConfigOverrides,
+        },
     },
 };
 
@@ -49,8 +73,250 @@ pub const CONTAINER_IMAGE_BASE_NAME: &str = "superset";
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
-    pub product_config: ProductConfigManager,
     pub operator_environment: OperatorEnvironmentOptions,
+}
+
+/// Per-role configuration extracted during validation.
+#[derive(Clone, Debug)]
+pub struct ValidatedRoleConfig {
+    pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
+    pub listener_class: Option<String>,
+    pub group_listener_name: Option<String>,
+}
+
+/// Per-rolegroup configuration: the merged CRD config plus the overrides.
+///
+/// Holds the merged config fragment in `config`, the typed `config_overrides` (role-group merged
+/// over role), the merged `env_overrides`/`pod_overrides` and the validated `logging`. The config
+/// overrides are kept typed
+/// ([`SupersetConfigOverrides`](crate::crd::v1alpha1::SupersetConfigOverrides)) and assembled into
+/// the rendered `superset_config.py` later, in the build step.
+#[derive(Clone, Debug)]
+pub struct SupersetRoleGroupConfig {
+    pub replicas: u16,
+    pub config: SupersetConfig,
+    pub config_overrides: SupersetConfigOverrides,
+    pub env_overrides: EnvVarSet,
+    pub pod_overrides: PodTemplateSpec,
+    pub logging: ValidatedLogging,
+}
+
+/// Validated logging configuration for the Superset and (optional) Vector container.
+///
+/// Produced up-front by `validate_logging` (mirroring the hive-operator) so that an invalid custom
+/// log ConfigMap name or a missing Vector aggregator discovery ConfigMap name fails reconciliation
+/// during validation rather than at resource-build time.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ValidatedLogging {
+    pub superset_container: ValidatedContainerLogConfigChoice,
+    pub vector_container: Option<VectorContainerLogConfig>,
+    pub enable_vector_agent: bool,
+}
+
+/// Cluster-wide configuration that applies to every role and role group.
+///
+/// Carries the dereferenced external references, so every downstream build step reads them from
+/// here rather than from the raw cluster object.
+#[derive(Clone, Debug)]
+pub struct ValidatedClusterConfig {
+    pub authentication_config: SupersetClientAuthenticationDetailsResolved,
+    pub opa_config: Option<SupersetOpaConfigResolved>,
+    /// Name of the Secret holding the admin user credentials.
+    pub credentials_secret_name: String,
+    /// Name of the auto-generated Secret holding the Flask `SECRET_KEY`.
+    pub secret_key_secret_name: String,
+    /// Name of the Secret holding the Mapbox API key, if configured.
+    pub mapbox_secret: Option<String>,
+    /// Connection to the metadata database.
+    pub metadata_database: MetadataDatabaseConnection,
+    /// Connection to the Celery results backend, if configured.
+    pub celery_results_backend: Option<CeleryResultsBackendConnection>,
+    /// Connection to the Celery broker, if configured.
+    pub celery_broker: Option<CeleryBrokerConnection>,
+}
+
+/// The validated cluster: proves that config merging succeeded for every role and role group
+/// before any Kubernetes resources are created.
+#[derive(Clone, Debug)]
+pub struct ValidatedCluster {
+    /// `ObjectMeta` carrying `name`, `namespace` and `uid`, captured during validation, so this
+    /// struct can stand in as the owner [`Resource`] for child objects.
+    metadata: ObjectMeta,
+    pub name: ClusterName,
+    pub product_version: ProductVersion,
+    pub image: ResolvedProductImage,
+    pub cluster_config: ValidatedClusterConfig,
+    pub role_groups: BTreeMap<SupersetRole, BTreeMap<RoleGroupName, SupersetRoleGroupConfig>>,
+    pub role_configs: BTreeMap<SupersetRole, ValidatedRoleConfig>,
+}
+
+impl ValidatedCluster {
+    pub fn new(
+        superset: &SupersetCluster,
+        name: ClusterName,
+        image: ResolvedProductImage,
+        cluster_config: ValidatedClusterConfig,
+        role_groups: BTreeMap<SupersetRole, BTreeMap<RoleGroupName, SupersetRoleGroupConfig>>,
+        role_configs: BTreeMap<SupersetRole, ValidatedRoleConfig>,
+    ) -> Self {
+        let product_version = ProductVersion::from_str(&image.app_version_label_value)
+            .expect("the app version label value is a valid product version");
+        Self {
+            // Capture only the identity fields needed to own child objects.
+            metadata: ObjectMeta {
+                name: Some(superset.name_any()),
+                namespace: superset.namespace(),
+                uid: superset.uid(),
+                ..ObjectMeta::default()
+            },
+            image,
+            cluster_config,
+            role_groups,
+            role_configs,
+            name,
+            product_version,
+        }
+    }
+
+    pub fn resource_names(
+        &self,
+        role: &SupersetRole,
+        role_group_name: &RoleGroupName,
+    ) -> ResourceNames {
+        ResourceNames {
+            cluster_name: self.name.clone(),
+            role_name: role.role_name(),
+            role_group_name: role_group_name.clone(),
+        }
+    }
+
+    pub fn recommended_labels(
+        &self,
+        role: &SupersetRole,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        self.recommended_labels_for(&role.role_name(), role_group_name)
+    }
+
+    pub fn recommended_labels_for(
+        &self,
+        role_name: &RoleName,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        self.recommended_labels_with(&self.product_version, role_name, role_group_name)
+    }
+
+    /// Recommended labels with a constant `none` version, for PVC templates that cannot be modified
+    /// after deployment (keeps the labels stable across version upgrades).
+    pub fn unversioned_recommended_labels(
+        &self,
+        role: &SupersetRole,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        self.recommended_labels_with(
+            &ProductVersion::from_str("none").expect("'none' is a valid product version"),
+            &role.role_name(),
+            role_group_name,
+        )
+    }
+
+    fn recommended_labels_with(
+        &self,
+        product_version: &ProductVersion,
+        role_name: &RoleName,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        recommended_labels(
+            self,
+            &product_name(),
+            product_version,
+            &operator_name(),
+            &controller_name(),
+            role_name,
+            role_group_name,
+        )
+    }
+
+    pub fn role_group_selector(
+        &self,
+        role: &SupersetRole,
+        role_group_name: &RoleGroupName,
+    ) -> Labels {
+        role_group_selector(self, &product_name(), &role.role_name(), role_group_name)
+    }
+}
+
+/// Lets [`ValidatedCluster`] stand in for the raw [`SupersetCluster`] when building owner
+/// references and metadata for child objects. Kind/group/version are delegated to the CRD; the
+/// `metadata` (name, namespace, uid) is captured during validation.
+impl Resource for ValidatedCluster {
+    type DynamicType = <SupersetCluster as Resource>::DynamicType;
+    type Scope = <SupersetCluster as Resource>::Scope;
+
+    fn kind(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        SupersetCluster::kind(dt)
+    }
+
+    fn group(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        SupersetCluster::group(dt)
+    }
+
+    fn version(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        SupersetCluster::version(dt)
+    }
+
+    fn plural(dt: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
+        SupersetCluster::plural(dt)
+    }
+
+    fn meta(&self) -> &ObjectMeta {
+        &self.metadata
+    }
+
+    fn meta_mut(&mut self) -> &mut ObjectMeta {
+        &mut self.metadata
+    }
+}
+
+impl HasName for ValidatedCluster {
+    fn to_name(&self) -> String {
+        self.name_any()
+    }
+}
+
+impl HasUid for ValidatedCluster {
+    fn to_uid(&self) -> Uid {
+        Uid::from_str(
+            &self
+                .metadata
+                .uid
+                .clone()
+                .expect("the uid is captured during validation"),
+        )
+        .expect("the uid is a valid Kubernetes UID")
+    }
+}
+
+impl NameIsValidLabelValue for ValidatedCluster {
+    fn to_label_value(&self) -> String {
+        self.name.to_label_value()
+    }
+}
+
+/// The product name (`superset`) as a type-safe label value.
+fn product_name() -> ProductName {
+    ProductName::from_str(APP_NAME).expect("'superset' is a valid product name")
+}
+
+/// The operator name as a type-safe label value.
+fn operator_name() -> OperatorName {
+    OperatorName::from_str(OPERATOR_NAME).expect("the operator name is a valid label value")
+}
+
+/// The controller name as a type-safe label value.
+fn controller_name() -> ControllerName {
+    ControllerName::from_str(SUPERSET_CONTROLLER_NAME)
+        .expect("the controller name is a valid label value")
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -73,28 +339,28 @@ pub enum Error {
         source: stackable_operator::cluster_resources::Error,
     },
 
-    #[snafu(display("failed to apply Service for {rolegroup}"))]
+    #[snafu(display("failed to apply Service for role group {role_group_name}"))]
     ApplyRoleGroupService {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<SupersetCluster>,
+        role_group_name: RoleGroupName,
     },
 
-    #[snafu(display("failed to apply ConfigMap for {rolegroup}"))]
+    #[snafu(display("failed to apply ConfigMap for role group {role_group_name}"))]
     ApplyRoleGroupConfig {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<SupersetCluster>,
+        role_group_name: RoleGroupName,
     },
 
-    #[snafu(display("failed to apply StatefulSet for {rolegroup}"))]
+    #[snafu(display("failed to apply StatefulSet for role group {role_group_name}"))]
     ApplyRoleGroupStatefulSet {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<SupersetCluster>,
+        role_group_name: RoleGroupName,
     },
 
-    #[snafu(display("failed to apply Deployment for {rolegroup}"))]
+    #[snafu(display("failed to apply Deployment for role group {role_group_name}"))]
     ApplyRoleGroupDeployment {
         source: stackable_operator::cluster_resources::Error,
-        rolegroup: RoleGroupRef<SupersetCluster>,
+        role_group_name: RoleGroupName,
     },
 
     #[snafu(display("failed to update status"))]
@@ -119,7 +385,12 @@ pub enum Error {
 
     #[snafu(display("failed to create PodDisruptionBudget"))]
     FailedToCreatePdb {
-        source: crate::operations::pdb::Error,
+        source: crate::controller::build::resource::pdb::Error,
+    },
+
+    #[snafu(display("failed to apply PodDisruptionBudget"))]
+    ApplyPdb {
+        source: stackable_operator::cluster_resources::Error,
     },
 
     #[snafu(display("failed to get required Labels"))]
@@ -138,29 +409,19 @@ pub enum Error {
         source: stackable_operator::cluster_resources::Error,
     },
 
-    #[snafu(display("failed to build listener"))]
-    BuildListener {
-        source: crate::resources::listener::Error,
-    },
-
-    #[snafu(display("failed to build service"))]
-    BuildService {
-        source: crate::resources::service::Error,
-    },
-
     #[snafu(display("failed to build statefulset"))]
     BuildStatefulSet {
-        source: crate::resources::statefulset::Error,
+        source: crate::controller::build::resource::statefulset::Error,
     },
 
     #[snafu(display("failed to build deployment"))]
     BuildDeployment {
-        source: crate::resources::deployment::Error,
+        source: crate::controller::build::resource::deployment::Error,
     },
 
     #[snafu(display("failed to build configmap"))]
     BuildConfigMap {
-        source: crate::resources::configmap::Error,
+        source: crate::controller::build::resource::config_map::Error,
     },
 
     #[snafu(display("failed to create SECRET_KEY secret"))]
@@ -202,12 +463,8 @@ pub async fn reconcile_superset(
         superset,
         dereferenced,
         &ctx.operator_environment.image_repository,
-        &ctx.product_config,
     )
     .context(ValidateSnafu)?;
-    let resolved_product_image = &validated.image;
-    let auth_config = &validated.authentication_config;
-    let superset_opa_config = &validated.opa_config;
 
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
@@ -252,61 +509,53 @@ pub async fn reconcile_superset(
 
     for (superset_role, rolegroup_configs) in validated.role_groups.iter() {
         for (rolegroup_name, validated_rolegroup) in rolegroup_configs.iter() {
-            let rolegroup = superset.rolegroup_ref(superset_role, rolegroup_name);
-            let rolegroup_config = &validated_rolegroup.product_config_properties;
-            let config = &validated_rolegroup.merged_config;
+            let config = &validated_rolegroup.config;
 
-            let rg_configmap = build_rolegroup_config_map(
-                superset,
-                resolved_product_image,
-                &rolegroup,
-                rolegroup_config,
-                auth_config,
-                superset_opa_config,
+            let rg_configmap = build::resource::config_map::build_rolegroup_config_map(
+                &validated,
+                superset_role,
+                rolegroup_name,
+                config,
+                &validated_rolegroup.config_overrides,
                 &config.logging,
             )
             .context(BuildConfigMapSnafu)?;
 
             let rg_metrics_service =
-                build_node_rolegroup_metrics_service(superset, resolved_product_image, &rolegroup)
-                    .context(BuildServiceSnafu)?;
+                build_node_rolegroup_metrics_service(&validated, rolegroup_name);
 
             let rg_headless_service =
-                build_node_rolegroup_headless_service(superset, resolved_product_image, &rolegroup)
-                    .context(BuildServiceSnafu)?;
+                build_node_rolegroup_headless_service(&validated, rolegroup_name);
 
             cluster_resources
                 .add(client, rg_metrics_service)
                 .await
                 .with_context(|_| ApplyRoleGroupServiceSnafu {
-                    rolegroup: rolegroup.clone(),
+                    role_group_name: rolegroup_name.clone(),
                 })?;
 
             cluster_resources
                 .add(client, rg_headless_service)
                 .await
                 .with_context(|_| ApplyRoleGroupServiceSnafu {
-                    rolegroup: rolegroup.clone(),
+                    role_group_name: rolegroup_name.clone(),
                 })?;
 
             cluster_resources
                 .add(client, rg_configmap)
                 .await
                 .with_context(|_| ApplyRoleGroupConfigSnafu {
-                    rolegroup: rolegroup.clone(),
+                    role_group_name: rolegroup_name.clone(),
                 })?;
 
             match superset_role {
                 SupersetRole::Node => {
                     let rg_statefulset = build_server_rolegroup_statefulset(
-                        superset,
-                        resolved_product_image,
+                        &validated,
                         superset_role,
-                        &rolegroup,
-                        rolegroup_config,
-                        auth_config,
+                        rolegroup_name,
+                        validated_rolegroup,
                         &rbac_sa.name_any(),
-                        config,
                     )
                     .context(BuildStatefulSetSnafu)?;
 
@@ -318,19 +567,17 @@ pub async fn reconcile_superset(
                             .add(client, rg_statefulset.clone())
                             .await
                             .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
-                                rolegroup: rolegroup.clone(),
+                                role_group_name: rolegroup_name.clone(),
                             })?,
                     );
                 }
-                SupersetRole::Worker => {
-                    let rg_worker_deployment = build_worker_rolegroup_deployment(
-                        superset,
-                        resolved_product_image,
+                SupersetRole::Worker | SupersetRole::Beat => {
+                    let rg_deployment = build_rolegroup_deployment(
+                        &validated,
                         superset_role,
-                        &rolegroup,
-                        rolegroup_config,
+                        rolegroup_name,
+                        validated_rolegroup,
                         &rbac_sa.name_any(),
-                        config,
                     )
                     .context(BuildDeploymentSnafu)?;
 
@@ -339,68 +586,43 @@ pub async fn reconcile_superset(
                     // See https://github.com/stackabletech/commons-operator/issues/111 for details.
                     deployment_cond_builder.add(
                         cluster_resources
-                            .add(client, rg_worker_deployment.clone())
+                            .add(client, rg_deployment.clone())
                             .await
                             .with_context(|_| ApplyRoleGroupDeploymentSnafu {
-                                rolegroup: rolegroup.clone(),
-                            })?,
-                    );
-                }
-                SupersetRole::Beat => {
-                    let rg_beat_deployment = build_beat_rolegroup_deployment(
-                        superset,
-                        resolved_product_image,
-                        superset_role,
-                        &rolegroup,
-                        rolegroup_config,
-                        &rbac_sa.name_any(),
-                        config,
-                    )
-                    .context(BuildDeploymentSnafu)?;
-
-                    // Note: The Deployment needs to be applied after all ConfigMaps and Secrets it mounts
-                    // to prevent unnecessary Pod restarts.
-                    // See https://github.com/stackabletech/commons-operator/issues/111 for details.
-                    deployment_cond_builder.add(
-                        cluster_resources
-                            .add(client, rg_beat_deployment.clone())
-                            .await
-                            .with_context(|_| ApplyRoleGroupDeploymentSnafu {
-                                rolegroup: rolegroup.clone(),
+                                role_group_name: rolegroup_name.clone(),
                             })?,
                     );
                 }
             }
+        }
 
-            if let Some(role_config) = validated.role_configs.get(superset_role) {
-                if let (Some(listener_class), Some(listener_group_name)) = (
-                    &role_config.listener_class,
-                    &role_config.group_listener_name,
-                ) {
-                    let group_listener = build_group_listener(
-                        superset,
-                        build_recommended_labels(
-                            superset,
-                            SUPERSET_CONTROLLER_NAME,
-                            &resolved_product_image.product_version,
-                            &superset_role.to_string(),
-                            "none",
-                        ),
-                        listener_class.clone(),
-                        listener_group_name.clone(),
-                    )
-                    .context(BuildListenerSnafu)?;
-                    cluster_resources
-                        .add(client, group_listener)
-                        .await
-                        .context(ApplyGroupListenerSnafu)?;
-                }
+        // Role-level resources (group listener, PDB) are built once per role, after
+        // its role groups — not once per role group.
+        if let Some(role_config) = validated.role_configs.get(superset_role) {
+            if let (Some(listener_class), Some(listener_group_name)) = (
+                &role_config.listener_class,
+                &role_config.group_listener_name,
+            ) {
+                let group_listener = build_group_listener(
+                    &validated,
+                    superset_role,
+                    listener_class.clone(),
+                    listener_group_name.clone(),
+                );
+                cluster_resources
+                    .add(client, group_listener)
+                    .await
+                    .context(ApplyGroupListenerSnafu)?;
+            }
 
-                if let Some(pdb) = &role_config.pdb {
-                    add_pdbs(pdb, superset, superset_role, client, &mut cluster_resources)
-                        .await
-                        .context(FailedToCreatePdbSnafu)?;
-                }
+            if let Some(pdb) = &role_config.pdb
+                && let Some(pdb) =
+                    build_pdb(pdb, &validated, superset_role).context(FailedToCreatePdbSnafu)?
+            {
+                cluster_resources
+                    .add(client, pdb)
+                    .await
+                    .context(ApplyPdbSnafu)?;
             }
         }
     }

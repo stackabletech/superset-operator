@@ -1,8 +1,5 @@
-use std::collections::BTreeMap;
-
-use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::Snafu;
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
@@ -15,37 +12,40 @@ use stackable_operator::{
             Resources, ResourcesFragment,
         },
     },
-    config::{
-        fragment::{self, Fragment, ValidationError},
-        merge::Merge,
-    },
-    config_overrides::{KeyValueConfigOverrides, KeyValueOverridesProvider},
+    config::{fragment::Fragment, merge::Merge},
     deep_merger::ObjectOverrides,
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
-    kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
+    kube::{CustomResource, ResourceExt},
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config_utils::{self, Configuration},
     product_logging::{self, spec::Logging},
-    role_utils::{GenericRoleConfig, Role, RoleGroupRef},
+    role_utils::{GenericRoleConfig, Role},
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
+    v2::{
+        config_overrides::KeyValueConfigOverrides,
+        flask_config_writer::{FlaskAppConfigOptions, PythonType},
+        role_utils::GenericCommonConfig,
+    },
     versioned::versioned,
 };
-use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+use strum::{Display, EnumIter, EnumString};
 
-use crate::{
-    crd::{
-        databases::{
-            CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
-        },
-        v1alpha1::SupersetRoleConfig,
+use crate::crd::{
+    databases::{
+        CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
     },
-    resources::listener::default_listener_class,
+    v1alpha1::SupersetRoleConfig,
 };
+
+/// Default listener class used by the rolegroup listener.
+fn default_listener_class() -> String {
+    "cluster-internal".to_string()
+}
 
 pub mod affinity;
 pub mod authentication;
+pub mod authorization;
 pub mod databases;
 pub mod druidconnection;
 
@@ -55,13 +55,15 @@ pub const STACKABLE_CONFIG_DIR: &str = "/stackable/config";
 pub const STACKABLE_LOG_CONFIG_DIR: &str = "/stackable/log_config";
 pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const PYTHONPATH: &str = "/stackable/app/pythonpath";
-pub const SUPERSET_CONFIG_FILENAME: &str = "superset_config.py";
 pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
 };
 
 pub const INTERNAL_SECRET_SECRET_KEY: &str = "SECRET_KEY";
+
+/// Env-var prefix for the metadata database connection credentials (e.g. `METADATA_DATABASE_*`).
+pub const METADATA_DATABASE_ENV_PREFIX: &str = "METADATA";
 
 pub const APP_PORT_NAME: &str = "http";
 pub const APP_PORT: u16 = 8088;
@@ -70,17 +72,15 @@ pub const METRICS_PORT: u16 = 9102;
 
 const DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 
-pub type SupersetRoleType =
-    Role<v1alpha1::SupersetConfigFragment, v1alpha1::SupersetConfigOverrides, SupersetRoleConfig>;
+pub type SupersetRoleType = Role<
+    v1alpha1::SupersetConfigFragment,
+    v1alpha1::SupersetConfigOverrides,
+    SupersetRoleConfig,
+    GenericCommonConfig,
+>;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
-    #[snafu(display("unknown Superset role found {role}. Should be one of {roles:?}"))]
-    UnknownSupersetRole { role: String, roles: Vec<String> },
-
-    #[snafu(display("fragment validation failure"))]
-    FragmentValidationFailure { source: ValidationError },
-
     #[snafu(display("Configuration/Executor conflict!"))]
     NoRoleForExecutorFailure,
 
@@ -189,15 +189,11 @@ pub mod versioned {
         pub listener_class: String,
     }
 
-    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, Merge, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct SupersetConfigOverrides {
-        #[serde(
-            default,
-            rename = "superset_config.py",
-            skip_serializing_if = "Option::is_none"
-        )]
-        pub superset_config_py: Option<KeyValueConfigOverrides>,
+        #[serde(default, rename = "superset_config.py")]
+        pub superset_config_py: KeyValueConfigOverrides,
     }
 
     #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -372,19 +368,6 @@ impl Default for v1alpha1::SupersetRoleConfig {
     }
 }
 
-impl KeyValueOverridesProvider for v1alpha1::SupersetConfigOverrides {
-    fn get_key_value_overrides(&self, file: &str) -> BTreeMap<String, Option<String>> {
-        match file {
-            SUPERSET_CONFIG_FILENAME => self
-                .superset_config_py
-                .as_ref()
-                .map(KeyValueConfigOverrides::as_product_config_overrides)
-                .unwrap_or_default(),
-            _ => BTreeMap::new(),
-        }
-    }
-}
-
 #[derive(
     Clone,
     Debug,
@@ -395,7 +378,9 @@ impl KeyValueOverridesProvider for v1alpha1::SupersetConfigOverrides {
     Eq,
     Hash,
     JsonSchema,
+    Ord,
     PartialEq,
+    PartialOrd,
     Serialize,
 )]
 pub enum SupersetRole {
@@ -419,30 +404,10 @@ impl SupersetRole {
         }
     }
 
-    pub fn roles() -> Vec<String> {
-        let mut roles = vec![];
-        for role in Self::iter() {
-            roles.push(role.to_string())
-        }
-        roles
-    }
-}
-
-impl SupersetConfigOptions {
-    /// Mapping from `SupersetConfigOptions` to the values set in `SupersetConfigFragment`.
-    /// `None` is returned if either the according option is not set or is not exposed in the
-    /// `SupersetConfig`.
-    fn config_type_to_string(
-        &self,
-        superset_config: &v1alpha1::SupersetConfigFragment,
-    ) -> Option<String> {
-        match self {
-            SupersetConfigOptions::RowLimit => superset_config.row_limit.map(|v| v.to_string()),
-            SupersetConfigOptions::SupersetWebserverTimeout => {
-                superset_config.webserver_timeout.map(|v| v.to_string())
-            }
-            _ => None,
-        }
+    pub fn role_name(&self) -> stackable_operator::v2::types::operator::RoleName {
+        self.to_string()
+            .parse()
+            .expect("a Superset serialises to a valid RoleName")
     }
 }
 
@@ -494,9 +459,10 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
 }
 
 impl v1alpha1::SupersetConfig {
-    pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
-
-    fn default_config(cluster_name: &str, role: &SupersetRole) -> v1alpha1::SupersetConfigFragment {
+    pub(crate) fn default_config(
+        cluster_name: &str,
+        role: &SupersetRole,
+    ) -> v1alpha1::SupersetConfigFragment {
         match role {
             SupersetRole::Node => v1alpha1::SupersetConfigFragment {
                 resources: ResourcesFragment {
@@ -556,52 +522,6 @@ impl v1alpha1::SupersetConfig {
     }
 }
 
-impl Configuration for v1alpha1::SupersetConfigFragment {
-    type Configurable = v1alpha1::SupersetCluster;
-
-    fn compute_env(
-        &self,
-        cluster: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        let mut result = BTreeMap::new();
-        if let Some(msec) = &cluster.spec.cluster_config.mapbox_secret {
-            result.insert(
-                v1alpha1::SupersetConfig::MAPBOX_SECRET_PROPERTY.to_string(),
-                Some(msec.clone()),
-            );
-        }
-        Ok(result)
-    }
-
-    fn compute_cli(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        Ok(BTreeMap::new())
-    }
-
-    fn compute_files(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-        file: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        let mut result = BTreeMap::new();
-
-        if file == SUPERSET_CONFIG_FILENAME {
-            for option in SupersetConfigOptions::iter() {
-                if let Some(value) = option.config_type_to_string(self) {
-                    result.insert(option.to_string(), Some(value));
-                }
-            }
-        }
-
-        Ok(result)
-    }
-}
-
 impl HasStatusCondition for v1alpha1::SupersetCluster {
     fn conditions(&self) -> Vec<ClusterCondition> {
         match &self.status {
@@ -645,61 +565,12 @@ impl v1alpha1::SupersetCluster {
         }
     }
 
-    /// Metadata about a node rolegroup
-    pub fn rolegroup_ref(
-        &self,
-        role: &SupersetRole,
-        group_name: impl Into<String>,
-    ) -> RoleGroupRef<v1alpha1::SupersetCluster> {
-        RoleGroupRef {
-            cluster: ObjectRef::from_obj(self),
-            role: role.to_string(),
-            role_group: group_name.into(),
-        }
-    }
-
     pub fn get_opa_config(&self) -> Option<&v1alpha1::SupersetOpaRoleMappingConfig> {
         self.spec
             .cluster_config
             .authorization
             .as_ref()
             .map(|a| &a.role_mapping_from_opa)
-    }
-
-    /// Retrieve and merge resource configs for role and role groups
-    pub fn merged_config(
-        &self,
-        role: &SupersetRole,
-        rolegroup_ref: &RoleGroupRef<v1alpha1::SupersetCluster>,
-    ) -> Result<v1alpha1::SupersetConfig, Error> {
-        // Initialize the result with all default values as baseline
-        let conf_defaults = v1alpha1::SupersetConfig::default_config(&self.name_any(), role);
-
-        let role = self.get_role(role).context(UnknownSupersetRoleSnafu {
-            role: role.to_string(),
-            roles: SupersetRole::roles(),
-        })?;
-
-        // Retrieve role resource config
-        let mut conf_role = role.config.config.to_owned();
-
-        // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup = role
-            .role_groups
-            .get(&rolegroup_ref.role_group)
-            .map(|rg| rg.config.config.clone())
-            .unwrap_or_default();
-
-        // Merge more specific configs into default config
-        // Hierarchy is:
-        // 1. RoleGroup
-        // 2. Role
-        // 3. Default
-        conf_role.merge(&conf_defaults);
-        conf_rolegroup.merge(&conf_role);
-
-        tracing::debug!("Merged config: {:?}", conf_rolegroup);
-        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 }
 

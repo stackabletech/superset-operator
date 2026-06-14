@@ -8,7 +8,7 @@ timeout: 300
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: superset-node-resources-from-role
+  name: superset-node-from-role
 spec:
   template:
     spec:
@@ -32,7 +32,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: superset-node-resources-from-rolegroup
+  name: superset-node-from-rolegroup
 spec:
   template:
     spec:
@@ -56,7 +56,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: superset-node-resources-from-pod-overrides
+  name: superset-node-from-overrides
 spec:
   template:
     spec:

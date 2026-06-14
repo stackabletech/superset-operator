@@ -28,13 +28,13 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     APP_NAME, OPERATOR_NAME,
-    controller::CONTAINER_IMAGE_BASE_NAME,
-    crd::{
-        INTERNAL_SECRET_SECRET_KEY, PYTHONPATH, SUPERSET_CONFIG_FILENAME, druidconnection, v1alpha1,
-    },
-    operations::job_state::{JobState, get_job_state},
-    resources::rbac,
+    controller::{CONTAINER_IMAGE_BASE_NAME, build::properties::ConfigFileName},
+    crd::{INTERNAL_SECRET_SECRET_KEY, PYTHONPATH, druidconnection, v1alpha1},
+    druid_connection_controller::job_state::{JobState, get_job_state},
 };
+
+mod job_state;
+mod rbac;
 
 pub const DRUID_CONNECTION_CONTROLLER_NAME: &str = "druid-connection";
 pub const DRUID_CONNECTION_FULL_CONTROLLER_NAME: &str =
@@ -327,7 +327,8 @@ async fn build_import_job(
     let config = "import os; SQLALCHEMY_DATABASE_URI = os.path.expandvars(os.environ.get('SQLALCHEMY_DATABASE_URI'))";
     commands.push(format!("mkdir -p {PYTHONPATH}"));
     commands.push(format!(
-        "echo \"{config}\" > {PYTHONPATH}/{SUPERSET_CONFIG_FILENAME}"
+        "echo \"{config}\" > {PYTHONPATH}/{config_file}",
+        config_file = ConfigFileName::SupersetConfig
     ));
 
     let druid_info = build_druid_db_yaml(&druid_connection.spec.druid.name, sqlalchemy_str)?;
@@ -336,15 +337,18 @@ async fn build_import_job(
         "superset import_datasources -p /tmp/druids.yaml",
     ));
 
-    // "METADATA" is the prefix for the env vars that hold the database credentials
-    // (e.g. METADATA_DATABASE_USERNAME, METADATA_DATABASE_PASSWORD). It should match
+    // `METADATA_DATABASE_ENV_PREFIX` is the prefix for the env vars that hold the database
+    // credentials (e.g. METADATA_DATABASE_USERNAME, METADATA_DATABASE_PASSWORD). It should match
     // the prefix used by the airflow-operator for consistency.
     let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
     let metadata_database_connection_details = superset_cluster
         .spec
         .cluster_config
         .metadata_database
-        .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism);
+        .sqlalchemy_connection_details_with_templating(
+            crate::crd::METADATA_DATABASE_ENV_PREFIX,
+            &templating_mechanism,
+        );
 
     let mut container_builder = ContainerBuilder::new("superset-import-druid-connection")
         .expect("ContainerBuilder not created");

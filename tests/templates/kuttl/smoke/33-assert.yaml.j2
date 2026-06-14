@@ -62,7 +62,36 @@ spec:
         - name: superset
         - name: metrics
 {% if vector_enabled %}
+        # Unlike the superset container (whose env the operator interleaves), the vector
+        # container's env is set entirely by the v2 `vector_container` builder in a fixed,
+        # alphabetically-sorted order, so it can be asserted positionally.
         - name: vector
+          env:
+            - name: CLUSTER_NAME
+              value: superset
+            - name: DATA_DIR
+              value: /stackable/log/_vector-state
+            - name: LOG_DIR
+              value: /stackable/log
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: ROLE_GROUP_NAME
+              value: default
+            - name: ROLE_NAME
+              value: node
+            - name: VECTOR_AGGREGATOR_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  key: ADDRESS
+                  name: vector-aggregator-discovery
+            - name: VECTOR_CONFIG_YAML
+              value: /stackable/config/vector.yaml
+            - name: VECTOR_FILE_LOG_LEVEL
+              value: info
+            - name: VECTOR_LOG
+              value: info
 {% endif %}
 status:
   readyReplicas: 1
