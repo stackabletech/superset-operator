@@ -56,11 +56,6 @@ use crate::{
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("invalid container name"))]
-    InvalidContainerName {
-        source: stackable_operator::builder::pod::container::Error,
-    },
-
     #[snafu(display("failed to build container"))]
     BuildContainer { source: super::Error },
 
@@ -237,9 +232,7 @@ pub fn build_server_rolegroup_statefulset(
         merged_config.logging.containers.get(&Container::Superset),
     ))
     .context(AddVolumeSnafu)?;
-    pb.add_container(
-        super::build_metrics_container(&validated.image).context(BuildContainerSnafu)?,
-    );
+    pb.add_container(super::build_metrics_container(&validated.image));
 
     if let Some(vector_container) = super::build_vector_container(validated, &merged_config.logging)
         .context(BuildContainerSnafu)?

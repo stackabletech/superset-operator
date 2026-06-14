@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use indoc::formatdoc;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
@@ -23,6 +25,7 @@ use stackable_operator::{
         },
     },
     utils::COMMON_BASH_TRAP_FUNCTIONS,
+    v2::{builder::pod::container::new_container_builder, types::kubernetes::ContainerName},
 };
 
 use crate::{
@@ -49,14 +52,12 @@ pub const CONFIG_VOLUME_NAME: &str = "config";
 pub const LOG_CONFIG_VOLUME_NAME: &str = "log-config";
 pub const LOG_VOLUME_NAME: &str = "log";
 
-/// Errors shared by the sidecar-container builders below.
+stackable_operator::constant!(SUPERSET_CONTAINER_NAME: ContainerName = "superset");
+stackable_operator::constant!(METRICS_CONTAINER_NAME: ContainerName = "metrics");
+
+/// Errors shared by the container builders below.
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("invalid container name"))]
-    InvalidContainerName {
-        source: stackable_operator::builder::pod::container::Error,
-    },
-
     #[snafu(display("vector agent is enabled but vector aggregator ConfigMap is missing"))]
     VectorAggregatorConfigMapMissing,
 
@@ -133,8 +134,7 @@ pub(crate) fn build_superset_container_builder(
     validated: &ValidatedCluster,
     rolegroup_config: &SupersetRoleGroupConfig,
 ) -> Result<ContainerBuilder, Error> {
-    let mut superset_cb = ContainerBuilder::new(&Container::Superset.to_string())
-        .context(InvalidContainerNameSnafu)?;
+    let mut superset_cb = new_container_builder(&SUPERSET_CONTAINER_NAME);
 
     metadata_database_connection_details(&validated.cluster_config.metadata_database)
         .add_to_container(&mut superset_cb);
@@ -197,9 +197,8 @@ pub(crate) fn build_superset_container_builder(
 /// Deployment rolegroup builders.
 pub(crate) fn build_metrics_container(
     resolved_product_image: &ResolvedProductImage,
-) -> Result<K8sContainer, Error> {
-    Ok(ContainerBuilder::new("metrics")
-        .context(InvalidContainerNameSnafu)?
+) -> K8sContainer {
+    new_container_builder(&METRICS_CONTAINER_NAME)
         .image_from_product_image(resolved_product_image)
         .command(vec![
             "/bin/bash".to_string(),
@@ -223,7 +222,7 @@ pub(crate) fn build_metrics_container(
                 .with_memory_limit("64Mi")
                 .build(),
         )
-        .build())
+        .build()
 }
 
 /// Builds the Vector agent sidecar container for the rolegroup, or `None` if vector logging is
