@@ -30,7 +30,7 @@ use stackable_operator::{
         builder::pod::container::{EnvVarSet, new_container_builder},
         product_logging::framework::vector_container,
         types::{
-            kubernetes::{ContainerName, VolumeName},
+            kubernetes::{ContainerName, PersistentVolumeClaimName, VolumeName},
             operator::RoleGroupName,
         },
     },
@@ -67,6 +67,10 @@ stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
 // config and log volumes). Their values match the `&str` constants used by `create_volumes`.
 stackable_operator::constant!(CONFIG_VOLUME_NAME_TYPED: VolumeName = "config");
 stackable_operator::constant!(LOG_VOLUME_NAME_TYPED: VolumeName = "log");
+
+// PVC name for the listener volume, required by the v2 listener-volume builder. Its value matches
+// `LISTENER_VOLUME_NAME` in `resource::listener`.
+stackable_operator::constant!(pub(crate) LISTENER_VOLUME_NAME_PVC: PersistentVolumeClaimName = "listener");
 
 /// The `fsGroup` the Pods run as, required by secret-operator-provided volumes.
 pub(crate) const SECRET_OPERATOR_FS_GROUP: i64 = 1000;

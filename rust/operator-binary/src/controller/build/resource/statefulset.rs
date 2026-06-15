@@ -6,14 +6,8 @@ use stackable_operator::{
     builder::{
         meta::ObjectMetaBuilder,
         pod::{
-            PodBuilder,
-            container::ContainerBuilder,
-            probe::ProbeBuilder,
+            PodBuilder, container::ContainerBuilder, probe::ProbeBuilder,
             security::PodSecurityContextBuilder,
-            volume::{
-                ListenerOperatorVolumeSourceBuilder, ListenerOperatorVolumeSourceBuilderError,
-                ListenerReference,
-            },
         },
     },
     k8s_openapi::{
@@ -29,7 +23,13 @@ use stackable_operator::{
     },
     shared::time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
-    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
+    v2::{
+        builder::{
+            meta::ownerreference_from_resource,
+            pod::volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
+        },
+        types::operator::RoleGroupName,
+    },
 };
 
 use crate::{
@@ -90,11 +90,6 @@ pub enum Error {
     #[snafu(display("failed to add needed volumeMount"))]
     AddVolumeMount {
         source: stackable_operator::builder::pod::container::Error,
-    },
-
-    #[snafu(display("failed to build listener volume"))]
-    BuildListenerVolume {
-        source: ListenerOperatorVolumeSourceBuilderError,
     },
 }
 
@@ -197,12 +192,11 @@ pub fn build_server_rolegroup_statefulset(
         .get(superset_role)
         .and_then(|role_config| role_config.group_listener_name.clone())
     {
-        let pvc = ListenerOperatorVolumeSourceBuilder::new(
-            &ListenerReference::ListenerName(group_listener_name),
+        let pvc = listener_operator_volume_source_builder_build_pvc(
+            &ListenerReference::Listener(group_listener_name),
             &unversioned_recommended_labels,
-        )
-        .build_pvc(LISTENER_VOLUME_NAME.to_owned())
-        .context(BuildListenerVolumeSnafu)?;
+            &super::LISTENER_VOLUME_NAME_PVC,
+        );
         Some(vec![pvc])
     } else {
         None

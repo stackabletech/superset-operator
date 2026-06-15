@@ -163,7 +163,10 @@ pub fn validate_cluster(
                      }| pod_disruption_budget,
                 ),
                 listener_class: role.listener_class_name(superset),
-                group_listener_name: superset.group_listener_name(&role),
+                group_listener_name: superset.group_listener_name(&role).map(|name| {
+                    name.parse()
+                        .expect("the group listener name is a valid ListenerName")
+                }),
             },
         );
 

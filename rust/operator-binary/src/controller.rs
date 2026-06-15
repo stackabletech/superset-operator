@@ -34,7 +34,7 @@ use stackable_operator::{
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
         types::{
-            kubernetes::Uid,
+            kubernetes::{ListenerName, Uid},
             operator::{
                 ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
                 RoleGroupName, RoleName,
@@ -81,7 +81,7 @@ pub struct Ctx {
 pub struct ValidatedRoleConfig {
     pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
     pub listener_class: Option<String>,
-    pub group_listener_name: Option<String>,
+    pub group_listener_name: Option<ListenerName>,
 }
 
 /// Per-rolegroup configuration: the merged CRD config plus the overrides.
@@ -602,7 +602,7 @@ pub async fn reconcile_superset(
                     &validated,
                     superset_role,
                     listener_class.clone(),
-                    listener_group_name.clone(),
+                    listener_group_name.to_string(),
                 );
                 cluster_resources
                     .add(client, group_listener)
