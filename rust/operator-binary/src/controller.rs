@@ -89,7 +89,7 @@ pub struct ValidatedRoleConfig {
 /// Holds the merged config fragment in `config`, the typed `config_overrides` (role-group merged
 /// over role), the merged `env_overrides`/`pod_overrides` and the validated `logging`. The config
 /// overrides are kept typed
-/// ([`SupersetConfigOverrides`](crate::crd::v1alpha1::SupersetConfigOverrides)) and assembled into
+/// ([`SupersetConfigOverrides`]) and assembled into
 /// the rendered `superset_config.py` later, in the build step.
 #[derive(Clone, Debug)]
 pub struct SupersetRoleGroupConfig {
