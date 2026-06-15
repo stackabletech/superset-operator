@@ -57,7 +57,7 @@ pub fn build_node_rolegroup_metrics_service(
             .name_and_namespace(validated)
             // `ResourceNames` has no metrics-service helper, so the `-metrics` suffix is appended to
             // the qualified role-group name (which is also the StatefulSet name).
-            .name(format!("{}-metrics", resource_names.stateful_set_name()))
+            .name(resource_names.metrics_service_name().to_string())
             .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
             .with_labels(validated.recommended_labels(&SupersetRole::Node, role_group_name))
             .with_labels(prometheus_labels())
