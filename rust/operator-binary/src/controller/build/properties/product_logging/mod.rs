@@ -44,8 +44,7 @@ pub fn build_log_config(logging: &Logging<Container>) -> Option<String> {
 /// Renders the Vector agent config (`vector.yaml`).
 ///
 /// Returns `None` when the Vector agent is disabled for this role group. The returned config is the
-/// vendored, env-var-parameterized `vector.yaml`; the parameterizing env vars are injected into the
-/// Vector container by the v2 `vector_container`.
+/// vendored, env-var-parameterized `vector.yaml`.
 pub fn build_vector_config(logging: &Logging<Container>) -> Option<String> {
     logging.enable_vector_agent.then(vector_config_file_content)
 }
