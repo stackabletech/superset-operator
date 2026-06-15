@@ -1,52 +1,38 @@
-use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    builder::pdb::PodDisruptionBudgetBuilder, commons::pdb::PdbConfig,
-    k8s_openapi::api::policy::v1::PodDisruptionBudget,
+    commons::pdb::PdbConfig, k8s_openapi::api::policy::v1::PodDisruptionBudget,
+    v2::builder::pdb::pod_disruption_budget_builder_with_role,
 };
 
 use crate::{
-    OPERATOR_NAME,
-    controller::{SUPERSET_CONTROLLER_NAME, ValidatedCluster},
-    crd::{APP_NAME, SupersetRole},
+    controller::{ValidatedCluster, controller_name, operator_name, product_name},
+    crd::SupersetRole,
 };
-
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display("Cannot create PodDisruptionBudget for role [{role}]"))]
-    CreatePdb {
-        source: stackable_operator::builder::pdb::Error,
-        role: String,
-    },
-}
 
 /// Builds the [`PodDisruptionBudget`] for the given `role`, or `None` if PDBs are disabled.
 pub fn build_pdb(
     pdb: &PdbConfig,
     validated: &ValidatedCluster,
     role: &SupersetRole,
-) -> Result<Option<PodDisruptionBudget>, Error> {
+) -> Option<PodDisruptionBudget> {
     if !pdb.enabled {
-        return Ok(None);
+        return None;
     }
     let max_unavailable = pdb.max_unavailable.unwrap_or(match role {
         SupersetRole::Node => max_unavailable_nodes(),
         SupersetRole::Worker => max_unavailable_workers(),
         SupersetRole::Beat => max_unavailable_beat(),
     });
-    let pdb = PodDisruptionBudgetBuilder::new_with_role(
+    let pdb = pod_disruption_budget_builder_with_role(
         validated,
-        APP_NAME,
-        &role.to_string(),
-        OPERATOR_NAME,
-        SUPERSET_CONTROLLER_NAME,
+        &product_name(),
+        &role.role_name(),
+        &operator_name(),
+        &controller_name(),
     )
-    .with_context(|_| CreatePdbSnafu {
-        role: role.to_string(),
-    })?
     .with_max_unavailable(max_unavailable)
     .build();
 
-    Ok(Some(pdb))
+    Some(pdb)
 }
 
 fn max_unavailable_nodes() -> u16 {

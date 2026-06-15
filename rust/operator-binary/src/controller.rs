@@ -304,17 +304,17 @@ impl NameIsValidLabelValue for ValidatedCluster {
 }
 
 /// The product name (`superset`) as a type-safe label value.
-fn product_name() -> ProductName {
+pub(crate) fn product_name() -> ProductName {
     ProductName::from_str(APP_NAME).expect("'superset' is a valid product name")
 }
 
 /// The operator name as a type-safe label value.
-fn operator_name() -> OperatorName {
+pub(crate) fn operator_name() -> OperatorName {
     OperatorName::from_str(OPERATOR_NAME).expect("the operator name is a valid label value")
 }
 
 /// The controller name as a type-safe label value.
-fn controller_name() -> ControllerName {
+pub(crate) fn controller_name() -> ControllerName {
     ControllerName::from_str(SUPERSET_CONTROLLER_NAME)
         .expect("the controller name is a valid label value")
 }
@@ -381,11 +381,6 @@ pub enum Error {
     #[snafu(display("failed to build RBAC objects"))]
     BuildRBACObjects {
         source: stackable_operator::commons::rbac::Error,
-    },
-
-    #[snafu(display("failed to create PodDisruptionBudget"))]
-    FailedToCreatePdb {
-        source: crate::controller::build::resource::pdb::Error,
     },
 
     #[snafu(display("failed to apply PodDisruptionBudget"))]
@@ -616,8 +611,7 @@ pub async fn reconcile_superset(
             }
 
             if let Some(pdb) = &role_config.pdb
-                && let Some(pdb) =
-                    build_pdb(pdb, &validated, superset_role).context(FailedToCreatePdbSnafu)?
+                && let Some(pdb) = build_pdb(pdb, &validated, superset_role)
             {
                 cluster_resources
                     .add(client, pdb)
