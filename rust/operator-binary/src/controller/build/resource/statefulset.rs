@@ -14,7 +14,7 @@ use stackable_operator::{
         DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::EnvVar,
+            core::v1::{EnvVar, Probe},
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
@@ -118,10 +118,8 @@ pub fn build_server_rolegroup_statefulset(
         .with_labels(recommended_object_labels)
         .build();
 
-    let mut pb = &mut PodBuilder::new();
-
-    pb = pb
-        .metadata(metadata)
+    let mut pb = PodBuilder::new();
+    pb.metadata(metadata)
         .image_pull_secrets_from_product_image(&validated.image)
         .security_context(
             PodSecurityContextBuilder::new()
@@ -140,7 +138,7 @@ pub fn build_server_rolegroup_statefulset(
     add_authentication_volumes_and_volume_mounts(
         &validated.cluster_config.authentication_config,
         &mut superset_cb,
-        pb,
+        &mut pb,
     )?;
 
     // The gunicorn worker timeout mirrors the `SUPERSET_WEBSERVER_TIMEOUT` written into
@@ -184,7 +182,11 @@ pub fn build_server_rolegroup_statefulset(
                 create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
         }])
         .resources(merged_config.resources.clone().into());
-    add_superset_container_probes(&mut superset_cb);
+    let (startup_probe, readiness_probe, liveness_probe) = superset_container_probes();
+    superset_cb
+        .startup_probe(startup_probe)
+        .readiness_probe(readiness_probe)
+        .liveness_probe(liveness_probe);
 
     // listener endpoints will use persistent volumes
     // so that load balancers can hard-code the target addresses and
@@ -209,7 +211,7 @@ pub fn build_server_rolegroup_statefulset(
         .context(AddVolumeMountSnafu)?;
 
     pb.add_container(superset_cb.build());
-    add_graceful_shutdown_config(merged_config, pb).context(GracefulShutdownSnafu)?;
+    add_graceful_shutdown_config(merged_config, &mut pb).context(GracefulShutdownSnafu)?;
 
     pb.add_volumes(super::create_volumes(
         resource_names.role_group_config_map().as_ref(),
@@ -256,34 +258,34 @@ pub fn build_server_rolegroup_statefulset(
     })
 }
 
-fn add_superset_container_probes(superset_cb: &mut ContainerBuilder) {
+/// Builds the startup, readiness and liveness probes for the `superset` container, all derived from
+/// a common HTTP `/health` check. Returned (rather than applied to a builder) so the caller owns the
+/// container assembly.
+fn superset_container_probes() -> (Probe, Probe, Probe) {
     let common =
         ProbeBuilder::http_get_port_scheme_path(APP_PORT.0, None, Some("/health".to_owned()))
             .with_period(Duration::from_secs(5));
 
-    superset_cb.startup_probe(
-        common
-            .clone()
-            .with_failure_threshold_duration(Duration::from_minutes_unchecked(10))
-            .expect("const period is non-zero")
-            .build()
-            .expect("const duration does not overflow"),
-    );
+    let startup_probe = common
+        .clone()
+        .with_failure_threshold_duration(Duration::from_minutes_unchecked(10))
+        .expect("const period is non-zero")
+        .build()
+        .expect("const duration does not overflow");
 
     // Remove it from the Service immediately
-    superset_cb.readiness_probe(
-        common
-            .clone()
-            .build()
-            .expect("const duration does not overflow"),
-    );
+    let readiness_probe = common
+        .clone()
+        .build()
+        .expect("const duration does not overflow");
+
     // But only restart it after 3 failures
-    superset_cb.liveness_probe(
-        common
-            .with_failure_threshold(3)
-            .build()
-            .expect("const duration does not overflow"),
-    );
+    let liveness_probe = common
+        .with_failure_threshold(3)
+        .build()
+        .expect("const duration does not overflow");
+
+    (startup_probe, readiness_probe, liveness_probe)
 }
 
 fn add_authentication_volumes_and_volume_mounts(

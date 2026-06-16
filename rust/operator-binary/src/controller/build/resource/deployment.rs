@@ -118,10 +118,8 @@ pub fn build_rolegroup_deployment(
         .with_labels(recommended_object_labels)
         .build();
 
-    let mut pb = &mut PodBuilder::new();
-
-    pb = pb
-        .metadata(metadata)
+    let mut pb = PodBuilder::new();
+    pb.metadata(metadata)
         .image_pull_secrets_from_product_image(resolved_product_image)
         .security_context(
             PodSecurityContextBuilder::new()
@@ -162,7 +160,7 @@ pub fn build_rolegroup_deployment(
         .resources(merged_config.resources.clone().into());
 
     pb.add_container(superset_cb.build());
-    add_graceful_shutdown_config(merged_config, pb).context(GracefulShutdownSnafu)?;
+    add_graceful_shutdown_config(merged_config, &mut pb).context(GracefulShutdownSnafu)?;
 
     pb.add_volumes(super::create_volumes(
         resource_names.role_group_config_map().as_ref(),
