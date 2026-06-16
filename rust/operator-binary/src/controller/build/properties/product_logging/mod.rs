@@ -5,10 +5,8 @@ use std::fmt::Write;
 
 use indoc::formatdoc;
 use stackable_operator::{
-    product_logging::spec::{
-        AutomaticContainerLogConfig, ContainerLogConfig, ContainerLogConfigChoice, Logging,
-    },
-    v2::product_logging::framework::STACKABLE_LOG_DIR,
+    product_logging::spec::AutomaticContainerLogConfig,
+    v2::product_logging::framework::{STACKABLE_LOG_DIR, ValidatedContainerLogConfigChoice},
 };
 
 use crate::crd::v1alpha1::Container;
@@ -26,21 +24,19 @@ pub fn vector_config_file_content() -> String {
 
 /// Renders `log_config.py` for the Superset container.
 ///
-/// Returns `None` when the Superset container does not use the operator's automatic logging
-/// configuration (e.g. a custom log ConfigMap is referenced instead), in which case no
-/// `log_config.py` should be added to the rolegroup `ConfigMap`.
-pub fn build_log_config(logging: &Logging<Container>) -> Option<String> {
-    match logging.containers.get(&Container::Superset) {
-        Some(ContainerLogConfig {
-            choice: Some(ContainerLogConfigChoice::Automatic(log_config)),
-        }) => {
+/// Returns `None` when the Superset container uses a custom log ConfigMap instead of the operator's
+/// automatic logging configuration, in which case no `log_config.py` should be added to the
+/// rolegroup `ConfigMap`.
+pub fn build_log_config(log_config: &ValidatedContainerLogConfigChoice) -> Option<String> {
+    match log_config {
+        ValidatedContainerLogConfigChoice::Automatic(log_config) => {
             let log_dir = format!(
                 "{STACKABLE_LOG_DIR}/{container}",
                 container = Container::Superset
             );
             Some(create_superset_config(log_config, &log_dir))
         }
-        _ => None,
+        ValidatedContainerLogConfigChoice::Custom(_) => None,
     }
 }
 
@@ -48,8 +44,8 @@ pub fn build_log_config(logging: &Logging<Container>) -> Option<String> {
 ///
 /// Returns `None` when the Vector agent is disabled for this role group. The returned config is the
 /// vendored, env-var-parameterized `vector.yaml`.
-pub fn build_vector_config(logging: &Logging<Container>) -> Option<String> {
-    logging.enable_vector_agent.then(vector_config_file_content)
+pub fn build_vector_config(enable_vector_agent: bool) -> Option<String> {
+    enable_vector_agent.then(vector_config_file_content)
 }
 
 fn create_superset_config(log_config: &AutomaticContainerLogConfig, log_dir: &str) -> String {

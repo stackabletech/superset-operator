@@ -546,7 +546,7 @@ pub async fn reconcile_superset(
                 rolegroup_name,
                 &config.config,
                 &validated_rolegroup.config_overrides,
-                &config.config.logging,
+                &config.logging,
             )
             .context(BuildConfigMapSnafu)?;
 

@@ -47,7 +47,6 @@ use crate::{
         authentication::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
         },
-        v1alpha1::Container,
     },
 };
 
@@ -214,7 +213,7 @@ pub fn build_server_rolegroup_statefulset(
 
     pb.add_volumes(super::create_volumes(
         resource_names.role_group_config_map().as_ref(),
-        merged_config.logging.containers.get(&Container::Superset),
+        &rolegroup_config.config.logging.superset_container,
     ))
     .context(AddVolumeSnafu)?;
     pb.add_container(super::build_metrics_container(&validated.image));

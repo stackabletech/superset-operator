@@ -25,10 +25,7 @@ use crate::{
         SupersetRoleGroupConfig, ValidatedCluster,
         build::{graceful_shutdown::add_graceful_shutdown_config, properties::ConfigFileName},
     },
-    crd::{
-        PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, SupersetRole,
-        v1alpha1::Container,
-    },
+    crd::{PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, SupersetRole},
 };
 
 /// PID file written by the Celery `beat` process; its liveness probe checks the same path, so both
@@ -169,7 +166,7 @@ pub fn build_rolegroup_deployment(
 
     pb.add_volumes(super::create_volumes(
         resource_names.role_group_config_map().as_ref(),
-        merged_config.logging.containers.get(&Container::Superset),
+        &rolegroup_config.config.logging.superset_container,
     ))
     .context(AddVolumeSnafu)?;
     pb.add_container(super::build_metrics_container(resolved_product_image));

@@ -18,17 +18,13 @@ use stackable_operator::{
         ConfigMapVolumeSource, Container as K8sContainer, EmptyDirVolumeSource, Volume,
     },
     kvp::Label,
-    product_logging::{
-        self,
-        spec::{
-            ConfigMapLogConfig, ContainerLogConfig, ContainerLogConfigChoice,
-            CustomContainerLogConfig,
-        },
-    },
+    product_logging,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{
         builder::pod::container::{EnvVarSet, new_container_builder},
-        product_logging::framework::{STACKABLE_LOG_DIR, vector_container},
+        product_logging::framework::{
+            STACKABLE_LOG_DIR, ValidatedContainerLogConfigChoice, vector_container,
+        },
         types::{
             kubernetes::{ContainerName, PersistentVolumeClaimName, VolumeName},
             operator::RoleGroupName,
@@ -109,7 +105,7 @@ pub enum Error {
 
 pub(crate) fn create_volumes(
     config_map_name: &str,
-    log_config: Option<&ContainerLogConfig>,
+    log_config: &ValidatedContainerLogConfigChoice,
 ) -> Vec<Volume> {
     let mut volumes = Vec::new();
 
@@ -129,31 +125,22 @@ pub(crate) fn create_volumes(
         ..Volume::default()
     });
 
-    if let Some(ContainerLogConfig {
-        choice:
-            Some(ContainerLogConfigChoice::Custom(CustomContainerLogConfig {
-                custom: ConfigMapLogConfig { config_map },
-            })),
-    }) = log_config
-    {
-        volumes.push(Volume {
-            name: LOG_CONFIG_VOLUME_NAME.into(),
-            config_map: Some(ConfigMapVolumeSource {
-                name: config_map.into(),
-                ..ConfigMapVolumeSource::default()
-            }),
-            ..Volume::default()
-        });
-    } else {
-        volumes.push(Volume {
-            name: LOG_CONFIG_VOLUME_NAME.into(),
-            config_map: Some(ConfigMapVolumeSource {
-                name: config_map_name.into(),
-                ..ConfigMapVolumeSource::default()
-            }),
-            ..Volume::default()
-        });
-    }
+    // A custom log config references its own ConfigMap; automatic logging uses the rolegroup
+    // ConfigMap (which carries the operator-generated `log_config.py`).
+    let log_config_map = match log_config {
+        ValidatedContainerLogConfigChoice::Custom(custom_config_map) => {
+            custom_config_map.to_string()
+        }
+        ValidatedContainerLogConfigChoice::Automatic(_) => config_map_name.to_owned(),
+    };
+    volumes.push(Volume {
+        name: LOG_CONFIG_VOLUME_NAME.into(),
+        config_map: Some(ConfigMapVolumeSource {
+            name: log_config_map,
+            ..ConfigMapVolumeSource::default()
+        }),
+        ..Volume::default()
+    });
 
     volumes
 }
