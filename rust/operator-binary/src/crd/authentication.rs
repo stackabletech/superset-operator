@@ -292,9 +292,7 @@ impl SupersetClientAuthenticationDetailsResolved {
         let oidc_provider = match &provider.provider_hint {
             None => {
                 info!(
-                    "No OIDC provider hint given in AuthClass {auth_class_name}, assuming {default_oidc_provider_name}",
-                    default_oidc_provider_name =
-                        serde_json::to_string(&DEFAULT_OIDC_PROVIDER).unwrap()
+                    "No OIDC provider hint given in AuthClass {auth_class_name}, assuming {DEFAULT_OIDC_PROVIDER:?}"
                 );
                 DEFAULT_OIDC_PROVIDER
             }
@@ -305,7 +303,7 @@ impl SupersetClientAuthenticationDetailsResolved {
             SUPPORTED_OIDC_PROVIDERS.contains(&oidc_provider),
             OidcProviderNotSupportedSnafu {
                 auth_class_name,
-                oidc_provider: serde_json::to_string(&oidc_provider).unwrap(),
+                oidc_provider: format!("{oidc_provider:?}"),
             }
         );
 
