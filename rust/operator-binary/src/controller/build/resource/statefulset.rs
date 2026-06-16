@@ -27,6 +27,7 @@ use stackable_operator::{
         builder::pod::volume::{
             ListenerReference, listener_operator_volume_source_builder_build_pvc,
         },
+        product_logging::framework::STACKABLE_LOG_DIR,
         types::operator::RoleGroupName,
     },
 };
@@ -42,8 +43,7 @@ use crate::{
         },
     },
     crd::{
-        APP_PORT, PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
-        SupersetRole,
+        APP_PORT, PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, SupersetRole,
         authentication::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
         },

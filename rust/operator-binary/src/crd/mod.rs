@@ -54,7 +54,6 @@ pub const FIELD_MANAGER: &str = "superset-operator";
 pub const APP_NAME: &str = "superset";
 pub const STACKABLE_CONFIG_DIR: &str = "/stackable/config";
 pub const STACKABLE_LOG_CONFIG_DIR: &str = "/stackable/log_config";
-pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const PYTHONPATH: &str = "/stackable/app/pythonpath";
 pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,

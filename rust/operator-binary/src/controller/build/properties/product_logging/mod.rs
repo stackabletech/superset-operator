@@ -4,11 +4,14 @@
 use std::fmt::Write;
 
 use indoc::formatdoc;
-use stackable_operator::product_logging::spec::{
-    AutomaticContainerLogConfig, ContainerLogConfig, ContainerLogConfigChoice, Logging,
+use stackable_operator::{
+    product_logging::spec::{
+        AutomaticContainerLogConfig, ContainerLogConfig, ContainerLogConfigChoice, Logging,
+    },
+    v2::product_logging::framework::STACKABLE_LOG_DIR,
 };
 
-use crate::crd::{STACKABLE_LOG_DIR, v1alpha1::Container};
+use crate::crd::v1alpha1::Container;
 
 /// The rotating log file the generated `log_config.py` writes to (consumed by the Vector agent).
 const LOG_FILE: &str = "superset.py.json";

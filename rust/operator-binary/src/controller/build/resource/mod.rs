@@ -28,7 +28,7 @@ use stackable_operator::{
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{
         builder::pod::container::{EnvVarSet, new_container_builder},
-        product_logging::framework::vector_container,
+        product_logging::framework::{STACKABLE_LOG_DIR, vector_container},
         types::{
             kubernetes::{ContainerName, PersistentVolumeClaimName, VolumeName},
             operator::RoleGroupName,
@@ -40,7 +40,7 @@ use crate::{
     controller::{SupersetRoleGroupConfig, ValidatedCluster},
     crd::{
         APP_PORT, APP_PORT_NAME, MAX_LOG_FILES_SIZE, METRICS_PORT, METRICS_PORT_NAME,
-        STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR, SupersetRole,
+        STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, SupersetRole,
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection,
             CeleryResultsBackendConnectionDetails, MetadataDatabaseConnection,

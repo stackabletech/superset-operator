@@ -17,7 +17,7 @@ use stackable_operator::{
         create_vector_shutdown_file_command, remove_vector_shutdown_file_command,
     },
     utils::COMMON_BASH_TRAP_FUNCTIONS,
-    v2::types::operator::RoleGroupName,
+    v2::{product_logging::framework::STACKABLE_LOG_DIR, types::operator::RoleGroupName},
 };
 
 use crate::{
@@ -26,8 +26,8 @@ use crate::{
         build::{graceful_shutdown::add_graceful_shutdown_config, properties::ConfigFileName},
     },
     crd::{
-        PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, STACKABLE_LOG_DIR,
-        SupersetRole, v1alpha1::Container,
+        PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, SupersetRole,
+        v1alpha1::Container,
     },
 };
 
