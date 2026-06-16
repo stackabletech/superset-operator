@@ -342,9 +342,7 @@ async fn build_import_job(
     // the prefix used by the airflow-operator for consistency.
     let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
     let metadata_database_connection_details = superset_cluster
-        .spec
-        .cluster_config
-        .metadata_database
+        .metadata_database()
         .sqlalchemy_connection_details_with_templating(
             crate::crd::METADATA_DATABASE_ENV_PREFIX,
             &templating_mechanism,

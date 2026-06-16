@@ -536,6 +536,11 @@ impl v1alpha1::SupersetCluster {
         format!("{}-secret-key", &self.name_any())
     }
 
+    /// The connection to the metadata database.
+    pub fn metadata_database(&self) -> &MetadataDatabaseConnection {
+        &self.spec.cluster_config.metadata_database
+    }
+
     /// The name of the group-listener provided for a specific role.
     /// Nodes will use this group listener so that only one load balancer
     /// is needed for that role.
