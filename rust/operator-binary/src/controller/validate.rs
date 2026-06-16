@@ -14,14 +14,12 @@ use stackable_operator::{
     role_utils::GenericRoleConfig,
     v2::{
         builder::pod::container::{EnvVarName, EnvVarSet},
+        controller_utils::{get_cluster_name, get_namespace, get_uid},
         product_logging::framework::{
             VectorContainerLogConfig, validate_logging_configuration_for_container,
         },
         role_utils::{GenericCommonConfig, with_validated_config},
-        types::{
-            kubernetes::ConfigMapName,
-            operator::{ClusterName, RoleGroupName},
-        },
+        types::{kubernetes::ConfigMapName, operator::RoleGroupName},
     },
 };
 use strum::IntoEnumIterator;
@@ -48,10 +46,19 @@ pub enum Error {
         source: product_image_selection::Error,
     },
 
-    #[snafu(display("invalid cluster name {cluster_name}"))]
-    ParseClusterName {
-        source: stackable_operator::v2::macros::attributed_string_type::Error,
-        cluster_name: String,
+    #[snafu(display("failed to resolve cluster name"))]
+    ResolveClusterName {
+        source: stackable_operator::v2::controller_utils::Error,
+    },
+
+    #[snafu(display("failed to resolve namespace"))]
+    ResolveNamespace {
+        source: stackable_operator::v2::controller_utils::Error,
+    },
+
+    #[snafu(display("failed to resolve uid"))]
+    ResolveUid {
+        source: stackable_operator::v2::controller_utils::Error,
     },
 
     #[snafu(display("failed to resolve and merge config for role group {role_group}"))]
@@ -228,14 +235,14 @@ pub fn validate_cluster(
 
     let cluster_config = &superset.spec.cluster_config;
 
-    let cluster_name =
-        ClusterName::from_str(&superset.name_any()).with_context(|_| ParseClusterNameSnafu {
-            cluster_name: superset.name_any(),
-        })?;
+    let cluster_name = get_cluster_name(superset).context(ResolveClusterNameSnafu)?;
+    let namespace = get_namespace(superset).context(ResolveNamespaceSnafu)?;
+    let uid = get_uid(superset).context(ResolveUidSnafu)?;
 
     Ok(ValidatedCluster::new(
-        superset,
         cluster_name,
+        namespace,
+        uid,
         resolved_product_image,
         ValidatedClusterConfig {
             authentication_config,
@@ -291,6 +298,8 @@ mod tests {
         kind: SupersetCluster
         metadata:
           name: simple-superset
+          namespace: default
+          uid: 01234567-89ab-cdef-0123-456789abcdef
         spec:
           image:
             productVersion: 4.1.4
@@ -346,6 +355,8 @@ mod tests {
         kind: SupersetCluster
         metadata:
           name: simple-superset
+          namespace: default
+          uid: 01234567-89ab-cdef-0123-456789abcdef
         spec:
           image:
             productVersion: 4.1.4

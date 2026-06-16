@@ -35,7 +35,7 @@ use stackable_operator::{
         role_group_utils::ResourceNames,
         role_utils::{GenericCommonConfig, RoleGroupConfig},
         types::{
-            kubernetes::{ListenerName, Uid},
+            kubernetes::{ListenerName, NamespaceName, Uid},
             operator::{
                 ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
                 RoleGroupName, RoleName,
@@ -162,8 +162,9 @@ pub struct ValidatedCluster {
 
 impl ValidatedCluster {
     pub fn new(
-        superset: &SupersetCluster,
         name: ClusterName,
+        namespace: NamespaceName,
+        uid: Uid,
         image: ResolvedProductImage,
         cluster_config: ValidatedClusterConfig,
         role_groups: BTreeMap<SupersetRole, BTreeMap<RoleGroupName, SupersetRoleGroupConfig>>,
@@ -172,11 +173,12 @@ impl ValidatedCluster {
         let product_version = ProductVersion::from_str(&image.app_version_label_value)
             .expect("the app version label value is a valid product version");
         Self {
-            // Capture only the identity fields needed to own child objects.
+            // Capture only the identity fields needed to own child objects, derived from the
+            // typed cluster identity rather than the raw CRD.
             metadata: ObjectMeta {
-                name: Some(superset.name_any()),
-                namespace: superset.namespace(),
-                uid: superset.uid(),
+                name: Some(name.to_string()),
+                namespace: Some(namespace.to_string()),
+                uid: Some(uid.to_string()),
                 ..ObjectMeta::default()
             },
             image,
