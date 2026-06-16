@@ -256,7 +256,7 @@ pub fn build_server_rolegroup_statefulset(
 
 fn add_superset_container_probes(superset_cb: &mut ContainerBuilder) {
     let common =
-        ProbeBuilder::http_get_port_scheme_path(APP_PORT, None, Some("/health".to_owned()))
+        ProbeBuilder::http_get_port_scheme_path(APP_PORT.0, None, Some("/health".to_owned()))
             .with_period(Duration::from_secs(5));
 
     superset_cb.startup_probe(

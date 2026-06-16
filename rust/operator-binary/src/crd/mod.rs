@@ -26,6 +26,7 @@ use stackable_operator::{
         config_overrides::KeyValueConfigOverrides,
         flask_config_writer::{FlaskAppConfigOptions, PythonType},
         role_utils::GenericCommonConfig,
+        types::common::Port,
     },
     versioned::versioned,
 };
@@ -66,9 +67,9 @@ pub const INTERNAL_SECRET_SECRET_KEY: &str = "SECRET_KEY";
 pub const METADATA_DATABASE_ENV_PREFIX: &str = "METADATA";
 
 pub const APP_PORT_NAME: &str = "http";
-pub const APP_PORT: u16 = 8088;
+pub const APP_PORT: Port = Port(8088);
 pub const METRICS_PORT_NAME: &str = "metrics";
-pub const METRICS_PORT: u16 = 9102;
+pub const METRICS_PORT: Port = Port(9102);
 
 const DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 
