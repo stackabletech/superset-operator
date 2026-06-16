@@ -51,6 +51,10 @@ use crate::{
     },
 };
 
+/// `StatefulSet` pod management policy: start Pods one after another so the init commands don't run
+/// in parallel.
+const POD_MANAGEMENT_POLICY_ORDERED_READY: &str = "OrderedReady";
+
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("failed to build container"))]
@@ -234,8 +238,7 @@ pub fn build_server_rolegroup_statefulset(
             .with_label(super::restarter_enabled_label().context(LabelBuildSnafu)?)
             .build(),
         spec: Some(StatefulSetSpec {
-            // Set to `OrderedReady`, to make sure Pods start after another and the init commands don't run in parallel
-            pod_management_policy: Some("OrderedReady".to_string()),
+            pod_management_policy: Some(POD_MANAGEMENT_POLICY_ORDERED_READY.to_string()),
             replicas: rolegroup_config.replicas.map(i32::from),
             selector: LabelSelector {
                 match_labels: Some(

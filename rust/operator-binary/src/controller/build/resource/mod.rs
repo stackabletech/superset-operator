@@ -59,6 +59,11 @@ pub const CONFIG_VOLUME_NAME: &str = "config";
 pub const LOG_CONFIG_VOLUME_NAME: &str = "log-config";
 pub const LOG_VOLUME_NAME: &str = "log";
 
+/// Directory the `SSL_CERT_DIR` env var points the Superset container at for trusted CA certs.
+const STACKABLE_CERTS_DIR: &str = "/stackable/certs/";
+/// Path of the statsd-exporter binary launched by the `metrics` sidecar.
+const STATSD_EXPORTER_BINARY: &str = "/stackable/statsd_exporter";
+
 stackable_operator::constant!(SUPERSET_CONTAINER_NAME: ContainerName = "superset");
 stackable_operator::constant!(METRICS_CONTAINER_NAME: ContainerName = "metrics");
 stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
@@ -218,7 +223,7 @@ pub(crate) fn build_superset_container_builder(
             "CONTAINERDEBUG_LOG_DIRECTORY",
             format!("{STACKABLE_LOG_DIR}/containerdebug"),
         )
-        .add_env_var("SSL_CERT_DIR", "/stackable/certs/");
+        .add_env_var("SSL_CERT_DIR", STACKABLE_CERTS_DIR);
 
     Ok(superset_cb)
 }
@@ -234,7 +239,7 @@ pub(crate) fn build_metrics_container(
         .args(vec![formatdoc! {"
             {COMMON_BASH_TRAP_FUNCTIONS}
             prepare_signal_handlers
-            /stackable/statsd_exporter &
+            {STATSD_EXPORTER_BINARY} &
             wait_for_termination $!
         "}])
         .add_container_port(METRICS_PORT_NAME, METRICS_PORT.into())

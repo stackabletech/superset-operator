@@ -31,6 +31,10 @@ use crate::{
     },
 };
 
+/// PID file written by the Celery `beat` process; its liveness probe checks the same path, so both
+/// must agree.
+const CELERY_BEAT_PIDFILE: &str = "/tmp/celerybeat.pid";
+
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("failed to build container"))]
@@ -84,7 +88,7 @@ pub fn build_rolegroup_deployment(
     // between the `worker` and `beat` rolegroups.
     let (celery_command, liveness_probe, replicas) = match superset_role {
         SupersetRole::Worker => (
-            "celery --app=superset.tasks.celery_app:app worker --task-events",
+            "celery --app=superset.tasks.celery_app:app worker --task-events".to_string(),
             worker_liveness_probe(),
             rolegroup_config.replicas,
         ),
@@ -101,7 +105,9 @@ pub fn build_rolegroup_deployment(
                 _ => Some(1),
             };
             (
-                "celery --app=superset.tasks.celery_app:app beat --pidfile /tmp/celerybeat.pid",
+                format!(
+                    "celery --app=superset.tasks.celery_app:app beat --pidfile {CELERY_BEAT_PIDFILE}"
+                ),
                 beat_liveness_probe(),
                 replicas,
             )
@@ -226,9 +232,9 @@ fn worker_liveness_probe() -> Probe {
 fn beat_liveness_probe() -> Probe {
     Probe {
         exec: Some(ExecAction {
-            command: Some(vec![
-                "[ -f /tmp/celerybeat.pid ] && kill -0 $(cat /tmp/celerybeat.pid)".to_string(),
-            ]),
+            command: Some(vec![format!(
+                "[ -f {CELERY_BEAT_PIDFILE} ] && kill -0 $(cat {CELERY_BEAT_PIDFILE})"
+            )]),
         }),
         initial_delay_seconds: Some(30),
         period_seconds: Some(30),
