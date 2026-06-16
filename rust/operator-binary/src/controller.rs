@@ -9,7 +9,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     cli::OperatorEnvironmentOptions,
-    cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
+    cluster_resources::ClusterResourceApplyStrategy,
     commons::{
         product_image_selection::ResolvedProductImage, random_secret_creation,
         rbac::build_rbac_resources,
@@ -30,6 +30,7 @@ use stackable_operator::{
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
         builder::meta::ownerreference_from_resource,
+        cluster_resources::cluster_resources_new,
         kvp::label::{recommended_labels, role_group_selector},
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
@@ -153,6 +154,8 @@ pub struct ValidatedCluster {
     /// struct can stand in as the owner [`Resource`] for child objects.
     metadata: ObjectMeta,
     pub name: ClusterName,
+    pub namespace: NamespaceName,
+    pub uid: Uid,
     pub product_version: ProductVersion,
     pub image: ResolvedProductImage,
     pub cluster_config: ValidatedClusterConfig,
@@ -186,6 +189,8 @@ impl ValidatedCluster {
             role_groups,
             role_configs,
             name,
+            namespace,
+            uid,
             product_version,
         }
     }
@@ -362,11 +367,6 @@ pub enum Error {
     #[snafu(display("failed to validate cluster"))]
     Validate { source: validate::Error },
 
-    #[snafu(display("failed to create cluster resources"))]
-    CreateClusterResources {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
     #[snafu(display("failed to delete orphaned resources"))]
     DeleteOrphanedResources {
         source: stackable_operator::cluster_resources::Error,
@@ -494,15 +494,16 @@ pub async fn reconcile_superset(
     )
     .context(ValidateSnafu)?;
 
-    let mut cluster_resources = ClusterResources::new(
-        APP_NAME,
-        OPERATOR_NAME,
-        SUPERSET_CONTROLLER_NAME,
-        &superset.object_ref(&()),
+    let mut cluster_resources = cluster_resources_new(
+        &product_name(),
+        &operator_name(),
+        &controller_name(),
+        &validated.name,
+        &validated.namespace,
+        &validated.uid,
         ClusterResourceApplyStrategy::from(&superset.spec.cluster_config.cluster_operation),
         &superset.spec.object_overrides,
-    )
-    .context(CreateClusterResourcesSnafu)?;
+    );
 
     let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
         superset,
