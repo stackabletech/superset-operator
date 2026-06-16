@@ -1,9 +1,9 @@
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    builder::{configmap::ConfigMapBuilder, meta::ObjectMetaBuilder},
+    builder::configmap::ConfigMapBuilder,
     k8s_openapi::api::core::v1::ConfigMap,
     product_logging::{framework::VECTOR_CONFIG_FILE, spec::Logging},
-    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
+    v2::types::operator::RoleGroupName,
 };
 
 use crate::{
@@ -52,16 +52,15 @@ pub fn build_rolegroup_config_map(
 
     cm_builder
         .metadata(
-            ObjectMetaBuilder::new()
-                .name_and_namespace(validated)
-                .name(
+            validated
+                .object_meta(
                     validated
                         .resource_names(role, role_group_name)
                         .role_group_config_map()
                         .to_string(),
+                    role,
+                    role_group_name,
                 )
-                .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-                .with_labels(validated.recommended_labels(role, role_group_name))
                 .build(),
         )
         .add_data(ConfigFileName::SupersetConfig.to_string(), config_file);
@@ -146,9 +145,9 @@ mod tests {
             &validated,
             &SupersetRole::Node,
             &role_group_name,
-            &rolegroup_config.config,
+            &rolegroup_config.config.config,
             &rolegroup_config.config_overrides,
-            &rolegroup_config.config.logging,
+            &rolegroup_config.config.config.logging,
         )
         .expect("config map built");
 

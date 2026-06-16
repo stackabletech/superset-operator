@@ -17,7 +17,7 @@ use stackable_operator::{
         create_vector_shutdown_file_command, remove_vector_shutdown_file_command,
     },
     utils::COMMON_BASH_TRAP_FUNCTIONS,
-    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
+    v2::types::operator::RoleGroupName,
 };
 
 use crate::{
@@ -75,7 +75,7 @@ pub fn build_rolegroup_deployment(
     sa_name: &str,
 ) -> Result<Deployment> {
     let resolved_product_image = &validated.image;
-    let merged_config = &rolegroup_config.config;
+    let merged_config = &rolegroup_config.config.config;
 
     let resource_names = validated.resource_names(superset_role, role_group_name);
     let recommended_object_labels = validated.recommended_labels(superset_role, role_group_name);
@@ -89,12 +89,16 @@ pub fn build_rolegroup_deployment(
             rolegroup_config.replicas,
         ),
         SupersetRole::Beat => {
-            // Beat must only ever run a single instance; we ignore values > 1 (0 is still allowed).
-            let replicas = if rolegroup_config.replicas > 1 {
-                tracing::warn! {"replicas for role `beat` set to greater `1`. Multiple beat instances are not allowed. Setting to `1` replica."}
-                1
-            } else {
-                rolegroup_config.replicas
+            // Beat must only ever run a single instance, so the replica count is never left
+            // unset (no HorizontalPodAutoscaler): an explicit `0` is honoured (to stop Beat),
+            // any value `> 1` is clamped to `1`, and an unset value defaults to `1`.
+            let replicas = match rolegroup_config.replicas {
+                Some(0) => Some(0),
+                Some(replicas) if replicas > 1 => {
+                    tracing::warn! {"replicas for role `beat` set to greater `1`. Multiple beat instances are not allowed. Setting to `1` replica."}
+                    Some(1)
+                }
+                _ => Some(1),
             };
             (
                 "celery --app=superset.tasks.celery_app:app beat --pidfile /tmp/celerybeat.pid",
@@ -108,7 +112,7 @@ pub fn build_rolegroup_deployment(
     };
 
     let metadata = ObjectMetaBuilder::new()
-        .with_labels(recommended_object_labels.clone())
+        .with_labels(recommended_object_labels)
         .build();
 
     let mut pb = &mut PodBuilder::new();
@@ -174,17 +178,18 @@ pub fn build_rolegroup_deployment(
     pod_template.merge_from(rolegroup_config.pod_overrides.clone());
 
     Ok(Deployment {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(validated)
-            // `ResourceNames` has no Deployment helper; the qualified name (which is also the
-            // StatefulSet name) is the correct `<cluster>-<role>-<rolegroup>` Deployment name.
-            .name(resource_names.stateful_set_name().to_string())
-            .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-            .with_labels(recommended_object_labels)
+        // `ResourceNames` has no Deployment helper; the qualified name (which is also the
+        // StatefulSet name) is the correct `<cluster>-<role>-<rolegroup>` Deployment name.
+        metadata: validated
+            .object_meta(
+                resource_names.stateful_set_name().to_string(),
+                superset_role,
+                role_group_name,
+            )
             .with_label(super::restarter_enabled_label().context(LabelBuildSnafu)?)
             .build(),
         spec: Some(DeploymentSpec {
-            replicas: Some(i32::from(replicas)),
+            replicas: replicas.map(i32::from),
             selector: LabelSelector {
                 match_labels: Some(
                     validated

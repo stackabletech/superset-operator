@@ -30,7 +30,7 @@ use crate::{
     built_info::PKG_VERSION,
     controller::{
         CONTAINER_IMAGE_BASE_NAME, SupersetRoleGroupConfig, ValidatedCluster,
-        ValidatedClusterConfig, ValidatedLogging, ValidatedRoleConfig,
+        ValidatedClusterConfig, ValidatedLogging, ValidatedRoleConfig, ValidatedSupersetConfig,
         dereference::DereferencedObjects,
     },
     crd::{
@@ -207,12 +207,18 @@ pub fn validate_cluster(
             group_configs.insert(
                 role_group_name,
                 SupersetRoleGroupConfig {
-                    replicas: validated_rg.replicas.unwrap_or(1),
-                    config: validated_rg.config.config,
+                    replicas: validated_rg.replicas,
+                    config: ValidatedSupersetConfig::from_merged(
+                        validated_rg.config.config,
+                        logging,
+                    ),
                     config_overrides: validated_rg.config.config_overrides,
                     env_overrides,
+                    cli_overrides: validated_rg.config.cli_overrides,
                     pod_overrides: validated_rg.config.pod_overrides,
-                    logging,
+                    product_specific_common_config: validated_rg
+                        .config
+                        .product_specific_common_config,
                 },
             );
         }

@@ -258,6 +258,7 @@ pub(crate) fn build_vector_container(
     rolegroup_config: &SupersetRoleGroupConfig,
 ) -> Option<K8sContainer> {
     rolegroup_config
+        .config
         .logging
         .vector_container
         .as_ref()

@@ -24,9 +24,8 @@ use stackable_operator::{
     shared::time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{
-        builder::{
-            meta::ownerreference_from_resource,
-            pod::volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
+        builder::pod::volume::{
+            ListenerReference, listener_operator_volume_source_builder_build_pvc,
         },
         types::operator::RoleGroupName,
     },
@@ -103,7 +102,7 @@ pub fn build_server_rolegroup_statefulset(
     rolegroup_config: &SupersetRoleGroupConfig,
     sa_name: &str,
 ) -> Result<StatefulSet> {
-    let merged_config = &rolegroup_config.config;
+    let merged_config = &rolegroup_config.config.config;
 
     let resource_names = validated.resource_names(superset_role, role_group_name);
     let recommended_object_labels = validated.recommended_labels(superset_role, role_group_name);
@@ -113,7 +112,7 @@ pub fn build_server_rolegroup_statefulset(
         validated.unversioned_recommended_labels(superset_role, role_group_name);
 
     let metadata = ObjectMetaBuilder::new()
-        .with_labels(recommended_object_labels.clone())
+        .with_labels(recommended_object_labels)
         .build();
 
     let mut pb = &mut PodBuilder::new();
@@ -226,17 +225,18 @@ pub fn build_server_rolegroup_statefulset(
     pod_template.merge_from(rolegroup_config.pod_overrides.clone());
 
     Ok(StatefulSet {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(validated)
-            .name(resource_names.stateful_set_name().to_string())
-            .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-            .with_labels(recommended_object_labels)
+        metadata: validated
+            .object_meta(
+                resource_names.stateful_set_name().to_string(),
+                superset_role,
+                role_group_name,
+            )
             .with_label(super::restarter_enabled_label().context(LabelBuildSnafu)?)
             .build(),
         spec: Some(StatefulSetSpec {
             // Set to `OrderedReady`, to make sure Pods start after another and the init commands don't run in parallel
             pod_management_policy: Some("OrderedReady".to_string()),
-            replicas: Some(i32::from(rolegroup_config.replicas)),
+            replicas: rolegroup_config.replicas.map(i32::from),
             selector: LabelSelector {
                 match_labels: Some(
                     validated

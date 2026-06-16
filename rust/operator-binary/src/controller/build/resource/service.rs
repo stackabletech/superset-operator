@@ -1,8 +1,7 @@
 use stackable_operator::{
-    builder::meta::ObjectMetaBuilder,
     k8s_openapi::api::core::v1::{Service, ServicePort, ServiceSpec},
     kvp::{Annotations, Labels},
-    v2::{builder::meta::ownerreference_from_resource, types::operator::RoleGroupName},
+    v2::types::operator::RoleGroupName,
 };
 
 use crate::{
@@ -18,16 +17,15 @@ pub fn build_node_rolegroup_headless_service(
     role_group_name: &RoleGroupName,
 ) -> Service {
     Service {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(validated)
-            .name(
+        metadata: validated
+            .object_meta(
                 validated
                     .resource_names(&SupersetRole::Node, role_group_name)
                     .headless_service_name()
                     .to_string(),
+                &SupersetRole::Node,
+                role_group_name,
             )
-            .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-            .with_labels(validated.recommended_labels(&SupersetRole::Node, role_group_name))
             .build(),
         spec: Some(ServiceSpec {
             // Internal communication does not need to be exposed
@@ -53,13 +51,12 @@ pub fn build_node_rolegroup_metrics_service(
 ) -> Service {
     let resource_names = validated.resource_names(&SupersetRole::Node, role_group_name);
     Service {
-        metadata: ObjectMetaBuilder::new()
-            .name_and_namespace(validated)
-            // `ResourceNames` has no metrics-service helper, so the `-metrics` suffix is appended to
-            // the qualified role-group name (which is also the StatefulSet name).
-            .name(resource_names.metrics_service_name().to_string())
-            .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-            .with_labels(validated.recommended_labels(&SupersetRole::Node, role_group_name))
+        metadata: validated
+            .object_meta(
+                resource_names.metrics_service_name().to_string(),
+                &SupersetRole::Node,
+                role_group_name,
+            )
             .with_labels(prometheus_labels())
             .with_annotations(prometheus_annotations())
             .build(),

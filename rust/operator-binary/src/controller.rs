@@ -7,13 +7,13 @@ use std::{collections::BTreeMap, str::FromStr, sync::Arc};
 use const_format::concatcp;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
+    builder::meta::ObjectMetaBuilder,
     cli::OperatorEnvironmentOptions,
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     commons::{
         product_image_selection::ResolvedProductImage, random_secret_creation,
         rbac::build_rbac_resources,
     },
-    k8s_openapi::api::core::v1::PodTemplateSpec,
     kube::{
         Resource, ResourceExt,
         api::ObjectMeta,
@@ -29,10 +29,11 @@ use stackable_operator::{
     },
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
-        builder::pod::container::EnvVarSet,
+        builder::meta::ownerreference_from_resource,
         kvp::label::{recommended_labels, role_group_selector},
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
+        role_utils::{GenericCommonConfig, RoleGroupConfig},
         types::{
             kubernetes::{ListenerName, Uid},
             operator::{
@@ -84,21 +85,30 @@ pub struct ValidatedRoleConfig {
     pub group_listener_name: Option<ListenerName>,
 }
 
-/// Per-rolegroup configuration: the merged CRD config plus the overrides.
+/// A validated, merged Superset role-group config.
 ///
-/// Holds the merged config fragment in `config`, the typed `config_overrides` (role-group merged
-/// over role), the merged `env_overrides`/`pod_overrides` and the validated `logging`. The config
-/// overrides are kept typed
-/// ([`SupersetConfigOverrides`]) and assembled into
-/// the rendered `superset_config.py` later, in the build step.
+/// Aliasing the framework [`RoleGroupConfig`] keeps `replicas` optional (`Option<u16>`), so an
+/// unset value is propagated all the way to the StatefulSet/Deployment `replicas` field. That lets
+/// an external controller such as a HorizontalPodAutoscaler own the replica count instead of the
+/// operator forcing a default.
+pub type SupersetRoleGroupConfig =
+    RoleGroupConfig<ValidatedSupersetConfig, GenericCommonConfig, SupersetConfigOverrides>;
+
+/// A validated Superset config: the merged [`SupersetConfig`] together with the up-front–validated
+/// [`ValidatedLogging`] (so an invalid custom log ConfigMap name or a missing Vector aggregator
+/// name fails reconciliation during validation rather than at resource-build time).
 #[derive(Clone, Debug)]
-pub struct SupersetRoleGroupConfig {
-    pub replicas: u16,
+pub struct ValidatedSupersetConfig {
     pub config: SupersetConfig,
-    pub config_overrides: SupersetConfigOverrides,
-    pub env_overrides: EnvVarSet,
-    pub pod_overrides: PodTemplateSpec,
     pub logging: ValidatedLogging,
+}
+
+impl ValidatedSupersetConfig {
+    /// Builds the validated config from the merged [`SupersetConfig`] and the already-validated
+    /// logging.
+    fn from_merged(config: SupersetConfig, logging: ValidatedLogging) -> Self {
+        Self { config, logging }
+    }
 }
 
 /// Validated logging configuration for the Superset and (optional) Vector container.
@@ -243,6 +253,27 @@ impl ValidatedCluster {
         role_group_name: &RoleGroupName,
     ) -> Labels {
         role_group_selector(self, &product_name(), &role.role_name(), role_group_name)
+    }
+
+    /// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, an owner reference back to
+    /// this cluster, and the recommended labels for a resource named `name` in `role`/
+    /// `role_group_name`.
+    ///
+    /// Consolidates the metadata chain repeated by the role-group child-resource builders. Call
+    /// sites that need extra labels/annotations chain them onto the returned builder.
+    pub(crate) fn object_meta(
+        &self,
+        name: impl Into<String>,
+        role: &SupersetRole,
+        role_group_name: &RoleGroupName,
+    ) -> ObjectMetaBuilder {
+        let mut builder = ObjectMetaBuilder::new();
+        builder
+            .name_and_namespace(self)
+            .name(name)
+            .ownerreference(ownerreference_from_resource(self, None, Some(true)))
+            .with_labels(self.recommended_labels(role, role_group_name));
+        builder
     }
 }
 
@@ -510,9 +541,9 @@ pub async fn reconcile_superset(
                 &validated,
                 superset_role,
                 rolegroup_name,
-                config,
+                &config.config,
                 &validated_rolegroup.config_overrides,
-                &config.logging,
+                &config.config.logging,
             )
             .context(BuildConfigMapSnafu)?;
 
