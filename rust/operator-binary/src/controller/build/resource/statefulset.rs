@@ -98,7 +98,7 @@ pub enum Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
-pub fn build_server_rolegroup_statefulset(
+pub fn build_node_rolegroup_statefulset(
     validated: &ValidatedCluster,
     superset_role: &SupersetRole,
     role_group_name: &RoleGroupName,

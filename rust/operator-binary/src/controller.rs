@@ -53,7 +53,7 @@ use crate::{
         listener::build_group_listener,
         pdb::build_pdb,
         service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
-        statefulset::build_server_rolegroup_statefulset,
+        statefulset::build_node_rolegroup_statefulset,
     },
     crd::{
         APP_NAME, INTERNAL_SECRET_SECRET_KEY, SupersetRole,
@@ -524,10 +524,10 @@ pub async fn reconcile_superset(
         .context(ApplyRoleBindingSnafu)?;
 
     random_secret_creation::create_random_secret_if_not_exists(
-        &superset.shared_secret_key_secret_name(),
+        &validated.cluster_config.secret_key_secret_name,
         INTERNAL_SECRET_SECRET_KEY,
         256,
-        superset,
+        &validated,
         client,
     )
     .await
@@ -579,7 +579,7 @@ pub async fn reconcile_superset(
 
             match superset_role {
                 SupersetRole::Node => {
-                    let rg_statefulset = build_server_rolegroup_statefulset(
+                    let rg_statefulset = build_node_rolegroup_statefulset(
                         &validated,
                         superset_role,
                         rolegroup_name,

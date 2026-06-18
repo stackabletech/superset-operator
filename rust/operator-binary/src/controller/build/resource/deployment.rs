@@ -67,7 +67,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// The rolegroup [`Deployment`] runs a Celery `worker` or `beat` rolegroup, as configured by the
 /// administrator. The `Node` role is deployed as a
-/// [`StatefulSet`](super::statefulset::build_server_rolegroup_statefulset) instead.
+/// [`StatefulSet`](super::statefulset::build_node_rolegroup_statefulset) instead.
 pub fn build_rolegroup_deployment(
     validated: &ValidatedCluster,
     superset_role: &SupersetRole,
