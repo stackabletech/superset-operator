@@ -35,8 +35,9 @@ use stackable_operator::{
 use crate::{
     controller::{SupersetRoleGroupConfig, ValidatedCluster},
     crd::{
-        APP_PORT, APP_PORT_NAME, MAX_LOG_FILES_SIZE, METRICS_PORT, METRICS_PORT_NAME,
-        STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, SupersetRole,
+        APP_PORT, APP_PORT_NAME, INTERNAL_SECRET_SECRET_KEY, MAX_LOG_FILES_SIZE,
+        METADATA_DATABASE_ENV_PREFIX, METRICS_PORT, METRICS_PORT_NAME, STACKABLE_CONFIG_DIR,
+        STACKABLE_LOG_CONFIG_DIR, SupersetRole,
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection,
             CeleryResultsBackendConnectionDetails, MetadataDatabaseConnection,
@@ -187,7 +188,7 @@ pub(crate) fn build_superset_container_builder(
     superset_cb.add_env_var_from_secret(
         "SECRET_KEY",
         validated.cluster_config.secret_key_secret_name.clone(),
-        crate::crd::INTERNAL_SECRET_SECRET_KEY,
+        INTERNAL_SECRET_SECRET_KEY,
     );
 
     let secret = &validated.cluster_config.credentials_secret_name;
@@ -271,7 +272,7 @@ pub(crate) fn metadata_database_connection_details(
     metadata_database: &MetadataDatabaseConnection,
 ) -> SqlAlchemyDatabaseConnectionDetails {
     metadata_database.sqlalchemy_connection_details_with_templating(
-        crate::crd::METADATA_DATABASE_ENV_PREFIX,
+        METADATA_DATABASE_ENV_PREFIX,
         &TemplatingMechanism::BashEnvSubstitution,
     )
 }

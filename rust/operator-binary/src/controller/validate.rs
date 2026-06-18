@@ -34,7 +34,8 @@ use crate::{
     crd::{
         SupersetRole,
         v1alpha1::{
-            Container, SupersetCluster, SupersetConfig, SupersetConfigFragment, SupersetRoleConfig,
+            Container, SupersetCluster, SupersetConfig, SupersetConfigFragment,
+            SupersetConfigOverrides, SupersetRoleConfig,
         },
     },
 };
@@ -186,7 +187,7 @@ pub fn validate_cluster(
                 GenericCommonConfig,
                 SupersetConfigFragment,
                 SupersetRoleConfig,
-                crate::crd::v1alpha1::SupersetConfigOverrides,
+                SupersetConfigOverrides,
             >(rolegroup, resolved_role, &default_config)
             .with_context(|_| FailedToResolveConfigSnafu {
                 role_group: rolegroup_name.clone(),

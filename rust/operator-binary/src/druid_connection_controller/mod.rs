@@ -28,8 +28,12 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     APP_NAME, OPERATOR_NAME,
+    built_info::PKG_VERSION,
     controller::{CONTAINER_IMAGE_BASE_NAME, build::properties::ConfigFileName},
-    crd::{INTERNAL_SECRET_SECRET_KEY, PYTHONPATH, druidconnection, v1alpha1},
+    crd::{
+        INTERNAL_SECRET_SECRET_KEY, METADATA_DATABASE_ENV_PREFIX, PYTHONPATH, druidconnection,
+        v1alpha1,
+    },
     druid_connection_controller::job_state::{JobState, get_job_state},
 };
 
@@ -221,7 +225,7 @@ pub async fn reconcile_druid_connection(
                         .resolve(
                             CONTAINER_IMAGE_BASE_NAME,
                             &ctx.operator_environment.image_repository,
-                            crate::built_info::PKG_VERSION,
+                            PKG_VERSION,
                         )
                         .context(ResolveProductImageSnafu)?;
                     let job = build_import_job(
@@ -344,7 +348,7 @@ async fn build_import_job(
     let metadata_database_connection_details = superset_cluster
         .metadata_database()
         .sqlalchemy_connection_details_with_templating(
-            crate::crd::METADATA_DATABASE_ENV_PREFIX,
+            METADATA_DATABASE_ENV_PREFIX,
             &templating_mechanism,
         );
 

@@ -20,6 +20,7 @@ use crate::{
     },
     crd::{
         SupersetConfigOptions, SupersetRole,
+        authentication::SupersetClientAuthenticationDetailsResolved,
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
         },
@@ -129,7 +130,7 @@ pub fn build(
 /// logging configurator, recaptcha, …) including the resolved authentication properties.
 fn core_config_properties(
     metadata_database: &MetadataDatabaseConnection,
-    authentication_config: &crate::crd::authentication::SupersetClientAuthenticationDetailsResolved,
+    authentication_config: &SupersetClientAuthenticationDetailsResolved,
 ) -> Result<BTreeMap<String, String>, Error> {
     let metadata_database_url_template =
         metadata_database_connection_details(metadata_database).url_template;

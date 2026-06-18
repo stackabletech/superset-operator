@@ -11,7 +11,8 @@ use stackable_operator::{
     cli::OperatorEnvironmentOptions,
     cluster_resources::ClusterResourceApplyStrategy,
     commons::{
-        product_image_selection::ResolvedProductImage, random_secret_creation,
+        product_image_selection::ResolvedProductImage,
+        random_secret_creation::{self, create_random_secret_if_not_exists},
         rbac::build_rbac_resources,
     },
     kube::{
@@ -49,6 +50,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::{
     OPERATOR_NAME,
     controller::build::resource::{
+        config_map::build_rolegroup_config_map,
         deployment::build_rolegroup_deployment,
         listener::build_group_listener,
         pdb::build_pdb,
@@ -523,7 +525,7 @@ pub async fn reconcile_superset(
         .await
         .context(ApplyRoleBindingSnafu)?;
 
-    random_secret_creation::create_random_secret_if_not_exists(
+    create_random_secret_if_not_exists(
         &validated.cluster_config.secret_key_secret_name,
         INTERNAL_SECRET_SECRET_KEY,
         256,
@@ -540,7 +542,7 @@ pub async fn reconcile_superset(
         for (rolegroup_name, validated_rolegroup) in rolegroup_configs.iter() {
             let config = &validated_rolegroup.config;
 
-            let rg_configmap = build::resource::config_map::build_rolegroup_config_map(
+            let rg_configmap = build_rolegroup_config_map(
                 &validated,
                 superset_role,
                 rolegroup_name,
