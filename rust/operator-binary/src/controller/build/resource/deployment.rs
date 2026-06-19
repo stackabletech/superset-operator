@@ -179,11 +179,9 @@ pub fn build_rolegroup_deployment(
     pod_template.merge_from(rolegroup_config.pod_overrides.clone());
 
     Ok(Deployment {
-        // `ResourceNames` has no Deployment helper; the qualified name (which is also the
-        // StatefulSet name) is the correct `<cluster>-<role>-<rolegroup>` Deployment name.
         metadata: validated
             .object_meta(
-                resource_names.stateful_set_name().to_string(),
+                resource_names.deployment_name().to_string(),
                 superset_role,
                 role_group_name,
             )
