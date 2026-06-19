@@ -9,7 +9,7 @@ use stackable_operator::v2::flask_config_writer;
 
 use crate::{
     controller::{
-        ValidatedCluster,
+        ValidatedCluster, ValidatedSupersetConfig,
         build::{
             properties::{authentication, authorization},
             resource::{
@@ -24,7 +24,7 @@ use crate::{
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
         },
-        v1alpha1::{SupersetConfig, SupersetConfigOverrides},
+        v1alpha1::SupersetConfigOverrides,
     },
 };
 
@@ -66,7 +66,7 @@ pub enum Error {
 pub fn build(
     validated: &ValidatedCluster,
     role: &SupersetRole,
-    merged_config: &SupersetConfig,
+    config: &ValidatedSupersetConfig,
     config_overrides: &SupersetConfigOverrides,
 ) -> Result<String, Error> {
     let mut config_properties = BTreeMap::new();
@@ -93,7 +93,7 @@ pub fn build(
 
     // The order here should be kept in order to preserve overrides.
     // No properties should be added after this extend.
-    config_properties.extend(rolegroup_properties(role, merged_config, config_overrides));
+    config_properties.extend(rolegroup_properties(role, config, config_overrides));
 
     let mut config_file = Vec::new();
 
@@ -240,7 +240,7 @@ fn celery_connection_config(
 ///    (role-group wins) by `with_validated_config`.
 fn rolegroup_properties(
     role: &SupersetRole,
-    merged_config: &SupersetConfig,
+    config: &ValidatedSupersetConfig,
     config_overrides: &SupersetConfigOverrides,
 ) -> BTreeMap<String, String> {
     let mut properties: BTreeMap<String, String> = BTreeMap::new();
@@ -256,10 +256,10 @@ fn rolegroup_properties(
         );
     }
 
-    if let Some(v) = merged_config.row_limit {
+    if let Some(v) = config.row_limit {
         properties.insert(SupersetConfigOptions::RowLimit.to_string(), v.to_string());
     }
-    if let Some(v) = merged_config.webserver_timeout {
+    if let Some(v) = config.webserver_timeout {
         properties.insert(
             SupersetConfigOptions::SupersetWebserverTimeout.to_string(),
             v.to_string(),

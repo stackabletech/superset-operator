@@ -22,10 +22,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::{
-        SupersetRoleGroupConfig, ValidatedCluster,
-        build::{graceful_shutdown::add_graceful_shutdown_config, properties::ConfigFileName},
-    },
+    controller::{SupersetRoleGroupConfig, ValidatedCluster, build::properties::ConfigFileName},
     crd::{PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, SupersetRole},
 };
 
@@ -38,9 +35,9 @@ pub enum Error {
     #[snafu(display("failed to build container"))]
     BuildContainer { source: super::Error },
 
-    #[snafu(display("failed to configure graceful shutdown"))]
+    #[snafu(display("failed to set termination grace period for graceful shutdown"))]
     GracefulShutdown {
-        source: crate::controller::build::graceful_shutdown::Error,
+        source: stackable_operator::builder::pod::Error,
     },
 
     #[snafu(display("failed to build Metadata"))]
@@ -72,7 +69,7 @@ pub fn build_rolegroup_deployment(
     sa_name: &str,
 ) -> Result<Deployment> {
     let resolved_product_image = &validated.image;
-    let merged_config = &rolegroup_config.config.config;
+    let merged_config = &rolegroup_config.config;
 
     let resource_names = validated.resource_names(superset_role, role_group_name);
     let recommended_object_labels = validated.recommended_labels(superset_role, role_group_name);
@@ -156,7 +153,10 @@ pub fn build_rolegroup_deployment(
         .resources(merged_config.resources.clone().into());
 
     pb.add_container(superset_cb.build());
-    add_graceful_shutdown_config(merged_config, &mut pb).context(GracefulShutdownSnafu)?;
+    if let Some(termination_grace_period) = merged_config.graceful_shutdown_timeout {
+        pb.termination_grace_period(&termination_grace_period)
+            .context(GracefulShutdownSnafu)?;
+    }
 
     pb.add_volumes(super::create_volumes(
         resource_names.role_group_config_map().as_ref(),

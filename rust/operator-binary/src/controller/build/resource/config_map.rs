@@ -6,13 +6,10 @@ use stackable_operator::{
 
 use crate::{
     controller::{
-        ValidatedCluster, ValidatedLogging,
+        ValidatedCluster, ValidatedSupersetConfig,
         build::properties::{ConfigFileName, product_logging, superset_config},
     },
-    crd::{
-        SupersetRole,
-        v1alpha1::{SupersetConfig, SupersetConfigOverrides},
-    },
+    crd::{SupersetRole, v1alpha1::SupersetConfigOverrides},
 };
 
 #[derive(Snafu, Debug)]
@@ -37,11 +34,10 @@ pub fn build_rolegroup_config_map(
     validated: &ValidatedCluster,
     role: &SupersetRole,
     role_group_name: &RoleGroupName,
-    merged_config: &SupersetConfig,
+    config: &ValidatedSupersetConfig,
     config_overrides: &SupersetConfigOverrides,
-    logging: &ValidatedLogging,
 ) -> Result<ConfigMap, Error> {
-    let config_file = superset_config::build(validated, role, merged_config, config_overrides)
+    let config_file = superset_config::build(validated, role, config, config_overrides)
         .with_context(|_| SupersetConfigSnafu {
             role_group_name: role_group_name.clone(),
         })?;
@@ -63,10 +59,13 @@ pub fn build_rolegroup_config_map(
         )
         .add_data(ConfigFileName::SupersetConfig.to_string(), config_file);
 
-    if let Some(log_config) = product_logging::build_log_config(&logging.superset_container) {
+    if let Some(log_config) = product_logging::build_log_config(&config.logging.superset_container)
+    {
         cm_builder.add_data(ConfigFileName::LogConfig.to_string(), log_config);
     }
-    if let Some(vector_config) = product_logging::build_vector_config(logging.enable_vector_agent) {
+    if let Some(vector_config) =
+        product_logging::build_vector_config(config.logging.enable_vector_agent)
+    {
         cm_builder.add_data(VECTOR_CONFIG_FILE, vector_config);
     }
 
@@ -144,9 +143,8 @@ mod tests {
             &validated,
             &SupersetRole::Node,
             &role_group_name,
-            &rolegroup_config.config.config,
+            &rolegroup_config.config,
             &rolegroup_config.config_overrides,
-            &rolegroup_config.config.logging,
         )
         .expect("config map built");
 

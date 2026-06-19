@@ -11,9 +11,11 @@ use stackable_operator::{
     cli::OperatorEnvironmentOptions,
     cluster_resources::ClusterResourceApplyStrategy,
     commons::{
+        affinity::StackableAffinity,
         product_image_selection::ResolvedProductImage,
         random_secret_creation::{self, create_random_secret_if_not_exists},
         rbac::build_rbac_resources,
+        resources::{NoRuntimeLimits, Resources},
     },
     kube::{
         Resource, ResourceExt,
@@ -66,6 +68,7 @@ use crate::{
         },
         v1alpha1::{
             SupersetCluster, SupersetClusterStatus, SupersetConfig, SupersetConfigOverrides,
+            SupersetStorageConfig,
         },
     },
 };
@@ -97,20 +100,33 @@ pub struct ValidatedRoleConfig {
 pub type SupersetRoleGroupConfig =
     RoleGroupConfig<ValidatedSupersetConfig, GenericCommonConfig, SupersetConfigOverrides>;
 
-/// A validated Superset config: the merged [`SupersetConfig`] together with the up-front–validated
-/// [`ValidatedLogging`] (so an invalid custom log ConfigMap name or a missing Vector aggregator
-/// name fails reconciliation during validation rather than at resource-build time).
+/// A validated Superset config: the merged [`SupersetConfig`] exploded into named fields, with its
+/// raw `logging` replaced by the up-front–validated [`ValidatedLogging`] (so an invalid custom log
+/// ConfigMap name or a missing Vector aggregator name fails reconciliation during validation rather
+/// than at resource-build time). The raw [`SupersetConfig`] does not survive into this struct, so
+/// the build step never sees the un-validated CRD type.
 #[derive(Clone, Debug)]
 pub struct ValidatedSupersetConfig {
-    pub config: SupersetConfig,
+    pub affinity: StackableAffinity,
+    pub graceful_shutdown_timeout: Option<Duration>,
     pub logging: ValidatedLogging,
+    pub resources: Resources<SupersetStorageConfig, NoRuntimeLimits>,
+    pub row_limit: Option<i32>,
+    pub webserver_timeout: Option<u32>,
 }
 
 impl ValidatedSupersetConfig {
-    /// Builds the validated config from the merged [`SupersetConfig`] and the already-validated
-    /// logging.
-    fn from_merged(config: SupersetConfig, logging: ValidatedLogging) -> Self {
-        Self { config, logging }
+    /// Builds the validated config from the merged [`SupersetConfig`], swapping in the
+    /// already-validated logging.
+    fn from_merged(merged: SupersetConfig, logging: ValidatedLogging) -> Self {
+        Self {
+            affinity: merged.affinity,
+            graceful_shutdown_timeout: merged.graceful_shutdown_timeout,
+            logging,
+            resources: merged.resources,
+            row_limit: merged.row_limit,
+            webserver_timeout: merged.webserver_timeout,
+        }
     }
 }
 
@@ -546,9 +562,8 @@ pub async fn reconcile_superset(
                 &validated,
                 superset_role,
                 rolegroup_name,
-                &config.config,
+                config,
                 &validated_rolegroup.config_overrides,
-                &config.logging,
             )
             .context(BuildConfigMapSnafu)?;
 

@@ -5,7 +5,6 @@ use std::str::FromStr;
 use stackable_operator::v2::types::operator::RoleGroupName;
 
 pub mod command;
-pub mod graceful_shutdown;
 pub mod properties;
 pub mod resource;
 
