@@ -17,7 +17,6 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::{
         ConfigMapVolumeSource, Container as K8sContainer, EmptyDirVolumeSource, Volume,
     },
-    kvp::Label,
     product_logging,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{
@@ -77,6 +76,15 @@ stackable_operator::constant!(pub(crate) LISTENER_VOLUME_NAME_PVC: PersistentVol
 /// The `fsGroup` the Pods run as, required by secret-operator-provided volumes.
 pub(crate) const SECRET_OPERATOR_FS_GROUP: i64 = 1000;
 
+/// Errors shared by the container builders below.
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display("failed to add needed volumeMount"))]
+    AddVolumeMount {
+        source: stackable_operator::builder::pod::container::Error,
+    },
+}
+
 /// The shell wrapper used to launch the long-running product containers
 /// (`/bin/bash -x -euo pipefail -c <args>`).
 pub(crate) fn bash_wrapper_command() -> Vec<String> {
@@ -87,21 +95,6 @@ pub(crate) fn bash_wrapper_command() -> Vec<String> {
         "pipefail".to_string(),
         "-c".to_string(),
     ]
-}
-
-/// The label that opts a workload into the Stackable restart controller (so it restarts on mounted
-/// ConfigMap/Secret changes).
-pub(crate) fn restarter_enabled_label() -> Result<Label, stackable_operator::kvp::LabelError> {
-    Label::try_from(("restarter.stackable.tech/enabled", "true"))
-}
-
-/// Errors shared by the container builders below.
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display("failed to add needed volumeMount"))]
-    AddVolumeMount {
-        source: stackable_operator::builder::pod::container::Error,
-    },
 }
 
 pub(crate) fn create_volumes(

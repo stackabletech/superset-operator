@@ -5,6 +5,7 @@ use stackable_operator::{
         meta::ObjectMetaBuilder,
         pod::{PodBuilder, security::PodSecurityContextBuilder},
     },
+    constants::RESTART_CONTROLLER_ENABLED_LABEL,
     k8s_openapi::{
         DeepMerge,
         api::{
@@ -40,11 +41,6 @@ pub enum Error {
     #[snafu(display("failed to configure graceful shutdown"))]
     GracefulShutdown {
         source: crate::controller::build::graceful_shutdown::Error,
-    },
-
-    #[snafu(display("failed to build Labels"))]
-    LabelBuild {
-        source: stackable_operator::kvp::LabelError,
     },
 
     #[snafu(display("failed to build Metadata"))]
@@ -185,7 +181,7 @@ pub fn build_rolegroup_deployment(
                 superset_role,
                 role_group_name,
             )
-            .with_label(super::restarter_enabled_label().context(LabelBuildSnafu)?)
+            .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
             .build(),
         spec: Some(DeploymentSpec {
             replicas: replicas.map(i32::from),

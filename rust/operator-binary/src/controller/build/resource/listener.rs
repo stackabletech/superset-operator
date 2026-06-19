@@ -1,4 +1,4 @@
-use stackable_operator::crd::listener;
+use stackable_operator::{crd::listener, v2::types::kubernetes::ListenerClassName};
 
 use crate::{
     controller::{ValidatedCluster, build::PLACEHOLDER_LISTENER_ROLE_GROUP},
@@ -11,7 +11,7 @@ pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 pub fn build_group_listener(
     validated: &ValidatedCluster,
     role: &SupersetRole,
-    listener_class: String,
+    listener_class: &ListenerClassName,
     listener_group_name: String,
 ) -> listener::v1alpha1::Listener {
     // The group listener is a role-level object, so the constant `none` placeholder role-group is
@@ -21,7 +21,7 @@ pub fn build_group_listener(
         .build();
 
     let spec = listener::v1alpha1::ListenerSpec {
-        class_name: Some(listener_class),
+        class_name: Some(listener_class.to_string()),
         ports: Some(listener_ports()),
         ..Default::default()
     };

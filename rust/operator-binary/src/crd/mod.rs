@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use stackable_operator::{
@@ -26,7 +28,10 @@ use stackable_operator::{
         config_overrides::KeyValueConfigOverrides,
         flask_config_writer::{FlaskAppConfigOptions, PythonType},
         role_utils::GenericCommonConfig,
-        types::common::Port,
+        types::{
+            common::Port,
+            kubernetes::{ConfigMapName, ListenerClassName},
+        },
     },
     versioned::versioned,
 };
@@ -39,9 +44,13 @@ use crate::crd::{
     v1alpha1::SupersetRoleConfig,
 };
 
+/// Default [`ListenerClassName`] value used by the rolegroup listener.
+pub const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
+
 /// Default listener class used by the rolegroup listener.
-fn default_listener_class() -> String {
-    "cluster-internal".to_string()
+fn default_listener_class() -> ListenerClassName {
+    ListenerClassName::from_str(DEFAULT_LISTENER_CLASS)
+        .expect("the default listener class is a valid listener class name")
 }
 
 pub mod affinity;
@@ -186,7 +195,7 @@ pub mod versioned {
 
         /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
         #[serde(default = "default_listener_class")]
-        pub listener_class: String,
+        pub listener_class: ListenerClassName,
     }
 
     #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, Merge, PartialEq, Serialize)]
@@ -253,7 +262,7 @@ pub mod versioned {
         /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
         /// to learn how to configure log aggregation with Vector.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub vector_aggregator_config_map_name: Option<String>,
+        pub vector_aggregator_config_map_name: Option<ConfigMapName>,
     }
 
     #[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
@@ -393,7 +402,10 @@ pub enum SupersetRole {
 }
 
 impl SupersetRole {
-    pub fn listener_class_name(&self, superset: &v1alpha1::SupersetCluster) -> Option<String> {
+    pub fn listener_class_name(
+        &self,
+        superset: &v1alpha1::SupersetCluster,
+    ) -> Option<ListenerClassName> {
         match self {
             Self::Node => superset
                 .spec

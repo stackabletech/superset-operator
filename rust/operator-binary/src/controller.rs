@@ -37,7 +37,7 @@ use stackable_operator::{
         role_group_utils::ResourceNames,
         role_utils::{GenericCommonConfig, RoleGroupConfig},
         types::{
-            kubernetes::{ListenerName, NamespaceName, Uid},
+            kubernetes::{ListenerClassName, ListenerName, NamespaceName, Uid},
             operator::{
                 ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
                 RoleGroupName, RoleName,
@@ -84,7 +84,7 @@ pub struct Ctx {
 #[derive(Clone, Debug)]
 pub struct ValidatedRoleConfig {
     pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
-    pub listener_class: Option<String>,
+    pub listener_class: Option<ListenerClassName>,
     pub group_listener_name: Option<ListenerName>,
 }
 
@@ -637,7 +637,7 @@ pub async fn reconcile_superset(
                 let group_listener = build_group_listener(
                     &validated,
                     superset_role,
-                    listener_class.clone(),
+                    listener_class,
                     listener_group_name.to_string(),
                 );
                 cluster_resources
