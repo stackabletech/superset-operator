@@ -174,9 +174,10 @@ pub(crate) fn build_superset_container_builder(
         );
     }
 
-    // SECRET_KEY from auto-generated secret
+    // The Flask `SECRET_KEY` env var is sourced from the auto-generated Secret. Superset requires the
+    // env var name to equal the Secret data key, so both use `INTERNAL_SECRET_SECRET_KEY`.
     superset_cb.add_env_var_from_secret(
-        "SECRET_KEY",
+        INTERNAL_SECRET_SECRET_KEY,
         validated.cluster_config.secret_key_secret_name.clone(),
         INTERNAL_SECRET_SECRET_KEY,
     );

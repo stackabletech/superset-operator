@@ -154,6 +154,10 @@ pub fn default_user_registration() -> bool {
 /// Default Superset role assigned to users on registration.
 pub const DEFAULT_USER_REGISTRATION_ROLE: &str = "Public";
 
+/// The OIDC principal claim Superset enforces for the Keycloak provider, due to the Flask-AppBuilder
+/// implementation (see <https://github.com/dpgaspar/Flask-AppBuilder/blob/6d44e6d581433dcea475764c4bb1270c24bbd6de/flask_appbuilder/security/manager.py#L719>).
+pub const ENFORCED_PRINCIPAL_CLAIM: &str = "preferred_username";
+
 pub fn default_user_registration_role() -> String {
     DEFAULT_USER_REGISTRATION_ROLE.to_string()
 }
@@ -310,15 +314,14 @@ impl SupersetClientAuthenticationDetailsResolved {
             }
         );
 
-        // We have to enforce preferred_username here due to the flask implementation
-        // https://github.com/dpgaspar/Flask-AppBuilder/blob/6d44e6d581433dcea475764c4bb1270c24bbd6de/flask_appbuilder/security/manager.py#L719
+        // We have to enforce `ENFORCED_PRINCIPAL_CLAIM` here due to the Flask-AppBuilder implementation.
         match oidc_provider {
             oidc::v1alpha1::IdentityProviderHint::Keycloak => {
                 ensure!(
-                    &provider.principal_claim == "preferred_username",
+                    provider.principal_claim == ENFORCED_PRINCIPAL_CLAIM,
                     OidcPrincipalClaimNotSupportedSnafu {
                         configured: provider.principal_claim.clone(),
-                        supported: "preferred_username".to_owned(),
+                        supported: ENFORCED_PRINCIPAL_CLAIM.to_owned(),
                         auth_class_name,
                     }
                 );

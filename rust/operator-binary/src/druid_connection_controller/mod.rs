@@ -29,7 +29,10 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::{
     APP_NAME, OPERATOR_NAME,
     built_info::PKG_VERSION,
-    controller::{CONTAINER_IMAGE_BASE_NAME, build::properties::ConfigFileName},
+    controller::{
+        CONTAINER_IMAGE_BASE_NAME,
+        build::{properties::ConfigFileName, resource::bash_wrapper_command},
+    },
     crd::{
         INTERNAL_SECRET_SECRET_KEY, METADATA_DATABASE_ENV_PREFIX, PYTHONPATH, druidconnection,
         v1alpha1,
@@ -318,6 +321,10 @@ fn build_druid_db_yaml(druid_cluster_name: &str, sqlalchemy_str: &str) -> Result
     ))
 }
 
+/// Name of the env var (and the matching `superset_config.py` setting) holding the metadata
+/// database connection string for the import job.
+const SQLALCHEMY_DATABASE_URI_ENV: &str = "SQLALCHEMY_DATABASE_URI";
+
 /// Builds the import job.  When run it will import the druid connection into the database.
 async fn build_import_job(
     superset_cluster: &v1alpha1::SupersetCluster,
@@ -328,7 +335,9 @@ async fn build_import_job(
 ) -> Result<Job> {
     let mut commands = vec![];
 
-    let config = "import os; SQLALCHEMY_DATABASE_URI = os.path.expandvars(os.environ.get('SQLALCHEMY_DATABASE_URI'))";
+    let config = format!(
+        "import os; {SQLALCHEMY_DATABASE_URI_ENV} = os.path.expandvars(os.environ.get('{SQLALCHEMY_DATABASE_URI_ENV}'))"
+    );
     commands.push(format!("mkdir -p {PYTHONPATH}"));
     commands.push(format!(
         "echo \"{config}\" > {PYTHONPATH}/{config_file}",
@@ -356,10 +365,10 @@ async fn build_import_job(
         .expect("ContainerBuilder not created");
     container_builder
         .image_from_product_image(resolved_product_image)
-        .command(vec!["/bin/bash".to_string()])
-        .args(vec![String::from("-c"), commands.join("; ")])
+        .command(bash_wrapper_command())
+        .args(vec![commands.join("; ")])
         .add_env_var(
-            "SQLALCHEMY_DATABASE_URI",
+            SQLALCHEMY_DATABASE_URI_ENV,
             metadata_database_connection_details.url_template.clone(),
         )
         .add_env_var_from_secret(
