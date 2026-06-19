@@ -85,24 +85,11 @@ pub fn build_rolegroup_deployment(
             worker_liveness_probe(),
             rolegroup_config.replicas,
         ),
-        SupersetRole::Beat => {
-            // Beat must only ever run a single instance, so the replica count is never left
-            // unset (no HorizontalPodAutoscaler): an explicit `0` is honoured (to stop Beat),
-            // any value `> 1` is clamped to `1`, and an unset value defaults to `1`.
-            let replicas = match rolegroup_config.replicas {
-                Some(0) => Some(0),
-                Some(replicas) if replicas > 1 => {
-                    tracing::warn! {"replicas for role `beat` set to greater `1`. Multiple beat instances are not allowed. Setting to `1` replica."}
-                    Some(1)
-                }
-                _ => Some(1),
-            };
-            (
-                format!("{CELERY_APP_INVOCATION} beat --pidfile {CELERY_BEAT_PIDFILE}"),
-                beat_liveness_probe(),
-                replicas,
-            )
-        }
+        SupersetRole::Beat => (
+            format!("{CELERY_APP_INVOCATION} beat --pidfile {CELERY_BEAT_PIDFILE}"),
+            beat_liveness_probe(),
+            beat_replicas(rolegroup_config.replicas),
+        ),
         SupersetRole::Node => {
             unreachable!("the `Node` role is deployed as a StatefulSet, not a Deployment")
         }
@@ -230,5 +217,41 @@ fn beat_liveness_probe() -> Probe {
         timeout_seconds: Some(30),
         failure_threshold: Some(3),
         ..Default::default()
+    }
+}
+
+/// Computes the replica count for the Celery `beat` role.
+///
+/// Beat is a singleton scheduler, so it must never run more than one instance: an explicit `0` is
+/// honoured (to stop Beat), any value `> 1` is clamped to `1` (with a warning), and an unset value
+/// defaults to `1`. The result is always `Some`, so no HorizontalPodAutoscaler can own the count.
+fn beat_replicas(requested: Option<u16>) -> Option<u16> {
+    match requested {
+        Some(0) => Some(0),
+        Some(replicas) if replicas > 1 => {
+            tracing::warn!(
+                "replicas for role `beat` set to greater `1`. Multiple beat instances are not allowed. Setting to `1` replica."
+            );
+            Some(1)
+        }
+        _ => Some(1),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::beat_replicas;
+
+    #[test]
+    fn beat_replicas_clamps_to_a_single_instance() {
+        // An unset replica count defaults to a single instance.
+        assert_eq!(beat_replicas(None), Some(1));
+        // An explicit `0` is honoured so Beat can be stopped.
+        assert_eq!(beat_replicas(Some(0)), Some(0));
+        // A single instance is kept as-is.
+        assert_eq!(beat_replicas(Some(1)), Some(1));
+        // Anything greater than one is clamped down to a single instance.
+        assert_eq!(beat_replicas(Some(2)), Some(1));
+        assert_eq!(beat_replicas(Some(100)), Some(1));
     }
 }

@@ -255,9 +255,17 @@ pub fn validate_cluster(
 #[cfg(test)]
 mod tests {
 
-    use stackable_operator::utils::yaml_from_str_singleton_map;
+    use std::str::FromStr;
 
-    use super::validate_cluster;
+    use stackable_operator::{
+        product_logging::spec::{
+            AutomaticContainerLogConfig, ContainerLogConfig, ContainerLogConfigChoice, Logging,
+        },
+        utils::yaml_from_str_singleton_map,
+        v2::types::kubernetes::ConfigMapName,
+    };
+
+    use super::{Error, validate_cluster, validate_logging};
     use crate::{
         controller::dereference::DereferencedObjects,
         crd::{
@@ -279,6 +287,49 @@ mod tests {
             },
             opa_config: None,
         }
+    }
+
+    /// Builds a [`Logging`] with automatic log configuration for the Superset and Vector containers.
+    fn automatic_logging(enable_vector_agent: bool) -> Logging<v1alpha1::Container> {
+        let automatic = || ContainerLogConfig {
+            choice: Some(ContainerLogConfigChoice::Automatic(
+                AutomaticContainerLogConfig::default(),
+            )),
+        };
+        Logging {
+            enable_vector_agent,
+            containers: [
+                (v1alpha1::Container::Superset, automatic()),
+                (v1alpha1::Container::Vector, automatic()),
+            ]
+            .into(),
+        }
+    }
+
+    /// The Vector aggregator discovery ConfigMap name is required exactly when the Vector agent is
+    /// enabled, and a Vector container is configured only in that case.
+    #[test]
+    fn validate_logging_requires_vector_aggregator_only_when_vector_enabled() {
+        // Vector enabled without an aggregator ConfigMap name fails validation up-front.
+        assert!(matches!(
+            validate_logging(&automatic_logging(true), &None),
+            Err(Error::MissingVectorAggregatorConfigMapName)
+        ));
+
+        // Vector enabled with an aggregator name configures a Vector container.
+        let aggregator = Some(
+            ConfigMapName::from_str("vector-aggregator-discovery").expect("valid ConfigMap name"),
+        );
+        let validated = validate_logging(&automatic_logging(true), &aggregator)
+            .expect("logging should validate");
+        assert!(validated.enable_vector_agent);
+        assert!(validated.vector_container.is_some());
+
+        // Vector disabled needs no aggregator name and configures no Vector container.
+        let validated =
+            validate_logging(&automatic_logging(false), &None).expect("logging should validate");
+        assert!(!validated.enable_vector_agent);
+        assert!(validated.vector_container.is_none());
     }
 
     /// Characterises the `superset_config.py` override resolution: role-level overrides are merged

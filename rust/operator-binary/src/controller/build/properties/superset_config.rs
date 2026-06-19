@@ -270,3 +270,105 @@ fn rolegroup_properties(
 
     properties
 }
+
+#[cfg(test)]
+mod tests {
+    use stackable_operator::{
+        commons::{affinity::StackableAffinity, resources::Resources},
+        product_logging::spec::AutomaticContainerLogConfig,
+        v2::{
+            config_overrides::KeyValueConfigOverrides,
+            product_logging::framework::ValidatedContainerLogConfigChoice,
+        },
+    };
+
+    use super::{DEFAULT_ROW_LIMIT, DEFAULT_WEBSERVER_TIMEOUT, rolegroup_properties};
+    use crate::{
+        controller::{ValidatedLogging, ValidatedSupersetConfig},
+        crd::{SupersetConfigOptions, SupersetRole, v1alpha1::SupersetConfigOverrides},
+    };
+
+    /// Builds a [`ValidatedSupersetConfig`] with only the fields that affect `rolegroup_properties`
+    /// set; everything else defaults.
+    fn validated_config(
+        row_limit: Option<i32>,
+        webserver_timeout: Option<u32>,
+    ) -> ValidatedSupersetConfig {
+        ValidatedSupersetConfig {
+            affinity: StackableAffinity::default(),
+            graceful_shutdown_timeout: None,
+            logging: ValidatedLogging {
+                superset_container: ValidatedContainerLogConfigChoice::Automatic(
+                    AutomaticContainerLogConfig::default(),
+                ),
+                vector_container: None,
+                enable_vector_agent: false,
+            },
+            resources: Resources::default(),
+            row_limit,
+            webserver_timeout,
+        }
+    }
+
+    fn row_limit_key() -> String {
+        SupersetConfigOptions::RowLimit.to_string()
+    }
+
+    fn webserver_timeout_key() -> String {
+        SupersetConfigOptions::SupersetWebserverTimeout.to_string()
+    }
+
+    /// The `ROW_LIMIT`/`SUPERSET_WEBSERVER_TIMEOUT` defaults are only emitted for the `Node` role.
+    #[test]
+    fn rolegroup_properties_defaults_are_node_only() {
+        let worker = rolegroup_properties(
+            &SupersetRole::Worker,
+            &validated_config(None, None),
+            &SupersetConfigOverrides::default(),
+        );
+        assert!(!worker.contains_key(&row_limit_key()));
+        assert!(!worker.contains_key(&webserver_timeout_key()));
+
+        let node = rolegroup_properties(
+            &SupersetRole::Node,
+            &validated_config(None, None),
+            &SupersetConfigOverrides::default(),
+        );
+        assert_eq!(
+            node.get(&row_limit_key()),
+            Some(&DEFAULT_ROW_LIMIT.to_string())
+        );
+        assert_eq!(
+            node.get(&webserver_timeout_key()),
+            Some(&DEFAULT_WEBSERVER_TIMEOUT.to_string())
+        );
+    }
+
+    /// A typed `row_limit`/`webserver_timeout` overrides the Node default.
+    #[test]
+    fn rolegroup_properties_typed_fields_override_defaults() {
+        let node = rolegroup_properties(
+            &SupersetRole::Node,
+            &validated_config(Some(10), Some(600)),
+            &SupersetConfigOverrides::default(),
+        );
+        assert_eq!(node.get(&row_limit_key()), Some(&"10".to_string()));
+        assert_eq!(node.get(&webserver_timeout_key()), Some(&"600".to_string()));
+    }
+
+    /// `configOverrides` are applied last and win over both the default and the typed field.
+    #[test]
+    fn rolegroup_properties_config_overrides_win() {
+        let mut superset_config_py = KeyValueConfigOverrides::default();
+        superset_config_py
+            .overrides
+            .insert(row_limit_key(), "99".to_string());
+
+        let node = rolegroup_properties(
+            &SupersetRole::Node,
+            &validated_config(Some(10), None),
+            &SupersetConfigOverrides { superset_config_py },
+        );
+        assert_eq!(node.get(&row_limit_key()), Some(&"99".to_string()));
+    }
+}
