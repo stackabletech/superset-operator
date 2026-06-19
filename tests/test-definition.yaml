@@ -8,17 +8,32 @@ dimensions:
     values:
       - 4.1.4
       - 6.0.0
+      - 6.1.0
       # Or use a custom image:
-      # - x.x.x,oci.stackable.tech/razvan/superset:x.x.x-stackable0.0.0-dev
+      # - 6.1.0,oci.stackable.tech/sandbox/superset:6.1.0
   - name: superset-latest
     values:
+      - 6.1.0
+      # - 6.1.0,oci.stackable.tech/sandbox/superset:6.1.0
+  - name: superset-old
+    values:
+      - 4.1.4
       - 6.0.0
-      # - x.x.x,oci.stackable.tech/razvan/superset:x.x.x-stackable0.0.0-dev
+  - name: superset-new
+    values:
+      - 6.1.0
   - name: ldap-authentication
     values:
       - no-tls
       - insecure-tls
       - server-verification-tls
+  # Authentication used in the upgrade test. "none" tests that seeded content
+  # survives the metadata database migrations, "oidc" tests that the OAuth
+  # login of an existing user still works after the upgrade.
+  - name: authentication
+    values:
+      - none
+      - oidc
   - name: opa-latest
     values:
       - 1.16.2
@@ -67,6 +82,12 @@ tests:
   - name: celery-worker
     dimensions:
       - superset
+      - openshift
+  - name: upgrade
+    dimensions:
+      - superset-old
+      - superset-new
+      - authentication
       - openshift
 suites:
   - name: nightly
