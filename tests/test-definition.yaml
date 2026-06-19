@@ -14,7 +14,7 @@ dimensions:
   - name: superset-latest
     values:
       - 6.1.0
-      # - 6.0.0,oci.stackable.tech/sandbox/superset:6.0.0
+      # - 6.1.0,oci.stackable.tech/sandbox/superset:6.1.0
   - name: superset-old
     values:
       - 4.1.4
