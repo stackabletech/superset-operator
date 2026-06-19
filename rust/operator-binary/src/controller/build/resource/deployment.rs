@@ -43,11 +43,6 @@ pub enum Error {
         source: stackable_operator::builder::pod::Error,
     },
 
-    #[snafu(display("failed to build Metadata"))]
-    MetadataBuild {
-        source: stackable_operator::builder::meta::Error,
-    },
-
     #[snafu(display("failed to add needed volume"))]
     AddVolume {
         source: stackable_operator::builder::pod::Error,
@@ -71,7 +66,6 @@ pub fn build_rolegroup_deployment(
     rolegroup_config: &SupersetRoleGroupConfig,
     sa_name: &str,
 ) -> Result<Deployment> {
-    let resolved_product_image = &validated.image;
     let merged_config = &rolegroup_config.config;
 
     let resource_names = validated.resource_names(superset_role, role_group_name);
@@ -101,7 +95,7 @@ pub fn build_rolegroup_deployment(
 
     let mut pb = PodBuilder::new();
     pb.metadata(metadata)
-        .image_pull_secrets_from_product_image(resolved_product_image)
+        .image_pull_secrets_from_product_image(&validated.image)
         .security_context(
             PodSecurityContextBuilder::new()
                 .fs_group(super::SECRET_OPERATOR_FS_GROUP) // Needed for secret-operator
@@ -151,7 +145,7 @@ pub fn build_rolegroup_deployment(
         &rolegroup_config.config.logging.superset_container,
     ))
     .context(AddVolumeSnafu)?;
-    pb.add_container(super::build_metrics_container(resolved_product_image));
+    pb.add_container(super::build_metrics_container(&validated.image));
 
     if let Some(vector_container) =
         super::build_vector_container(validated, superset_role, role_group_name, rolegroup_config)

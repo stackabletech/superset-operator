@@ -698,3 +698,27 @@ pub fn error_policy(
         _ => Action::requeue(*Duration::from_secs(5)),
     }
 }
+
+#[cfg(test)]
+pub(crate) mod test_support {
+    use crate::{
+        controller::dereference::DereferencedObjects,
+        crd::authentication::{
+            self, SupersetClientAuthenticationDetailsResolved, v1alpha1::FlaskRolesSyncMoment,
+        },
+    };
+
+    /// A [`DereferencedObjects`] with no authentication classes and no OPA config, for tests that
+    /// build a `ValidatedCluster` without exercising the dereference step.
+    pub(crate) fn default_dereferenced() -> DereferencedObjects {
+        DereferencedObjects {
+            authentication_config: SupersetClientAuthenticationDetailsResolved {
+                authentication_classes_resolved: vec![],
+                user_registration: true,
+                user_registration_role: authentication::DEFAULT_USER_REGISTRATION_ROLE.to_string(),
+                sync_roles_at: FlaskRolesSyncMoment::default(),
+            },
+            opa_config: None,
+        }
+    }
+}

@@ -64,11 +64,6 @@ pub enum Error {
         source: stackable_operator::builder::pod::Error,
     },
 
-    #[snafu(display("failed to build Metadata"))]
-    MetadataBuild {
-        source: stackable_operator::builder::meta::Error,
-    },
-
     #[snafu(display("failed to add LDAP Volumes and VolumeMounts"))]
     AddLdapVolumesAndVolumeMounts {
         source: stackable_operator::crd::authentication::ldap::v1alpha1::Error,

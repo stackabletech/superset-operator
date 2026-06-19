@@ -19,7 +19,7 @@ use stackable_operator::{
     kube::{CustomResource, ResourceExt},
     memory::{BinaryMultiple, MemoryQuantity},
     product_logging::{self, spec::Logging},
-    role_utils::{GenericRoleConfig, Role},
+    role_utils::{GenericRoleConfig, Role, RoleGroup},
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
@@ -88,6 +88,12 @@ pub type SupersetRoleType = Role<
     v1alpha1::SupersetConfigOverrides,
     SupersetRoleConfig,
     GenericCommonConfig,
+>;
+
+pub type SupersetRoleGroupType = RoleGroup<
+    v1alpha1::SupersetConfigFragment,
+    GenericCommonConfig,
+    v1alpha1::SupersetConfigOverrides,
 >;
 
 #[derive(Display, EnumIter, EnumString)]

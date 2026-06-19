@@ -32,7 +32,7 @@ use crate::{
         dereference::DereferencedObjects,
     },
     crd::{
-        SupersetRole,
+        SupersetRole, SupersetRoleGroupType, SupersetRoleType,
         v1alpha1::{
             Container, SupersetCluster, SupersetConfig, SupersetConfigFragment,
             SupersetConfigOverrides, SupersetRoleConfig,
@@ -62,15 +62,16 @@ pub enum Error {
         source: stackable_operator::v2::controller_utils::Error,
     },
 
-    #[snafu(display("failed to resolve and merge config for role group {role_group}"))]
-    FailedToResolveConfig {
+    #[snafu(display("failed to validate the config for role group {role_group}"))]
+    ValidateConfig {
         source: fragment::ValidationError,
-        role_group: String,
+        role_group: RoleGroupName,
     },
 
-    #[snafu(display("failed to parse environment variable name"))]
+    #[snafu(display("invalid environment variable override name in role group {role_group}"))]
     ParseEnvVarName {
         source: stackable_operator::v2::macros::attributed_string_type::Error,
+        role_group: RoleGroupName,
     },
 
     #[snafu(display("invalid role group name {role_group}"))]
@@ -174,53 +175,19 @@ pub fn validate_cluster(
 
         let mut group_configs = BTreeMap::new();
         for (rolegroup_name, rolegroup) in &resolved_role.role_groups {
-            let validated_rg = with_validated_config::<
-                SupersetConfig,
-                GenericCommonConfig,
-                SupersetConfigFragment,
-                SupersetRoleConfig,
-                SupersetConfigOverrides,
-            >(rolegroup, resolved_role, &default_config)
-            .with_context(|_| FailedToResolveConfigSnafu {
-                role_group: rolegroup_name.clone(),
-            })?;
-
-            let mut env_overrides = EnvVarSet::new();
-            for (name, value) in validated_rg.config.env_overrides {
-                env_overrides = env_overrides.with_value(
-                    &EnvVarName::from_str(&name).context(ParseEnvVarNameSnafu)?,
-                    value,
-                );
-            }
-
             let role_group_name = RoleGroupName::from_str(rolegroup_name).with_context(|_| {
                 ParseRoleGroupNameSnafu {
                     role_group: rolegroup_name.clone(),
                 }
             })?;
-
-            let logging = validate_logging(
-                &validated_rg.config.config.logging,
+            let validated_rg = validate_role_group_config(
+                &role_group_name,
+                rolegroup,
+                resolved_role,
+                &default_config,
                 &vector_aggregator_config_map_name,
             )?;
-
-            group_configs.insert(
-                role_group_name,
-                SupersetRoleGroupConfig {
-                    replicas: validated_rg.replicas,
-                    config: ValidatedSupersetConfig::from_merged(
-                        validated_rg.config.config,
-                        logging,
-                    ),
-                    config_overrides: validated_rg.config.config_overrides,
-                    env_overrides,
-                    cli_overrides: validated_rg.config.cli_overrides,
-                    pod_overrides: validated_rg.config.pod_overrides,
-                    product_specific_common_config: validated_rg
-                        .config
-                        .product_specific_common_config,
-                },
-            );
+            group_configs.insert(role_group_name, validated_rg);
         }
 
         role_groups.insert(role, group_configs);
@@ -252,6 +219,51 @@ pub fn validate_cluster(
     ))
 }
 
+/// Merges and validates one role group into a [`SupersetRoleGroupConfig`].
+fn validate_role_group_config(
+    role_group_name: &RoleGroupName,
+    role_group: &SupersetRoleGroupType,
+    role: &SupersetRoleType,
+    default_config: &SupersetConfigFragment,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
+) -> Result<SupersetRoleGroupConfig, Error> {
+    let merged = with_validated_config::<
+        SupersetConfig,
+        GenericCommonConfig,
+        SupersetConfigFragment,
+        SupersetRoleConfig,
+        SupersetConfigOverrides,
+    >(role_group, role, default_config)
+    .with_context(|_| ValidateConfigSnafu {
+        role_group: role_group_name.clone(),
+    })?;
+
+    let mut env_overrides = EnvVarSet::new();
+    for (env_var_name, env_var_value) in merged.config.env_overrides {
+        env_overrides = env_overrides.with_value(
+            &EnvVarName::from_str(&env_var_name).with_context(|_| ParseEnvVarNameSnafu {
+                role_group: role_group_name.clone(),
+            })?,
+            env_var_value,
+        );
+    }
+
+    let logging = validate_logging(
+        &merged.config.config.logging,
+        vector_aggregator_config_map_name,
+    )?;
+
+    Ok(SupersetRoleGroupConfig {
+        replicas: merged.replicas,
+        config: ValidatedSupersetConfig::from_merged(merged.config.config, logging),
+        config_overrides: merged.config.config_overrides,
+        env_overrides,
+        cli_overrides: merged.config.cli_overrides,
+        pod_overrides: merged.config.pod_overrides,
+        product_specific_common_config: merged.config.product_specific_common_config,
+    })
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -267,27 +279,9 @@ mod tests {
 
     use super::{Error, validate_cluster, validate_logging};
     use crate::{
-        controller::dereference::DereferencedObjects,
-        crd::{
-            SupersetRole,
-            authentication::{
-                self, SupersetClientAuthenticationDetailsResolved, v1alpha1::FlaskRolesSyncMoment,
-            },
-            v1alpha1,
-        },
+        controller::test_support::default_dereferenced,
+        crd::{SupersetRole, v1alpha1},
     };
-
-    fn default_dereferenced() -> DereferencedObjects {
-        DereferencedObjects {
-            authentication_config: SupersetClientAuthenticationDetailsResolved {
-                authentication_classes_resolved: vec![],
-                user_registration: true,
-                user_registration_role: authentication::DEFAULT_USER_REGISTRATION_ROLE.to_string(),
-                sync_roles_at: FlaskRolesSyncMoment::default(),
-            },
-            opa_config: None,
-        }
-    }
 
     /// Builds a [`Logging`] with automatic log configuration for the Superset and Vector containers.
     fn automatic_logging(enable_vector_agent: bool) -> Logging<v1alpha1::Container> {

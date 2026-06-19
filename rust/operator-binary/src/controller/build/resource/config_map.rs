@@ -80,26 +80,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        controller::{dereference::DereferencedObjects, validate::validate_cluster},
-        crd::{
-            authentication::{
-                self, SupersetClientAuthenticationDetailsResolved, v1alpha1::FlaskRolesSyncMoment,
-            },
-            v1alpha1,
-        },
+        controller::{test_support::default_dereferenced, validate::validate_cluster},
+        crd::v1alpha1,
     };
-
-    fn default_dereferenced() -> DereferencedObjects {
-        DereferencedObjects {
-            authentication_config: SupersetClientAuthenticationDetailsResolved {
-                authentication_classes_resolved: vec![],
-                user_registration: true,
-                user_registration_role: authentication::DEFAULT_USER_REGISTRATION_ROLE.to_string(),
-                sync_roles_at: FlaskRolesSyncMoment::default(),
-            },
-            opa_config: None,
-        }
-    }
 
     /// The rolegroup ConfigMap carries `superset_config.py` and (for automatic logging)
     /// `log_config.py`, and omits `vector.yaml` while the Vector agent is disabled (the default).
