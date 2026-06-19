@@ -93,7 +93,7 @@ pub struct ValidatedRoleConfig {
 
 /// A validated, merged Superset role-group config.
 ///
-/// Aliasing the framework [`RoleGroupConfig`] keeps `replicas` optional (`Option<u16>`), so an
+/// Aliasing [`RoleGroupConfig`] keeps `replicas` optional (`Option<u16>`), so an
 /// unset value is propagated all the way to the StatefulSet/Deployment `replicas` field. That lets
 /// an external controller such as a HorizontalPodAutoscaler own the replica count instead of the
 /// operator forcing a default.
@@ -132,9 +132,9 @@ impl ValidatedSupersetConfig {
 
 /// Validated logging configuration for the Superset and (optional) Vector container.
 ///
-/// Produced up-front by `validate_logging` (mirroring the hive-operator) so that an invalid custom
-/// log ConfigMap name or a missing Vector aggregator discovery ConfigMap name fails reconciliation
-/// during validation rather than at resource-build time.
+/// Produced up-front by `validate_logging` so that an invalid custom log ConfigMap name or a
+/// missing Vector aggregator discovery ConfigMap name fails reconciliation during validation rather
+/// than at resource-build time.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidatedLogging {
     pub superset_container: ValidatedContainerLogConfigChoice,
@@ -249,7 +249,7 @@ impl ValidatedCluster {
         role_group_name: &RoleGroupName,
     ) -> Labels {
         self.recommended_labels_with(
-            &ProductVersion::from_str("none").expect("'none' is a valid product version"),
+            &build::UNVERSIONED_PRODUCT_VERSION,
             &role.role_name(),
             role_group_name,
         )
@@ -336,20 +336,13 @@ impl Resource for ValidatedCluster {
 
 impl HasName for ValidatedCluster {
     fn to_name(&self) -> String {
-        self.name_any()
+        self.name.to_string()
     }
 }
 
 impl HasUid for ValidatedCluster {
     fn to_uid(&self) -> Uid {
-        Uid::from_str(
-            &self
-                .metadata
-                .uid
-                .clone()
-                .expect("the uid is captured during validation"),
-        )
-        .expect("the uid is a valid Kubernetes UID")
+        self.uid.clone()
     }
 }
 
@@ -554,8 +547,8 @@ pub async fn reconcile_superset(
     let mut statefulset_cond_builder = StatefulSetConditionBuilder::default();
     let mut deployment_cond_builder = DeploymentConditionBuilder::default();
 
-    for (superset_role, rolegroup_configs) in validated.role_groups.iter() {
-        for (rolegroup_name, validated_rolegroup) in rolegroup_configs.iter() {
+    for (superset_role, rolegroup_configs) in &validated.role_groups {
+        for (rolegroup_name, validated_rolegroup) in rolegroup_configs {
             let config = &validated_rolegroup.config;
 
             let rg_configmap = build_rolegroup_config_map(
@@ -610,7 +603,7 @@ pub async fn reconcile_superset(
                     // See https://github.com/stackabletech/commons-operator/issues/111 for details.
                     statefulset_cond_builder.add(
                         cluster_resources
-                            .add(client, rg_statefulset.clone())
+                            .add(client, rg_statefulset)
                             .await
                             .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
                                 role_group_name: rolegroup_name.clone(),
@@ -632,7 +625,7 @@ pub async fn reconcile_superset(
                     // See https://github.com/stackabletech/commons-operator/issues/111 for details.
                     deployment_cond_builder.add(
                         cluster_resources
-                            .add(client, rg_deployment.clone())
+                            .add(client, rg_deployment)
                             .await
                             .with_context(|_| ApplyRoleGroupDeploymentSnafu {
                                 role_group_name: rolegroup_name.clone(),

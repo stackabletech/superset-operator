@@ -1,8 +1,7 @@
 //! The resolved OPA authorization config, dereferenced against the Kubernetes API.
 //!
 //! The rendering into `superset_config.py` properties lives in
-//! [`crate::controller::build::properties::authorization`], mirroring how
-//! [`crate::crd::authentication`] pairs with `build::properties::authentication`.
+//! [`crate::controller::build::properties::authorization`].
 
 use stackable_operator::{client::Client, commons::opa::OpaApiVersion, shared::time::Duration};
 

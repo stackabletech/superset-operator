@@ -9,7 +9,7 @@ pub mod superset_config;
 ///
 /// This is the single source of truth for the on-disk file names; nothing else should
 /// hard-code them (the Vector agent config is the exception — its name comes from the
-/// upstream `product_logging::framework::VECTOR_CONFIG_FILE` constant).
+/// `product_logging::framework::VECTOR_CONFIG_FILE` constant).
 #[derive(Clone, Copy, Debug, strum::Display)]
 pub enum ConfigFileName {
     #[strum(serialize = "superset_config.py")]

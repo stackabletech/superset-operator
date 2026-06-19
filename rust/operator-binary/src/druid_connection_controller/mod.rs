@@ -173,7 +173,7 @@ pub async fn reconcile_druid_connection(
                 // Is the referenced druid discovery configmap there?
                 let druid_discovery_cm_exists = client
                     .get_opt::<ConfigMap>(
-                        &druid_connection.druid_name(),
+                        druid_connection.druid_name(),
                         &druid_connection.druid_namespace().context(
                             DruidConnectionNoNamespaceSnafu {
                                 druid_connection: ObjectRef::from_obj(druid_connection),
@@ -186,7 +186,7 @@ pub async fn reconcile_druid_connection(
 
                 let superset_cluster = client
                     .get::<v1alpha1::SupersetCluster>(
-                        &druid_connection.superset_name(),
+                        druid_connection.superset_name(),
                         &druid_connection.superset_namespace().context(
                             DruidConnectionNoNamespaceSnafu {
                                 druid_connection: ObjectRef::from_obj(druid_connection),
@@ -210,7 +210,7 @@ pub async fn reconcile_druid_connection(
                 if druid_discovery_cm_exists && superset_cluster_is_ready {
                     // Everything is there, retrieve all necessary info and start the job
                     let sqlalchemy_str = get_sqlalchemy_uri_for_druid_cluster(
-                        &druid_connection.druid_name(),
+                        druid_connection.druid_name(),
                         &druid_connection.druid_namespace().context(
                             DruidConnectionNoNamespaceSnafu {
                                 druid_connection: ObjectRef::from_obj(druid_connection),

@@ -5,7 +5,6 @@ use crate::{
     crd::{APP_PORT, APP_PORT_NAME, SupersetRole},
 };
 
-pub const LISTENER_VOLUME_NAME: &str = "listener";
 pub const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
 pub fn build_group_listener(
@@ -37,6 +36,6 @@ pub fn listener_ports() -> Vec<listener::v1alpha1::ListenerPort> {
     vec![listener::v1alpha1::ListenerPort {
         name: APP_PORT_NAME.to_owned(),
         port: APP_PORT.into(),
-        protocol: Some("TCP".to_owned()),
+        protocol: Some(super::PROTOCOL_TCP.to_owned()),
     }]
 }

@@ -30,6 +30,9 @@ use crate::{
 /// must agree.
 const CELERY_BEAT_PIDFILE: &str = "/tmp/celerybeat.pid";
 
+/// Base Celery CLI invocation shared by the worker/beat commands and the worker liveness probe.
+const CELERY_APP_INVOCATION: &str = "celery --app=superset.tasks.celery_app:app";
+
 #[derive(Snafu, Debug)]
 pub enum Error {
     #[snafu(display("failed to build container"))]
@@ -78,7 +81,7 @@ pub fn build_rolegroup_deployment(
     // between the `worker` and `beat` rolegroups.
     let (celery_command, liveness_probe, replicas) = match superset_role {
         SupersetRole::Worker => (
-            "celery --app=superset.tasks.celery_app:app worker --task-events".to_string(),
+            format!("{CELERY_APP_INVOCATION} worker --task-events"),
             worker_liveness_probe(),
             rolegroup_config.replicas,
         ),
@@ -95,9 +98,7 @@ pub fn build_rolegroup_deployment(
                 _ => Some(1),
             };
             (
-                format!(
-                    "celery --app=superset.tasks.celery_app:app beat --pidfile {CELERY_BEAT_PIDFILE}"
-                ),
+                format!("{CELERY_APP_INVOCATION} beat --pidfile {CELERY_BEAT_PIDFILE}"),
                 beat_liveness_probe(),
                 replicas,
             )
@@ -204,10 +205,9 @@ pub fn build_rolegroup_deployment(
 fn worker_liveness_probe() -> Probe {
     Probe {
         exec: Some(ExecAction {
-            command: Some(vec![
-                "celery --app=superset.tasks.celery_app:app inspect ping -d celery@$HOSTNAME"
-                    .to_string(),
-            ]),
+            command: Some(vec![format!(
+                "{CELERY_APP_INVOCATION} inspect ping -d celery@$HOSTNAME"
+            )]),
         }),
         initial_delay_seconds: Some(30),
         period_seconds: Some(30),

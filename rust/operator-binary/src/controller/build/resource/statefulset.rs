@@ -39,7 +39,7 @@ use crate::{
         build::{
             command::add_cert_to_python_certifi_command,
             properties::{ConfigFileName, superset_config::DEFAULT_WEBSERVER_TIMEOUT},
-            resource::listener::{LISTENER_VOLUME_DIR, LISTENER_VOLUME_NAME},
+            resource::listener::LISTENER_VOLUME_DIR,
         },
     },
     crd::{
@@ -202,7 +202,10 @@ pub fn build_node_rolegroup_statefulset(
     };
 
     superset_cb
-        .add_volume_mount(LISTENER_VOLUME_NAME, LISTENER_VOLUME_DIR)
+        .add_volume_mount(
+            super::LISTENER_VOLUME_NAME_PVC.as_ref(),
+            LISTENER_VOLUME_DIR,
+        )
         .context(AddVolumeMountSnafu)?;
 
     pb.add_container(superset_cb.build());

@@ -11,6 +11,11 @@ use crate::{
     crd::{APP_PORT, APP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, SupersetRole},
 };
 
+/// Service type for the cluster-internal rolegroup services.
+const SERVICE_TYPE_CLUSTER_IP: &str = "ClusterIP";
+/// `clusterIP: None` marks a [`Service`] as headless.
+const SERVICE_CLUSTER_IP_NONE: &str = "None";
+
 /// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a certain rolegroup
 ///
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
@@ -31,8 +36,8 @@ pub fn build_node_rolegroup_headless_service(
             .build(),
         spec: Some(ServiceSpec {
             // Internal communication does not need to be exposed
-            type_: Some("ClusterIP".to_owned()),
-            cluster_ip: Some("None".to_owned()),
+            type_: Some(SERVICE_TYPE_CLUSTER_IP.to_owned()),
+            cluster_ip: Some(SERVICE_CLUSTER_IP_NONE.to_owned()),
             ports: Some(service_ports()),
             selector: Some(
                 validated
@@ -69,8 +74,8 @@ pub fn build_node_rolegroup_metrics_service(
             .build(),
         spec: Some(ServiceSpec {
             // Internal communication does not need to be exposed
-            type_: Some("ClusterIP".to_owned()),
-            cluster_ip: Some("None".to_owned()),
+            type_: Some(SERVICE_TYPE_CLUSTER_IP.to_owned()),
+            cluster_ip: Some(SERVICE_CLUSTER_IP_NONE.to_owned()),
             ports: Some(metrics_ports()),
             selector: Some(
                 validated
@@ -88,7 +93,7 @@ fn metrics_ports() -> Vec<ServicePort> {
     vec![ServicePort {
         name: Some(METRICS_PORT_NAME.to_string()),
         port: METRICS_PORT.into(),
-        protocol: Some("TCP".to_string()),
+        protocol: Some(super::PROTOCOL_TCP.to_string()),
         ..ServicePort::default()
     }]
 }
@@ -97,7 +102,7 @@ fn service_ports() -> Vec<ServicePort> {
     vec![ServicePort {
         name: Some(APP_PORT_NAME.to_string()),
         port: APP_PORT.into(),
-        protocol: Some("TCP".to_string()),
+        protocol: Some(super::PROTOCOL_TCP.to_string()),
         ..ServicePort::default()
     }]
 }

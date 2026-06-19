@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
@@ -30,7 +29,7 @@ use stackable_operator::{
         role_utils::GenericCommonConfig,
         types::{
             common::Port,
-            kubernetes::{ConfigMapName, ListenerClassName},
+            kubernetes::{ConfigMapName, ContainerName, ListenerClassName},
         },
     },
     versioned::versioned,
@@ -74,6 +73,9 @@ pub const INTERNAL_SECRET_SECRET_KEY: &str = "SECRET_KEY";
 /// Env-var prefix for the metadata database connection credentials (e.g. `METADATA_DATABASE_*`).
 pub const METADATA_DATABASE_ENV_PREFIX: &str = "METADATA";
 
+/// Name of the container env var holding the Mapbox API key, read by `superset_config.py`.
+pub const MAPBOX_API_KEY_ENV: &str = "MAPBOX_API_KEY";
+
 pub const APP_PORT_NAME: &str = "http";
 pub const APP_PORT: Port = Port(8088);
 pub const METRICS_PORT_NAME: &str = "metrics";
@@ -87,15 +89,6 @@ pub type SupersetRoleType = Role<
     SupersetRoleConfig,
     GenericCommonConfig,
 >;
-
-#[derive(Debug, Snafu)]
-pub enum Error {
-    #[snafu(display("Configuration/Executor conflict!"))]
-    NoRoleForExecutorFailure,
-
-    #[snafu(display("object has no associated namespace"))]
-    NoNamespace,
-}
 
 #[derive(Display, EnumIter, EnumString)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
@@ -410,8 +403,8 @@ impl SupersetRole {
             Self::Node => superset
                 .spec
                 .nodes
-                .to_owned()
-                .map(|node| node.role_config.listener_class),
+                .as_ref()
+                .map(|node| node.role_config.listener_class.clone()),
             Self::Worker | Self::Beat => None,
         }
     }
@@ -420,6 +413,14 @@ impl SupersetRole {
         self.to_string()
             .parse()
             .expect("a Superset serialises to a valid RoleName")
+    }
+}
+
+impl v1alpha1::Container {
+    /// The type-safe container name for this variant (matching its kebab-case serialization).
+    pub fn to_container_name(&self) -> ContainerName {
+        ContainerName::from_str(&self.to_string())
+            .expect("a Container variant name is a valid container name")
     }
 }
 

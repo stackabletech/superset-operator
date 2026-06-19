@@ -83,7 +83,7 @@ mod tests {
         controller::{dereference::DereferencedObjects, validate::validate_cluster},
         crd::{
             authentication::{
-                SupersetClientAuthenticationDetailsResolved, v1alpha1::FlaskRolesSyncMoment,
+                self, SupersetClientAuthenticationDetailsResolved, v1alpha1::FlaskRolesSyncMoment,
             },
             v1alpha1,
         },
@@ -94,7 +94,7 @@ mod tests {
             authentication_config: SupersetClientAuthenticationDetailsResolved {
                 authentication_classes_resolved: vec![],
                 user_registration: true,
-                user_registration_role: "Public".to_string(),
+                user_registration_role: authentication::DEFAULT_USER_REGISTRATION_ROLE.to_string(),
                 sync_roles_at: FlaskRolesSyncMoment::default(),
             },
             opa_config: None,

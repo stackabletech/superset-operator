@@ -151,8 +151,11 @@ pub fn default_user_registration() -> bool {
     true
 }
 
+/// Default Superset role assigned to users on registration.
+pub const DEFAULT_USER_REGISTRATION_ROLE: &str = "Public";
+
 pub fn default_user_registration_role() -> String {
-    "Public".to_string()
+    DEFAULT_USER_REGISTRATION_ROLE.to_string()
 }
 
 impl SupersetClientAuthenticationDetailsResolved {

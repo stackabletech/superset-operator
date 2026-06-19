@@ -19,7 +19,7 @@ use crate::{
         },
     },
     crd::{
-        SupersetConfigOptions, SupersetRole,
+        MAPBOX_API_KEY_ENV, SupersetConfigOptions, SupersetRole,
         authentication::SupersetClientAuthenticationDetailsResolved,
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
@@ -151,7 +151,7 @@ fn core_config_properties(
     );
     config.insert(
         SupersetConfigOptions::MapboxApiKey.to_string(),
-        "os.environ.get('MAPBOX_API_KEY', '')".to_owned(),
+        format!("os.environ.get('{MAPBOX_API_KEY_ENV}', '')"),
     );
     config.insert(
         SupersetConfigOptions::LoggingConfigurator.to_string(),

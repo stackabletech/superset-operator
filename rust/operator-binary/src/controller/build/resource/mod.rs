@@ -34,13 +34,14 @@ use stackable_operator::{
 use crate::{
     controller::{SupersetRoleGroupConfig, ValidatedCluster},
     crd::{
-        APP_PORT, APP_PORT_NAME, INTERNAL_SECRET_SECRET_KEY, MAX_LOG_FILES_SIZE,
-        METADATA_DATABASE_ENV_PREFIX, METRICS_PORT, METRICS_PORT_NAME, STACKABLE_CONFIG_DIR,
-        STACKABLE_LOG_CONFIG_DIR, SupersetRole,
+        APP_PORT, APP_PORT_NAME, INTERNAL_SECRET_SECRET_KEY, MAPBOX_API_KEY_ENV,
+        MAX_LOG_FILES_SIZE, METADATA_DATABASE_ENV_PREFIX, METRICS_PORT, METRICS_PORT_NAME,
+        STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, SupersetRole,
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection,
             CeleryResultsBackendConnectionDetails, MetadataDatabaseConnection,
         },
+        v1alpha1::Container,
     },
 };
 
@@ -51,27 +52,23 @@ pub mod pdb;
 pub mod service;
 pub mod statefulset;
 
-pub const CONFIG_VOLUME_NAME: &str = "config";
-pub const LOG_CONFIG_VOLUME_NAME: &str = "log-config";
-pub const LOG_VOLUME_NAME: &str = "log";
+stackable_operator::constant!(CONFIG_VOLUME_NAME: VolumeName = "config");
+stackable_operator::constant!(LOG_CONFIG_VOLUME_NAME: VolumeName = "log-config");
+stackable_operator::constant!(LOG_VOLUME_NAME: VolumeName = "log");
 
 /// Directory the `SSL_CERT_DIR` env var points the Superset container at for trusted CA certs.
 const STACKABLE_CERTS_DIR: &str = "/stackable/certs/";
 /// Path of the statsd-exporter binary launched by the `metrics` sidecar.
 const STATSD_EXPORTER_BINARY: &str = "/stackable/statsd_exporter";
 
-stackable_operator::constant!(SUPERSET_CONTAINER_NAME: ContainerName = "superset");
 stackable_operator::constant!(METRICS_CONTAINER_NAME: ContainerName = "metrics");
-stackable_operator::constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
 
-// Typed volume-name constants required by the v2 `vector_container` (which mounts the Vector
-// config and log volumes). Their values match the `&str` constants used by `create_volumes`.
-stackable_operator::constant!(CONFIG_VOLUME_NAME_TYPED: VolumeName = "config");
-stackable_operator::constant!(LOG_VOLUME_NAME_TYPED: VolumeName = "log");
-
-// PVC name for the listener volume, required by the v2 listener-volume builder. Its value matches
-// `LISTENER_VOLUME_NAME` in `resource::listener`.
+// Name of the listener volume. It is a PVC, so the same name is used as the volume/mount name and
+// as the PVC name.
 stackable_operator::constant!(pub(crate) LISTENER_VOLUME_NAME_PVC: PersistentVolumeClaimName = "listener");
+
+/// The only network protocol used by the Superset service and listener ports.
+pub(crate) const PROTOCOL_TCP: &str = "TCP";
 
 /// The `fsGroup` the Pods run as, required by secret-operator-provided volumes.
 pub(crate) const SECRET_OPERATOR_FS_GROUP: i64 = 1000;
@@ -104,12 +101,12 @@ pub(crate) fn create_volumes(
     let mut volumes = Vec::new();
 
     volumes.push(
-        VolumeBuilder::new(CONFIG_VOLUME_NAME)
+        VolumeBuilder::new(CONFIG_VOLUME_NAME.as_ref())
             .with_config_map(config_map_name)
             .build(),
     );
     volumes.push(Volume {
-        name: LOG_VOLUME_NAME.into(),
+        name: LOG_VOLUME_NAME.to_string(),
         empty_dir: Some(EmptyDirVolumeSource {
             medium: None,
             size_limit: Some(product_logging::framework::calculate_log_volume_size_limit(
@@ -128,7 +125,7 @@ pub(crate) fn create_volumes(
         ValidatedContainerLogConfigChoice::Automatic(_) => config_map_name.to_owned(),
     };
     volumes.push(Volume {
-        name: LOG_CONFIG_VOLUME_NAME.into(),
+        name: LOG_CONFIG_VOLUME_NAME.to_string(),
         config_map: Some(ConfigMapVolumeSource {
             name: log_config_map,
             ..ConfigMapVolumeSource::default()
@@ -150,7 +147,7 @@ pub(crate) fn build_superset_container_builder(
     validated: &ValidatedCluster,
     rolegroup_config: &SupersetRoleGroupConfig,
 ) -> Result<ContainerBuilder, Error> {
-    let mut superset_cb = new_container_builder(&SUPERSET_CONTAINER_NAME);
+    let mut superset_cb = new_container_builder(&Container::Superset.to_container_name());
 
     metadata_database_connection_details(&validated.cluster_config.metadata_database)
         .add_to_container(&mut superset_cb);
@@ -171,7 +168,7 @@ pub(crate) fn build_superset_container_builder(
     superset_cb.add_env_vars(rolegroup_config.env_overrides.clone());
     if let Some(mapbox_secret) = &validated.cluster_config.mapbox_secret {
         superset_cb.add_env_var_from_secret(
-            "MAPBOX_API_KEY",
+            MAPBOX_API_KEY_ENV,
             mapbox_secret,
             "connections.mapboxApiKey",
         );
@@ -188,11 +185,11 @@ pub(crate) fn build_superset_container_builder(
     superset_cb
         .image_from_product_image(&validated.image)
         .add_container_port(APP_PORT_NAME, APP_PORT.into())
-        .add_volume_mount(CONFIG_VOLUME_NAME, STACKABLE_CONFIG_DIR)
+        .add_volume_mount(CONFIG_VOLUME_NAME.as_ref(), STACKABLE_CONFIG_DIR)
         .context(AddVolumeMountSnafu)?
-        .add_volume_mount(LOG_CONFIG_VOLUME_NAME, STACKABLE_LOG_CONFIG_DIR)
+        .add_volume_mount(LOG_CONFIG_VOLUME_NAME.as_ref(), STACKABLE_LOG_CONFIG_DIR)
         .context(AddVolumeMountSnafu)?
-        .add_volume_mount(LOG_VOLUME_NAME, STACKABLE_LOG_DIR)
+        .add_volume_mount(LOG_VOLUME_NAME.as_ref(), STACKABLE_LOG_DIR)
         .context(AddVolumeMountSnafu)?
         .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
         .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
@@ -250,12 +247,12 @@ pub(crate) fn build_vector_container(
         .as_ref()
         .map(|vector_log_config| {
             vector_container(
-                &VECTOR_CONTAINER_NAME,
+                &Container::Vector.to_container_name(),
                 &validated.image,
                 vector_log_config,
                 &validated.resource_names(superset_role, role_group_name),
-                &CONFIG_VOLUME_NAME_TYPED,
-                &LOG_VOLUME_NAME_TYPED,
+                &CONFIG_VOLUME_NAME,
+                &LOG_VOLUME_NAME,
                 EnvVarSet::new(),
             )
         })
