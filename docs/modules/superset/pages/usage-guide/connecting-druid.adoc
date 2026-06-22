@@ -1,6 +1,6 @@
 = Connecting Apache Druid clusters
 
-The operator can automatically connect Superset to Apache Druid clusters managed by the https://docs.stackable.tech/druid/index.html[Stackable Druid Cluster].
+The operator can automatically connect Superset to Apache Druid clusters managed by the xref:druid:index.adoc[Stackable Druid Cluster].
 
 To do so, create a _DruidConnection_ resource:
 
