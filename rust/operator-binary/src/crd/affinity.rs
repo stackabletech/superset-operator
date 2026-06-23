@@ -46,7 +46,7 @@ mod tests {
           name: simple-superset
         spec:
           image:
-            productVersion: 4.1.4
+            productVersion: 6.1.0
           clusterConfig:
             credentialsSecretName: superset-admin-credentials
             metadataDatabase:
