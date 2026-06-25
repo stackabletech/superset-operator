@@ -28,13 +28,20 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     APP_NAME, OPERATOR_NAME,
-    controller::CONTAINER_IMAGE_BASE_NAME,
-    crd::{
-        INTERNAL_SECRET_SECRET_KEY, PYTHONPATH, SUPERSET_CONFIG_FILENAME, druidconnection, v1alpha1,
+    built_info::PKG_VERSION,
+    controller::{
+        CONTAINER_IMAGE_BASE_NAME,
+        build::{properties::ConfigFileName, resource::bash_wrapper_command},
     },
-    operations::job_state::{JobState, get_job_state},
-    resources::rbac,
+    crd::{
+        INTERNAL_SECRET_SECRET_KEY, METADATA_DATABASE_ENV_PREFIX, PYTHONPATH, druidconnection,
+        v1alpha1,
+    },
+    druid_connection_controller::job_state::{JobState, get_job_state},
 };
+
+mod job_state;
+mod rbac;
 
 pub const DRUID_CONNECTION_CONTROLLER_NAME: &str = "druid-connection";
 pub const DRUID_CONNECTION_FULL_CONTROLLER_NAME: &str =
@@ -169,7 +176,7 @@ pub async fn reconcile_druid_connection(
                 // Is the referenced druid discovery configmap there?
                 let druid_discovery_cm_exists = client
                     .get_opt::<ConfigMap>(
-                        &druid_connection.druid_name(),
+                        druid_connection.druid_name(),
                         &druid_connection.druid_namespace().context(
                             DruidConnectionNoNamespaceSnafu {
                                 druid_connection: ObjectRef::from_obj(druid_connection),
@@ -182,7 +189,7 @@ pub async fn reconcile_druid_connection(
 
                 let superset_cluster = client
                     .get::<v1alpha1::SupersetCluster>(
-                        &druid_connection.superset_name(),
+                        druid_connection.superset_name(),
                         &druid_connection.superset_namespace().context(
                             DruidConnectionNoNamespaceSnafu {
                                 druid_connection: ObjectRef::from_obj(druid_connection),
@@ -206,7 +213,7 @@ pub async fn reconcile_druid_connection(
                 if druid_discovery_cm_exists && superset_cluster_is_ready {
                     // Everything is there, retrieve all necessary info and start the job
                     let sqlalchemy_str = get_sqlalchemy_uri_for_druid_cluster(
-                        &druid_connection.druid_name(),
+                        druid_connection.druid_name(),
                         &druid_connection.druid_namespace().context(
                             DruidConnectionNoNamespaceSnafu {
                                 druid_connection: ObjectRef::from_obj(druid_connection),
@@ -221,7 +228,7 @@ pub async fn reconcile_druid_connection(
                         .resolve(
                             CONTAINER_IMAGE_BASE_NAME,
                             &ctx.operator_environment.image_repository,
-                            crate::built_info::PKG_VERSION,
+                            PKG_VERSION,
                         )
                         .context(ResolveProductImageSnafu)?;
                     let job = build_import_job(
@@ -314,6 +321,10 @@ fn build_druid_db_yaml(druid_cluster_name: &str, sqlalchemy_str: &str) -> Result
     ))
 }
 
+/// Name of the env var (and the matching `superset_config.py` setting) holding the metadata
+/// database connection string for the import job.
+const SQLALCHEMY_DATABASE_URI_ENV: &str = "SQLALCHEMY_DATABASE_URI";
+
 /// Builds the import job.  When run it will import the druid connection into the database.
 async fn build_import_job(
     superset_cluster: &v1alpha1::SupersetCluster,
@@ -324,10 +335,13 @@ async fn build_import_job(
 ) -> Result<Job> {
     let mut commands = vec![];
 
-    let config = "import os; SQLALCHEMY_DATABASE_URI = os.path.expandvars(os.environ.get('SQLALCHEMY_DATABASE_URI'))";
+    let config = format!(
+        "import os; {SQLALCHEMY_DATABASE_URI_ENV} = os.path.expandvars(os.environ.get('{SQLALCHEMY_DATABASE_URI_ENV}'))"
+    );
     commands.push(format!("mkdir -p {PYTHONPATH}"));
     commands.push(format!(
-        "echo \"{config}\" > {PYTHONPATH}/{SUPERSET_CONFIG_FILENAME}"
+        "echo \"{config}\" > {PYTHONPATH}/{config_file}",
+        config_file = ConfigFileName::SupersetConfig
     ));
 
     let druid_info = build_druid_db_yaml(&druid_connection.spec.druid.name, sqlalchemy_str)?;
@@ -336,24 +350,25 @@ async fn build_import_job(
         "superset import_datasources -p /tmp/druids.yaml",
     ));
 
-    // "METADATA" is the prefix for the env vars that hold the database credentials
-    // (e.g. METADATA_DATABASE_USERNAME, METADATA_DATABASE_PASSWORD). It should match
+    // `METADATA_DATABASE_ENV_PREFIX` is the prefix for the env vars that hold the database
+    // credentials (e.g. METADATA_DATABASE_USERNAME, METADATA_DATABASE_PASSWORD). It should match
     // the prefix used by the airflow-operator for consistency.
     let templating_mechanism = TemplatingMechanism::BashEnvSubstitution;
     let metadata_database_connection_details = superset_cluster
-        .spec
-        .cluster_config
-        .metadata_database
-        .sqlalchemy_connection_details_with_templating("METADATA", &templating_mechanism);
+        .metadata_database()
+        .sqlalchemy_connection_details_with_templating(
+            METADATA_DATABASE_ENV_PREFIX,
+            &templating_mechanism,
+        );
 
     let mut container_builder = ContainerBuilder::new("superset-import-druid-connection")
         .expect("ContainerBuilder not created");
     container_builder
         .image_from_product_image(resolved_product_image)
-        .command(vec!["/bin/bash".to_string()])
-        .args(vec![String::from("-c"), commands.join("; ")])
+        .command(bash_wrapper_command())
+        .args(vec![commands.join("; ")])
         .add_env_var(
-            "SQLALCHEMY_DATABASE_URI",
+            SQLALCHEMY_DATABASE_URI_ENV,
             metadata_database_connection_details.url_template.clone(),
         )
         .add_env_var_from_secret(

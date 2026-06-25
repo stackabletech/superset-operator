@@ -1,15 +1,14 @@
 //! The dereference step in the SupersetCluster controller.
 //!
 //! Fetches all Kubernetes objects referenced by the [`SupersetCluster`] spec and returns them
-//! in [`DereferencedObjects`]. Synchronous validation of the fetched objects (image resolution,
-//! product-config validation, per-rolegroup config merging) happens in the
-//! [validate](`super::validate`) step.
+//! in [`DereferencedObjects`]. Synchronous validation (image resolution, config fragment
+//! validation and per-rolegroup config merging) happens in the [validate](`super::validate`) step.
 
 use snafu::{ResultExt, Snafu};
 
-use crate::{
-    authorization::opa::SupersetOpaConfigResolved,
-    crd::{authentication::SupersetClientAuthenticationDetailsResolved, v1alpha1::SupersetCluster},
+use crate::crd::{
+    authentication::SupersetClientAuthenticationDetailsResolved,
+    authorization::SupersetOpaConfigResolved, v1alpha1::SupersetCluster,
 };
 
 #[derive(Snafu, Debug)]

@@ -73,8 +73,8 @@ impl v1alpha1::DruidConnection {
         format!("{}-import", self.name_unchecked())
     }
 
-    pub fn superset_name(&self) -> String {
-        self.spec.superset.name.clone()
+    pub fn superset_name(&self) -> &str {
+        &self.spec.superset.name
     }
 
     pub fn superset_namespace(&self) -> Result<String> {
@@ -90,8 +90,8 @@ impl v1alpha1::DruidConnection {
         }
     }
 
-    pub fn druid_name(&self) -> String {
-        self.spec.druid.name.clone()
+    pub fn druid_name(&self) -> &str {
+        &self.spec.druid.name
     }
 
     pub fn druid_namespace(&self) -> Result<String> {

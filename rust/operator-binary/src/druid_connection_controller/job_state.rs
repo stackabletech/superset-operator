@@ -10,7 +10,7 @@ pub fn get_job_state(job: &Job) -> JobState {
     let conditions = job
         .status
         .as_ref()
-        .and_then(|status| status.conditions.clone())
+        .and_then(|status| status.conditions.as_deref())
         .unwrap_or_default();
 
     if conditions

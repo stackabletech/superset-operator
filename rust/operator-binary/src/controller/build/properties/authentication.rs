@@ -1,22 +1,17 @@
-use std::{collections::BTreeMap, io::Write};
+//! Renders the authentication-related `superset_config.py` properties (LDAP / OIDC).
+
+use std::collections::BTreeMap;
 
 use indoc::formatdoc;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::crd::authentication::{ldap, oidc};
 
-use crate::{
-    crd::{
-        SupersetConfigOptions,
-        authentication::{
-            self, DEFAULT_OIDC_PROVIDER, SupersetAuthenticationClassResolved,
-            SupersetClientAuthenticationDetailsResolved,
-        },
+use crate::crd::{
+    SupersetConfigOptions,
+    authentication::{
+        self, DEFAULT_OIDC_PROVIDER, SupersetAuthenticationClassResolved,
+        SupersetClientAuthenticationDetailsResolved,
     },
-    resources::{
-        celery_broker_connection_details, celery_results_backend_connection_details,
-        metadata_database_connection_details,
-    },
-    v1alpha1::SupersetCluster,
 };
 
 #[derive(Snafu, Debug)]
@@ -37,117 +32,15 @@ pub enum Error {
     },
 }
 
-pub const PYTHON_IMPORTS: &[&str] = &[
-    "import os",
-    "from superset.stats_logger import StatsdStatsLogger",
-    "from flask_appbuilder.security.manager import (AUTH_DB, AUTH_LDAP, AUTH_OAUTH, AUTH_REMOTE_USER)",
-    "from log_config import StackableLoggingConfigurator",
-];
-
-pub fn add_superset_config(
-    config: &mut BTreeMap<String, String>,
-    superset: &SupersetCluster,
-    authentication_config: &SupersetClientAuthenticationDetailsResolved,
-) -> Result<(), Error> {
-    let metadata_database_url_template =
-        metadata_database_connection_details(superset).url_template;
-
-    config.insert(
-        SupersetConfigOptions::SecretKey.to_string(),
-        "os.environ.get('SECRET_KEY')".to_owned(),
-    );
-    config.insert(
-        SupersetConfigOptions::SqlalchemyDatabaseUri.to_string(),
-        format!("os.path.expandvars('{metadata_database_url_template}')"),
-    );
-    config.insert(
-        SupersetConfigOptions::StatsLogger.to_string(),
-        "StatsdStatsLogger(host='0.0.0.0', port=9125)".to_owned(),
-    );
-    config.insert(
-        SupersetConfigOptions::MapboxApiKey.to_string(),
-        "os.environ.get('MAPBOX_API_KEY', '')".to_owned(),
-    );
-    config.insert(
-        SupersetConfigOptions::LoggingConfigurator.to_string(),
-        "StackableLoggingConfigurator()".to_owned(),
-    );
-    // Flask AppBuilder requires this to be set, otherwise the web ui cannot be used.
-    // We chose to make it an expression in case the user wants to override it through
-    // configurationOverrides (though it would require other settings like the private key too).
-    config.insert(
-        SupersetConfigOptions::RecaptchaPublicKey.to_string(),
-        "''".to_owned(),
-    );
-
-    append_authentication_config(config, authentication_config)?;
-    Ok(())
-}
-
-pub(crate) fn append_celery_connection_config(
-    config_file: &mut Vec<u8>,
-    superset: &SupersetCluster,
-) {
-    let (
-        Some(additional_celery_results_backend_connection_details),
-        Some(celery_results_backend_connection_details),
-    ) = celery_results_backend_connection_details(superset)
-    else {
-        return;
-    };
-
-    let Some(celery_broker_connection_details) = celery_broker_connection_details(superset) else {
-        return;
-    };
-
-    let result_backend_username_env = celery_results_backend_connection_details
-        .username_env
-        .map(|env| env.name)
-        .unwrap_or("".to_string());
-    let result_backend_password_env = celery_results_backend_connection_details
-        .password_env
-        .map(|env| env.name)
-        .unwrap_or("".to_string());
-    let result_backend_url_template = celery_results_backend_connection_details.url_template;
-    let result_backend_host = additional_celery_results_backend_connection_details.host;
-    let result_backend_port = additional_celery_results_backend_connection_details.port;
-    let result_backend_db = additional_celery_results_backend_connection_details.database_id;
-    let broker_url_template = celery_broker_connection_details.url_template;
-
-    let celery_config = formatdoc!(
-        r#"
-        # CELERY ASYNC
-        from flask_caching.backends.rediscache import RedisCache
-        RESULTS_BACKEND = RedisCache(host='{result_backend_host}', port={result_backend_port}, db={result_backend_db}, key_prefix='superset_results', username=os.path.expandvars('${{{result_backend_username_env}}}'), password=os.path.expandvars('${{{result_backend_password_env}}}'))
-        class CeleryConfig(object):
-          broker_url = os.path.expandvars('{broker_url_template}')
-          imports = (
-            "superset.sql_lab",
-            "superset.tasks.scheduler",
-          )
-          result_backend = os.path.expandvars('{result_backend_url_template}')
-          worker_prefetch_multiplier = 10
-          task_acks_late = True
-          task_annotations = {{
-            "sql_lab.get_sql_results": {{
-              "rate_limit": "100/s",
-            }},
-          }}
-
-        CELERY_CONFIG = CeleryConfig
-    "#,
-    );
-
-    writeln!(config_file, "{celery_config}").expect("Writing to vec always works.");
-}
-
-fn append_authentication_config(
-    config: &mut BTreeMap<String, String>,
+/// Renders the authentication key/value properties for `superset_config.py`.
+pub fn authentication_properties(
     auth_config: &SupersetClientAuthenticationDetailsResolved,
-) -> Result<(), Error> {
+) -> Result<BTreeMap<String, String>, Error> {
     // SupersetClientAuthenticationDetailsResolved ensures that there
     // are either only LDAP or OIDC providers configured. It is not
     // necessary to check this here again.
+
+    let mut config = BTreeMap::new();
 
     let ldap_providers = auth_config
         .authentication_classes_resolved
@@ -178,11 +71,11 @@ fn append_authentication_config(
         .collect::<Vec<_>>();
 
     if let Some(ldap_provider) = ldap_providers.first() {
-        append_ldap_config(config, ldap_provider)?;
+        config.extend(ldap_properties(ldap_provider)?);
     }
 
     if !oidc_providers.is_empty() {
-        append_oidc_config(config, &oidc_providers)?;
+        config.extend(oidc_properties(&oidc_providers)?);
     }
 
     config.insert(
@@ -199,13 +92,14 @@ fn append_authentication_config(
             .to_string(),
     );
 
-    Ok(())
+    Ok(config)
 }
 
-fn append_ldap_config(
-    config: &mut BTreeMap<String, String>,
+fn ldap_properties(
     ldap: &ldap::v1alpha1::AuthenticationProvider,
-) -> Result<(), Error> {
+) -> Result<BTreeMap<String, String>, Error> {
+    let mut config = BTreeMap::new();
+
     config.insert(
         SupersetConfigOptions::AuthType.to_string(),
         "AUTH_LDAP".into(),
@@ -273,18 +167,19 @@ fn append_ldap_config(
         );
     }
 
-    Ok(())
+    Ok(config)
 }
 
-fn append_oidc_config(
-    config: &mut BTreeMap<String, String>,
+fn oidc_properties(
     providers: &[(
         &oidc::v1alpha1::AuthenticationProvider,
         &oidc::v1alpha1::ClientAuthenticationOptions<
             oidc::v1alpha1::ClientAuthenticationMethodOption,
         >,
     )],
-) -> Result<(), Error> {
+) -> Result<BTreeMap<String, String>, Error> {
+    let mut config = BTreeMap::new();
+
     config.insert(
         SupersetConfigOptions::AuthType.to_string(),
         "AUTH_OAUTH".into(),
@@ -358,7 +253,7 @@ fn append_oidc_config(
         ),
     );
 
-    Ok(())
+    Ok(config)
 }
 
 #[cfg(test)]
@@ -394,14 +289,13 @@ mod tests {
         "https://keycloak.mycorp.org/realms/sdp/protocol/",
         "https://keycloak.mycorp.org/realms/sdp/.well-known/openid-configuration"
     )]
-    fn test_append_oidc_config(
+    fn test_oidc_properties(
         #[case] root_path: String,
         #[case] expected_api_base_url: &str,
         #[case] expected_server_metadata_url: &str,
     ) {
         use stackable_operator::commons::tls_verification::{CaCert, Tls, TlsServerVerification};
 
-        let mut properties = BTreeMap::new();
         let provider = oidc::v1alpha1::AuthenticationProvider::new(
             "keycloak.mycorp.org".to_owned().try_into().unwrap(),
             Some(443),
@@ -425,8 +319,7 @@ mod tests {
             },
         };
 
-        append_oidc_config(&mut properties, &[(&provider, &oidc)])
-            .expect("OIDC config adding failed");
+        let properties = oidc_properties(&[(&provider, &oidc)]).expect("OIDC config adding failed");
 
         assert_eq!(properties.get("AUTH_TYPE"), Some(&"AUTH_OAUTH".to_owned()));
         let oauth_providers = properties
