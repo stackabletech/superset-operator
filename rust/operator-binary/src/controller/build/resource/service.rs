@@ -19,18 +19,19 @@ const SERVICE_CLUSTER_IP_NONE: &str = "None";
 /// The rolegroup [`Service`] is a headless service that allows direct access to the instances of a certain rolegroup
 ///
 /// This is mostly useful for internal communication between peers, or for clients that perform client-side load balancing.
-pub fn build_node_rolegroup_headless_service(
+pub fn build_rolegroup_headless_service(
     validated: &ValidatedCluster,
+    role: &SupersetRole,
     role_group_name: &RoleGroupName,
 ) -> Service {
     Service {
         metadata: validated
             .object_meta(
                 validated
-                    .resource_names(&SupersetRole::Node, role_group_name)
+                    .resource_names(role, role_group_name)
                     .headless_service_name()
                     .to_string(),
-                &SupersetRole::Node,
+                role,
                 role_group_name,
             )
             .build(),
@@ -39,11 +40,7 @@ pub fn build_node_rolegroup_headless_service(
             type_: Some(SERVICE_TYPE_CLUSTER_IP.to_owned()),
             cluster_ip: Some(SERVICE_CLUSTER_IP_NONE.to_owned()),
             ports: Some(service_ports()),
-            selector: Some(
-                validated
-                    .role_group_selector(&SupersetRole::Node, role_group_name)
-                    .into(),
-            ),
+            selector: Some(validated.role_group_selector(role, role_group_name).into()),
             publish_not_ready_addresses: Some(true),
             ..ServiceSpec::default()
         }),
@@ -52,16 +49,17 @@ pub fn build_node_rolegroup_headless_service(
 }
 
 /// The rolegroup metrics [`Service`] is a service that exposes metrics and a prometheus scraping label
-pub fn build_node_rolegroup_metrics_service(
+pub fn build_rolegroup_metrics_service(
     validated: &ValidatedCluster,
+    role: &SupersetRole,
     role_group_name: &RoleGroupName,
 ) -> Service {
-    let resource_names = validated.resource_names(&SupersetRole::Node, role_group_name);
+    let resource_names = validated.resource_names(role, role_group_name);
     Service {
         metadata: validated
             .object_meta(
                 resource_names.metrics_service_name().to_string(),
-                &SupersetRole::Node,
+                role,
                 role_group_name,
             )
             .with_labels(prometheus_labels(&Scraping::Enabled))
@@ -77,11 +75,7 @@ pub fn build_node_rolegroup_metrics_service(
             type_: Some(SERVICE_TYPE_CLUSTER_IP.to_owned()),
             cluster_ip: Some(SERVICE_CLUSTER_IP_NONE.to_owned()),
             ports: Some(metrics_ports()),
-            selector: Some(
-                validated
-                    .role_group_selector(&SupersetRole::Node, role_group_name)
-                    .into(),
-            ),
+            selector: Some(validated.role_group_selector(role, role_group_name).into()),
             publish_not_ready_addresses: Some(true),
             ..ServiceSpec::default()
         }),

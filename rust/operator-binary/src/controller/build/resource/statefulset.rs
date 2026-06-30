@@ -43,7 +43,8 @@ use crate::{
         },
     },
     crd::{
-        APP_PORT, PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, SupersetRole,
+        APP_PORT, APP_PORT_NAME, PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR,
+        SupersetRole,
         authentication::{
             SupersetAuthenticationClassResolved, SupersetClientAuthenticationDetailsResolved,
         },
@@ -172,8 +173,11 @@ pub fn build_node_rolegroup_statefulset(
                 create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
         }])
         .resources(merged_config.resources.clone().into());
+    // Only the `Node` role serves the Superset web UI, so the HTTP container port is added here
+    // rather than in the shared container builder.
     let (startup_probe, readiness_probe, liveness_probe) = superset_container_probes();
     superset_cb
+        .add_container_port(APP_PORT_NAME, APP_PORT.into())
         .startup_probe(startup_probe)
         .readiness_probe(readiness_probe)
         .liveness_probe(liveness_probe);

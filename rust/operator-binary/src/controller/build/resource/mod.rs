@@ -34,9 +34,9 @@ use stackable_operator::{
 use crate::{
     controller::{SupersetRoleGroupConfig, ValidatedCluster},
     crd::{
-        APP_PORT, APP_PORT_NAME, INTERNAL_SECRET_SECRET_KEY, MAPBOX_API_KEY_ENV,
-        MAX_LOG_FILES_SIZE, METADATA_DATABASE_ENV_PREFIX, METRICS_PORT, METRICS_PORT_NAME,
-        STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, SupersetRole,
+        INTERNAL_SECRET_SECRET_KEY, MAPBOX_API_KEY_ENV, MAX_LOG_FILES_SIZE,
+        METADATA_DATABASE_ENV_PREFIX, METRICS_PORT, METRICS_PORT_NAME, STACKABLE_CONFIG_DIR,
+        STACKABLE_LOG_CONFIG_DIR, SupersetRole,
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection,
             CeleryResultsBackendConnectionDetails, MetadataDatabaseConnection,
@@ -138,11 +138,13 @@ pub(crate) fn create_volumes(
 
 /// Builds the `superset` main container builder with the configuration shared by every role:
 /// database/celery connection details, env overrides, the optional Mapbox key, the Flask
-/// `SECRET_KEY`, the product image, the HTTP port, the config/log volume mounts, the
-/// admin-credential env vars and the `containerdebug`/SSL env vars.
+/// `SECRET_KEY`, the product image, the config/log volume mounts, the admin-credential env vars
+/// and the `containerdebug`/SSL env vars.
 ///
-/// The returned builder is finished by the caller with the role-specific command, args and probes
-/// (and, for the `Node` role, the authentication volumes/mounts and listener volume mount).
+/// The returned builder is finished by the caller with the role-specific command, args and probes.
+/// Only the `Node` role serves the Superset web UI, so the caller additionally adds the HTTP
+/// container port, the authentication volumes/mounts and the listener volume mount; the
+/// `Worker`/`Beat` Celery roles do not serve HTTP and so declare no HTTP port.
 pub(crate) fn build_superset_container_builder(
     validated: &ValidatedCluster,
     rolegroup_config: &SupersetRoleGroupConfig,
@@ -185,7 +187,6 @@ pub(crate) fn build_superset_container_builder(
     let secret = &validated.cluster_config.credentials_secret_name;
     superset_cb
         .image_from_product_image(&validated.image)
-        .add_container_port(APP_PORT_NAME, APP_PORT.into())
         .add_volume_mount(CONFIG_VOLUME_NAME.as_ref(), STACKABLE_CONFIG_DIR)
         .context(AddVolumeMountSnafu)?
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME.as_ref(), STACKABLE_LOG_CONFIG_DIR)

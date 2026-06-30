@@ -56,7 +56,7 @@ use crate::{
         deployment::build_rolegroup_deployment,
         listener::build_group_listener,
         pdb::build_pdb,
-        service::{build_node_rolegroup_headless_service, build_node_rolegroup_metrics_service},
+        service::{build_rolegroup_headless_service, build_rolegroup_metrics_service},
         statefulset::build_node_rolegroup_statefulset,
     },
     crd::{
@@ -560,21 +560,15 @@ pub async fn reconcile_superset(
             )
             .context(BuildConfigMapSnafu)?;
 
+            // Every role exposes metrics via the statsd-exporter sidecar, so each rolegroup gets a
+            // metrics Service. The headless Service is built per role below: only the `Node` role's
+            // StatefulSet references one (as its `serviceName`); the `Worker`/`Beat` Deployments have
+            // no `serviceName` and do not serve the HTTP port, so they get no headless Service.
             let rg_metrics_service =
-                build_node_rolegroup_metrics_service(&validated, rolegroup_name);
-
-            let rg_headless_service =
-                build_node_rolegroup_headless_service(&validated, rolegroup_name);
+                build_rolegroup_metrics_service(&validated, superset_role, rolegroup_name);
 
             cluster_resources
                 .add(client, rg_metrics_service)
-                .await
-                .with_context(|_| ApplyRoleGroupServiceSnafu {
-                    role_group_name: rolegroup_name.clone(),
-                })?;
-
-            cluster_resources
-                .add(client, rg_headless_service)
                 .await
                 .with_context(|_| ApplyRoleGroupServiceSnafu {
                     role_group_name: rolegroup_name.clone(),
@@ -589,6 +583,16 @@ pub async fn reconcile_superset(
 
             match superset_role {
                 SupersetRole::Node => {
+                    let rg_headless_service =
+                        build_rolegroup_headless_service(&validated, superset_role, rolegroup_name);
+
+                    cluster_resources
+                        .add(client, rg_headless_service)
+                        .await
+                        .with_context(|_| ApplyRoleGroupServiceSnafu {
+                            role_group_name: rolegroup_name.clone(),
+                        })?;
+
                     let rg_statefulset = build_node_rolegroup_statefulset(
                         &validated,
                         superset_role,
