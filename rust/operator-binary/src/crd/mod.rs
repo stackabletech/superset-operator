@@ -1,8 +1,6 @@
-use std::collections::BTreeMap;
+use std::str::FromStr;
 
-use product_config::flask_app_config_writer::{FlaskAppConfigOptions, PythonType};
 use serde::{Deserialize, Serialize};
-use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     commons::{
         affinity::StackableAffinity,
@@ -15,37 +13,48 @@ use stackable_operator::{
             Resources, ResourcesFragment,
         },
     },
-    config::{
-        fragment::{self, Fragment, ValidationError},
-        merge::Merge,
-    },
-    config_overrides::{KeyValueConfigOverrides, KeyValueOverridesProvider},
+    config::{fragment::Fragment, merge::Merge},
     deep_merger::ObjectOverrides,
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
-    kube::{CustomResource, ResourceExt, runtime::reflector::ObjectRef},
+    kube::{CustomResource, ResourceExt},
     memory::{BinaryMultiple, MemoryQuantity},
-    product_config_utils::{self, Configuration},
     product_logging::{self, spec::Logging},
-    role_utils::{GenericRoleConfig, Role, RoleGroupRef},
+    role_utils::{GenericRoleConfig, Role, RoleGroup},
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
+    v2::{
+        config_overrides::KeyValueConfigOverrides,
+        flask_config_writer::{FlaskAppConfigOptions, PythonType},
+        role_utils::GenericCommonConfig,
+        types::{
+            common::Port,
+            kubernetes::{ConfigMapName, ContainerName, ListenerClassName},
+        },
+    },
     versioned::versioned,
 };
-use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+use strum::{Display, EnumIter, EnumString};
 
-use crate::{
-    crd::{
-        databases::{
-            CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
-        },
-        v1alpha1::SupersetRoleConfig,
+use crate::crd::{
+    databases::{
+        CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
     },
-    resources::listener::default_listener_class,
+    v1alpha1::SupersetRoleConfig,
 };
+
+/// Default [`ListenerClassName`] value used by the rolegroup listener.
+pub const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
+
+/// Default listener class used by the rolegroup listener.
+fn default_listener_class() -> ListenerClassName {
+    ListenerClassName::from_str(DEFAULT_LISTENER_CLASS)
+        .expect("the default listener class is a valid listener class name")
+}
 
 pub mod affinity;
 pub mod authentication;
+pub mod authorization;
 pub mod databases;
 pub mod druidconnection;
 
@@ -53,9 +62,7 @@ pub const FIELD_MANAGER: &str = "superset-operator";
 pub const APP_NAME: &str = "superset";
 pub const STACKABLE_CONFIG_DIR: &str = "/stackable/config";
 pub const STACKABLE_LOG_CONFIG_DIR: &str = "/stackable/log_config";
-pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
 pub const PYTHONPATH: &str = "/stackable/app/pythonpath";
-pub const SUPERSET_CONFIG_FILENAME: &str = "superset_config.py";
 pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     value: 10.0,
     unit: BinaryMultiple::Mebi,
@@ -63,30 +70,31 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
 
 pub const INTERNAL_SECRET_SECRET_KEY: &str = "SECRET_KEY";
 
+/// Env-var prefix for the metadata database connection credentials (e.g. `METADATA_DATABASE_*`).
+pub const METADATA_DATABASE_ENV_PREFIX: &str = "METADATA";
+
+/// Name of the container env var holding the Mapbox API key, read by `superset_config.py`.
+pub const MAPBOX_API_KEY_ENV: &str = "MAPBOX_API_KEY";
+
 pub const APP_PORT_NAME: &str = "http";
-pub const APP_PORT: u16 = 8088;
+pub const APP_PORT: Port = Port(8088);
 pub const METRICS_PORT_NAME: &str = "metrics";
-pub const METRICS_PORT: u16 = 9102;
+pub const METRICS_PORT: Port = Port(9102);
 
 const DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_minutes_unchecked(2);
 
-pub type SupersetRoleType =
-    Role<v1alpha1::SupersetConfigFragment, v1alpha1::SupersetConfigOverrides, SupersetRoleConfig>;
+pub type SupersetRoleType = Role<
+    v1alpha1::SupersetConfigFragment,
+    v1alpha1::SupersetConfigOverrides,
+    SupersetRoleConfig,
+    GenericCommonConfig,
+>;
 
-#[derive(Debug, Snafu)]
-pub enum Error {
-    #[snafu(display("unknown Superset role found {role}. Should be one of {roles:?}"))]
-    UnknownSupersetRole { role: String, roles: Vec<String> },
-
-    #[snafu(display("fragment validation failure"))]
-    FragmentValidationFailure { source: ValidationError },
-
-    #[snafu(display("Configuration/Executor conflict!"))]
-    NoRoleForExecutorFailure,
-
-    #[snafu(display("object has no associated namespace"))]
-    NoNamespace,
-}
+pub type SupersetRoleGroupType = RoleGroup<
+    v1alpha1::SupersetConfigFragment,
+    GenericCommonConfig,
+    v1alpha1::SupersetConfigOverrides,
+>;
 
 #[derive(Display, EnumIter, EnumString)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
@@ -186,18 +194,14 @@ pub mod versioned {
 
         /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
         #[serde(default = "default_listener_class")]
-        pub listener_class: String,
+        pub listener_class: ListenerClassName,
     }
 
-    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, Merge, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct SupersetConfigOverrides {
-        #[serde(
-            default,
-            rename = "superset_config.py",
-            skip_serializing_if = "Option::is_none"
-        )]
-        pub superset_config_py: Option<KeyValueConfigOverrides>,
+        #[serde(default, rename = "superset_config.py")]
+        pub superset_config_py: KeyValueConfigOverrides,
     }
 
     #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -257,7 +261,7 @@ pub mod versioned {
         /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
         /// to learn how to configure log aggregation with Vector.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub vector_aggregator_config_map_name: Option<String>,
+        pub vector_aggregator_config_map_name: Option<ConfigMapName>,
     }
 
     #[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
@@ -372,19 +376,6 @@ impl Default for v1alpha1::SupersetRoleConfig {
     }
 }
 
-impl KeyValueOverridesProvider for v1alpha1::SupersetConfigOverrides {
-    fn get_key_value_overrides(&self, file: &str) -> BTreeMap<String, Option<String>> {
-        match file {
-            SUPERSET_CONFIG_FILENAME => self
-                .superset_config_py
-                .as_ref()
-                .map(KeyValueConfigOverrides::as_product_config_overrides)
-                .unwrap_or_default(),
-            _ => BTreeMap::new(),
-        }
-    }
-}
-
 #[derive(
     Clone,
     Debug,
@@ -395,7 +386,9 @@ impl KeyValueOverridesProvider for v1alpha1::SupersetConfigOverrides {
     Eq,
     Hash,
     JsonSchema,
+    Ord,
     PartialEq,
+    PartialOrd,
     Serialize,
 )]
 pub enum SupersetRole {
@@ -408,41 +401,32 @@ pub enum SupersetRole {
 }
 
 impl SupersetRole {
-    pub fn listener_class_name(&self, superset: &v1alpha1::SupersetCluster) -> Option<String> {
+    pub fn listener_class_name(
+        &self,
+        superset: &v1alpha1::SupersetCluster,
+    ) -> Option<ListenerClassName> {
         match self {
             Self::Node => superset
                 .spec
                 .nodes
-                .to_owned()
-                .map(|node| node.role_config.listener_class),
+                .as_ref()
+                .map(|node| node.role_config.listener_class.clone()),
             Self::Worker | Self::Beat => None,
         }
     }
 
-    pub fn roles() -> Vec<String> {
-        let mut roles = vec![];
-        for role in Self::iter() {
-            roles.push(role.to_string())
-        }
-        roles
+    pub fn role_name(&self) -> stackable_operator::v2::types::operator::RoleName {
+        self.to_string()
+            .parse()
+            .expect("a Superset serialises to a valid RoleName")
     }
 }
 
-impl SupersetConfigOptions {
-    /// Mapping from `SupersetConfigOptions` to the values set in `SupersetConfigFragment`.
-    /// `None` is returned if either the according option is not set or is not exposed in the
-    /// `SupersetConfig`.
-    fn config_type_to_string(
-        &self,
-        superset_config: &v1alpha1::SupersetConfigFragment,
-    ) -> Option<String> {
-        match self {
-            SupersetConfigOptions::RowLimit => superset_config.row_limit.map(|v| v.to_string()),
-            SupersetConfigOptions::SupersetWebserverTimeout => {
-                superset_config.webserver_timeout.map(|v| v.to_string())
-            }
-            _ => None,
-        }
+impl v1alpha1::Container {
+    /// The type-safe container name for this variant (matching its kebab-case serialization).
+    pub fn to_container_name(&self) -> ContainerName {
+        ContainerName::from_str(&self.to_string())
+            .expect("a Container variant name is a valid container name")
     }
 }
 
@@ -494,9 +478,10 @@ impl FlaskAppConfigOptions for SupersetConfigOptions {
 }
 
 impl v1alpha1::SupersetConfig {
-    pub const MAPBOX_SECRET_PROPERTY: &'static str = "mapboxSecret";
-
-    fn default_config(cluster_name: &str, role: &SupersetRole) -> v1alpha1::SupersetConfigFragment {
+    pub(crate) fn default_config(
+        cluster_name: &str,
+        role: &SupersetRole,
+    ) -> v1alpha1::SupersetConfigFragment {
         match role {
             SupersetRole::Node => v1alpha1::SupersetConfigFragment {
                 resources: ResourcesFragment {
@@ -556,52 +541,6 @@ impl v1alpha1::SupersetConfig {
     }
 }
 
-impl Configuration for v1alpha1::SupersetConfigFragment {
-    type Configurable = v1alpha1::SupersetCluster;
-
-    fn compute_env(
-        &self,
-        cluster: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        let mut result = BTreeMap::new();
-        if let Some(msec) = &cluster.spec.cluster_config.mapbox_secret {
-            result.insert(
-                v1alpha1::SupersetConfig::MAPBOX_SECRET_PROPERTY.to_string(),
-                Some(msec.clone()),
-            );
-        }
-        Ok(result)
-    }
-
-    fn compute_cli(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        Ok(BTreeMap::new())
-    }
-
-    fn compute_files(
-        &self,
-        _cluster: &Self::Configurable,
-        _role_name: &str,
-        file: &str,
-    ) -> Result<BTreeMap<String, Option<String>>, product_config_utils::Error> {
-        let mut result = BTreeMap::new();
-
-        if file == SUPERSET_CONFIG_FILENAME {
-            for option in SupersetConfigOptions::iter() {
-                if let Some(value) = option.config_type_to_string(self) {
-                    result.insert(option.to_string(), Some(value));
-                }
-            }
-        }
-
-        Ok(result)
-    }
-}
-
 impl HasStatusCondition for v1alpha1::SupersetCluster {
     fn conditions(&self) -> Vec<ClusterCondition> {
         match &self.status {
@@ -614,6 +553,11 @@ impl HasStatusCondition for v1alpha1::SupersetCluster {
 impl v1alpha1::SupersetCluster {
     pub fn shared_secret_key_secret_name(&self) -> String {
         format!("{}-secret-key", &self.name_any())
+    }
+
+    /// The connection to the metadata database.
+    pub fn metadata_database(&self) -> &MetadataDatabaseConnection {
+        &self.spec.cluster_config.metadata_database
     }
 
     /// The name of the group-listener provided for a specific role.
@@ -645,61 +589,12 @@ impl v1alpha1::SupersetCluster {
         }
     }
 
-    /// Metadata about a node rolegroup
-    pub fn rolegroup_ref(
-        &self,
-        role: &SupersetRole,
-        group_name: impl Into<String>,
-    ) -> RoleGroupRef<v1alpha1::SupersetCluster> {
-        RoleGroupRef {
-            cluster: ObjectRef::from_obj(self),
-            role: role.to_string(),
-            role_group: group_name.into(),
-        }
-    }
-
     pub fn get_opa_config(&self) -> Option<&v1alpha1::SupersetOpaRoleMappingConfig> {
         self.spec
             .cluster_config
             .authorization
             .as_ref()
             .map(|a| &a.role_mapping_from_opa)
-    }
-
-    /// Retrieve and merge resource configs for role and role groups
-    pub fn merged_config(
-        &self,
-        role: &SupersetRole,
-        rolegroup_ref: &RoleGroupRef<v1alpha1::SupersetCluster>,
-    ) -> Result<v1alpha1::SupersetConfig, Error> {
-        // Initialize the result with all default values as baseline
-        let conf_defaults = v1alpha1::SupersetConfig::default_config(&self.name_any(), role);
-
-        let role = self.get_role(role).context(UnknownSupersetRoleSnafu {
-            role: role.to_string(),
-            roles: SupersetRole::roles(),
-        })?;
-
-        // Retrieve role resource config
-        let mut conf_role = role.config.config.to_owned();
-
-        // Retrieve rolegroup specific resource config
-        let mut conf_rolegroup = role
-            .role_groups
-            .get(&rolegroup_ref.role_group)
-            .map(|rg| rg.config.config.clone())
-            .unwrap_or_default();
-
-        // Merge more specific configs into default config
-        // Hierarchy is:
-        // 1. RoleGroup
-        // 2. Role
-        // 3. Default
-        conf_role.merge(&conf_defaults);
-        conf_rolegroup.merge(&conf_role);
-
-        tracing::debug!("Merged config: {:?}", conf_rolegroup);
-        fragment::validate(conf_rolegroup).context(FragmentValidationFailureSnafu)
     }
 }
 

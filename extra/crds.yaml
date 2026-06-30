@@ -336,12 +336,8 @@ spec:
                       superset_config.py:
                         additionalProperties:
                           type: string
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
-                        nullable: true
+                        default: {}
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -378,6 +374,9 @@ spec:
                       listenerClass:
                         default: cluster-internal
                         description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
+                        maxLength: 253
+                        minLength: 1
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                         type: string
                       podDisruptionBudget:
                         default:
@@ -713,12 +712,8 @@ spec:
                             superset_config.py:
                               additionalProperties:
                                 type: string
-                              description: |-
-                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                                This is backwards-compatible with the existing flat key-value YAML format
-                                used by `HashMap<String, String>`.
-                              nullable: true
+                              default: {}
+                              description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                               type: object
                           type: object
                         envOverrides:
@@ -1092,7 +1087,10 @@ spec:
                       It must contain the key `ADDRESS` with the address of the Vector aggregator.
                       Follow the [logging tutorial](https://docs.stackable.tech/home/nightly/tutorials/logging-vector-aggregator)
                       to learn how to configure log aggregation with Vector.
+                    maxLength: 253
+                    minLength: 1
                     nullable: true
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                     type: string
                 required:
                 - credentialsSecretName
@@ -1471,12 +1469,8 @@ spec:
                       superset_config.py:
                         additionalProperties:
                           type: string
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
-                        nullable: true
+                        default: {}
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -1513,6 +1507,9 @@ spec:
                       listenerClass:
                         default: cluster-internal
                         description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
+                        maxLength: 253
+                        minLength: 1
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                         type: string
                       podDisruptionBudget:
                         default:
@@ -1848,12 +1845,8 @@ spec:
                             superset_config.py:
                               additionalProperties:
                                 type: string
-                              description: |-
-                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                                This is backwards-compatible with the existing flat key-value YAML format
-                                used by `HashMap<String, String>`.
-                              nullable: true
+                              default: {}
+                              description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                               type: object
                           type: object
                         envOverrides:
@@ -2214,12 +2207,8 @@ spec:
                       superset_config.py:
                         additionalProperties:
                           type: string
-                        description: |-
-                          Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                          This is backwards-compatible with the existing flat key-value YAML format
-                          used by `HashMap<String, String>`.
-                        nullable: true
+                        default: {}
+                        description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                         type: object
                     type: object
                   envOverrides:
@@ -2256,6 +2245,9 @@ spec:
                       listenerClass:
                         default: cluster-internal
                         description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
+                        maxLength: 253
+                        minLength: 1
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                         type: string
                       podDisruptionBudget:
                         default:
@@ -2591,12 +2583,8 @@ spec:
                             superset_config.py:
                               additionalProperties:
                                 type: string
-                              description: |-
-                                Flat key-value overrides for `*.properties`, Hadoop XML, etc.
-
-                                This is backwards-compatible with the existing flat key-value YAML format
-                                used by `HashMap<String, String>`.
-                              nullable: true
+                              default: {}
+                              description: Flat key-value overrides for `*.properties`, Hadoop XML, etc.
                               type: object
                           type: object
                         envOverrides:

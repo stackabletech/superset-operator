@@ -25,10 +25,12 @@ mod tests {
 
     use stackable_operator::{
         commons::affinity::StackableAffinity,
+        config::fragment,
         k8s_openapi::{
             api::core::v1::{PodAffinityTerm, PodAntiAffinity, WeightedPodAffinityTerm},
             apimachinery::pkg::apis::meta::v1::LabelSelector,
         },
+        kube::ResourceExt,
         utils::yaml_from_str_singleton_map,
     };
 
@@ -59,12 +61,12 @@ mod tests {
         "#;
         let superset: v1alpha1::SupersetCluster =
             yaml_from_str_singleton_map(input).expect("illegal test input");
-        let merged_config = superset
-            .merged_config(
-                &SupersetRole::Node,
-                &superset.rolegroup_ref(&SupersetRole::Node, "default"),
-            )
-            .unwrap();
+        // The role group carries no resource/affinity overrides, so the merged config is just the
+        // validated default config.
+        let merged_config: v1alpha1::SupersetConfig = fragment::validate(
+            v1alpha1::SupersetConfig::default_config(&superset.name_any(), &SupersetRole::Node),
+        )
+        .expect("default config should validate");
 
         assert_eq!(
             merged_config.affinity,
