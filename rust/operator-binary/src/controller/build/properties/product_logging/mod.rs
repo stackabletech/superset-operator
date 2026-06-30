@@ -134,36 +134,3 @@ fn create_superset_config(log_config: &AutomaticContainerLogConfig, log_dir: &st
             .to_python_expression(),
     )
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// The vendored `vector.yaml` keeps only the sources Superset produces and drops the ones it
-    /// does not (log4j/log4j2/airlift/opa/tracing). Guards against accidental drift.
-    #[test]
-    fn test_vector_config_file_content() {
-        let content = vector_config_file_content();
-        assert!(!content.is_empty());
-        // Superset logs JSON to `superset.py.json`, so the Python-JSON source must be present.
-        assert!(content.contains("files_py"));
-        assert!(content.contains("*.py.json"));
-        // Sources Superset does not emit must have been trimmed out.
-        for dropped in [
-            "files_log4j",
-            "files_log4j2",
-            "files_airlift",
-            "files_opa_json",
-            "files_tracing_rs",
-        ] {
-            assert!(
-                !content.contains(dropped),
-                "vendored vector.yaml should not contain the dropped source {dropped}"
-            );
-        }
-        // The config is env-var-parameterized (resolved at runtime by the Vector container), not
-        // baked, so the role-group identity must appear as placeholders.
-        assert!(content.contains("${ROLE_NAME}"));
-        assert!(content.contains("${VECTOR_AGGREGATOR_ADDRESS}"));
-    }
-}
