@@ -87,7 +87,6 @@ commands:
         LOGGING_CONFIGURATOR = StackableLoggingConfigurator()
         MAPBOX_API_KEY = os.environ.get('MAPBOX_API_KEY', '')
         RECAPTCHA_PUBLIC_KEY = ''
-        ROW_LIMIT = 50000
         SECRET_KEY = os.environ.get('SECRET_KEY')
         SQLALCHEMY_DATABASE_URI = os.path.expandvars('postgresql+psycopg2://${METADATA_DATABASE_USERNAME}:${METADATA_DATABASE_PASSWORD}@superset-postgresql:5432/superset')
         STATS_LOGGER = StatsdStatsLogger(host='0.0.0.0', port=9125)

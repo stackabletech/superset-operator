@@ -36,9 +36,6 @@ const CONFIG_OVERRIDE_FILE_FOOTER_KEY: &str = "FILE_FOOTER";
 /// Operator default for `SUPERSET_WEBSERVER_TIMEOUT` (seconds), applied to the `Node` role.
 /// Superset's own 60s default is too low for "big data" queries.
 pub const DEFAULT_WEBSERVER_TIMEOUT: u32 = 300;
-/// Operator default for `ROW_LIMIT`, applied to the `Node` role.
-pub const DEFAULT_ROW_LIMIT: i32 = 50000;
-
 const PYTHON_IMPORTS: &[&str] = &[
     "import os",
     "from superset.stats_logger import StatsdStatsLogger",
@@ -232,7 +229,7 @@ fn celery_connection_config(
 ///
 /// Layered in precedence order (each step may override the previous one):
 /// 1. Operator recommended values — `Node` role only
-///    role-scoping): `ROW_LIMIT` and `SUPERSET_WEBSERVER_TIMEOUT` (Superset's 60s default is too
+///    role-scoping): `SUPERSET_WEBSERVER_TIMEOUT` (Superset's 60s default is too
 ///    low for "big data" queries).
 /// 2. Config-derived values (all roles) — user-set typed CRD fields override the recommended
 ///    values above.
@@ -246,10 +243,6 @@ fn rolegroup_properties(
     let mut properties: BTreeMap<String, String> = BTreeMap::new();
 
     if *role == SupersetRole::Node {
-        properties.insert(
-            SupersetConfigOptions::RowLimit.to_string(),
-            DEFAULT_ROW_LIMIT.to_string(),
-        );
         properties.insert(
             SupersetConfigOptions::SupersetWebserverTimeout.to_string(),
             DEFAULT_WEBSERVER_TIMEOUT.to_string(),
@@ -282,7 +275,7 @@ mod tests {
         },
     };
 
-    use super::{DEFAULT_ROW_LIMIT, DEFAULT_WEBSERVER_TIMEOUT, rolegroup_properties};
+    use super::{DEFAULT_WEBSERVER_TIMEOUT, rolegroup_properties};
     use crate::{
         controller::{ValidatedLogging, ValidatedSupersetConfig},
         crd::{SupersetConfigOptions, SupersetRole, v1alpha1::SupersetConfigOverrides},
@@ -318,7 +311,7 @@ mod tests {
         SupersetConfigOptions::SupersetWebserverTimeout.to_string()
     }
 
-    /// The `ROW_LIMIT`/`SUPERSET_WEBSERVER_TIMEOUT` defaults are only emitted for the `Node` role.
+    /// The `SUPERSET_WEBSERVER_TIMEOUT` default is only emitted for the `Node` role.
     #[test]
     fn rolegroup_properties_defaults_are_node_only() {
         let worker = rolegroup_properties(
@@ -326,17 +319,12 @@ mod tests {
             &validated_config(None, None),
             &SupersetConfigOverrides::default(),
         );
-        assert!(!worker.contains_key(&row_limit_key()));
         assert!(!worker.contains_key(&webserver_timeout_key()));
 
         let node = rolegroup_properties(
             &SupersetRole::Node,
             &validated_config(None, None),
             &SupersetConfigOverrides::default(),
-        );
-        assert_eq!(
-            node.get(&row_limit_key()),
-            Some(&DEFAULT_ROW_LIMIT.to_string())
         );
         assert_eq!(
             node.get(&webserver_timeout_key()),
