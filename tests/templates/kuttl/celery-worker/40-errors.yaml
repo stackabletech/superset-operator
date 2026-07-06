@@ -1,0 +1,14 @@
+# The `Worker` and `Beat` roles are deployed as Deployments, which have no `serviceName` and do not
+# serve the HTTP port. They must therefore NOT get a headless Service (only the `Node` StatefulSet
+# does). These assert the absence of such Services, guarding against a regression that re-adds a
+# headless Service for every role.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset-worker-default-headless
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset-beat-default-headless
