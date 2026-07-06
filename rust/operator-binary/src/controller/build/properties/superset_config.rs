@@ -264,6 +264,26 @@ fn rolegroup_properties(
     properties
 }
 
+/// The effective `SUPERSET_WEBSERVER_TIMEOUT` value that will appear in the rendered
+/// `superset_config.py` for this role group, i.e. the operator default (`Node` only) with the
+/// typed `webserverTimeout` field and then `configOverrides` applied on top.
+///
+/// Callers that also need this value elsewhere — notably the gunicorn `--timeout` flag in the
+/// `Node` container command — must use this so the flag stays in lock-step with the config file
+/// even when a user overrides `SUPERSET_WEBSERVER_TIMEOUT` via `configOverrides`. Returns `None`
+/// for roles that don't emit the key (`Worker`/`Beat`).
+pub fn webserver_timeout(
+    role: &SupersetRole,
+    config: &ValidatedSupersetConfig,
+    config_overrides: &SupersetConfigOverrides,
+) -> Option<String> {
+    // Read the value back from the same assembled property map that produces `superset_config.py`,
+    // so the flag and the file are computed from a single source and cannot disagree.
+    rolegroup_properties(role, config, config_overrides)
+        .get(&SupersetConfigOptions::SupersetWebserverTimeout.to_string())
+        .cloned()
+}
+
 #[cfg(test)]
 mod tests {
     use stackable_operator::{
@@ -275,7 +295,7 @@ mod tests {
         },
     };
 
-    use super::{DEFAULT_WEBSERVER_TIMEOUT, rolegroup_properties};
+    use super::{DEFAULT_WEBSERVER_TIMEOUT, rolegroup_properties, webserver_timeout};
     use crate::{
         controller::{ValidatedLogging, ValidatedSupersetConfig},
         crd::{SupersetConfigOptions, SupersetRole, v1alpha1::SupersetConfigOverrides},
@@ -358,5 +378,32 @@ mod tests {
             &SupersetConfigOverrides { superset_config_py },
         );
         assert_eq!(node.get(&row_limit_key()), Some(&"99".to_string()));
+    }
+
+    /// Regression: the gunicorn `--timeout` source must equal the `SUPERSET_WEBSERVER_TIMEOUT`
+    /// actually written to `superset_config.py`, including when a `configOverride` changes it.
+    /// Previously the flag read the typed field and diverged from the file (file said 999, flag
+    /// said the typed 300).
+    #[test]
+    fn webserver_timeout_follows_config_override() {
+        let mut superset_config_py = KeyValueConfigOverrides::default();
+        superset_config_py
+            .overrides
+            .insert(webserver_timeout_key(), "999".to_string());
+        let config_overrides = SupersetConfigOverrides { superset_config_py };
+        // Typed field deliberately different from the override, so the two sources can't be
+        // confused for one another.
+        let config = validated_config(None, Some(300));
+
+        let file_value = rolegroup_properties(&SupersetRole::Node, &config, &config_overrides)
+            .get(&webserver_timeout_key())
+            .cloned();
+        let flag_value = webserver_timeout(&SupersetRole::Node, &config, &config_overrides);
+
+        assert_eq!(flag_value, Some("999".to_string()));
+        assert_eq!(
+            flag_value, file_value,
+            "flag must mirror the config file value"
+        );
     }
 }

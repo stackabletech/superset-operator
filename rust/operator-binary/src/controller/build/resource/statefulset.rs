@@ -38,7 +38,7 @@ use crate::{
         SupersetRoleGroupConfig, ValidatedCluster,
         build::{
             command::add_cert_to_python_certifi_command,
-            properties::{ConfigFileName, superset_config::DEFAULT_WEBSERVER_TIMEOUT},
+            properties::{ConfigFileName, superset_config},
             resource::listener::LISTENER_VOLUME_DIR,
         },
     },
@@ -133,10 +133,14 @@ pub fn build_node_rolegroup_statefulset(
     )?;
 
     // The gunicorn worker timeout mirrors the `SUPERSET_WEBSERVER_TIMEOUT` written into
-    // `superset_config.py` (see `controller::build::properties::superset_config`).
-    let webserver_timeout = merged_config
-        .webserver_timeout
-        .unwrap_or(DEFAULT_WEBSERVER_TIMEOUT);
+    // `superset_config.py`: read from the same assembled property map (default ← typed field ←
+    // configOverrides) so the flag and the file never disagree, even under a user override.
+    let webserver_timeout = superset_config::webserver_timeout(
+        superset_role,
+        merged_config,
+        &rolegroup_config.config_overrides,
+    )
+    .unwrap_or_else(|| superset_config::DEFAULT_WEBSERVER_TIMEOUT.to_string());
 
     superset_cb
         .add_env_vars(authentication_env_vars(&validated.cluster_config.authentication_config))
