@@ -28,6 +28,7 @@ pub mod versioned {
     /// The DruidConnection resource can be used to automatically deploy a Druid datasource in Superset.
     /// Learn more about it in the [Superset operator usage guide](DOCS_BASE_URL_PLACEHOLDER/superset/usage-guide/connecting-druid).
     #[versioned(crd(
+        doc = "The DruidConnection resource can be used to automatically deploy a Druid datasource in Superset.",
         group = "superset.stackable.tech",
         plural = "druidconnections",
         status = "v1alpha1::DruidConnectionStatus",
