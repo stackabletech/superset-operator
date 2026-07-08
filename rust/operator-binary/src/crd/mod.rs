@@ -152,6 +152,7 @@ pub mod versioned {
     /// Find more information on how to use it and the resources that the operator generates in the
     /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/superset/).
     #[versioned(crd(
+        doc = "A Superset cluster stacklet. This resource is managed by the Stackable operator for Apache Superset.",
         group = "superset.stackable.tech",
         plural = "supersetclusters",
         shortname = "superset",
