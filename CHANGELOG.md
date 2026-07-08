@@ -10,6 +10,7 @@
 
 ### Changed
 
+- Bump stackable-operator to 0.113.3 ([#751]).
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#717]).
 - BREAKING: `configOverrides` now only accepts the supported config file name `superset_config.py`. Previously arbitrary keys were silently accepted but ignored ([#719]).
 - Bump `stackable-operator` to 0.111.1 and `kube` to 3.1.0 ([#719], [#726]).
@@ -37,6 +38,7 @@
 [#731]: https://github.com/stackabletech/superset-operator/pull/731
 [#735]: https://github.com/stackabletech/superset-operator/pull/735
 [#738]: https://github.com/stackabletech/superset-operator/pull/738
+[#751]: https://github.com/stackabletech/superset-operator/pull/751
 
 ## [26.3.0] - 2026-03-16
 
