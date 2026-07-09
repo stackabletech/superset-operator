@@ -17,7 +17,7 @@ spec:
         command: [
           "/bin/bash",
           "-c",
-          "export SQLALCHEMY_DATABASE_URI=\"postgresql://${DB_USERNAME}:${DB_PASSWORD}@superset-postgresql.default.svc.cluster.local/superset\" && \
+          "export SQLALCHEMY_DATABASE_URI=\"postgresql://${METADATA_DATABASE_USERNAME}:${METADATA_DATABASE_PASSWORD}@superset-postgresql.default.svc.cluster.local/superset\" && \
           mkdir --parents /stackable/app/pythonpath && \
           cp /stackable/config/* /stackable/app/pythonpath && \
           echo 'SQLALCHEMY_EXAMPLES_URI = os.environ.get(\"SQLALCHEMY_DATABASE_URI\")' >> /stackable/app/pythonpath/superset_config.py && \
@@ -29,12 +29,12 @@ spec:
             secretKeyRef:
               key: SECRET_KEY
               name: simple-superset-secret-key
-        - name: DB_USERNAME
+        - name: METADATA_DATABASE_USERNAME
           valueFrom:
             secretKeyRef:
               key: username
               name: superset-postgresql-credentials
-        - name: DB_PASSWORD
+        - name: METADATA_DATABASE_PASSWORD
           valueFrom:
             secretKeyRef:
               key: password
