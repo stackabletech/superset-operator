@@ -713,7 +713,8 @@ pub async fn reconcile_superset(
 }
 
 // TODO: Can be removed after SDP 26.7 is released (it's only a migration from 26.3 - 26.7)
-// (don't forget about the snafu Error variants)
+// (don't forget about the snafu Error variants).
+// Removal is tracked in https://github.com/stackabletech/superset-operator/issues/755
 #[instrument(skip_all)]
 async fn migrate_legacy_secret_key_secret_from_26_3(
     superset: &SupersetCluster,
