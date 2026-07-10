@@ -245,7 +245,8 @@ pub mod versioned {
         /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/superset/getting_started/first_steps)
         /// to find out more.
         // TODO: In the future rename this to `credentialsSecretName`
-        pub credentials_secret: String,
+        #[serde(rename = "credentialsSecret")]
+        pub credentials_secret_name: String,
 
         /// Cluster operations like pause reconciliation or cluster stop.
         #[serde(default)]

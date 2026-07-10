@@ -207,7 +207,7 @@ pub fn validate_cluster(
         ValidatedClusterConfig {
             authentication_config,
             opa_config,
-            credentials_secret_name: cluster_config.credentials_secret.clone(),
+            credentials_secret_name: cluster_config.credentials_secret_name.clone(),
             secret_key_secret_name: superset.shared_secret_key_secret_name(),
             mapbox_secret: cluster_config.mapbox_secret.clone(),
             metadata_database: cluster_config.metadata_database.clone(),
