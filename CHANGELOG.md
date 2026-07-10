@@ -17,12 +17,11 @@
 - Support setting `clientAuthenticationMethod` for OIDC authentication. The value is passed through to the Flask-AppBuilder config as `token_endpoint_auth_method` ([#719]).
 - BREAKING: Rename `EXPERIMENTAL_FILE_HEADER` and `EXPERIMENTAL_FILE_FOOTER` in `superset_config.py` for arbitrary Python code to `FILE_HEADER` and `FILE_FOOTER`  ([#719], [#721]).
 - Use an internal Secret for the Superset `SECRET_KEY`.
-  Going forward, the operator will automatically create the Secret in case it doesn't exist ([#722]).
-- BREAKING: The `.clusterConfig.credentialsSecret` field has been renamed to `.clusterConfig.credentialsSecretName` for consistency ([#722]).
+  Going forward, the operator will automatically create the Secret in case it doesn't exist ([#722], [#XXX]).
 - BREAKING: Implement generic database connection.
   This means you need to replace your simple database connection string with a typed struct.
   This struct is consistent between different CRDs, so that you can easily copy/paste it between stacklets.
-  More information can be found in the [Superset database documentation](https://docs.stackable.tech/home/nightly/superset/usage-guide/database-connections) for details ([#722]).
+  More information can be found in the [Superset database documentation](https://docs.stackable.tech/home/nightly/superset/usage-guide/database-connections) for details ([#722], [#XXX]).
 - Internal operator refactoring: introduce dereference() and validate() steps in the reconciler ([#731]).
 - test: Bump vector-aggregator to 0.55.0, replace /graphql call with gRPC call ([#735]).
 - BREAKING: Removed product-config machinery. This is a breaking change in terms of configuration.
@@ -39,6 +38,7 @@
 [#735]: https://github.com/stackabletech/superset-operator/pull/735
 [#738]: https://github.com/stackabletech/superset-operator/pull/738
 [#751]: https://github.com/stackabletech/superset-operator/pull/751
+[#XXX]: https://github.com/stackabletech/superset-operator/pull/XXX
 
 ## [26.3.0] - 2026-03-16
 

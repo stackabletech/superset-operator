@@ -48,7 +48,7 @@ mod tests {
           image:
             productVersion: 6.1.0
           clusterConfig:
-            credentialsSecretName: superset-admin-credentials
+            credentialsSecret: superset-admin-credentials
             metadataDatabase:
               postgresql:
                 host: superset-postgresql
