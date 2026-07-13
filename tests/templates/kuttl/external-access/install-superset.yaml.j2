@@ -33,7 +33,7 @@ spec:
 {% endif %}
     pullPolicy: IfNotPresent
   clusterConfig:
-    credentialsSecretName: superset-admin-credentials
+    credentialsSecret: superset-admin-credentials
     metadataDatabase:
       postgresql:
         host: superset-postgresql

@@ -99,7 +99,7 @@ mod tests {
           image:
             productVersion: 4.1.4
           clusterConfig:
-            credentialsSecretName: superset-admin-credentials
+            credentialsSecret: superset-admin-credentials
             metadataDatabase:
               postgresql:
                 host: superset-postgresql

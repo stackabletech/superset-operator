@@ -244,6 +244,8 @@ pub mod versioned {
         /// Read the
         /// [getting started guide first steps](DOCS_BASE_URL_PLACEHOLDER/superset/getting_started/first_steps)
         /// to find out more.
+        // TODO: In the future rename this to `credentialsSecretName`
+        #[serde(rename = "credentialsSecret")]
         pub credentials_secret_name: String,
 
         /// Cluster operations like pause reconciliation or cluster stop.
@@ -615,7 +617,7 @@ mod tests {
                   reconciliationPaused: false
                   stopped: true
                 clusterConfig:
-                  credentialsSecretName: superset-admin-credentials
+                  credentialsSecret: superset-admin-credentials
                   metadataDatabase:
                     postgresql:
                       host: superset-postgresql

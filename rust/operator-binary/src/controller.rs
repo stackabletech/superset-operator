@@ -9,6 +9,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     cli::OperatorEnvironmentOptions,
+    client::Client,
     cluster_resources::ClusterResourceApplyStrategy,
     commons::{
         affinity::StackableAffinity,
@@ -17,6 +18,7 @@ use stackable_operator::{
         rbac::build_rbac_resources,
         resources::{NoRuntimeLimits, Resources},
     },
+    k8s_openapi::api::core::v1::Secret,
     kube::{
         Resource, ResourceExt,
         api::ObjectMeta,
@@ -48,6 +50,7 @@ use stackable_operator::{
     },
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
+use tracing::instrument;
 
 use crate::{
     OPERATOR_NAME,
@@ -467,6 +470,22 @@ pub enum Error {
     CreateSecretKeySecret {
         source: random_secret_creation::Error,
     },
+
+    #[snafu(display("failed to retrieve credentials secret {secret_name:?}"))]
+    RetrieveCredentialsSecret {
+        source: stackable_operator::client::Error,
+        secret_name: String,
+    },
+
+    #[snafu(display("object is missing metadata to build owner reference"))]
+    ObjectMissingMetadataForOwnerRef {
+        source: stackable_operator::builder::meta::Error,
+    },
+
+    #[snafu(display("failed to create SECRET_KEY secret from migrated value"))]
+    CreateRandomSecret {
+        source: stackable_operator::client::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -534,6 +553,10 @@ pub async fn reconcile_superset(
         .await
         .context(ApplyRoleBindingSnafu)?;
 
+    // TODO: Can be removed after SDP 26.7 is released (it's only a migration from 26.3 - 26.7)
+    // (don't forget about the snafu Error variants).
+    // Removal is tracked in https://github.com/stackabletech/superset-operator/issues/755
+    migrate_legacy_secret_key_secret_from_26_3(superset, &validated, client).await?;
     create_random_secret_if_not_exists(
         &validated.cluster_config.secret_key_secret_name,
         INTERNAL_SECRET_SECRET_KEY,
@@ -690,6 +713,72 @@ pub async fn reconcile_superset(
         .context(ApplyStatusSnafu)?;
 
     Ok(Action::await_change())
+}
+
+// TODO: Can be removed after SDP 26.7 is released (it's only a migration from 26.3 - 26.7)
+// (don't forget about the snafu Error variants).
+// Removal is tracked in https://github.com/stackabletech/superset-operator/issues/755
+#[instrument(skip_all)]
+async fn migrate_legacy_secret_key_secret_from_26_3(
+    superset: &SupersetCluster,
+    validated: &ValidatedCluster,
+    client: &Client,
+) -> Result<()> {
+    let old_secret_name = &validated.cluster_config.credentials_secret_name;
+    let new_secret_name = &validated.cluster_config.secret_key_secret_name;
+    let secret_namespace = &validated.namespace;
+
+    let new_secret = client
+        .get_opt::<Secret>(new_secret_name, secret_namespace.as_ref())
+        .await
+        .with_context(|_| RetrieveCredentialsSecretSnafu {
+            secret_name: new_secret_name,
+        })?;
+    if new_secret.is_some() {
+        tracing::debug!("SECRET_KEY Secret already exists, nothing to migrate");
+        return Ok(());
+    }
+
+    let old_secret = client
+        .get_opt::<Secret>(old_secret_name, secret_namespace.as_ref())
+        .await
+        .with_context(|_| RetrieveCredentialsSecretSnafu {
+            secret_name: old_secret_name,
+        })?;
+    let old_secret_key = old_secret
+        .and_then(|secret| secret.data)
+        // Note: We remove the key to take ownership
+        .and_then(|mut data| data.remove("connections.secretKey"))
+        .and_then(|key| String::from_utf8(key.0).ok());
+    if let Some(old_secret_key) = old_secret_key {
+        tracing::info!(
+            old.secret.name = old_secret_name,
+            old.secret.namespace = %secret_namespace,
+            new.secret.name = new_secret_name,
+            new.secret.namespace = %secret_namespace,
+            "Migrating old SECRET_KEY to new Secret"
+        );
+
+        let secret = Secret {
+            metadata: ObjectMetaBuilder::new()
+                .name(new_secret_name)
+                .namespace(secret_namespace)
+                .ownerreference_from_resource(superset, None, Some(true))
+                .context(ObjectMissingMetadataForOwnerRefSnafu)?
+                .build(),
+            string_data: Some(BTreeMap::from([(
+                INTERNAL_SECRET_SECRET_KEY.to_string(),
+                old_secret_key,
+            )])),
+            ..Secret::default()
+        };
+        client
+            .create(&secret)
+            .await
+            .context(CreateRandomSecretSnafu)?;
+    }
+
+    Ok(())
 }
 
 pub fn error_policy(

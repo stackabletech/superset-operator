@@ -1023,7 +1023,7 @@ spec:
                           and `stopped` will take no effect until `reconciliationPaused` is set to false or removed.
                         type: boolean
                     type: object
-                  credentialsSecretName:
+                  credentialsSecret:
                     description: |-
                       The name of the Secret object containing the admin user credentials.
                       Read the
@@ -1108,7 +1108,7 @@ spec:
                     pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                     type: string
                 required:
-                - credentialsSecretName
+                - credentialsSecret
                 - metadataDatabase
                 type: object
               image:
