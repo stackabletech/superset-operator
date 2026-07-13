@@ -2,7 +2,23 @@
 
 use std::str::FromStr;
 
+use snafu::{ResultExt, Snafu};
 use stackable_operator::v2::types::operator::{ProductVersion, RoleGroupName};
+
+use crate::{
+    controller::{
+        KubernetesResources, ValidatedCluster,
+        build::resource::{
+            config_map::build_rolegroup_config_map,
+            deployment::build_rolegroup_deployment,
+            listener::build_group_listener,
+            pdb::build_pdb,
+            service::{build_rolegroup_headless_service, build_rolegroup_metrics_service},
+            statefulset::build_node_rolegroup_statefulset,
+        },
+    },
+    crd::SupersetRole,
+};
 
 pub mod command;
 pub mod properties;
@@ -15,3 +31,136 @@ stackable_operator::constant!(pub(crate) PLACEHOLDER_LISTENER_ROLE_GROUP: RoleGr
 // Product version used for the recommended labels of PVC templates, which cannot be modified after
 // deployment. A constant `none` keeps those labels stable across version upgrades.
 stackable_operator::constant!(pub(crate) UNVERSIONED_PRODUCT_VERSION: ProductVersion = "none");
+
+#[derive(Snafu, Debug)]
+pub enum Error {
+    #[snafu(display("failed to build ConfigMap for role group {role_group}"))]
+    ConfigMap {
+        source: resource::config_map::Error,
+        role_group: RoleGroupName,
+    },
+
+    #[snafu(display("failed to build StatefulSet for role group {role_group}"))]
+    StatefulSet {
+        source: resource::statefulset::Error,
+        role_group: RoleGroupName,
+    },
+
+    #[snafu(display("failed to build Deployment for role group {role_group}"))]
+    Deployment {
+        source: resource::deployment::Error,
+        role_group: RoleGroupName,
+    },
+}
+
+/// Builds every Kubernetes resource for the given validated cluster.
+///
+/// `service_account_name` is the name of the RBAC `ServiceAccount` the role-group Pods run under.
+/// The RBAC resources themselves are built and applied separately in the reconcile step.
+pub fn build(
+    cluster: &ValidatedCluster,
+    service_account_name: &str,
+) -> Result<KubernetesResources, Error> {
+    let mut stateful_sets = vec![];
+    let mut deployments = vec![];
+    let mut services = vec![];
+    let mut listeners = vec![];
+    let mut config_maps = vec![];
+    let mut pod_disruption_budgets = vec![];
+
+    for (superset_role, role_group_configs) in &cluster.role_groups {
+        for (role_group_name, rolegroup_config) in role_group_configs {
+            let config = &rolegroup_config.config;
+
+            config_maps.push(
+                build_rolegroup_config_map(
+                    cluster,
+                    superset_role,
+                    role_group_name,
+                    config,
+                    &rolegroup_config.config_overrides,
+                )
+                .context(ConfigMapSnafu {
+                    role_group: role_group_name.clone(),
+                })?,
+            );
+
+            // Every role exposes metrics via the statsd-exporter sidecar, so each rolegroup gets a
+            // metrics Service.
+            services.push(build_rolegroup_metrics_service(
+                cluster,
+                superset_role,
+                role_group_name,
+            ));
+
+            match superset_role {
+                SupersetRole::Node => {
+                    // Only the `Node` role's StatefulSet references a headless Service (as its
+                    // `serviceName`); the `Worker`/`Beat` Deployments have no `serviceName` and do
+                    // not serve the HTTP port, so they get no headless Service.
+                    services.push(build_rolegroup_headless_service(
+                        cluster,
+                        superset_role,
+                        role_group_name,
+                    ));
+
+                    stateful_sets.push(
+                        build_node_rolegroup_statefulset(
+                            cluster,
+                            superset_role,
+                            role_group_name,
+                            rolegroup_config,
+                            service_account_name,
+                        )
+                        .context(StatefulSetSnafu {
+                            role_group: role_group_name.clone(),
+                        })?,
+                    );
+                }
+                SupersetRole::Worker | SupersetRole::Beat => {
+                    deployments.push(
+                        build_rolegroup_deployment(
+                            cluster,
+                            superset_role,
+                            role_group_name,
+                            rolegroup_config,
+                            service_account_name,
+                        )
+                        .context(DeploymentSnafu {
+                            role_group: role_group_name.clone(),
+                        })?,
+                    );
+                }
+            }
+        }
+
+        // Role-level resources (group listener, PDB) are built once per role, after its role
+        // groups — not once per role group.
+        if let Some(role_config) = cluster.role_configs.get(superset_role) {
+            if let (Some(listener_class), Some(listener_group_name)) = (
+                &role_config.listener_class,
+                &role_config.group_listener_name,
+            ) {
+                listeners.push(build_group_listener(
+                    cluster,
+                    superset_role,
+                    listener_class,
+                    listener_group_name.to_string(),
+                ));
+            }
+
+            if let Some(pdb_config) = &role_config.pdb {
+                pod_disruption_budgets.extend(build_pdb(pdb_config, cluster, superset_role));
+            }
+        }
+    }
+
+    Ok(KubernetesResources {
+        stateful_sets,
+        deployments,
+        services,
+        listeners,
+        config_maps,
+        pod_disruption_budgets,
+    })
+}

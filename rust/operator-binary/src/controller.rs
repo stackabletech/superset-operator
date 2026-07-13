@@ -18,7 +18,12 @@ use stackable_operator::{
         rbac::build_rbac_resources,
         resources::{NoRuntimeLimits, Resources},
     },
-    k8s_openapi::api::core::v1::Secret,
+    crd::listener,
+    k8s_openapi::api::{
+        apps::v1::{Deployment, StatefulSet},
+        core::v1::{ConfigMap, Secret, Service},
+        policy::v1::PodDisruptionBudget,
+    },
     kube::{
         Resource, ResourceExt,
         api::ObjectMeta,
@@ -54,14 +59,6 @@ use tracing::instrument;
 
 use crate::{
     OPERATOR_NAME,
-    controller::build::resource::{
-        config_map::build_rolegroup_config_map,
-        deployment::build_rolegroup_deployment,
-        listener::build_group_listener,
-        pdb::build_pdb,
-        service::{build_rolegroup_headless_service, build_rolegroup_metrics_service},
-        statefulset::build_node_rolegroup_statefulset,
-    },
     crd::{
         APP_NAME, INTERNAL_SECRET_SECRET_KEY, SupersetRole,
         authentication::SupersetClientAuthenticationDetailsResolved,
@@ -84,6 +81,19 @@ pub const CONTAINER_IMAGE_BASE_NAME: &str = "superset";
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
     pub operator_environment: OperatorEnvironmentOptions,
+}
+
+/// Every Kubernetes resource produced by the build step.
+///
+/// The `Node` role is provisioned via a `StatefulSet` (it serves the Superset web UI), while the
+/// `Worker`/`Beat` Celery roles are provisioned via `Deployment`s; the build step collects both.
+pub struct KubernetesResources {
+    pub stateful_sets: Vec<StatefulSet>,
+    pub deployments: Vec<Deployment>,
+    pub services: Vec<Service>,
+    pub listeners: Vec<listener::v1alpha1::Listener>,
+    pub config_maps: Vec<ConfigMap>,
+    pub pod_disruption_budgets: Vec<PodDisruptionBudget>,
 }
 
 /// Per-role configuration extracted during validation.
@@ -386,28 +396,12 @@ pub enum Error {
         source: stackable_operator::cluster_resources::Error,
     },
 
-    #[snafu(display("failed to apply Service for role group {role_group_name}"))]
-    ApplyRoleGroupService {
-        source: stackable_operator::cluster_resources::Error,
-        role_group_name: RoleGroupName,
-    },
+    #[snafu(display("failed to build the Kubernetes resources"))]
+    BuildResources { source: build::Error },
 
-    #[snafu(display("failed to apply ConfigMap for role group {role_group_name}"))]
-    ApplyRoleGroupConfig {
+    #[snafu(display("failed to apply Kubernetes resource"))]
+    ApplyResource {
         source: stackable_operator::cluster_resources::Error,
-        role_group_name: RoleGroupName,
-    },
-
-    #[snafu(display("failed to apply StatefulSet for role group {role_group_name}"))]
-    ApplyRoleGroupStatefulSet {
-        source: stackable_operator::cluster_resources::Error,
-        role_group_name: RoleGroupName,
-    },
-
-    #[snafu(display("failed to apply Deployment for role group {role_group_name}"))]
-    ApplyRoleGroupDeployment {
-        source: stackable_operator::cluster_resources::Error,
-        role_group_name: RoleGroupName,
     },
 
     #[snafu(display("failed to update status"))]
@@ -430,11 +424,6 @@ pub enum Error {
         source: stackable_operator::commons::rbac::Error,
     },
 
-    #[snafu(display("failed to apply PodDisruptionBudget"))]
-    ApplyPdb {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
     #[snafu(display("failed to get required Labels"))]
     GetRequiredLabels {
         source:
@@ -444,26 +433,6 @@ pub enum Error {
     #[snafu(display("SupersetCluster object is invalid"))]
     InvalidSupersetCluster {
         source: error_boundary::InvalidObject,
-    },
-
-    #[snafu(display("failed to apply group listener"))]
-    ApplyGroupListener {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to build statefulset"))]
-    BuildStatefulSet {
-        source: crate::controller::build::resource::statefulset::Error,
-    },
-
-    #[snafu(display("failed to build deployment"))]
-    BuildDeployment {
-        source: crate::controller::build::resource::deployment::Error,
-    },
-
-    #[snafu(display("failed to build configmap"))]
-    BuildConfigMap {
-        source: crate::controller::build::resource::config_map::Error,
     },
 
     #[snafu(display("failed to create SECRET_KEY secret"))]
@@ -567,129 +536,53 @@ pub async fn reconcile_superset(
     .await
     .context(CreateSecretKeySecretSnafu)?;
 
+    let resources = build::build(&validated, &rbac_sa.name_any()).context(BuildResourcesSnafu)?;
+
     let mut statefulset_cond_builder = StatefulSetConditionBuilder::default();
     let mut deployment_cond_builder = DeploymentConditionBuilder::default();
 
-    for (superset_role, rolegroup_configs) in &validated.role_groups {
-        for (rolegroup_name, validated_rolegroup) in rolegroup_configs {
-            let config = &validated_rolegroup.config;
-
-            let rg_configmap = build_rolegroup_config_map(
-                &validated,
-                superset_role,
-                rolegroup_name,
-                config,
-                &validated_rolegroup.config_overrides,
-            )
-            .context(BuildConfigMapSnafu)?;
-
-            // Every role exposes metrics via the statsd-exporter sidecar, so each rolegroup gets a
-            // metrics Service. The headless Service is built per role below: only the `Node` role's
-            // StatefulSet references one (as its `serviceName`); the `Worker`/`Beat` Deployments have
-            // no `serviceName` and do not serve the HTTP port, so they get no headless Service.
-            let rg_metrics_service =
-                build_rolegroup_metrics_service(&validated, superset_role, rolegroup_name);
-
+    // The StatefulSets/Deployments are applied last, so every ConfigMap and Secret they mount
+    // already exists — otherwise a changed mount would restart the Pods.
+    // See https://github.com/stackabletech/commons-operator/issues/111 for details.
+    for service in resources.services {
+        cluster_resources
+            .add(client, service)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
+    for config_map in resources.config_maps {
+        cluster_resources
+            .add(client, config_map)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
+    for listener in resources.listeners {
+        cluster_resources
+            .add(client, listener)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
+    for pdb in resources.pod_disruption_budgets {
+        cluster_resources
+            .add(client, pdb)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
+    for statefulset in resources.stateful_sets {
+        statefulset_cond_builder.add(
             cluster_resources
-                .add(client, rg_metrics_service)
+                .add(client, statefulset)
                 .await
-                .with_context(|_| ApplyRoleGroupServiceSnafu {
-                    role_group_name: rolegroup_name.clone(),
-                })?;
-
+                .context(ApplyResourceSnafu)?,
+        );
+    }
+    for deployment in resources.deployments {
+        deployment_cond_builder.add(
             cluster_resources
-                .add(client, rg_configmap)
+                .add(client, deployment)
                 .await
-                .with_context(|_| ApplyRoleGroupConfigSnafu {
-                    role_group_name: rolegroup_name.clone(),
-                })?;
-
-            match superset_role {
-                SupersetRole::Node => {
-                    let rg_headless_service =
-                        build_rolegroup_headless_service(&validated, superset_role, rolegroup_name);
-
-                    cluster_resources
-                        .add(client, rg_headless_service)
-                        .await
-                        .with_context(|_| ApplyRoleGroupServiceSnafu {
-                            role_group_name: rolegroup_name.clone(),
-                        })?;
-
-                    let rg_statefulset = build_node_rolegroup_statefulset(
-                        &validated,
-                        superset_role,
-                        rolegroup_name,
-                        validated_rolegroup,
-                        &rbac_sa.name_any(),
-                    )
-                    .context(BuildStatefulSetSnafu)?;
-
-                    // Note: The StatefulSet needs to be applied after all ConfigMaps and Secrets it mounts
-                    // to prevent unnecessary Pod restarts.
-                    // See https://github.com/stackabletech/commons-operator/issues/111 for details.
-                    statefulset_cond_builder.add(
-                        cluster_resources
-                            .add(client, rg_statefulset)
-                            .await
-                            .with_context(|_| ApplyRoleGroupStatefulSetSnafu {
-                                role_group_name: rolegroup_name.clone(),
-                            })?,
-                    );
-                }
-                SupersetRole::Worker | SupersetRole::Beat => {
-                    let rg_deployment = build_rolegroup_deployment(
-                        &validated,
-                        superset_role,
-                        rolegroup_name,
-                        validated_rolegroup,
-                        &rbac_sa.name_any(),
-                    )
-                    .context(BuildDeploymentSnafu)?;
-
-                    // Note: The Deployment needs to be applied after all ConfigMaps and Secrets it mounts
-                    // to prevent unnecessary Pod restarts.
-                    // See https://github.com/stackabletech/commons-operator/issues/111 for details.
-                    deployment_cond_builder.add(
-                        cluster_resources
-                            .add(client, rg_deployment)
-                            .await
-                            .with_context(|_| ApplyRoleGroupDeploymentSnafu {
-                                role_group_name: rolegroup_name.clone(),
-                            })?,
-                    );
-                }
-            }
-        }
-
-        // Role-level resources (group listener, PDB) are built once per role, after
-        // its role groups — not once per role group.
-        if let Some(role_config) = validated.role_configs.get(superset_role) {
-            if let (Some(listener_class), Some(listener_group_name)) = (
-                &role_config.listener_class,
-                &role_config.group_listener_name,
-            ) {
-                let group_listener = build_group_listener(
-                    &validated,
-                    superset_role,
-                    listener_class,
-                    listener_group_name.to_string(),
-                );
-                cluster_resources
-                    .add(client, group_listener)
-                    .await
-                    .context(ApplyGroupListenerSnafu)?;
-            }
-
-            if let Some(pdb) = &role_config.pdb
-                && let Some(pdb) = build_pdb(pdb, &validated, superset_role)
-            {
-                cluster_resources
-                    .add(client, pdb)
-                    .await
-                    .context(ApplyPdbSnafu)?;
-            }
-        }
+                .context(ApplyResourceSnafu)?,
+        );
     }
 
     cluster_resources
