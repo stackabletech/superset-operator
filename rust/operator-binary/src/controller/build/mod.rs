@@ -164,3 +164,102 @@ pub fn build(
         pod_disruption_budgets,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use stackable_operator::{kube::Resource, utils::yaml_from_str_singleton_map};
+
+    use super::build;
+    use crate::{
+        controller::{
+            ValidatedCluster, test_support::default_dereferenced, validate::validate_cluster,
+        },
+        crd::v1alpha1,
+    };
+
+    /// A validated cluster with a `node`, `worker` and `beat` role (one `default` role group each).
+    fn validated_cluster() -> ValidatedCluster {
+        let input = r#"
+        apiVersion: superset.stackable.tech/v1alpha1
+        kind: SupersetCluster
+        metadata:
+          name: simple-superset
+          namespace: default
+        spec:
+          image:
+            productVersion: 4.1.4
+          clusterConfig:
+            credentialsSecret: superset-admin-credentials
+            metadataDatabase:
+              postgresql:
+                host: superset-postgresql
+                database: superset
+                credentialsSecretName: superset-postgresql-credentials
+          nodes:
+            roleGroups:
+              default:
+                replicas: 1
+          workers:
+            roleGroups:
+              default:
+                replicas: 1
+          beat:
+            roleGroups:
+              default:
+                replicas: 1
+        "#;
+        let superset: v1alpha1::SupersetCluster =
+            yaml_from_str_singleton_map(input).expect("illegal test input");
+        validate_cluster(&superset, default_dereferenced(), "test-repo").expect("validated")
+    }
+
+    fn sorted_names(resources: &[impl Resource]) -> Vec<&str> {
+        let mut names: Vec<&str> = resources
+            .iter()
+            .filter_map(|resource| resource.meta().name.as_deref())
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// The build step turns a validated cluster into the full set of Kubernetes resources: the
+    /// `node` role becomes a StatefulSet, the `worker`/`beat` Celery roles become Deployments, and
+    /// each role group additionally gets a ConfigMap and a metrics Service (plus a headless Service
+    /// for the `node` role). Role-level Listeners and PDBs are emitted once per role.
+    #[test]
+    fn build_produces_expected_resource_names() {
+        let cluster = validated_cluster();
+        let resources = build(&cluster, "simple-superset-serviceaccount").expect("build succeeds");
+
+        assert_eq!(
+            sorted_names(&resources.stateful_sets),
+            ["simple-superset-node-default"]
+        );
+        assert_eq!(
+            sorted_names(&resources.deployments),
+            [
+                "simple-superset-beat-default",
+                "simple-superset-worker-default"
+            ]
+        );
+        assert_eq!(
+            sorted_names(&resources.config_maps),
+            [
+                "simple-superset-beat-default",
+                "simple-superset-node-default",
+                "simple-superset-worker-default",
+            ]
+        );
+        // Only the `node` role serves the web UI and gets a group Listener.
+        assert_eq!(sorted_names(&resources.listeners), ["simple-superset-node"]);
+        // A default PDB per role.
+        assert_eq!(
+            sorted_names(&resources.pod_disruption_budgets),
+            [
+                "simple-superset-beat",
+                "simple-superset-node",
+                "simple-superset-worker"
+            ]
+        );
+    }
+}
