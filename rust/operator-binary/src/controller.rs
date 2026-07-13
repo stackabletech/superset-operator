@@ -482,7 +482,7 @@ pub enum Error {
         source: stackable_operator::builder::meta::Error,
     },
 
-    #[snafu(display("failed to create SECRET_KEY secret from migrated value "))]
+    #[snafu(display("failed to create SECRET_KEY secret from migrated value"))]
     CreateRandomSecret {
         source: stackable_operator::client::Error,
     },
