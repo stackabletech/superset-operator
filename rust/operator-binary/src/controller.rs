@@ -15,17 +15,17 @@ use stackable_operator::{
         affinity::StackableAffinity,
         product_image_selection::ResolvedProductImage,
         random_secret_creation::{self, create_random_secret_if_not_exists},
-        rbac::build_rbac_resources,
         resources::{NoRuntimeLimits, Resources},
     },
     crd::listener,
     k8s_openapi::api::{
         apps::v1::{Deployment, StatefulSet},
-        core::v1::{ConfigMap, Secret, Service},
+        core::v1::{ConfigMap, Secret, Service, ServiceAccount},
         policy::v1::PodDisruptionBudget,
+        rbac::v1::RoleBinding,
     },
     kube::{
-        Resource, ResourceExt,
+        Resource,
         api::ObjectMeta,
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
@@ -44,7 +44,7 @@ use stackable_operator::{
         kvp::label::{recommended_labels, role_group_selector},
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
-        role_utils::{GenericCommonConfig, RoleGroupConfig},
+        role_utils::{self, GenericCommonConfig, RoleGroupConfig},
         types::{
             kubernetes::{ListenerClassName, ListenerName, NamespaceName, Uid},
             operator::{
@@ -94,6 +94,8 @@ pub struct KubernetesResources {
     pub listeners: Vec<listener::v1alpha1::Listener>,
     pub config_maps: Vec<ConfigMap>,
     pub pod_disruption_budgets: Vec<PodDisruptionBudget>,
+    pub service_accounts: Vec<ServiceAccount>,
+    pub role_bindings: Vec<RoleBinding>,
 }
 
 /// Per-role configuration extracted during validation.
@@ -235,6 +237,15 @@ impl ValidatedCluster {
             cluster_name: self.name.clone(),
             role_name: role.role_name(),
             role_group_name: role_group_name.clone(),
+        }
+    }
+
+    /// Type-safe names for the per-cluster RBAC resources: the ServiceAccount shared by all
+    /// Pods, its (namespaced) RoleBinding, and the operator-deployed ClusterRole it binds.
+    pub fn rbac_resource_names(&self) -> role_utils::ResourceNames {
+        role_utils::ResourceNames {
+            cluster_name: self.name.clone(),
+            product_name: product_name(),
         }
     }
 
@@ -409,27 +420,6 @@ pub enum Error {
         source: stackable_operator::client::Error,
     },
 
-    #[snafu(display("failed to patch service account"))]
-    ApplyServiceAccount {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to patch role binding"))]
-    ApplyRoleBinding {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to build RBAC objects"))]
-    BuildRBACObjects {
-        source: stackable_operator::commons::rbac::Error,
-    },
-
-    #[snafu(display("failed to get required Labels"))]
-    GetRequiredLabels {
-        source:
-            stackable_operator::kvp::KeyValuePairError<stackable_operator::kvp::LabelValueError>,
-    },
-
     #[snafu(display("SupersetCluster object is invalid"))]
     InvalidSupersetCluster {
         source: error_boundary::InvalidObject,
@@ -504,24 +494,6 @@ pub async fn reconcile_superset(
         &superset.spec.object_overrides,
     );
 
-    let (rbac_sa, rbac_rolebinding) = build_rbac_resources(
-        superset,
-        APP_NAME,
-        cluster_resources
-            .get_required_labels()
-            .context(GetRequiredLabelsSnafu)?,
-    )
-    .context(BuildRBACObjectsSnafu)?;
-
-    let rbac_sa = cluster_resources
-        .add(client, rbac_sa)
-        .await
-        .context(ApplyServiceAccountSnafu)?;
-    cluster_resources
-        .add(client, rbac_rolebinding)
-        .await
-        .context(ApplyRoleBindingSnafu)?;
-
     // TODO: Can be removed after SDP 26.7 is released (it's only a migration from 26.3 - 26.7)
     // (don't forget about the snafu Error variants).
     // Removal is tracked in https://github.com/stackabletech/superset-operator/issues/755
@@ -536,7 +508,7 @@ pub async fn reconcile_superset(
     .await
     .context(CreateSecretKeySecretSnafu)?;
 
-    let resources = build::build(&validated, &rbac_sa.name_any()).context(BuildResourcesSnafu)?;
+    let resources = build::build(&validated).context(BuildResourcesSnafu)?;
 
     let mut statefulset_cond_builder = StatefulSetConditionBuilder::default();
     let mut deployment_cond_builder = DeploymentConditionBuilder::default();
@@ -544,6 +516,18 @@ pub async fn reconcile_superset(
     // The StatefulSets/Deployments are applied last, so every ConfigMap and Secret they mount
     // already exists — otherwise a changed mount would restart the Pods.
     // See https://github.com/stackabletech/commons-operator/issues/111 for details.
+    for service_account in resources.service_accounts {
+        cluster_resources
+            .add(client, service_account)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
+    for role_binding in resources.role_bindings {
+        cluster_resources
+            .add(client, role_binding)
+            .await
+            .context(ApplyResourceSnafu)?;
+    }
     for service in resources.services {
         cluster_resources
             .add(client, service)

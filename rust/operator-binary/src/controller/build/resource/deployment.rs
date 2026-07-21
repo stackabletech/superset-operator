@@ -64,7 +64,6 @@ pub fn build_rolegroup_deployment(
     superset_role: &SupersetRole,
     role_group_name: &RoleGroupName,
     rolegroup_config: &SupersetRoleGroupConfig,
-    sa_name: &str,
 ) -> Result<Deployment> {
     let merged_config = &rolegroup_config.config;
 
@@ -102,7 +101,12 @@ pub fn build_rolegroup_deployment(
                 .build(),
         )
         .affinity(&merged_config.affinity)
-        .service_account_name(sa_name);
+        .service_account_name(
+            validated
+                .rbac_resource_names()
+                .service_account_name()
+                .to_string(),
+        );
 
     let mut superset_cb = super::build_superset_container_builder(validated, rolegroup_config)
         .context(BuildContainerSnafu)?;
