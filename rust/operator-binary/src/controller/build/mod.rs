@@ -185,6 +185,7 @@ mod tests {
         metadata:
           name: simple-superset
           namespace: default
+          uid: 01234567-89ab-cdef-0123-456789abcdef
         spec:
           image:
             productVersion: 4.1.4
