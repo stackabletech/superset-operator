@@ -97,7 +97,7 @@ pub fn build_node_rolegroup_statefulset(
 ) -> Result<StatefulSet> {
     let merged_config = &rolegroup_config.config;
 
-    let resource_names = validated.resource_names(superset_role, role_group_name);
+    let resource_names = validated.role_group_resource_names(superset_role, role_group_name);
     let recommended_object_labels = validated.recommended_labels(superset_role, role_group_name);
     // Used for PVC templates that cannot be modified once they are deployed (a constant "none"
     // version keeps the labels stable across version upgrades).
@@ -119,7 +119,7 @@ pub fn build_node_rolegroup_statefulset(
         .affinity(&merged_config.affinity)
         .service_account_name(
             validated
-                .rbac_resource_names()
+                .cluster_resource_names()
                 .service_account_name()
                 .to_string(),
         );

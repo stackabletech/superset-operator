@@ -67,7 +67,7 @@ pub fn build_rolegroup_deployment(
 ) -> Result<Deployment> {
     let merged_config = &rolegroup_config.config;
 
-    let resource_names = validated.resource_names(superset_role, role_group_name);
+    let resource_names = validated.role_group_resource_names(superset_role, role_group_name);
     let recommended_object_labels = validated.recommended_labels(superset_role, role_group_name);
 
     // The Celery process command, liveness probe and replica policy are the only differences
@@ -103,7 +103,7 @@ pub fn build_rolegroup_deployment(
         .affinity(&merged_config.affinity)
         .service_account_name(
             validated
-                .rbac_resource_names()
+                .cluster_resource_names()
                 .service_account_name()
                 .to_string(),
         );

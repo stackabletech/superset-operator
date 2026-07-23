@@ -228,7 +228,7 @@ impl ValidatedCluster {
         }
     }
 
-    pub fn resource_names(
+    pub fn role_group_resource_names(
         &self,
         role: &SupersetRole,
         role_group_name: &RoleGroupName,
@@ -242,7 +242,7 @@ impl ValidatedCluster {
 
     /// Type-safe names for the per-cluster RBAC resources: the ServiceAccount shared by all
     /// Pods, its (namespaced) RoleBinding, and the operator-deployed ClusterRole it binds.
-    pub fn rbac_resource_names(&self) -> role_utils::ResourceNames {
+    pub fn cluster_resource_names(&self) -> role_utils::ResourceNames {
         role_utils::ResourceNames {
             cluster_name: self.name.clone(),
             product_name: product_name(),
