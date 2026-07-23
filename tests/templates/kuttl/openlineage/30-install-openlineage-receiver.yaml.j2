@@ -1,0 +1,96 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openlineage-receiver-script
+data:
+  receiver.py: |
+    #!/usr/bin/env python
+    # Minimal OpenLineage receiver used for integration testing.
+    # The OpenLineage HTTP transport POSTs run events to /api/v1/lineage; this handler
+    # appends every POST body to a log regardless of path. GET returns everything received
+    # so far, so the test can assert lineage was emitted.
+    import http.server
+    import os
+
+    EVENTS = "/tmp/events.log"
+    PORT = int(os.environ.get("PORT", "5000"))
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length) if length else b""
+            with open(EVENTS, "ab") as f:
+                f.write(body + b"\n")
+            self.send_response(201)
+            self.end_headers()
+
+        def do_GET(self):
+            try:
+                with open(EVENTS, "rb") as f:
+                    data = f.read()
+            except FileNotFoundError:
+                data = b""
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *args):
+            pass
+
+    httpd = http.server.HTTPServer(("0.0.0.0", PORT), Handler)
+    httpd.serve_forever()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openlineage-receiver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openlineage-receiver
+  template:
+    metadata:
+      labels:
+        app: openlineage-receiver
+    spec:
+      serviceAccountName: integration-tests-sa
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: receiver
+          image: oci.stackable.tech/sdp/testing-tools:0.3.0-stackable0.0.0-dev
+          command: ["python", "/scripts/receiver.py"]
+          env:
+            - name: PORT
+              value: "5000"
+          ports:
+            - containerPort: 5000
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "256m"
+            limits:
+              memory: "128Mi"
+              cpu: "1"
+      volumes:
+        - name: script
+          configMap:
+            name: openlineage-receiver-script
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openlineage-receiver
+spec:
+  selector:
+    app: openlineage-receiver
+  ports:
+    - port: 5000
+      targetPort: 5000
