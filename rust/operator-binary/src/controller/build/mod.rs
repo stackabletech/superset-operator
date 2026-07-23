@@ -13,6 +13,7 @@ use crate::{
             deployment::build_rolegroup_deployment,
             listener::build_group_listener,
             pdb::build_pdb,
+            rbac::{build_role_binding, build_service_account},
             service::{build_rolegroup_headless_service, build_rolegroup_metrics_service},
             statefulset::build_node_rolegroup_statefulset,
         },
@@ -26,7 +27,7 @@ pub mod resource;
 
 // Placeholder role-group name used for the recommended labels of the role-level `Listener`
 // (which is not tied to a single role group).
-stackable_operator::constant!(pub(crate) PLACEHOLDER_LISTENER_ROLE_GROUP: RoleGroupName = "none");
+stackable_operator::constant!(pub(crate) NONE_ROLE_GROUP_NAME: RoleGroupName = "none");
 
 // Product version used for the recommended labels of PVC templates, which cannot be modified after
 // deployment. A constant `none` keeps those labels stable across version upgrades.
@@ -54,13 +55,7 @@ pub enum Error {
 }
 
 /// Builds every Kubernetes resource for the given validated cluster.
-///
-/// `service_account_name` is the name of the RBAC `ServiceAccount` the role-group Pods run under.
-/// The RBAC resources themselves are built and applied separately in the reconcile step.
-pub fn build(
-    cluster: &ValidatedCluster,
-    service_account_name: &str,
-) -> Result<KubernetesResources, Error> {
+pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
     let mut stateful_sets = vec![];
     let mut deployments = vec![];
     let mut services = vec![];
@@ -110,7 +105,6 @@ pub fn build(
                             superset_role,
                             role_group_name,
                             rolegroup_config,
-                            service_account_name,
                         )
                         .context(StatefulSetSnafu {
                             role_group: role_group_name.clone(),
@@ -124,7 +118,6 @@ pub fn build(
                             superset_role,
                             role_group_name,
                             rolegroup_config,
-                            service_account_name,
                         )
                         .context(DeploymentSnafu {
                             role_group: role_group_name.clone(),
@@ -162,11 +155,15 @@ pub fn build(
         listeners,
         config_maps,
         pod_disruption_budgets,
+        service_accounts: vec![build_service_account(cluster)],
+        role_bindings: vec![build_role_binding(cluster)],
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use stackable_operator::{kube::Resource, utils::yaml_from_str_singleton_map};
 
     use super::build;
@@ -230,7 +227,7 @@ mod tests {
     #[test]
     fn build_produces_expected_resource_names() {
         let cluster = validated_cluster();
-        let resources = build(&cluster, "simple-superset-serviceaccount").expect("build succeeds");
+        let resources = build(&cluster).expect("build succeeds");
 
         assert_eq!(
             sorted_names(&resources.stateful_sets),
@@ -262,5 +259,54 @@ mod tests {
                 "simple-superset-worker"
             ]
         );
+    }
+
+    /// Locks the RBAC resource names, the roleRef, and the recommended label set against
+    /// accidental drift. The fixture's cluster name deliberately differs from the product name so
+    /// that swapped `name`/`instance` label values cannot pass unnoticed.
+    #[test]
+    fn build_produces_rbac() {
+        let cluster = validated_cluster();
+        let resources = build(&cluster).expect("build succeeds");
+
+        assert_eq!(
+            sorted_names(&resources.service_accounts),
+            ["simple-superset-serviceaccount"]
+        );
+        assert_eq!(
+            sorted_names(&resources.role_bindings),
+            ["simple-superset-rolebinding"]
+        );
+
+        let expected_labels = BTreeMap::from(
+            [
+                ("app.kubernetes.io/component", "none"),
+                ("app.kubernetes.io/instance", "simple-superset"),
+                (
+                    "app.kubernetes.io/managed-by",
+                    "superset.stackable.tech_supersetcluster",
+                ),
+                ("app.kubernetes.io/name", "superset"),
+                ("app.kubernetes.io/role-group", "none"),
+                ("app.kubernetes.io/version", "4.1.4-stackable0.0.0-dev"),
+                ("stackable.tech/vendor", "Stackable"),
+            ]
+            .map(|(key, value)| (key.to_string(), value.to_string())),
+        );
+        let service_account = resources
+            .service_accounts
+            .first()
+            .expect("a ServiceAccount is built");
+        assert_eq!(
+            service_account.metadata.labels,
+            Some(expected_labels.clone())
+        );
+
+        let role_binding = resources
+            .role_bindings
+            .first()
+            .expect("a RoleBinding is built");
+        assert_eq!(role_binding.metadata.labels, Some(expected_labels));
+        assert_eq!(role_binding.role_ref.name, "superset-clusterrole");
     }
 }

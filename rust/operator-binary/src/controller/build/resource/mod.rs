@@ -49,6 +49,7 @@ pub mod config_map;
 pub mod deployment;
 pub mod listener;
 pub mod pdb;
+pub mod rbac;
 pub mod service;
 pub mod statefulset;
 
@@ -252,7 +253,7 @@ pub(crate) fn build_vector_container(
                 &Container::Vector.to_container_name(),
                 &validated.image,
                 vector_log_config,
-                &validated.resource_names(superset_role, role_group_name),
+                &validated.role_group_resource_names(superset_role, role_group_name),
                 &CONFIG_VOLUME_NAME,
                 &LOG_VOLUME_NAME,
                 EnvVarSet::new(),

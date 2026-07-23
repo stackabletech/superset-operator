@@ -1,7 +1,7 @@
 use stackable_operator::{crd::listener, v2::types::kubernetes::ListenerClassName};
 
 use crate::{
-    controller::{ValidatedCluster, build::PLACEHOLDER_LISTENER_ROLE_GROUP},
+    controller::{ValidatedCluster, build::NONE_ROLE_GROUP_NAME},
     crd::{APP_PORT, APP_PORT_NAME, SupersetRole},
 };
 
@@ -16,7 +16,7 @@ pub fn build_group_listener(
     // The group listener is a role-level object, so the constant `none` placeholder role-group is
     // used for the recommended labels.
     let metadata = validated
-        .object_meta(listener_group_name, role, &PLACEHOLDER_LISTENER_ROLE_GROUP)
+        .object_meta(listener_group_name, role, &NONE_ROLE_GROUP_NAME)
         .build();
 
     let spec = listener::v1alpha1::ListenerSpec {

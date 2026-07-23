@@ -28,7 +28,7 @@ pub fn build_rolegroup_headless_service(
         metadata: validated
             .object_meta(
                 validated
-                    .resource_names(role, role_group_name)
+                    .role_group_resource_names(role, role_group_name)
                     .headless_service_name()
                     .to_string(),
                 role,
@@ -54,7 +54,7 @@ pub fn build_rolegroup_metrics_service(
     role: &SupersetRole,
     role_group_name: &RoleGroupName,
 ) -> Service {
-    let resource_names = validated.resource_names(role, role_group_name);
+    let resource_names = validated.role_group_resource_names(role, role_group_name);
     Service {
         metadata: validated
             .object_meta(

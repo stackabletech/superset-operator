@@ -49,7 +49,7 @@ pub fn build_rolegroup_config_map(
             validated
                 .object_meta(
                     validated
-                        .resource_names(role, role_group_name)
+                        .role_group_resource_names(role, role_group_name)
                         .role_group_config_map()
                         .to_string(),
                     role,

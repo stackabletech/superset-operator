@@ -7,8 +7,11 @@
 - Internal operator refactoring: introduce a build() step in the reconciler that
   assembles all relevant Kubernetes resources before anything is applied ([#756]).
 - Bump stackable-operator to 0.114.0 ([#765]).
+- The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
+  functions and carry the full set of recommended labels ([#761]).
 
 [#756]: https://github.com/stackabletech/superset-operator/pull/756
+[#761]: https://github.com/stackabletech/superset-operator/pull/761
 [#765]: https://github.com/stackabletech/superset-operator/pull/765
 
 ## [26.7.0] - 2026-07-21

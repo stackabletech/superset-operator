@@ -604,8 +604,18 @@ impl v1alpha1::SupersetCluster {
 #[cfg(test)]
 mod tests {
     use stackable_operator::versioned::test_utils::RoundtripTestData;
+    use strum::IntoEnumIterator;
 
-    use super::v1alpha1;
+    use super::{SupersetRole, v1alpha1};
+
+    /// Locks the invariant behind the `expect` in [`SupersetRole::role_name`]: every
+    /// `SupersetRole` variant (present and future) must serialise to a valid `RoleName`.
+    #[test]
+    fn every_superset_role_serialises_to_a_valid_role_name() {
+        for role in SupersetRole::iter() {
+            role.role_name();
+        }
+    }
 
     impl RoundtripTestData for v1alpha1::SupersetClusterSpec {
         fn roundtrip_test_data() -> Vec<Self> {
