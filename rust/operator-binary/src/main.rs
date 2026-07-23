@@ -76,7 +76,6 @@ async fn main() -> anyhow::Result<()> {
             watch_namespace,
             maintenance,
             common,
-            ..
         }) => {
             // NOTE (@NickLarsenNZ): Before stackable-telemetry was used:
             // - The console log level was set by `SUPERSET_OPERATOR_LOG`, and is now `CONSOLE_LOG` (when using Tracing::pre_configured).

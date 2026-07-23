@@ -6,8 +6,10 @@
 
 - Internal operator refactoring: introduce a build() step in the reconciler that
   assembles all relevant Kubernetes resources before anything is applied ([#756]).
+- Bump stackable-operator to 0.114.0 ([#765]).
 
 [#756]: https://github.com/stackabletech/superset-operator/pull/756
+[#765]: https://github.com/stackabletech/superset-operator/pull/765
 
 ## [26.7.0] - 2026-07-21
 
