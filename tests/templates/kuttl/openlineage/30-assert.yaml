@@ -1,0 +1,14 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: openlineage-receiver
+timeout: 240
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openlineage-receiver
+status:
+  readyReplicas: 1
+  replicas: 1
