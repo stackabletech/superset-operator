@@ -30,6 +30,7 @@ use stackable_operator::{
         types::{
             common::Port,
             kubernetes::{ConfigMapName, ContainerName, ListenerClassName},
+            operator::RoleName,
         },
     },
     versioned::versioned,
@@ -417,11 +418,23 @@ impl SupersetRole {
             Self::Worker | Self::Beat => None,
         }
     }
+}
 
-    pub fn role_name(&self) -> stackable_operator::v2::types::operator::RoleName {
-        self.to_string()
+impl From<SupersetRole> for RoleName {
+    fn from(value: SupersetRole) -> Self {
+        value
+            .to_string()
             .parse()
-            .expect("a Superset serialises to a valid RoleName")
+            .expect("a SupersetRole serialises to a valid RoleName")
+    }
+}
+
+impl From<&SupersetRole> for RoleName {
+    fn from(value: &SupersetRole) -> Self {
+        value
+            .to_string()
+            .parse()
+            .expect("a SupersetRole serialises to a valid RoleName")
     }
 }
 
@@ -603,17 +616,20 @@ impl v1alpha1::SupersetCluster {
 
 #[cfg(test)]
 mod tests {
-    use stackable_operator::versioned::test_utils::RoundtripTestData;
+    use stackable_operator::{
+        v2::types::operator::RoleName, versioned::test_utils::RoundtripTestData,
+    };
     use strum::IntoEnumIterator;
 
     use super::{SupersetRole, v1alpha1};
 
-    /// Locks the invariant behind the `expect` in [`SupersetRole::role_name`]: every
-    /// `SupersetRole` variant (present and future) must serialise to a valid `RoleName`.
+    /// Locks the invariant behind the `expect` in the `From<SupersetRole> for RoleName` impls:
+    /// every `SupersetRole` variant (present and future) must serialise to a valid `RoleName`.
     #[test]
     fn every_superset_role_serialises_to_a_valid_role_name() {
         for role in SupersetRole::iter() {
-            role.role_name();
+            let _: RoleName = (&role).into();
+            let _: RoleName = role.into();
         }
     }
 

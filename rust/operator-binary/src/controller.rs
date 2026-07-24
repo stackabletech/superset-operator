@@ -235,7 +235,7 @@ impl ValidatedCluster {
     ) -> ResourceNames {
         ResourceNames {
             cluster_name: self.name.clone(),
-            role_name: role.role_name(),
+            role_name: role.into(),
             role_group_name: role_group_name.clone(),
         }
     }
@@ -254,7 +254,7 @@ impl ValidatedCluster {
         role: &SupersetRole,
         role_group_name: &RoleGroupName,
     ) -> Labels {
-        self.recommended_labels_for(&role.role_name(), role_group_name)
+        self.recommended_labels_for(&role.into(), role_group_name)
     }
 
     pub fn recommended_labels_for(
@@ -274,7 +274,7 @@ impl ValidatedCluster {
     ) -> Labels {
         self.recommended_labels_with(
             &build::UNVERSIONED_PRODUCT_VERSION,
-            &role.role_name(),
+            &role.into(),
             role_group_name,
         )
     }
@@ -301,7 +301,7 @@ impl ValidatedCluster {
         role: &SupersetRole,
         role_group_name: &RoleGroupName,
     ) -> Labels {
-        role_group_selector(self, &product_name(), &role.role_name(), role_group_name)
+        role_group_selector(self, &product_name(), &role.into(), role_group_name)
     }
 
     /// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, an owner reference back to
