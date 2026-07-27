@@ -100,3 +100,81 @@ fn service_ports() -> Vec<ServicePort> {
         ..ServicePort::default()
     }]
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+    use stackable_operator::v2::types::operator::RoleGroupName;
+
+    use super::*;
+    use crate::controller::{
+        build::test_support::validated_cluster, test_support::app_version_label,
+    };
+
+    /// Every metrics Service must carry the Prometheus scrape label and the
+    /// `prometheus.io/path|port|scheme|scrape` annotations, or Prometheus stops discovering the
+    /// endpoints.
+    #[test]
+    fn test_rolegroup_metrics_service() {
+        let validated = validated_cluster();
+        let role_group_name: RoleGroupName = "default".parse().expect("valid role group name");
+
+        let service =
+            build_rolegroup_metrics_service(&validated, &SupersetRole::Node, &role_group_name);
+
+        assert_eq!(
+            json!({
+                "apiVersion": "v1",
+                "kind": "Service",
+                "metadata": {
+                    "annotations": {
+                        "prometheus.io/path": "/metrics",
+                        "prometheus.io/port": "9102",
+                        "prometheus.io/scheme": "http",
+                        "prometheus.io/scrape": "true"
+                    },
+                    "labels": {
+                        "app.kubernetes.io/component": "node",
+                        "app.kubernetes.io/instance": "simple-superset",
+                        "app.kubernetes.io/managed-by": "superset.stackable.tech_supersetcluster",
+                        "app.kubernetes.io/name": "superset",
+                        "app.kubernetes.io/role-group": "default",
+                        "app.kubernetes.io/version": app_version_label("4.1.4"),
+                        "prometheus.io/scrape": "true",
+                        "stackable.tech/vendor": "Stackable"
+                    },
+                    "name": "simple-superset-node-default-metrics",
+                    "namespace": "default",
+                    "ownerReferences": [
+                        {
+                            "apiVersion": "superset.stackable.tech/v1alpha1",
+                            "controller": true,
+                            "kind": "SupersetCluster",
+                            "name": "simple-superset",
+                            "uid": "01234567-89ab-cdef-0123-456789abcdef"
+                        }
+                    ]
+                },
+                "spec": {
+                    "clusterIP": "None",
+                    "ports": [
+                        {
+                            "name": "metrics",
+                            "port": 9102,
+                            "protocol": "TCP"
+                        }
+                    ],
+                    "publishNotReadyAddresses": true,
+                    "selector": {
+                        "app.kubernetes.io/component": "node",
+                        "app.kubernetes.io/instance": "simple-superset",
+                        "app.kubernetes.io/name": "superset",
+                        "app.kubernetes.io/role-group": "default"
+                    },
+                    "type": "ClusterIP"
+                }
+            }),
+            serde_json::to_value(service).expect("must be serializable")
+        );
+    }
+}

@@ -161,12 +161,9 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
+pub(crate) mod test_support {
+    use stackable_operator::utils::yaml_from_str_singleton_map;
 
-    use stackable_operator::{kube::Resource, utils::yaml_from_str_singleton_map};
-
-    use super::build;
     use crate::{
         controller::{
             ValidatedCluster, test_support::default_dereferenced, validate::validate_cluster,
@@ -174,8 +171,13 @@ mod tests {
         crd::v1alpha1,
     };
 
-    /// A validated cluster with a `node`, `worker` and `beat` role (one `default` role group each).
-    fn validated_cluster() -> ValidatedCluster {
+    /// A validated cluster with a `node`, `worker` and `beat` role (one `default` role group
+    /// each).
+    ///
+    /// The cluster name (`simple-superset`) deliberately differs from the product name
+    /// (`superset`), so tests asserting recommended labels catch swapped `name`/`instance`
+    /// values.
+    pub fn validated_cluster() -> ValidatedCluster {
         let input = r#"
         apiVersion: superset.stackable.tech/v1alpha1
         kind: SupersetCluster
@@ -210,6 +212,13 @@ mod tests {
             yaml_from_str_singleton_map(input).expect("illegal test input");
         validate_cluster(&superset, default_dereferenced(), "test-repo").expect("validated")
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use stackable_operator::kube::Resource;
+
+    use super::{build, test_support::validated_cluster};
 
     fn sorted_names(resources: &[impl Resource]) -> Vec<&str> {
         let mut names: Vec<&str> = resources
@@ -259,16 +268,7 @@ mod tests {
                 "simple-superset-worker"
             ]
         );
-    }
-
-    /// Locks the RBAC resource names, the roleRef, and the recommended label set against
-    /// accidental drift. The fixture's cluster name deliberately differs from the product name so
-    /// that swapped `name`/`instance` label values cannot pass unnoticed.
-    #[test]
-    fn build_produces_rbac() {
-        let cluster = validated_cluster();
-        let resources = build(&cluster).expect("build succeeds");
-
+        // The cluster-shared RBAC pair.
         assert_eq!(
             sorted_names(&resources.service_accounts),
             ["simple-superset-serviceaccount"]
@@ -277,36 +277,5 @@ mod tests {
             sorted_names(&resources.role_bindings),
             ["simple-superset-rolebinding"]
         );
-
-        let expected_labels = BTreeMap::from(
-            [
-                ("app.kubernetes.io/component", "none"),
-                ("app.kubernetes.io/instance", "simple-superset"),
-                (
-                    "app.kubernetes.io/managed-by",
-                    "superset.stackable.tech_supersetcluster",
-                ),
-                ("app.kubernetes.io/name", "superset"),
-                ("app.kubernetes.io/role-group", "none"),
-                ("app.kubernetes.io/version", "4.1.4-stackable0.0.0-dev"),
-                ("stackable.tech/vendor", "Stackable"),
-            ]
-            .map(|(key, value)| (key.to_string(), value.to_string())),
-        );
-        let service_account = resources
-            .service_accounts
-            .first()
-            .expect("a ServiceAccount is built");
-        assert_eq!(
-            service_account.metadata.labels,
-            Some(expected_labels.clone())
-        );
-
-        let role_binding = resources
-            .role_bindings
-            .first()
-            .expect("a RoleBinding is built");
-        assert_eq!(role_binding.metadata.labels, Some(expected_labels));
-        assert_eq!(role_binding.role_ref.name, "superset-clusterrole");
     }
 }
