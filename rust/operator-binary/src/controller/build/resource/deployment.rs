@@ -22,7 +22,10 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::{SupersetRoleGroupConfig, ValidatedCluster, build::properties::ConfigFileName},
+    controller::{
+        SupersetRoleGroupConfig, ValidatedCluster,
+        build::{object_meta, properties::ConfigFileName},
+    },
     crd::{PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, SupersetRole},
 };
 
@@ -161,14 +164,14 @@ pub fn build_rolegroup_deployment(
     pod_template.merge_from(rolegroup_config.pod_overrides.clone());
 
     Ok(Deployment {
-        metadata: validated
-            .object_meta(
-                resource_names.deployment_name().to_string(),
-                superset_role,
-                role_group_name,
-            )
-            .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
-            .build(),
+        metadata: object_meta(
+            validated,
+            resource_names.deployment_name().to_string(),
+            superset_role,
+            role_group_name,
+        )
+        .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
+        .build(),
         spec: Some(DeploymentSpec {
             replicas: replicas.map(i32::from),
             selector: LabelSelector {

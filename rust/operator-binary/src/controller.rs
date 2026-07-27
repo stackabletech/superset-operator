@@ -39,7 +39,6 @@ use stackable_operator::{
     },
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
-        builder::meta::ownerreference_from_resource,
         cluster_resources::cluster_resources_new,
         kvp::label::{recommended_labels, role_group_selector},
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
@@ -302,27 +301,6 @@ impl ValidatedCluster {
         role_group_name: &RoleGroupName,
     ) -> Labels {
         role_group_selector(self, &product_name(), &role.into(), role_group_name)
-    }
-
-    /// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, an owner reference back to
-    /// this cluster, and the recommended labels for a resource named `name` in `role`/
-    /// `role_group_name`.
-    ///
-    /// Consolidates the metadata chain repeated by the role-group child-resource builders. Call
-    /// sites that need extra labels/annotations chain them onto the returned builder.
-    pub(crate) fn object_meta(
-        &self,
-        name: impl Into<String>,
-        role: &SupersetRole,
-        role_group_name: &RoleGroupName,
-    ) -> ObjectMetaBuilder {
-        let mut builder = ObjectMetaBuilder::new();
-        builder
-            .name_and_namespace(self)
-            .name(name)
-            .ownerreference(ownerreference_from_resource(self, None, Some(true)))
-            .with_labels(self.recommended_labels(role, role_group_name));
-        builder
     }
 }
 

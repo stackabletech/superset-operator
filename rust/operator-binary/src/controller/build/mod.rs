@@ -3,7 +3,13 @@
 use std::str::FromStr;
 
 use snafu::{ResultExt, Snafu};
-use stackable_operator::v2::types::operator::{ProductVersion, RoleGroupName};
+use stackable_operator::{
+    builder::meta::ObjectMetaBuilder,
+    v2::{
+        builder::meta::ownerreference_from_resource,
+        types::operator::{ProductVersion, RoleGroupName},
+    },
+};
 
 use crate::{
     controller::{
@@ -158,6 +164,27 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
         service_accounts: vec![build_service_account(cluster)],
         role_bindings: vec![build_role_binding(cluster)],
     })
+}
+
+/// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, an owner reference back to
+/// the cluster, and the recommended labels for a resource named `name` in `role`/
+/// `role_group_name`.
+///
+/// Consolidates the metadata chain repeated by the role-group child-resource builders. Call
+/// sites that need extra labels/annotations chain them onto the returned builder.
+pub(crate) fn object_meta(
+    validated: &ValidatedCluster,
+    name: impl Into<String>,
+    role: &SupersetRole,
+    role_group_name: &RoleGroupName,
+) -> ObjectMetaBuilder {
+    let mut builder = ObjectMetaBuilder::new();
+    builder
+        .name_and_namespace(validated)
+        .name(name)
+        .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
+        .with_labels(validated.recommended_labels(role, role_group_name));
+    builder
 }
 
 #[cfg(test)]
