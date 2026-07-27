@@ -9,6 +9,8 @@
 - Bump stackable-operator to 0.114.0 ([#765]).
 - The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
   functions and carry the full set of recommended labels ([#761]).
+- BREAKING: The `nodes` role is now required by the CRD; a SupersetCluster without it was
+  previously accepted by the API server but reconciled to no `nodes` resources ([#761]).
 
 [#756]: https://github.com/stackabletech/superset-operator/pull/756
 [#761]: https://github.com/stackabletech/superset-operator/pull/761
