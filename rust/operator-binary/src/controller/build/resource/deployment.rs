@@ -22,7 +22,10 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::{SupersetRoleGroupConfig, ValidatedCluster, build::properties::ConfigFileName},
+    controller::{
+        SupersetRoleGroupConfig, ValidatedCluster,
+        build::{object_meta, properties::ConfigFileName},
+    },
     crd::{PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, SupersetRole},
 };
 
@@ -64,11 +67,10 @@ pub fn build_rolegroup_deployment(
     superset_role: &SupersetRole,
     role_group_name: &RoleGroupName,
     rolegroup_config: &SupersetRoleGroupConfig,
-    sa_name: &str,
 ) -> Result<Deployment> {
     let merged_config = &rolegroup_config.config;
 
-    let resource_names = validated.resource_names(superset_role, role_group_name);
+    let resource_names = validated.role_group_resource_names(superset_role, role_group_name);
     let recommended_object_labels = validated.recommended_labels(superset_role, role_group_name);
 
     // The Celery process command, liveness probe and replica policy are the only differences
@@ -102,7 +104,12 @@ pub fn build_rolegroup_deployment(
                 .build(),
         )
         .affinity(&merged_config.affinity)
-        .service_account_name(sa_name);
+        .service_account_name(
+            validated
+                .cluster_resource_names()
+                .service_account_name()
+                .to_string(),
+        );
 
     let mut superset_cb = super::build_superset_container_builder(validated, rolegroup_config)
         .context(BuildContainerSnafu)?;
@@ -157,14 +164,14 @@ pub fn build_rolegroup_deployment(
     pod_template.merge_from(rolegroup_config.pod_overrides.clone());
 
     Ok(Deployment {
-        metadata: validated
-            .object_meta(
-                resource_names.deployment_name().to_string(),
-                superset_role,
-                role_group_name,
-            )
-            .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
-            .build(),
+        metadata: object_meta(
+            validated,
+            resource_names.deployment_name().to_string(),
+            superset_role,
+            role_group_name,
+        )
+        .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
+        .build(),
         spec: Some(DeploymentSpec {
             replicas: replicas.map(i32::from),
             selector: LabelSelector {

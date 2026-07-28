@@ -7,7 +7,10 @@ use stackable_operator::{
 use crate::{
     controller::{
         ValidatedCluster, ValidatedSupersetConfig,
-        build::properties::{ConfigFileName, product_logging, superset_config},
+        build::{
+            object_meta,
+            properties::{ConfigFileName, product_logging, superset_config},
+        },
     },
     crd::{SupersetRole, v1alpha1::SupersetConfigOverrides},
 };
@@ -46,16 +49,16 @@ pub fn build_rolegroup_config_map(
 
     cm_builder
         .metadata(
-            validated
-                .object_meta(
-                    validated
-                        .resource_names(role, role_group_name)
-                        .role_group_config_map()
-                        .to_string(),
-                    role,
-                    role_group_name,
-                )
-                .build(),
+            object_meta(
+                validated,
+                validated
+                    .role_group_resource_names(role, role_group_name)
+                    .role_group_config_map()
+                    .to_string(),
+                role,
+                role_group_name,
+            )
+            .build(),
         )
         .add_data(ConfigFileName::SupersetConfig.to_string(), config_file);
 

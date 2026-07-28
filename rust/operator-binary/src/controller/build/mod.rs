@@ -3,7 +3,13 @@
 use std::str::FromStr;
 
 use snafu::{ResultExt, Snafu};
-use stackable_operator::v2::types::operator::{ProductVersion, RoleGroupName};
+use stackable_operator::{
+    builder::meta::ObjectMetaBuilder,
+    v2::{
+        builder::meta::ownerreference_from_resource,
+        types::operator::{ProductVersion, RoleGroupName},
+    },
+};
 
 use crate::{
     controller::{
@@ -13,6 +19,7 @@ use crate::{
             deployment::build_rolegroup_deployment,
             listener::build_group_listener,
             pdb::build_pdb,
+            rbac::{build_role_binding, build_service_account},
             service::{build_rolegroup_headless_service, build_rolegroup_metrics_service},
             statefulset::build_node_rolegroup_statefulset,
         },
@@ -26,7 +33,7 @@ pub mod resource;
 
 // Placeholder role-group name used for the recommended labels of the role-level `Listener`
 // (which is not tied to a single role group).
-stackable_operator::constant!(pub(crate) PLACEHOLDER_LISTENER_ROLE_GROUP: RoleGroupName = "none");
+stackable_operator::constant!(pub(crate) NONE_ROLE_GROUP_NAME: RoleGroupName = "none");
 
 // Product version used for the recommended labels of PVC templates, which cannot be modified after
 // deployment. A constant `none` keeps those labels stable across version upgrades.
@@ -54,13 +61,7 @@ pub enum Error {
 }
 
 /// Builds every Kubernetes resource for the given validated cluster.
-///
-/// `service_account_name` is the name of the RBAC `ServiceAccount` the role-group Pods run under.
-/// The RBAC resources themselves are built and applied separately in the reconcile step.
-pub fn build(
-    cluster: &ValidatedCluster,
-    service_account_name: &str,
-) -> Result<KubernetesResources, Error> {
+pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
     let mut stateful_sets = vec![];
     let mut deployments = vec![];
     let mut services = vec![];
@@ -110,7 +111,6 @@ pub fn build(
                             superset_role,
                             role_group_name,
                             rolegroup_config,
-                            service_account_name,
                         )
                         .context(StatefulSetSnafu {
                             role_group: role_group_name.clone(),
@@ -124,7 +124,6 @@ pub fn build(
                             superset_role,
                             role_group_name,
                             rolegroup_config,
-                            service_account_name,
                         )
                         .context(DeploymentSnafu {
                             role_group: role_group_name.clone(),
@@ -162,14 +161,36 @@ pub fn build(
         listeners,
         config_maps,
         pod_disruption_budgets,
+        service_accounts: vec![build_service_account(cluster)],
+        role_bindings: vec![build_role_binding(cluster)],
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use stackable_operator::{kube::Resource, utils::yaml_from_str_singleton_map};
+/// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, an owner reference back to
+/// the cluster, and the recommended labels for a resource named `name` in `role`/
+/// `role_group_name`.
+///
+/// Consolidates the metadata chain repeated by the role-group child-resource builders. Call
+/// sites that need extra labels/annotations chain them onto the returned builder.
+pub(crate) fn object_meta(
+    validated: &ValidatedCluster,
+    name: impl Into<String>,
+    role: &SupersetRole,
+    role_group_name: &RoleGroupName,
+) -> ObjectMetaBuilder {
+    let mut builder = ObjectMetaBuilder::new();
+    builder
+        .name_and_namespace(validated)
+        .name(name)
+        .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
+        .with_labels(validated.recommended_labels(role, role_group_name));
+    builder
+}
 
-    use super::build;
+#[cfg(test)]
+pub(crate) mod test_support {
+    use stackable_operator::utils::yaml_from_str_singleton_map;
+
     use crate::{
         controller::{
             ValidatedCluster, test_support::default_dereferenced, validate::validate_cluster,
@@ -177,8 +198,13 @@ mod tests {
         crd::v1alpha1,
     };
 
-    /// A validated cluster with a `node`, `worker` and `beat` role (one `default` role group each).
-    fn validated_cluster() -> ValidatedCluster {
+    /// A validated cluster with a `node`, `worker` and `beat` role (one `default` role group
+    /// each).
+    ///
+    /// The cluster name (`simple-superset`) deliberately differs from the product name
+    /// (`superset`), so tests asserting recommended labels catch swapped `name`/`instance`
+    /// values.
+    pub fn validated_cluster() -> ValidatedCluster {
         let input = r#"
         apiVersion: superset.stackable.tech/v1alpha1
         kind: SupersetCluster
@@ -213,6 +239,13 @@ mod tests {
             yaml_from_str_singleton_map(input).expect("illegal test input");
         validate_cluster(&superset, default_dereferenced(), "test-repo").expect("validated")
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use stackable_operator::kube::Resource;
+
+    use super::{build, test_support::validated_cluster};
 
     fn sorted_names(resources: &[impl Resource]) -> Vec<&str> {
         let mut names: Vec<&str> = resources
@@ -230,7 +263,7 @@ mod tests {
     #[test]
     fn build_produces_expected_resource_names() {
         let cluster = validated_cluster();
-        let resources = build(&cluster, "simple-superset-serviceaccount").expect("build succeeds");
+        let resources = build(&cluster).expect("build succeeds");
 
         assert_eq!(
             sorted_names(&resources.stateful_sets),
@@ -261,6 +294,15 @@ mod tests {
                 "simple-superset-node",
                 "simple-superset-worker"
             ]
+        );
+        // The cluster-shared RBAC pair.
+        assert_eq!(
+            sorted_names(&resources.service_accounts),
+            ["simple-superset-serviceaccount"]
+        );
+        assert_eq!(
+            sorted_names(&resources.role_bindings),
+            ["simple-superset-rolebinding"]
         );
     }
 }

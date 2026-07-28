@@ -38,6 +38,7 @@ use crate::{
         SupersetRoleGroupConfig, ValidatedCluster,
         build::{
             command::add_cert_to_python_certifi_command,
+            object_meta,
             properties::{ConfigFileName, superset_config},
             resource::listener::LISTENER_VOLUME_DIR,
         },
@@ -94,11 +95,10 @@ pub fn build_node_rolegroup_statefulset(
     superset_role: &SupersetRole,
     role_group_name: &RoleGroupName,
     rolegroup_config: &SupersetRoleGroupConfig,
-    sa_name: &str,
 ) -> Result<StatefulSet> {
     let merged_config = &rolegroup_config.config;
 
-    let resource_names = validated.resource_names(superset_role, role_group_name);
+    let resource_names = validated.role_group_resource_names(superset_role, role_group_name);
     let recommended_object_labels = validated.recommended_labels(superset_role, role_group_name);
     // Used for PVC templates that cannot be modified once they are deployed (a constant "none"
     // version keeps the labels stable across version upgrades).
@@ -118,7 +118,12 @@ pub fn build_node_rolegroup_statefulset(
                 .build(),
         )
         .affinity(&merged_config.affinity)
-        .service_account_name(sa_name);
+        .service_account_name(
+            validated
+                .cluster_resource_names()
+                .service_account_name()
+                .to_string(),
+        );
 
     let mut superset_cb = super::build_superset_container_builder(validated, rolegroup_config)
         .context(BuildContainerSnafu)?;
@@ -234,14 +239,14 @@ pub fn build_node_rolegroup_statefulset(
     pod_template.merge_from(rolegroup_config.pod_overrides.clone());
 
     Ok(StatefulSet {
-        metadata: validated
-            .object_meta(
-                resource_names.stateful_set_name().to_string(),
-                superset_role,
-                role_group_name,
-            )
-            .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
-            .build(),
+        metadata: object_meta(
+            validated,
+            resource_names.stateful_set_name().to_string(),
+            superset_role,
+            role_group_name,
+        )
+        .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
+        .build(),
         spec: Some(StatefulSetSpec {
             pod_management_policy: Some(POD_MANAGEMENT_POLICY_ORDERED_READY.to_string()),
             replicas: rolegroup_config.replicas.map(i32::from),

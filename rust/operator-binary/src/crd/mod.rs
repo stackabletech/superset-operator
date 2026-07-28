@@ -30,6 +30,7 @@ use stackable_operator::{
         types::{
             common::Port,
             kubernetes::{ConfigMapName, ContainerName, ListenerClassName},
+            operator::RoleName,
         },
     },
     versioned::versioned,
@@ -174,8 +175,7 @@ pub mod versioned {
         pub object_overrides: ObjectOverrides,
 
         // no doc - docs in the struct.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub nodes: Option<SupersetRoleType>,
+        pub nodes: SupersetRoleType,
 
         // no doc - docs in the struct.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -409,19 +409,27 @@ impl SupersetRole {
         superset: &v1alpha1::SupersetCluster,
     ) -> Option<ListenerClassName> {
         match self {
-            Self::Node => superset
-                .spec
-                .nodes
-                .as_ref()
-                .map(|node| node.role_config.listener_class.clone()),
+            Self::Node => Some(superset.spec.nodes.role_config.listener_class.clone()),
             Self::Worker | Self::Beat => None,
         }
     }
+}
 
-    pub fn role_name(&self) -> stackable_operator::v2::types::operator::RoleName {
-        self.to_string()
+impl From<SupersetRole> for RoleName {
+    fn from(value: SupersetRole) -> Self {
+        value
+            .to_string()
             .parse()
-            .expect("a Superset serialises to a valid RoleName")
+            .expect("a SupersetRole serialises to a valid RoleName")
+    }
+}
+
+impl From<&SupersetRole> for RoleName {
+    fn from(value: &SupersetRole) -> Self {
+        value
+            .to_string()
+            .parse()
+            .expect("a SupersetRole serialises to a valid RoleName")
     }
 }
 
@@ -586,7 +594,9 @@ impl v1alpha1::SupersetCluster {
 
     pub fn get_role(&self, role: &SupersetRole) -> Option<&SupersetRoleType> {
         match role {
-            SupersetRole::Node => self.spec.nodes.as_ref(),
+            // The `nodes` role is required by the CRD; `Option` is kept for the signature shared
+            // with the genuinely optional Celery roles.
+            SupersetRole::Node => Some(&self.spec.nodes),
             SupersetRole::Worker => self.spec.workers.as_ref(),
             SupersetRole::Beat => self.spec.beat.as_ref(),
         }
@@ -603,9 +613,22 @@ impl v1alpha1::SupersetCluster {
 
 #[cfg(test)]
 mod tests {
-    use stackable_operator::versioned::test_utils::RoundtripTestData;
+    use stackable_operator::{
+        v2::types::operator::RoleName, versioned::test_utils::RoundtripTestData,
+    };
+    use strum::IntoEnumIterator;
 
-    use super::v1alpha1;
+    use super::{SupersetRole, v1alpha1};
+
+    /// Locks the invariant behind the `expect` in the `From<SupersetRole> for RoleName` impls:
+    /// every `SupersetRole` variant (present and future) must serialise to a valid `RoleName`.
+    #[test]
+    fn every_superset_role_serialises_to_a_valid_role_name() {
+        for role in SupersetRole::iter() {
+            let _: RoleName = (&role).into();
+            let _: RoleName = role.into();
+        }
+    }
 
     impl RoundtripTestData for v1alpha1::SupersetClusterSpec {
         fn roundtrip_test_data() -> Vec<Self> {
