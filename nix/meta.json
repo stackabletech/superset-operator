@@ -1,1 +1,1 @@
-{"operator": {"name": "superset-operator", "pretty_string": "Apache Superset", "product_string": "superset", "url": "stackabletech/superset-operator.git"}}
+{"operator": {"name": "superset-operator", "pretty_string": "Apache Superset", "product_string": "superset", "url": "stackabletech/superset-operator.git", "chart_description": "Kubernetes operator for Apache Superset. Deploy and run Superset with the Stackable Data Platform (SDP).", "keywords": ["apache-superset", "superset", "business-intelligence", "dashboards", "kubernetes", "operator"]}}

@@ -3,8 +3,21 @@ apiVersion: v2
 name: superset-operator
 version: "0.0.0-dev"
 appVersion: "0.0.0-dev"
-description: The Stackable Operator for Apache Superset
+description: "Kubernetes operator for Apache Superset. Deploy and run Superset with the Stackable Data Platform (SDP)."
 home: https://github.com/stackabletech/superset-operator
+sources:
+  - https://github.com/stackabletech/superset-operator
+keywords: ["apache-superset", "superset", "business-intelligence", "dashboards", "kubernetes", "operator"]
 maintainers:
   - name: Stackable
     url: https://www.stackable.tech
+# Consumed by Artifact Hub, see https://artifacthub.io/docs/topics/annotations/helm/
+annotations:
+  # The chart package ships no LICENSE file, so Artifact Hub cannot detect this itself.
+  artifacthub.io/license: OSL-3.0
+  # A link named "support" is rendered highlighted by Artifact Hub. Keep it lowercase.
+  artifacthub.io/links: |
+    - name: Documentation
+      url: https://docs.stackable.tech/home/stable/superset/
+    - name: support
+      url: https://github.com/stackabletech/superset-operator/issues
