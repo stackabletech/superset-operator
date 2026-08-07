@@ -1,19 +1,16 @@
 //! The apply step in the SupersetCluster controller.
 
-use std::{collections::BTreeMap, marker::PhantomData};
+use std::marker::PhantomData;
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    builder::meta::ObjectMetaBuilder,
     client::Client,
     cluster_resources::{ClusterResource, ClusterResourceApplyStrategy, ClusterResources},
     commons::random_secret_creation,
     deep_merger::ObjectOverrides,
-    k8s_openapi::api::core::v1::Secret,
-    v2::{builder::meta::ownerreference_from_resource, cluster_resources::cluster_resources_new},
+    v2::cluster_resources::cluster_resources_new,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
-use tracing::instrument;
 
 use crate::{
     controller::{
@@ -39,17 +36,6 @@ pub enum Error {
     #[snafu(display("failed to create SECRET_KEY Secret"))]
     CreateSecretKeySecret {
         source: random_secret_creation::Error,
-    },
-
-    #[snafu(display("failed to retrieve Secret {secret_name:?}"))]
-    RetrieveSecret {
-        source: stackable_operator::client::Error,
-        secret_name: String,
-    },
-
-    #[snafu(display("failed to create SECRET_KEY Secret from the migrated value"))]
-    CreateMigratedSecretKeySecret {
-        source: stackable_operator::client::Error,
     },
 }
 
@@ -166,10 +152,6 @@ impl<'a> Applier<'a> {
 /// deletion and an existing Secret is never overwritten (rotating the `SECRET_KEY` would
 /// invalidate every session).
 pub async fn ensure_secrets(client: &Client, cluster: &ValidatedCluster) -> Result<()> {
-    // The migration runs first, so that an existing key from the old Secret is carried over
-    // instead of a fresh random one being generated below.
-    migrate_legacy_secret_key_secret_from_26_3(client, cluster).await?;
-
     random_secret_creation::create_random_secret_if_not_exists(
         &cluster.cluster_config.secret_key_secret_name,
         INTERNAL_SECRET_SECRET_KEY,
@@ -179,76 +161,6 @@ pub async fn ensure_secrets(client: &Client, cluster: &ValidatedCluster) -> Resu
     )
     .await
     .context(CreateSecretKeySecretSnafu)?;
-
-    Ok(())
-}
-
-/// Copies the Flask `SECRET_KEY` out of the user-provided credentials Secret (where SDP 26.3 kept
-/// it, under the key `connections.secretKey`) into the operator-owned Secret that SDP 26.7 uses.
-///
-/// Does nothing if the new Secret already exists or if the old one carries no key, in which case
-/// [`ensure_secrets`] generates a fresh random value.
-///
-// TODO: Can be removed after SDP 26.7 is released (it's only a migration from 26.3 - 26.7)
-// (don't forget about the snafu Error variants).
-// Removal is tracked in https://github.com/stackabletech/superset-operator/issues/755
-#[instrument(skip_all)]
-async fn migrate_legacy_secret_key_secret_from_26_3(
-    client: &Client,
-    cluster: &ValidatedCluster,
-) -> Result<()> {
-    let old_secret_name = &cluster.cluster_config.credentials_secret_name;
-    let new_secret_name = &cluster.cluster_config.secret_key_secret_name;
-    let secret_namespace = &cluster.namespace;
-
-    let new_secret = client
-        .get_opt::<Secret>(new_secret_name, secret_namespace.as_ref())
-        .await
-        .with_context(|_| RetrieveSecretSnafu {
-            secret_name: new_secret_name,
-        })?;
-    if new_secret.is_some() {
-        tracing::debug!("SECRET_KEY Secret already exists, nothing to migrate");
-        return Ok(());
-    }
-
-    let old_secret = client
-        .get_opt::<Secret>(old_secret_name, secret_namespace.as_ref())
-        .await
-        .with_context(|_| RetrieveSecretSnafu {
-            secret_name: old_secret_name,
-        })?;
-    let old_secret_key = old_secret
-        .and_then(|secret| secret.data)
-        // Note: We remove the key to take ownership
-        .and_then(|mut data| data.remove("connections.secretKey"))
-        .and_then(|key| String::from_utf8(key.0).ok());
-    if let Some(old_secret_key) = old_secret_key {
-        tracing::info!(
-            old.secret.name = old_secret_name,
-            old.secret.namespace = %secret_namespace,
-            new.secret.name = new_secret_name,
-            new.secret.namespace = %secret_namespace,
-            "Migrating old SECRET_KEY to new Secret"
-        );
-
-        let secret = Secret {
-            metadata: ObjectMetaBuilder::new()
-                .name(new_secret_name)
-                .namespace(secret_namespace)
-                .ownerreference(ownerreference_from_resource(cluster, None, Some(true)))
-                .build(),
-            string_data: Some(BTreeMap::from([(
-                INTERNAL_SECRET_SECRET_KEY.to_string(),
-                old_secret_key,
-            )])),
-            ..Secret::default()
-        };
-        client
-            .create(&secret)
-            .await
-            .context(CreateMigratedSecretKeySecretSnafu)?;
-    }
 
     Ok(())
 }

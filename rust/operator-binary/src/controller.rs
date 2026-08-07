@@ -2,6 +2,7 @@
 pub mod apply;
 pub(crate) mod build;
 pub mod dereference;
+pub mod update_status;
 pub mod validate;
 use std::{collections::BTreeMap, marker::PhantomData, str::FromStr, sync::Arc};
 
@@ -31,10 +32,6 @@ use stackable_operator::{
     kvp::Labels,
     logging::controller::ReconcilerError,
     shared::time::Duration,
-    status::condition::{
-        compute_conditions, deployment::DeploymentConditionBuilder,
-        operations::ClusterOperationsConditionBuilder, statefulset::StatefulSetConditionBuilder,
-    },
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
         kvp::label::{recommended_labels, role_group_selector},
@@ -54,7 +51,10 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     OPERATOR_NAME,
-    controller::apply::{Applier, ensure_secrets},
+    controller::{
+        apply::{Applier, ensure_secrets},
+        update_status::update_status,
+    },
     crd::{
         APP_NAME, SupersetRole,
         authentication::SupersetClientAuthenticationDetailsResolved,
@@ -63,8 +63,7 @@ use crate::{
             CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
         },
         v1alpha1::{
-            SupersetCluster, SupersetClusterStatus, SupersetConfig, SupersetConfigOverrides,
-            SupersetStorageConfig,
+            SupersetCluster, SupersetConfig, SupersetConfigOverrides, SupersetStorageConfig,
         },
     },
 };
@@ -397,10 +396,8 @@ pub enum Error {
     #[snafu(display("failed to apply the Kubernetes resources"))]
     ApplyResources { source: apply::Error },
 
-    #[snafu(display("failed to update status"))]
-    ApplyStatus {
-        source: stackable_operator::client::Error,
-    },
+    #[snafu(display("failed to update the cluster status"))]
+    UpdateStatus { source: update_status::Error },
 
     #[snafu(display("SupersetCluster object is invalid"))]
     InvalidSupersetCluster {
@@ -416,6 +413,18 @@ impl ReconcilerError for Error {
     }
 }
 
+/// Reconcile function of the SupersetCluster controller.
+///
+/// The reconcile function performs the following steps:
+/// 1. Dereference the objects the SupersetCluster refers to (client required).
+/// 2. Validate the cluster specification together with the dereferenced objects, yielding a
+///    [`ValidatedCluster`] (no client required).
+/// 3. Build the Kubernetes resource specifications from the validated cluster (no client
+///    required).
+/// 4. Ensure the Secrets exist that the resources mount but that the operator cannot build,
+///    because their value has to be generated once and then kept (client required).
+/// 5. Apply the resource specifications and delete the orphaned ones (client required).
+/// 6. Update the cluster status from the applied resources (client required).
 pub async fn reconcile_superset(
     superset: Arc<DeserializeGuard<SupersetCluster>>,
     ctx: Arc<Ctx>,
@@ -429,9 +438,6 @@ pub async fn reconcile_superset(
         .context(InvalidSupersetClusterSnafu)?;
 
     let client = &ctx.client;
-
-    let cluster_operation_cond_builder =
-        ClusterOperationsConditionBuilder::new(&superset.spec.cluster_config.cluster_operation);
 
     let dereferenced = dereference::dereference(client, superset)
         .await
@@ -460,30 +466,9 @@ pub async fn reconcile_superset(
     .await
     .context(ApplyResourcesSnafu)?;
 
-    let mut statefulset_cond_builder = StatefulSetConditionBuilder::default();
-    for stateful_set in applied.stateful_sets {
-        statefulset_cond_builder.add(stateful_set);
-    }
-
-    let mut deployment_cond_builder = DeploymentConditionBuilder::default();
-    for deployment in applied.deployments {
-        deployment_cond_builder.add(deployment);
-    }
-
-    let status = SupersetClusterStatus {
-        conditions: compute_conditions(
-            superset,
-            &[
-                &statefulset_cond_builder,
-                &deployment_cond_builder,
-                &cluster_operation_cond_builder,
-            ],
-        ),
-    };
-    client
-        .apply_patch_status(OPERATOR_NAME, superset, &status)
+    update_status(client, superset, &applied)
         .await
-        .context(ApplyStatusSnafu)?;
+        .context(UpdateStatusSnafu)?;
 
     Ok(Action::await_change())
 }
