@@ -12,18 +12,18 @@
 - BREAKING: The `nodes` role is now required by the CRD; a SupersetCluster without it was
   previously accepted by the API server but reconciled to no `nodes` resources ([#761]).
 - The reconciler now applies resources and derives the cluster status in discrete
-  apply and update_status steps for the `controller` reconcile ([#xxx]).
+  apply and update_status steps for the `controller` reconcile ([#772]).
 
 ### Removed
 
 - The migration that copied the Flask `SECRET_KEY` from the credentials Secret (where SDP 26.3
   kept it, under `connections.secretKey`) into the operator-owned Secret. It was only needed for
-  the upgrade from SDP 26.3 to 26.7, which has been released ([#xxx]).
+  the upgrade from SDP 26.3 to 26.7, which has been released ([#772]).
 
 [#756]: https://github.com/stackabletech/superset-operator/pull/756
 [#761]: https://github.com/stackabletech/superset-operator/pull/761
 [#765]: https://github.com/stackabletech/superset-operator/pull/765
-[#xxx]: https://github.com/stackabletech/superset-operator/pull/xxx
+[#772]: https://github.com/stackabletech/superset-operator/pull/772
 
 ## [26.7.0] - 2026-07-21
 
