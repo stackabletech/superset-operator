@@ -2,7 +2,7 @@
 pub(crate) mod build;
 pub mod dereference;
 pub mod validate;
-use std::{collections::BTreeMap, str::FromStr, sync::Arc};
+use std::{collections::BTreeMap, marker::PhantomData, str::FromStr, sync::Arc};
 
 use const_format::concatcp;
 use snafu::{ResultExt, Snafu};
@@ -82,11 +82,18 @@ pub struct Ctx {
     pub operator_environment: OperatorEnvironmentOptions,
 }
 
+/// Marker for prepared Kubernetes resources which are not applied yet.
+pub struct Prepared;
+
 /// Every Kubernetes resource produced by the build step.
 ///
 /// The `Node` role is provisioned via a `StatefulSet` (it serves the Superset web UI), while the
 /// `Worker`/`Beat` Celery roles are provisioned via `Deployment`s; the build step collects both.
-pub struct KubernetesResources {
+///
+/// `T` marks how far these resources have progressed through the reconciliation (so far only
+/// [`Prepared`], meaning built but not applied). The marker lets the compiler prove that later
+/// steps consume resources in the state they expect.
+pub struct KubernetesResources<T> {
     pub stateful_sets: Vec<StatefulSet>,
     pub deployments: Vec<Deployment>,
     pub services: Vec<Service>,
@@ -95,6 +102,7 @@ pub struct KubernetesResources {
     pub pod_disruption_budgets: Vec<PodDisruptionBudget>,
     pub service_accounts: Vec<ServiceAccount>,
     pub role_bindings: Vec<RoleBinding>,
+    pub status: PhantomData<T>,
 }
 
 /// Per-role configuration extracted during validation.

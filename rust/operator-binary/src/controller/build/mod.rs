@@ -1,6 +1,6 @@
 //! Builders that assemble Kubernetes resources for superset rolegroups.
 
-use std::str::FromStr;
+use std::{marker::PhantomData, str::FromStr};
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
@@ -13,7 +13,7 @@ use stackable_operator::{
 
 use crate::{
     controller::{
-        KubernetesResources, ValidatedCluster,
+        KubernetesResources, Prepared, ValidatedCluster,
         build::resource::{
             config_map::build_rolegroup_config_map,
             deployment::build_rolegroup_deployment,
@@ -61,7 +61,7 @@ pub enum Error {
 }
 
 /// Builds every Kubernetes resource for the given validated cluster.
-pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
+pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources<Prepared>, Error> {
     let mut stateful_sets = vec![];
     let mut deployments = vec![];
     let mut services = vec![];
@@ -163,6 +163,7 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources, Error> {
         pod_disruption_budgets,
         service_accounts: vec![build_service_account(cluster)],
         role_bindings: vec![build_role_binding(cluster)],
+        status: PhantomData,
     })
 }
 
