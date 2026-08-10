@@ -113,7 +113,7 @@ pub fn build_node_rolegroup_statefulset(
     pb.metadata(metadata)
         .image_pull_secrets_from_product_image(&validated.image)
         .security_context(
-            PodSecurityContextBuilder::new()
+            PodSecurityContextBuilder::with_stackable_defaults()
                 .fs_group(super::SECRET_OPERATOR_FS_GROUP) // Needed for secret-operator
                 .build(),
         )

@@ -6,7 +6,6 @@ metadata:
 spec:
   group: superset.stackable.tech
   names:
-    categories: []
     kind: SupersetCluster
     plural: supersetclusters
     shortNames:
@@ -14,8 +13,7 @@ spec:
     singular: supersetcluster
   scope: Namespaced
   versions:
-  - additionalPrinterColumns: []
-    name: v1alpha1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
         description: A Superset cluster stacklet. This resource is managed by the Stackable operator for Apache Superset.
@@ -2728,15 +2726,12 @@ metadata:
 spec:
   group: superset.stackable.tech
   names:
-    categories: []
     kind: DruidConnection
     plural: druidconnections
-    shortNames: []
     singular: druidconnection
   scope: Namespaced
   versions:
-  - additionalPrinterColumns: []
-    name: v1alpha1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
         description: The DruidConnection resource can be used to automatically deploy a Druid datasource in Superset.
