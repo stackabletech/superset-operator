@@ -19,11 +19,19 @@
 - The migration that copied the Flask `SECRET_KEY` from the credentials Secret (where SDP 26.3
   kept it, under `connections.secretKey`) into the operator-owned Secret. It was only needed for
   the upgrade from SDP 26.3 to 26.7, which has been released ([#772]).
+- All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#773]).
+
+### Fixed
+
+- Fix a longstanding problem of including empty `categories`, `shortNames` and `additionalPrinterColumns` in the CRDs,
+  which could cause problems with GitOps tools (e.g. ArgoCD) reporting a diff in the custom resources.
+  See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#773]).
 
 [#756]: https://github.com/stackabletech/superset-operator/pull/756
 [#761]: https://github.com/stackabletech/superset-operator/pull/761
 [#765]: https://github.com/stackabletech/superset-operator/pull/765
 [#772]: https://github.com/stackabletech/superset-operator/pull/772
+[#773]: https://github.com/stackabletech/superset-operator/pull/773
 
 ## [26.7.0] - 2026-07-21
 
