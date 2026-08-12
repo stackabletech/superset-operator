@@ -1,26 +1,25 @@
 //! Ensures that `Pod`s are configured and running for each [`SupersetCluster`]
+pub mod apply;
 pub(crate) mod build;
 pub mod dereference;
+pub mod update_status;
 pub mod validate;
-use std::{collections::BTreeMap, str::FromStr, sync::Arc};
+use std::{collections::BTreeMap, marker::PhantomData, str::FromStr, sync::Arc};
 
 use const_format::concatcp;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    builder::meta::ObjectMetaBuilder,
     cli::OperatorEnvironmentOptions,
-    client::Client,
     cluster_resources::ClusterResourceApplyStrategy,
     commons::{
         affinity::StackableAffinity,
         product_image_selection::ResolvedProductImage,
-        random_secret_creation::{self, create_random_secret_if_not_exists},
         resources::{NoRuntimeLimits, Resources},
     },
     crd::listener,
     k8s_openapi::api::{
         apps::v1::{Deployment, StatefulSet},
-        core::v1::{ConfigMap, Secret, Service, ServiceAccount},
+        core::v1::{ConfigMap, Service, ServiceAccount},
         policy::v1::PodDisruptionBudget,
         rbac::v1::RoleBinding,
     },
@@ -33,13 +32,8 @@ use stackable_operator::{
     kvp::Labels,
     logging::controller::ReconcilerError,
     shared::time::Duration,
-    status::condition::{
-        compute_conditions, deployment::DeploymentConditionBuilder,
-        operations::ClusterOperationsConditionBuilder, statefulset::StatefulSetConditionBuilder,
-    },
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
-        cluster_resources::cluster_resources_new,
         kvp::label::{recommended_labels, role_group_selector},
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
@@ -54,20 +48,22 @@ use stackable_operator::{
     },
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
-use tracing::instrument;
 
 use crate::{
     OPERATOR_NAME,
+    controller::{
+        apply::{Applier, ensure_secrets},
+        update_status::update_status,
+    },
     crd::{
-        APP_NAME, INTERNAL_SECRET_SECRET_KEY, SupersetRole,
+        APP_NAME, SupersetRole,
         authentication::SupersetClientAuthenticationDetailsResolved,
         authorization::SupersetOpaConfigResolved,
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection, MetadataDatabaseConnection,
         },
         v1alpha1::{
-            SupersetCluster, SupersetClusterStatus, SupersetConfig, SupersetConfigOverrides,
-            SupersetStorageConfig,
+            SupersetCluster, SupersetConfig, SupersetConfigOverrides, SupersetStorageConfig,
         },
     },
 };
@@ -82,11 +78,21 @@ pub struct Ctx {
     pub operator_environment: OperatorEnvironmentOptions,
 }
 
+/// Marker for prepared Kubernetes resources which are not applied yet.
+pub struct Prepared;
+
+/// Marker for Kubernetes resources which are already applied.
+pub struct Applied;
+
 /// Every Kubernetes resource produced by the build step.
 ///
 /// The `Node` role is provisioned via a `StatefulSet` (it serves the Superset web UI), while the
 /// `Worker`/`Beat` Celery roles are provisioned via `Deployment`s; the build step collects both.
-pub struct KubernetesResources {
+///
+/// `T` marks whether these resources are merely [`Prepared`] or already [`Applied`]. The marker
+/// lets the compiler prove that the cluster status is derived from the applied resources (which
+/// carry the state the API server returned) rather than from the built ones.
+pub struct KubernetesResources<T> {
     pub stateful_sets: Vec<StatefulSet>,
     pub deployments: Vec<Deployment>,
     pub services: Vec<Service>,
@@ -95,6 +101,7 @@ pub struct KubernetesResources {
     pub pod_disruption_budgets: Vec<PodDisruptionBudget>,
     pub service_accounts: Vec<ServiceAccount>,
     pub role_bindings: Vec<RoleBinding>,
+    pub status: PhantomData<T>,
 }
 
 /// Per-role configuration extracted during validation.
@@ -380,48 +387,21 @@ pub enum Error {
     #[snafu(display("failed to validate cluster"))]
     Validate { source: validate::Error },
 
-    #[snafu(display("failed to delete orphaned resources"))]
-    DeleteOrphanedResources {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
     #[snafu(display("failed to build the Kubernetes resources"))]
     BuildResources { source: build::Error },
 
-    #[snafu(display("failed to apply Kubernetes resource"))]
-    ApplyResource {
-        source: stackable_operator::cluster_resources::Error,
-    },
+    #[snafu(display("failed to ensure the SECRET_KEY Secret exists"))]
+    EnsureSecrets { source: apply::Error },
 
-    #[snafu(display("failed to update status"))]
-    ApplyStatus {
-        source: stackable_operator::client::Error,
-    },
+    #[snafu(display("failed to apply the Kubernetes resources"))]
+    ApplyResources { source: apply::Error },
+
+    #[snafu(display("failed to update the cluster status"))]
+    UpdateStatus { source: update_status::Error },
 
     #[snafu(display("SupersetCluster object is invalid"))]
     InvalidSupersetCluster {
         source: error_boundary::InvalidObject,
-    },
-
-    #[snafu(display("failed to create SECRET_KEY secret"))]
-    CreateSecretKeySecret {
-        source: random_secret_creation::Error,
-    },
-
-    #[snafu(display("failed to retrieve credentials secret {secret_name:?}"))]
-    RetrieveCredentialsSecret {
-        source: stackable_operator::client::Error,
-        secret_name: String,
-    },
-
-    #[snafu(display("object is missing metadata to build owner reference"))]
-    ObjectMissingMetadataForOwnerRef {
-        source: stackable_operator::builder::meta::Error,
-    },
-
-    #[snafu(display("failed to create SECRET_KEY secret from migrated value"))]
-    CreateRandomSecret {
-        source: stackable_operator::client::Error,
     },
 }
 
@@ -433,6 +413,18 @@ impl ReconcilerError for Error {
     }
 }
 
+/// Reconcile function of the SupersetCluster controller.
+///
+/// The reconcile function performs the following steps:
+/// 1. Dereference the objects the SupersetCluster refers to (client required).
+/// 2. Validate the cluster specification together with the dereferenced objects, yielding a
+///    [`ValidatedCluster`] (no client required).
+/// 3. Build the Kubernetes resource specifications from the validated cluster (no client
+///    required).
+/// 4. Ensure the Secrets exist that the resources mount but that the operator cannot build,
+///    because their value has to be generated once and then kept (client required).
+/// 5. Apply the resource specifications and delete the orphaned ones (client required).
+/// 6. Update the cluster status from the applied resources (client required).
 pub async fn reconcile_superset(
     superset: Arc<DeserializeGuard<SupersetCluster>>,
     ctx: Arc<Ctx>,
@@ -447,9 +439,6 @@ pub async fn reconcile_superset(
 
     let client = &ctx.client;
 
-    let cluster_operation_cond_builder =
-        ClusterOperationsConditionBuilder::new(&superset.spec.cluster_config.cluster_operation);
-
     let dereferenced = dereference::dereference(client, superset)
         .await
         .context(DereferenceSnafu)?;
@@ -461,179 +450,27 @@ pub async fn reconcile_superset(
     )
     .context(ValidateSnafu)?;
 
-    let mut cluster_resources = cluster_resources_new(
-        &product_name(),
-        &operator_name(),
-        &controller_name(),
-        &validated.name,
-        &validated.namespace,
-        &validated.uid,
-        ClusterResourceApplyStrategy::from(&superset.spec.cluster_config.cluster_operation),
-        &superset.spec.object_overrides,
-    );
-
-    // TODO: Can be removed after SDP 26.7 is released (it's only a migration from 26.3 - 26.7)
-    // (don't forget about the snafu Error variants).
-    // Removal is tracked in https://github.com/stackabletech/superset-operator/issues/755
-    migrate_legacy_secret_key_secret_from_26_3(superset, &validated, client).await?;
-    create_random_secret_if_not_exists(
-        &validated.cluster_config.secret_key_secret_name,
-        INTERNAL_SECRET_SECRET_KEY,
-        256,
-        &validated,
-        client,
-    )
-    .await
-    .context(CreateSecretKeySecretSnafu)?;
-
     let resources = build::build(&validated).context(BuildResourcesSnafu)?;
 
-    let mut statefulset_cond_builder = StatefulSetConditionBuilder::default();
-    let mut deployment_cond_builder = DeploymentConditionBuilder::default();
-
-    // The StatefulSets/Deployments are applied last, so every ConfigMap and Secret they mount
-    // already exists — otherwise a changed mount would restart the Pods.
-    // See https://github.com/stackabletech/commons-operator/issues/111 for details.
-    for service_account in resources.service_accounts {
-        cluster_resources
-            .add(client, service_account)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for role_binding in resources.role_bindings {
-        cluster_resources
-            .add(client, role_binding)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for service in resources.services {
-        cluster_resources
-            .add(client, service)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for config_map in resources.config_maps {
-        cluster_resources
-            .add(client, config_map)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for listener in resources.listeners {
-        cluster_resources
-            .add(client, listener)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for pdb in resources.pod_disruption_budgets {
-        cluster_resources
-            .add(client, pdb)
-            .await
-            .context(ApplyResourceSnafu)?;
-    }
-    for statefulset in resources.stateful_sets {
-        statefulset_cond_builder.add(
-            cluster_resources
-                .add(client, statefulset)
-                .await
-                .context(ApplyResourceSnafu)?,
-        );
-    }
-    for deployment in resources.deployments {
-        deployment_cond_builder.add(
-            cluster_resources
-                .add(client, deployment)
-                .await
-                .context(ApplyResourceSnafu)?,
-        );
-    }
-
-    cluster_resources
-        .delete_orphaned_resources(client)
+    ensure_secrets(client, &validated)
         .await
-        .context(DeleteOrphanedResourcesSnafu)?;
+        .context(EnsureSecretsSnafu)?;
 
-    let status = SupersetClusterStatus {
-        conditions: compute_conditions(
-            superset,
-            &[
-                &statefulset_cond_builder,
-                &deployment_cond_builder,
-                &cluster_operation_cond_builder,
-            ],
-        ),
-    };
-    client
-        .apply_patch_status(OPERATOR_NAME, superset, &status)
+    let applied = Applier::new(
+        client,
+        &validated,
+        ClusterResourceApplyStrategy::from(&superset.spec.cluster_config.cluster_operation),
+        &superset.spec.object_overrides,
+    )
+    .apply(resources)
+    .await
+    .context(ApplyResourcesSnafu)?;
+
+    update_status(client, superset, &applied)
         .await
-        .context(ApplyStatusSnafu)?;
+        .context(UpdateStatusSnafu)?;
 
     Ok(Action::await_change())
-}
-
-// TODO: Can be removed after SDP 26.7 is released (it's only a migration from 26.3 - 26.7)
-// (don't forget about the snafu Error variants).
-// Removal is tracked in https://github.com/stackabletech/superset-operator/issues/755
-#[instrument(skip_all)]
-async fn migrate_legacy_secret_key_secret_from_26_3(
-    superset: &SupersetCluster,
-    validated: &ValidatedCluster,
-    client: &Client,
-) -> Result<()> {
-    let old_secret_name = &validated.cluster_config.credentials_secret_name;
-    let new_secret_name = &validated.cluster_config.secret_key_secret_name;
-    let secret_namespace = &validated.namespace;
-
-    let new_secret = client
-        .get_opt::<Secret>(new_secret_name, secret_namespace.as_ref())
-        .await
-        .with_context(|_| RetrieveCredentialsSecretSnafu {
-            secret_name: new_secret_name,
-        })?;
-    if new_secret.is_some() {
-        tracing::debug!("SECRET_KEY Secret already exists, nothing to migrate");
-        return Ok(());
-    }
-
-    let old_secret = client
-        .get_opt::<Secret>(old_secret_name, secret_namespace.as_ref())
-        .await
-        .with_context(|_| RetrieveCredentialsSecretSnafu {
-            secret_name: old_secret_name,
-        })?;
-    let old_secret_key = old_secret
-        .and_then(|secret| secret.data)
-        // Note: We remove the key to take ownership
-        .and_then(|mut data| data.remove("connections.secretKey"))
-        .and_then(|key| String::from_utf8(key.0).ok());
-    if let Some(old_secret_key) = old_secret_key {
-        tracing::info!(
-            old.secret.name = old_secret_name,
-            old.secret.namespace = %secret_namespace,
-            new.secret.name = new_secret_name,
-            new.secret.namespace = %secret_namespace,
-            "Migrating old SECRET_KEY to new Secret"
-        );
-
-        let secret = Secret {
-            metadata: ObjectMetaBuilder::new()
-                .name(new_secret_name)
-                .namespace(secret_namespace)
-                .ownerreference_from_resource(superset, None, Some(true))
-                .context(ObjectMissingMetadataForOwnerRefSnafu)?
-                .build(),
-            string_data: Some(BTreeMap::from([(
-                INTERNAL_SECRET_SECRET_KEY.to_string(),
-                old_secret_key,
-            )])),
-            ..Secret::default()
-        };
-        client
-            .create(&secret)
-            .await
-            .context(CreateRandomSecretSnafu)?;
-    }
-
-    Ok(())
 }
 
 pub fn error_policy(
