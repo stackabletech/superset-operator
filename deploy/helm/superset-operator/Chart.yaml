@@ -5,6 +5,10 @@ version: "0.0.0-dev"
 appVersion: "0.0.0-dev"
 description: "Kubernetes operator for Apache Superset. Deploy and run Superset with the Stackable Data Platform (SDP)."
 home: https://github.com/stackabletech/superset-operator
+# One known use of this is the Artifact Hub (AH) listing which shows the logo.
+# AH downloads the logo and re-hosts it.
+# We opted to not use the project logos (e.g. the Apache Spark logo) here due to trademark concerns.
+icon: https://raw.githubusercontent.com/stackabletech/superset-operator/main/.readme/static/borrowed/Icon_Stackable.svg
 sources:
   - https://github.com/stackabletech/superset-operator
 keywords: ["apache-superset", "superset", "business-intelligence", "dashboards", "kubernetes", "operator"]
@@ -21,3 +25,14 @@ annotations:
       url: https://docs.stackable.tech/home/stable/superset/
     - name: support
       url: https://github.com/stackabletech/superset-operator/issues
+  artifacthub.io/crds: |-
+    - kind: SupersetCluster
+      version: v1alpha1
+      name: supersetclusters.superset.stackable.tech
+      displayName: SupersetCluster
+      description: A Superset cluster stacklet. This resource is managed by the Stackable operator for Apache Superset.
+    - kind: DruidConnection
+      version: v1alpha1
+      name: druidconnections.superset.stackable.tech
+      displayName: DruidConnection
+      description: The DruidConnection resource can be used to automatically deploy a Druid datasource in Superset.
