@@ -7,6 +7,7 @@ use stackable_operator::{
         container::ContainerBuilder, resources::ResourceRequirementsBuilder, volume::VolumeBuilder,
     },
     commons::product_image_selection::ResolvedProductImage,
+    constant,
     database_connections::{
         TemplatingMechanism,
         drivers::{
@@ -20,12 +21,12 @@ use stackable_operator::{
     product_logging,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{
-        builder::pod::container::{EnvVarSet, new_container_builder},
+        builder::pod::container::{EnvVarName, EnvVarSet, new_container_builder},
         product_logging::framework::{
             STACKABLE_LOG_DIR, ValidatedContainerLogConfigChoice, vector_container,
         },
         types::{
-            kubernetes::{ContainerName, PersistentVolumeClaimName, VolumeName},
+            kubernetes::{ContainerName, PersistentVolumeClaimName, SecretKey, VolumeName},
             operator::RoleGroupName,
         },
     },
@@ -34,9 +35,9 @@ use stackable_operator::{
 use crate::{
     controller::{SupersetRoleGroupConfig, ValidatedCluster},
     crd::{
-        INTERNAL_SECRET_SECRET_KEY, MAPBOX_API_KEY_ENV, MAX_LOG_FILES_SIZE,
-        METADATA_DATABASE_ENV_PREFIX, METRICS_PORT, METRICS_PORT_NAME, STACKABLE_CONFIG_DIR,
-        STACKABLE_LOG_CONFIG_DIR, SupersetRole,
+        INTERNAL_SECRET_SECRET_KEY, MAPBOX_API_KEY_ENV, MAPBOX_API_KEY_SECRET_KEY,
+        MAX_LOG_FILES_SIZE, METADATA_DATABASE_ENV_PREFIX, METRICS_PORT, METRICS_PORT_NAME,
+        SECRET_KEY_ENV, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, SupersetRole,
         databases::{
             CeleryBrokerConnection, CeleryResultsBackendConnection,
             CeleryResultsBackendConnectionDetails, MetadataDatabaseConnection,
@@ -53,20 +54,38 @@ pub mod rbac;
 pub mod service;
 pub mod statefulset;
 
-stackable_operator::constant!(CONFIG_VOLUME_NAME: VolumeName = "config");
-stackable_operator::constant!(LOG_CONFIG_VOLUME_NAME: VolumeName = "log-config");
-stackable_operator::constant!(LOG_VOLUME_NAME: VolumeName = "log");
+constant!(CONFIG_VOLUME_NAME: VolumeName = "config");
+constant!(LOG_CONFIG_VOLUME_NAME: VolumeName = "log-config");
+constant!(LOG_VOLUME_NAME: VolumeName = "log");
+
+// Env vars holding the admin user credentials, read by the `superset fab create-admin` start
+// command, and the keys under which the user-provided credentials Secret holds them.
+constant!(ADMIN_USERNAME: EnvVarName = "ADMIN_USERNAME");
+constant!(ADMIN_FIRSTNAME: EnvVarName = "ADMIN_FIRSTNAME");
+constant!(ADMIN_LASTNAME: EnvVarName = "ADMIN_LASTNAME");
+constant!(ADMIN_EMAIL: EnvVarName = "ADMIN_EMAIL");
+constant!(ADMIN_PASSWORD: EnvVarName = "ADMIN_PASSWORD");
+constant!(ADMIN_USERNAME_SECRET_KEY: SecretKey = "adminUser.username");
+constant!(ADMIN_FIRSTNAME_SECRET_KEY: SecretKey = "adminUser.firstname");
+constant!(ADMIN_LASTNAME_SECRET_KEY: SecretKey = "adminUser.lastname");
+constant!(ADMIN_EMAIL_SECRET_KEY: SecretKey = "adminUser.email");
+constant!(ADMIN_PASSWORD_SECRET_KEY: SecretKey = "adminUser.password");
+
+// Env var the `containerdebug` process logs its tracing information to.
+constant!(CONTAINERDEBUG_LOG_DIRECTORY: EnvVarName = "CONTAINERDEBUG_LOG_DIRECTORY");
+// Env var pointing the Superset container at the directory holding trusted CA certs.
+constant!(SSL_CERT_DIR: EnvVarName = "SSL_CERT_DIR");
 
 /// Directory the `SSL_CERT_DIR` env var points the Superset container at for trusted CA certs.
 const STACKABLE_CERTS_DIR: &str = "/stackable/certs/";
 /// Path of the statsd-exporter binary launched by the `metrics` sidecar.
 const STATSD_EXPORTER_BINARY: &str = "/stackable/statsd_exporter";
 
-stackable_operator::constant!(METRICS_CONTAINER_NAME: ContainerName = "metrics");
+constant!(METRICS_CONTAINER_NAME: ContainerName = "metrics");
 
 // Name of the listener volume. It is a PVC, so the same name is used as the volume/mount name and
 // as the PVC name.
-stackable_operator::constant!(pub(crate) LISTENER_VOLUME_NAME_PVC: PersistentVolumeClaimName = "listener");
+constant!(pub(crate) LISTENER_VOLUME_NAME_PVC: PersistentVolumeClaimName = "listener");
 
 /// The only network protocol used by the Superset service and listener ports.
 pub(crate) const PROTOCOL_TCP: &str = "TCP";
@@ -137,10 +156,105 @@ pub(crate) fn create_volumes(
     volumes
 }
 
-/// Builds the `superset` main container builder with the configuration shared by every role:
-/// database/celery connection details, env overrides, the optional Mapbox key, the Flask
-/// `SECRET_KEY`, the product image, the config/log volume mounts, the admin-credential env vars
-/// and the `containerdebug`/SSL env vars.
+/// Assembles the env vars for the `superset` container in a name-keyed [`EnvVarSet`], so every
+/// name occurs exactly once: database/celery connection details, the optional Mapbox key, the
+/// Flask `SECRET_KEY`, the admin-credential env vars, the `containerdebug`/SSL env vars and the
+/// `role_specific_env_vars` of the caller.
+///
+/// The user-supplied `envOverrides` are merged in last, so that they override any operator-set
+/// environment variable.
+fn build_env_vars(
+    validated: &ValidatedCluster,
+    rolegroup_config: &SupersetRoleGroupConfig,
+    role_specific_env_vars: EnvVarSet,
+) -> EnvVarSet {
+    let mut env_vars = EnvVarSet::new();
+
+    let metadata_database_connection_details =
+        metadata_database_connection_details(&validated.cluster_config.metadata_database);
+    let (_, celery_results_backend_connection_details) = celery_results_backend_connection_details(
+        validated.cluster_config.celery_results_backend.as_ref(),
+    );
+    let celery_broker_connection_details =
+        celery_broker_connection_details(validated.cluster_config.celery_broker.as_ref());
+
+    for env_var in metadata_database_connection_details
+        .env_vars()
+        .chain(
+            celery_results_backend_connection_details
+                .iter()
+                .flat_map(|details| details.env_vars()),
+        )
+        .chain(
+            celery_broker_connection_details
+                .iter()
+                .flat_map(|details| details.env_vars()),
+        )
+    {
+        env_vars = env_vars.with_env_var(env_var.clone()).expect(
+            "the database connection env var names are generated by operator-rs from the unique \
+             database name and are therefore valid",
+        );
+    }
+
+    if let Some(mapbox_secret) = &validated.cluster_config.mapbox_secret {
+        env_vars = env_vars.with_secret_key_ref(
+            &MAPBOX_API_KEY_ENV,
+            mapbox_secret,
+            &MAPBOX_API_KEY_SECRET_KEY,
+        );
+    }
+
+    let credentials_secret = &validated.cluster_config.credentials_secret_name;
+    env_vars = env_vars
+        // The Flask `SECRET_KEY` env var is sourced from the auto-generated Secret.
+        .with_secret_key_ref(
+            &SECRET_KEY_ENV,
+            &validated.cluster_config.secret_key_secret_name,
+            &INTERNAL_SECRET_SECRET_KEY,
+        )
+        .with_secret_key_ref(
+            &ADMIN_USERNAME,
+            credentials_secret,
+            &ADMIN_USERNAME_SECRET_KEY,
+        )
+        .with_secret_key_ref(
+            &ADMIN_FIRSTNAME,
+            credentials_secret,
+            &ADMIN_FIRSTNAME_SECRET_KEY,
+        )
+        .with_secret_key_ref(
+            &ADMIN_LASTNAME,
+            credentials_secret,
+            &ADMIN_LASTNAME_SECRET_KEY,
+        )
+        .with_secret_key_ref(&ADMIN_EMAIL, credentials_secret, &ADMIN_EMAIL_SECRET_KEY)
+        .with_secret_key_ref(
+            &ADMIN_PASSWORD,
+            credentials_secret,
+            &ADMIN_PASSWORD_SECRET_KEY,
+        )
+        .with_value(
+            &CONTAINERDEBUG_LOG_DIRECTORY,
+            format!("{STACKABLE_LOG_DIR}/containerdebug"),
+        )
+        .with_value(&SSL_CERT_DIR, STACKABLE_CERTS_DIR);
+
+    // Environment variable overrides (highest precedence), merged from role and role group.
+    // They are merged in last so that they override any operator-set environment variable.
+    env_vars
+        .merge(role_specific_env_vars)
+        .merge(rolegroup_config.env_overrides.clone())
+}
+
+/// Builds the `superset` main container builder with the configuration shared by every role: the
+/// product image, the config/log volume mounts and the env vars built by [`build_env_vars`]
+/// (which merges the user-supplied `envOverrides` in last, so they take precedence over every
+/// operator-set environment variable).
+///
+/// `role_specific_env_vars` carries additional operator-set env vars of the caller's role (the
+/// `Node` role passes its authentication env vars) so that they participate in the same
+/// name-keyed set instead of being appended separately.
 ///
 /// The returned builder is finished by the caller with the role-specific command, args and probes.
 /// Only the `Node` role serves the Superset web UI, so the caller additionally adds the HTTP
@@ -149,43 +263,10 @@ pub(crate) fn create_volumes(
 pub(crate) fn build_superset_container_builder(
     validated: &ValidatedCluster,
     rolegroup_config: &SupersetRoleGroupConfig,
+    role_specific_env_vars: EnvVarSet,
 ) -> Result<ContainerBuilder, Error> {
     let mut superset_cb = new_container_builder(&Container::Superset.to_container_name());
 
-    metadata_database_connection_details(&validated.cluster_config.metadata_database)
-        .add_to_container(&mut superset_cb);
-    let celery_results_backend_connection_details = celery_results_backend_connection_details(
-        validated.cluster_config.celery_results_backend.as_ref(),
-    );
-    if let (_, Some(celery_results_backend_connection_details)) =
-        &celery_results_backend_connection_details
-    {
-        celery_results_backend_connection_details.add_to_container(&mut superset_cb);
-    }
-    if let Some(celery_broker_connection_details) =
-        celery_broker_connection_details(validated.cluster_config.celery_broker.as_ref())
-    {
-        celery_broker_connection_details.add_to_container(&mut superset_cb);
-    }
-
-    superset_cb.add_env_vars(rolegroup_config.env_overrides.clone());
-    if let Some(mapbox_secret) = &validated.cluster_config.mapbox_secret {
-        superset_cb.add_env_var_from_secret(
-            MAPBOX_API_KEY_ENV,
-            mapbox_secret,
-            "connections.mapboxApiKey",
-        );
-    }
-
-    // The Flask `SECRET_KEY` env var is sourced from the auto-generated Secret. Superset requires the
-    // env var name to equal the Secret data key, so both use `INTERNAL_SECRET_SECRET_KEY`.
-    superset_cb.add_env_var_from_secret(
-        INTERNAL_SECRET_SECRET_KEY,
-        validated.cluster_config.secret_key_secret_name.clone(),
-        INTERNAL_SECRET_SECRET_KEY,
-    );
-
-    let secret = &validated.cluster_config.credentials_secret_name;
     superset_cb
         .image_from_product_image(&validated.image)
         .add_volume_mount(CONFIG_VOLUME_NAME.as_ref(), STACKABLE_CONFIG_DIR)
@@ -194,17 +275,11 @@ pub(crate) fn build_superset_container_builder(
         .context(AddVolumeMountSnafu)?
         .add_volume_mount(LOG_VOLUME_NAME.as_ref(), STACKABLE_LOG_DIR)
         .context(AddVolumeMountSnafu)?
-        .add_env_var_from_secret("ADMIN_USERNAME", secret, "adminUser.username")
-        .add_env_var_from_secret("ADMIN_FIRSTNAME", secret, "adminUser.firstname")
-        .add_env_var_from_secret("ADMIN_LASTNAME", secret, "adminUser.lastname")
-        .add_env_var_from_secret("ADMIN_EMAIL", secret, "adminUser.email")
-        .add_env_var_from_secret("ADMIN_PASSWORD", secret, "adminUser.password")
-        // Needed by the `containerdebug` process to log it's tracing information to.
-        .add_env_var(
-            "CONTAINERDEBUG_LOG_DIRECTORY",
-            format!("{STACKABLE_LOG_DIR}/containerdebug"),
-        )
-        .add_env_var("SSL_CERT_DIR", STACKABLE_CERTS_DIR);
+        .add_env_vars(build_env_vars(
+            validated,
+            rolegroup_config,
+            role_specific_env_vars,
+        ));
 
     Ok(superset_cb)
 }
@@ -296,4 +371,37 @@ pub(crate) fn celery_broker_connection_details(
             &TemplatingMechanism::BashEnvSubstitution,
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        ADMIN_EMAIL, ADMIN_EMAIL_SECRET_KEY, ADMIN_FIRSTNAME, ADMIN_FIRSTNAME_SECRET_KEY,
+        ADMIN_LASTNAME, ADMIN_LASTNAME_SECRET_KEY, ADMIN_PASSWORD, ADMIN_PASSWORD_SECRET_KEY,
+        ADMIN_USERNAME, ADMIN_USERNAME_SECRET_KEY, CONFIG_VOLUME_NAME,
+        CONTAINERDEBUG_LOG_DIRECTORY, LISTENER_VOLUME_NAME_PVC, LOG_CONFIG_VOLUME_NAME,
+        LOG_VOLUME_NAME, METRICS_CONTAINER_NAME, SSL_CERT_DIR,
+    };
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *CONFIG_VOLUME_NAME;
+        let _ = *LOG_CONFIG_VOLUME_NAME;
+        let _ = *LOG_VOLUME_NAME;
+        let _ = *ADMIN_USERNAME;
+        let _ = *ADMIN_FIRSTNAME;
+        let _ = *ADMIN_LASTNAME;
+        let _ = *ADMIN_EMAIL;
+        let _ = *ADMIN_PASSWORD;
+        let _ = *ADMIN_USERNAME_SECRET_KEY;
+        let _ = *ADMIN_FIRSTNAME_SECRET_KEY;
+        let _ = *ADMIN_LASTNAME_SECRET_KEY;
+        let _ = *ADMIN_EMAIL_SECRET_KEY;
+        let _ = *ADMIN_PASSWORD_SECRET_KEY;
+        let _ = *CONTAINERDEBUG_LOG_DIRECTORY;
+        let _ = *SSL_CERT_DIR;
+        let _ = *METRICS_CONTAINER_NAME;
+        let _ = *LISTENER_VOLUME_NAME_PVC;
+    }
 }

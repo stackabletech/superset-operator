@@ -27,7 +27,7 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    APP_NAME, OPERATOR_NAME,
+    APP_NAME, SUPERSET_OPERATOR_NAME,
     built_info::PKG_VERSION,
     controller::{
         CONTAINER_IMAGE_BASE_NAME,
@@ -44,8 +44,11 @@ mod job_state;
 mod rbac;
 
 pub const DRUID_CONNECTION_CONTROLLER_NAME: &str = "druid-connection";
-pub const DRUID_CONNECTION_FULL_CONTROLLER_NAME: &str =
-    concatcp!(DRUID_CONNECTION_CONTROLLER_NAME, '.', OPERATOR_NAME);
+pub const DRUID_CONNECTION_FULL_CONTROLLER_NAME: &str = concatcp!(
+    DRUID_CONNECTION_CONTROLLER_NAME,
+    '.',
+    SUPERSET_OPERATOR_NAME
+);
 
 pub struct Ctx {
     pub client: Client,
@@ -374,7 +377,7 @@ async fn build_import_job(
         .add_env_var_from_secret(
             "SUPERSET_SECRET_KEY",
             superset_cluster.shared_secret_key_secret_name(),
-            INTERNAL_SECRET_SECRET_KEY,
+            INTERNAL_SECRET_SECRET_KEY.as_ref(),
         );
 
     metadata_database_connection_details.add_to_container(&mut container_builder);

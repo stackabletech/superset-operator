@@ -13,13 +13,15 @@ use stackable_operator::{
     product_logging::spec::Logging,
     role_utils::GenericRoleConfig,
     v2::{
-        builder::pod::container::{EnvVarName, EnvVarSet},
         controller_utils::{get_cluster_name, get_namespace, get_uid},
         product_logging::framework::{
             VectorContainerLogConfig, validate_logging_configuration_for_container,
         },
         role_utils::{GenericCommonConfig, with_validated_config},
-        types::{kubernetes::ConfigMapName, operator::RoleGroupName},
+        types::{
+            kubernetes::{ConfigMapName, SecretName},
+            operator::RoleGroupName,
+        },
     },
 };
 use strum::IntoEnumIterator;
@@ -78,6 +80,12 @@ pub enum Error {
     ParseRoleGroupName {
         source: stackable_operator::v2::macros::attributed_string_type::Error,
         role_group: String,
+    },
+
+    #[snafu(display("invalid Secret name {secret_name}"))]
+    ParseSecretName {
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
+        secret_name: String,
     },
 
     #[snafu(display("failed to validate logging configuration"))]
@@ -199,6 +207,12 @@ pub fn validate_cluster(
     let namespace = get_namespace(superset).context(ResolveNamespaceSnafu)?;
     let uid = get_uid(superset).context(ResolveUidSnafu)?;
 
+    let parse_secret_name = |secret_name: &str| {
+        SecretName::from_str(secret_name).with_context(|_| ParseSecretNameSnafu {
+            secret_name: secret_name.to_owned(),
+        })
+    };
+
     Ok(ValidatedCluster::new(
         cluster_name,
         namespace,
@@ -207,9 +221,13 @@ pub fn validate_cluster(
         ValidatedClusterConfig {
             authentication_config,
             opa_config,
-            credentials_secret_name: cluster_config.credentials_secret_name.clone(),
-            secret_key_secret_name: superset.shared_secret_key_secret_name(),
-            mapbox_secret: cluster_config.mapbox_secret.clone(),
+            credentials_secret_name: parse_secret_name(&cluster_config.credentials_secret_name)?,
+            secret_key_secret_name: parse_secret_name(&superset.shared_secret_key_secret_name())?,
+            mapbox_secret: cluster_config
+                .mapbox_secret
+                .as_deref()
+                .map(parse_secret_name)
+                .transpose()?,
             metadata_database: cluster_config.metadata_database.clone(),
             celery_results_backend: cluster_config.celery_results_backend.clone(),
             celery_broker: cluster_config.celery_broker.clone(),
@@ -238,16 +256,6 @@ fn validate_role_group_config(
         role_group: role_group_name.clone(),
     })?;
 
-    let mut env_overrides = EnvVarSet::new();
-    for (env_var_name, env_var_value) in merged.config.env_overrides {
-        env_overrides = env_overrides.with_value(
-            &EnvVarName::from_str(&env_var_name).with_context(|_| ParseEnvVarNameSnafu {
-                role_group: role_group_name.clone(),
-            })?,
-            env_var_value,
-        );
-    }
-
     let logging = validate_logging(
         &merged.config.config.logging,
         vector_aggregator_config_map_name,
@@ -257,7 +265,7 @@ fn validate_role_group_config(
         replicas: merged.replicas,
         config: ValidatedSupersetConfig::from_merged(merged.config.config, logging),
         config_overrides: merged.config.config_overrides,
-        env_overrides,
+        env_overrides: merged.config.env_overrides.into(),
         cli_overrides: merged.config.cli_overrides,
         pod_overrides: merged.config.pod_overrides,
         product_specific_common_config: merged.config.product_specific_common_config,

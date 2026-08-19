@@ -16,6 +16,7 @@ use stackable_operator::{
         product_image_selection::ResolvedProductImage,
         resources::{NoRuntimeLimits, Resources},
     },
+    constant,
     crd::listener,
     k8s_openapi::api::{
         apps::v1::{Deployment, StatefulSet},
@@ -29,20 +30,18 @@ use stackable_operator::{
         core::{DeserializeGuard, error_boundary},
         runtime::controller::Action,
     },
-    kvp::Labels,
     logging::controller::ReconcilerError,
     shared::time::Duration,
     v2::{
         HasName, HasUid, NameIsValidLabelValue,
-        kvp::label::{recommended_labels, role_group_selector},
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_group_utils::ResourceNames,
         role_utils::{self, GenericCommonConfig, RoleGroupConfig},
         types::{
-            kubernetes::{ListenerClassName, ListenerName, NamespaceName, Uid},
+            kubernetes::{ListenerClassName, ListenerName, NamespaceName, SecretName, Uid},
             operator::{
                 ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
-                RoleGroupName, RoleName,
+                RoleGroupName,
             },
         },
     },
@@ -50,7 +49,7 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    OPERATOR_NAME,
+    SUPERSET_OPERATOR_NAME,
     controller::{
         apply::{Applier, ensure_secrets},
         update_status::update_status,
@@ -70,8 +69,12 @@ use crate::{
 
 pub const SUPERSET_CONTROLLER_NAME: &str = "supersetcluster";
 pub const SUPERSET_FULL_CONTROLLER_NAME: &str =
-    concatcp!(SUPERSET_CONTROLLER_NAME, '.', OPERATOR_NAME);
+    concatcp!(SUPERSET_CONTROLLER_NAME, '.', SUPERSET_OPERATOR_NAME);
 pub const CONTAINER_IMAGE_BASE_NAME: &str = "superset";
+
+constant!(pub(crate) PRODUCT_NAME: ProductName = APP_NAME);
+constant!(pub(crate) OPERATOR_NAME: OperatorName = SUPERSET_OPERATOR_NAME);
+constant!(pub(crate) CONTROLLER_NAME: ControllerName = SUPERSET_CONTROLLER_NAME);
 
 pub struct Ctx {
     pub client: stackable_operator::client::Client,
@@ -172,11 +175,11 @@ pub struct ValidatedClusterConfig {
     pub authentication_config: SupersetClientAuthenticationDetailsResolved,
     pub opa_config: Option<SupersetOpaConfigResolved>,
     /// Name of the Secret holding the admin user credentials.
-    pub credentials_secret_name: String,
+    pub credentials_secret_name: SecretName,
     /// Name of the auto-generated Secret holding the Flask `SECRET_KEY`.
-    pub secret_key_secret_name: String,
+    pub secret_key_secret_name: SecretName,
     /// Name of the Secret holding the Mapbox API key, if configured.
-    pub mapbox_secret: Option<String>,
+    pub mapbox_secret: Option<SecretName>,
     /// Connection to the metadata database.
     pub metadata_database: MetadataDatabaseConnection,
     /// Connection to the Celery results backend, if configured.
@@ -251,63 +254,8 @@ impl ValidatedCluster {
     pub fn cluster_resource_names(&self) -> role_utils::ResourceNames {
         role_utils::ResourceNames {
             cluster_name: self.name.clone(),
-            product_name: product_name(),
+            product_name: PRODUCT_NAME.clone(),
         }
-    }
-
-    pub fn recommended_labels(
-        &self,
-        role: &SupersetRole,
-        role_group_name: &RoleGroupName,
-    ) -> Labels {
-        self.recommended_labels_for(&role.into(), role_group_name)
-    }
-
-    pub fn recommended_labels_for(
-        &self,
-        role_name: &RoleName,
-        role_group_name: &RoleGroupName,
-    ) -> Labels {
-        self.recommended_labels_with(&self.product_version, role_name, role_group_name)
-    }
-
-    /// Recommended labels with a constant `none` version, for PVC templates that cannot be modified
-    /// after deployment (keeps the labels stable across version upgrades).
-    pub fn unversioned_recommended_labels(
-        &self,
-        role: &SupersetRole,
-        role_group_name: &RoleGroupName,
-    ) -> Labels {
-        self.recommended_labels_with(
-            &build::UNVERSIONED_PRODUCT_VERSION,
-            &role.into(),
-            role_group_name,
-        )
-    }
-
-    fn recommended_labels_with(
-        &self,
-        product_version: &ProductVersion,
-        role_name: &RoleName,
-        role_group_name: &RoleGroupName,
-    ) -> Labels {
-        recommended_labels(
-            self,
-            &product_name(),
-            product_version,
-            &operator_name(),
-            &controller_name(),
-            role_name,
-            role_group_name,
-        )
-    }
-
-    pub fn role_group_selector(
-        &self,
-        role: &SupersetRole,
-        role_group_name: &RoleGroupName,
-    ) -> Labels {
-        role_group_selector(self, &product_name(), &role.into(), role_group_name)
     }
 }
 
@@ -359,22 +307,6 @@ impl NameIsValidLabelValue for ValidatedCluster {
     fn to_label_value(&self) -> String {
         self.name.to_label_value()
     }
-}
-
-/// The product name (`superset`) as a type-safe label value.
-pub(crate) fn product_name() -> ProductName {
-    ProductName::from_str(APP_NAME).expect("'superset' is a valid product name")
-}
-
-/// The operator name as a type-safe label value.
-pub(crate) fn operator_name() -> OperatorName {
-    OperatorName::from_str(OPERATOR_NAME).expect("the operator name is a valid label value")
-}
-
-/// The controller name as a type-safe label value.
-pub(crate) fn controller_name() -> ControllerName {
-    ControllerName::from_str(SUPERSET_CONTROLLER_NAME)
-        .expect("the controller name is a valid label value")
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -517,5 +449,18 @@ pub(crate) mod test_support {
             },
             opa_config: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod controller_tests {
+    use super::{CONTROLLER_NAME, OPERATOR_NAME, PRODUCT_NAME};
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *PRODUCT_NAME;
+        let _ = *OPERATOR_NAME;
+        let _ = *CONTROLLER_NAME;
     }
 }

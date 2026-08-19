@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{ops::Deref, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
@@ -14,22 +14,24 @@ use stackable_operator::{
         },
     },
     config::{fragment::Fragment, merge::Merge},
+    constant,
     deep_merger::ObjectOverrides,
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{CustomResource, ResourceExt},
     memory::{BinaryMultiple, MemoryQuantity},
     product_logging::{self, spec::Logging},
-    role_utils::{GenericRoleConfig, Role, RoleGroup},
+    role_utils::GenericRoleConfig,
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
     v2::{
+        builder::pod::container::EnvVarName,
         config_overrides::KeyValueConfigOverrides,
         flask_config_writer::{FlaskAppConfigOptions, PythonType},
-        role_utils::GenericCommonConfig,
+        role_utils::{GenericCommonConfig, Role, RoleGroup},
         types::{
             common::Port,
-            kubernetes::{ConfigMapName, ContainerName, ListenerClassName},
+            kubernetes::{ConfigMapName, ContainerName, ListenerClassName, SecretKey},
             operator::RoleName,
         },
     },
@@ -69,13 +71,19 @@ pub const MAX_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity {
     unit: BinaryMultiple::Mebi,
 };
 
-pub const INTERNAL_SECRET_SECRET_KEY: &str = "SECRET_KEY";
+// The Flask `SECRET_KEY` env var is sourced from the auto-generated Secret. Superset requires the
+// env var name to equal the Secret data key, so both constants use the value `SECRET_KEY`
+// (asserted in `test_constants`).
+constant!(pub SECRET_KEY_ENV: EnvVarName = "SECRET_KEY");
+constant!(pub INTERNAL_SECRET_SECRET_KEY: SecretKey = "SECRET_KEY");
 
 /// Env-var prefix for the metadata database connection credentials (e.g. `METADATA_DATABASE_*`).
 pub const METADATA_DATABASE_ENV_PREFIX: &str = "METADATA";
 
-/// Name of the container env var holding the Mapbox API key, read by `superset_config.py`.
-pub const MAPBOX_API_KEY_ENV: &str = "MAPBOX_API_KEY";
+// Name of the container env var holding the Mapbox API key, read by `superset_config.py`, and the
+// key under which the user-provided Secret holds it.
+constant!(pub MAPBOX_API_KEY_ENV: EnvVarName = "MAPBOX_API_KEY");
+constant!(pub MAPBOX_API_KEY_SECRET_KEY: SecretKey = "connections.mapboxApiKey");
 
 pub const APP_PORT_NAME: &str = "http";
 pub const APP_PORT: Port = Port(8088);
@@ -379,28 +387,27 @@ impl Default for v1alpha1::SupersetRoleConfig {
     }
 }
 
-#[derive(
-    Clone,
-    Debug,
-    Deserialize,
-    Display,
-    EnumIter,
-    EnumString,
-    Eq,
-    Hash,
-    JsonSchema,
-    Ord,
-    PartialEq,
-    PartialOrd,
-    Serialize,
-)]
+constant!(NODE_ROLE_NAME: RoleName = "node");
+constant!(WORKER_ROLE_NAME: RoleName = "worker");
+constant!(BEAT_ROLE_NAME: RoleName = "beat");
+
+#[derive(Clone, Debug, EnumIter, EnumString, Eq, Hash, JsonSchema, Ord, PartialEq, PartialOrd)]
 pub enum SupersetRole {
-    #[strum(serialize = "node")]
     Node,
-    #[strum(serialize = "worker")]
     Worker,
-    #[strum(serialize = "beat")]
     Beat,
+}
+
+impl Deref for SupersetRole {
+    type Target = RoleName;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            SupersetRole::Node => &NODE_ROLE_NAME,
+            SupersetRole::Worker => &WORKER_ROLE_NAME,
+            SupersetRole::Beat => &BEAT_ROLE_NAME,
+        }
+    }
 }
 
 impl SupersetRole {
@@ -578,6 +585,7 @@ impl v1alpha1::SupersetCluster {
         match role {
             SupersetRole::Node => Some(format!(
                 "{cluster_name}-{role}",
+                role = role.as_ref(),
                 cluster_name = self.name_any()
             )),
             SupersetRole::Worker | SupersetRole::Beat => None,
@@ -618,7 +626,10 @@ mod tests {
     };
     use strum::IntoEnumIterator;
 
-    use super::{SupersetRole, v1alpha1};
+    use super::{
+        BEAT_ROLE_NAME, INTERNAL_SECRET_SECRET_KEY, MAPBOX_API_KEY_ENV, MAPBOX_API_KEY_SECRET_KEY,
+        NODE_ROLE_NAME, SECRET_KEY_ENV, SupersetRole, WORKER_ROLE_NAME, v1alpha1,
+    };
 
     /// Locks the invariant behind the `expect` in the `From<SupersetRole> for RoleName` impls:
     /// every `SupersetRole` variant (present and future) must serialise to a valid `RoleName`.
@@ -628,6 +639,23 @@ mod tests {
             let _: RoleName = (&role).into();
             let _: RoleName = role.into();
         }
+    }
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *NODE_ROLE_NAME;
+        let _ = *WORKER_ROLE_NAME;
+        let _ = *BEAT_ROLE_NAME;
+        let _ = *SECRET_KEY_ENV;
+        let _ = *INTERNAL_SECRET_SECRET_KEY;
+        let _ = *MAPBOX_API_KEY_ENV;
+        let _ = *MAPBOX_API_KEY_SECRET_KEY;
+
+        // Superset requires the `SECRET_KEY` env var name to equal the Secret data key.
+        let secret_key_env: &str = SECRET_KEY_ENV.as_ref();
+        let internal_secret_secret_key: &str = INTERNAL_SECRET_SECRET_KEY.as_ref();
+        assert_eq!(secret_key_env, internal_secret_secret_key);
     }
 
     impl RoundtripTestData for v1alpha1::SupersetClusterSpec {

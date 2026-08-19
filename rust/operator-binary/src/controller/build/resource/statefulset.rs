@@ -15,7 +15,7 @@ use stackable_operator::{
         DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{EnvVar, Probe},
+            core::v1::Probe,
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
@@ -25,8 +25,9 @@ use stackable_operator::{
     shared::time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{
-        builder::pod::volume::{
-            ListenerReference, listener_operator_volume_source_builder_build_pvc,
+        builder::pod::{
+            container::EnvVarSet,
+            volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
         },
         product_logging::framework::STACKABLE_LOG_DIR,
         types::operator::RoleGroupName,
@@ -40,7 +41,10 @@ use crate::{
             command::add_cert_to_python_certifi_command,
             object_meta,
             properties::{ConfigFileName, superset_config},
+            recommended_labels_for_role_group_resources,
+            recommended_labels_for_unversioned_role_group_resources,
             resource::listener::LISTENER_VOLUME_DIR,
+            role_group_selector,
         },
     },
     crd::{
@@ -99,11 +103,15 @@ pub fn build_node_rolegroup_statefulset(
     let merged_config = &rolegroup_config.config;
 
     let resource_names = validated.role_group_resource_names(superset_role, role_group_name);
-    let recommended_object_labels = validated.recommended_labels(superset_role, role_group_name);
+    let recommended_object_labels =
+        recommended_labels_for_role_group_resources(validated, superset_role, role_group_name);
     // Used for PVC templates that cannot be modified once they are deployed (a constant "none"
     // version keeps the labels stable across version upgrades).
-    let unversioned_recommended_labels =
-        validated.unversioned_recommended_labels(superset_role, role_group_name);
+    let unversioned_recommended_labels = recommended_labels_for_unversioned_role_group_resources(
+        validated,
+        superset_role,
+        role_group_name,
+    );
 
     let metadata = ObjectMetaBuilder::new()
         .with_labels(recommended_object_labels)
@@ -125,12 +133,17 @@ pub fn build_node_rolegroup_statefulset(
                 .to_string(),
         );
 
-    let mut superset_cb = super::build_superset_container_builder(validated, rolegroup_config)
-        .context(BuildContainerSnafu)?;
+    // The `Node` role serves the Superset web UI, so it additionally passes the authentication
+    // env vars into the shared container builder (which merges the user `envOverrides` in last,
+    // so they keep the highest precedence) and mounts the authentication volumes. These mounts
+    // are added after the common config volume mounts (volume mount order is not significant).
+    let mut superset_cb = super::build_superset_container_builder(
+        validated,
+        rolegroup_config,
+        authentication_env_vars(&validated.cluster_config.authentication_config),
+    )
+    .context(BuildContainerSnafu)?;
 
-    // The `Node` role serves the Superset web UI, so it additionally mounts the authentication
-    // volumes and sets the authentication env vars. These mounts are added after the common config
-    // volume mounts (volume mount order is not significant).
     add_authentication_volumes_and_volume_mounts(
         &validated.cluster_config.authentication_config,
         &mut superset_cb,
@@ -148,7 +161,6 @@ pub fn build_node_rolegroup_statefulset(
     .unwrap_or_else(|| superset_config::DEFAULT_WEBSERVER_TIMEOUT.to_string());
 
     superset_cb
-        .add_env_vars(authentication_env_vars(&validated.cluster_config.authentication_config))
         .command(super::bash_wrapper_command())
         .args(vec![formatdoc! {"
             {COMMON_BASH_TRAP_FUNCTIONS}
@@ -252,9 +264,7 @@ pub fn build_node_rolegroup_statefulset(
             replicas: rolegroup_config.replicas.map(i32::from),
             selector: LabelSelector {
                 match_labels: Some(
-                    validated
-                        .role_group_selector(superset_role, role_group_name)
-                        .into(),
+                    role_group_selector(validated, superset_role, role_group_name).into(),
                 ),
                 ..LabelSelector::default()
             },
@@ -334,12 +344,10 @@ fn add_authentication_volumes_and_volume_mounts(
     Ok(())
 }
 
-fn authentication_env_vars(
-    auth_config: &SupersetClientAuthenticationDetailsResolved,
-) -> Vec<EnvVar> {
+fn authentication_env_vars(auth_config: &SupersetClientAuthenticationDetailsResolved) -> EnvVarSet {
     // Different OIDC authentication entries can reference the same
-    // client secret. It must be ensured that the env variables are only
-    // added once in such a case.
+    // client secret. The name-keyed EnvVarSet ensures that the env
+    // variables are only added once in such a case.
 
     let mut oidc_client_credentials_secrets = BTreeSet::new();
 
@@ -356,11 +364,18 @@ fn authentication_env_vars(
         }
     }
 
-    oidc_client_credentials_secrets
+    let mut env_vars = EnvVarSet::new();
+    for env_var in oidc_client_credentials_secrets
         .iter()
         .cloned()
         .flat_map(stackable_operator::crd::authentication::oidc::v1alpha1::AuthenticationProvider::client_credentials_env_var_mounts)
-        .collect()
+    {
+        env_vars = env_vars.with_env_var(env_var).expect(
+            "the OIDC client credentials env var names are generated by operator-rs and are \
+             therefore valid",
+        );
+    }
+    env_vars
 }
 
 fn authentication_start_commands(
@@ -393,4 +408,69 @@ fn authentication_start_commands(
         .cloned()
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use stackable_operator::v2::{
+        builder::pod::container::{EnvVarName, EnvVarSet},
+        types::operator::RoleGroupName,
+    };
+
+    use super::build_node_rolegroup_statefulset;
+    use crate::{controller::build::test_support::validated_cluster, crd::SupersetRole};
+
+    /// The user-supplied `envOverrides` must be merged in after all operator-set environment
+    /// variables, so that they can override any of them. `CONTAINERDEBUG_LOG_DIRECTORY` is used
+    /// as the example here because it is set unconditionally by the operator.
+    #[test]
+    fn env_overrides_override_operator_set_env_vars() {
+        let cluster = validated_cluster();
+        let role_group_name = RoleGroupName::from_str("default").expect("valid role group name");
+        let mut rg = cluster
+            .role_groups
+            .get(&SupersetRole::Node)
+            .and_then(|groups| groups.get(&role_group_name))
+            .expect("node default role group")
+            .clone();
+        rg.env_overrides = EnvVarSet::new().with_value(
+            &EnvVarName::from_str("CONTAINERDEBUG_LOG_DIRECTORY").expect("valid env var name"),
+            "/stackable/log/user-override",
+        );
+
+        let stateful_set =
+            build_node_rolegroup_statefulset(&cluster, &SupersetRole::Node, &role_group_name, &rg)
+                .expect("statefulset built");
+
+        let containers = stateful_set
+            .spec
+            .expect("statefulset spec")
+            .template
+            .spec
+            .expect("pod spec")
+            .containers;
+        let superset_container = containers
+            .iter()
+            .find(|container| container.name == "superset")
+            .expect("superset container");
+        let matching_env_vars: Vec<_> = superset_container
+            .env
+            .iter()
+            .flatten()
+            .filter(|env_var| env_var.name == "CONTAINERDEBUG_LOG_DIRECTORY")
+            .collect();
+        assert_eq!(
+            matching_env_vars.len(),
+            1,
+            "the env override must result in exactly one env var entry, \
+             not rely on kubelet duplicate-name handling"
+        );
+        assert_eq!(
+            matching_env_vars[0].value.as_deref(),
+            Some("/stackable/log/user-override"),
+            "the user-supplied env override must win over the operator-set value"
+        );
+    }
 }

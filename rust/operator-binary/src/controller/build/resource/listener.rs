@@ -1,10 +1,11 @@
-use stackable_operator::{crd::listener, v2::types::kubernetes::ListenerClassName};
+use stackable_operator::{
+    builder::meta::ObjectMetaBuilder,
+    crd::listener,
+    v2::{builder::meta::ownerreference_from_resource, types::kubernetes::ListenerClassName},
+};
 
 use crate::{
-    controller::{
-        ValidatedCluster,
-        build::{NONE_ROLE_GROUP_NAME, object_meta},
-    },
+    controller::{ValidatedCluster, build::recommended_labels_for_role_resources},
     crd::{APP_PORT, APP_PORT_NAME, SupersetRole},
 };
 
@@ -16,9 +17,14 @@ pub fn build_group_listener(
     listener_class: &ListenerClassName,
     listener_group_name: String,
 ) -> listener::v1alpha1::Listener {
-    // The group listener is a role-level object, so the constant `none` placeholder role-group is
-    // used for the recommended labels.
-    let metadata = object_meta(validated, listener_group_name, role, &NONE_ROLE_GROUP_NAME).build();
+    // The group listener is a role-level object, so it carries the recommended labels for role
+    // resources (no role-group label).
+    let metadata = ObjectMetaBuilder::new()
+        .name_and_namespace(validated)
+        .name(listener_group_name)
+        .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
+        .with_labels(recommended_labels_for_role_resources(validated, role))
+        .build();
 
     let spec = listener::v1alpha1::ListenerSpec {
         class_name: Some(listener_class.to_string()),

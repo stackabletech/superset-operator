@@ -4,7 +4,7 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::{ValidatedCluster, controller_name, operator_name, product_name},
+    controller::{CONTROLLER_NAME, OPERATOR_NAME, PRODUCT_NAME, ValidatedCluster},
     crd::SupersetRole,
 };
 
@@ -24,10 +24,10 @@ pub fn build_pdb(
     });
     let pdb = pod_disruption_budget_builder_with_role(
         validated,
-        &product_name(),
+        &PRODUCT_NAME,
         &role.into(),
-        &operator_name(),
-        &controller_name(),
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
     )
     .with_max_unavailable(max_unavailable)
     .build();
