@@ -13,6 +13,15 @@
   previously accepted by the API server but reconciled to no `nodes` resources ([#761]).
 - The reconciler now applies resources and derives the cluster status in discrete
   apply and update_status steps for the `controller` reconcile ([#772]).
+- Bump stackable-operator to 0.116.0 ([#779]).
+- Environment variable overrides (`envOverrides`) are now applied after all environment
+  variables set by the operator, whereas previously the operator's values always took
+  precedence ([#779]).
+- The Secret names in `clusterConfig` (`credentialsSecret`, `mapboxSecretRef`) are now
+  validated as RFC 1123 Secret names during reconciliation; an invalid name fails
+  validation up front instead of producing a broken Pod spec ([#779]).
+- The role-level group `Listener` now carries the recommended labels for role resources;
+  the `app.kubernetes.io/role-group: none` placeholder label is no longer set ([#779]).
 
 ### Removed
 
@@ -32,6 +41,7 @@
 [#765]: https://github.com/stackabletech/superset-operator/pull/765
 [#772]: https://github.com/stackabletech/superset-operator/pull/772
 [#773]: https://github.com/stackabletech/superset-operator/pull/773
+[#779]: https://github.com/stackabletech/superset-operator/pull/779
 
 ## [26.7.0] - 2026-07-21
 
