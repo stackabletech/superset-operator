@@ -1,16 +1,15 @@
 //! Builders that assemble Kubernetes resources for superset rolegroups.
 
-use std::{marker::PhantomData, str::FromStr};
+use std::marker::PhantomData;
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
-    constant,
     kvp::Labels,
     v2::{
         builder::meta::ownerreference_from_resource,
         kvp::label,
-        types::operator::{ProductVersion, RoleGroupName, RoleName},
+        types::operator::{RoleGroupName, RoleName},
     },
 };
 
@@ -34,10 +33,6 @@ use crate::{
 pub mod command;
 pub mod properties;
 pub mod resource;
-
-// Product version used for the recommended labels of PVC templates, which cannot be modified after
-// deployment. A constant `none` keeps those labels stable across version upgrades.
-constant!(pub(crate) UNVERSIONED_PRODUCT_VERSION: ProductVersion = "none");
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -314,13 +309,7 @@ pub(crate) mod test_support {
 mod tests {
     use stackable_operator::kube::Resource;
 
-    use super::{UNVERSIONED_PRODUCT_VERSION, build, test_support::validated_cluster};
-
-    #[test]
-    fn test_constants() {
-        // Test that dereferencing the constants does not panic.
-        let _ = *UNVERSIONED_PRODUCT_VERSION;
-    }
+    use super::{build, test_support::validated_cluster};
 
     /// The group listener is a role-level object, so it carries the recommended labels for role
     /// resources: a `component` label for the role, but no `role-group` label.

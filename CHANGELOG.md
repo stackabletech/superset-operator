@@ -17,11 +17,13 @@
 - Environment variable overrides (`envOverrides`) are now applied after all environment
   variables set by the operator, whereas previously the operator's values always took
   precedence ([#779]).
-- The Secret names in `clusterConfig` (`credentialsSecret`, `mapboxSecretRef`) are now
-  validated as RFC 1123 Secret names during reconciliation; an invalid name fails
-  validation up front instead of producing a broken Pod spec ([#779]).
 - The role-level group `Listener` now carries the recommended labels for role resources;
   the `app.kubernetes.io/role-group: none` placeholder label is no longer set ([#779]).
+- BREAKING: The listener PVC template of the `node` StatefulSet no longer carries an
+  `app.kubernetes.io/version` label (previously set to the placeholder value `none`).
+  Since `volumeClaimTemplates` cannot be updated in place, StatefulSets created by older
+  operator versions cannot be updated after the upgrade: delete the `node` StatefulSet(s)
+  so that the operator immediately recreates them with the new labels ([#779]).
 
 ### Removed
 
