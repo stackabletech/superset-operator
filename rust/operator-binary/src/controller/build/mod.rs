@@ -1,19 +1,22 @@
 //! Builders that assemble Kubernetes resources for superset rolegroups.
 
-use std::{marker::PhantomData, str::FromStr};
+use std::marker::PhantomData;
 
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
+    kvp::Labels,
     v2::{
         builder::meta::ownerreference_from_resource,
-        types::operator::{ProductVersion, RoleGroupName},
+        kvp::label,
+        types::operator::{RoleGroupName, RoleName},
     },
 };
 
 use crate::{
     controller::{
-        KubernetesResources, Prepared, ValidatedCluster,
+        CONTROLLER_NAME, KubernetesResources, OPERATOR_NAME, PRODUCT_NAME, Prepared,
+        ValidatedCluster,
         build::resource::{
             config_map::build_rolegroup_config_map,
             deployment::build_rolegroup_deployment,
@@ -30,14 +33,6 @@ use crate::{
 pub mod command;
 pub mod properties;
 pub mod resource;
-
-// Placeholder role-group name used for the recommended labels of the role-level `Listener`
-// (which is not tied to a single role group).
-stackable_operator::constant!(pub(crate) NONE_ROLE_GROUP_NAME: RoleGroupName = "none");
-
-// Product version used for the recommended labels of PVC templates, which cannot be modified after
-// deployment. A constant `none` keeps those labels stable across version upgrades.
-stackable_operator::constant!(pub(crate) UNVERSIONED_PRODUCT_VERSION: ProductVersion = "none");
 
 #[derive(Snafu, Debug)]
 pub enum Error {
@@ -184,8 +179,76 @@ pub(crate) fn object_meta(
         .name_and_namespace(validated)
         .name(name)
         .ownerreference(ownerreference_from_resource(validated, None, Some(true)))
-        .with_labels(validated.recommended_labels(role, role_group_name));
+        .with_labels(recommended_labels_for_role_group_resources(
+            validated,
+            role,
+            role_group_name,
+        ));
     builder
+}
+
+pub(crate) fn recommended_labels_for_cluster_resources(cluster: &ValidatedCluster) -> Labels {
+    label::recommended_labels_for_cluster_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+    )
+}
+
+pub(crate) fn recommended_labels_for_role_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+) -> Labels {
+    label::recommended_labels_for_role_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+    )
+}
+
+pub(crate) fn recommended_labels_for_role_group_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    label::recommended_labels_for_role_group_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &cluster.product_version,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+        role_group_name,
+    )
+}
+
+pub(crate) fn recommended_labels_for_unversioned_role_group_resources(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    label::recommended_labels_for_unversioned_role_group_resources(
+        &cluster.name,
+        &PRODUCT_NAME,
+        &OPERATOR_NAME,
+        &CONTROLLER_NAME,
+        role_name,
+        role_group_name,
+    )
+}
+
+/// Selector labels matching the pods of a role group.
+pub(crate) fn role_group_selector(
+    cluster: &ValidatedCluster,
+    role_name: &RoleName,
+    role_group_name: &RoleGroupName,
+) -> Labels {
+    label::role_group_selector(&cluster.name, &PRODUCT_NAME, role_name, role_group_name)
 }
 
 #[cfg(test)]
@@ -247,6 +310,36 @@ mod tests {
     use stackable_operator::kube::Resource;
 
     use super::{build, test_support::validated_cluster};
+
+    /// The group listener is a role-level object, so it carries the recommended labels for role
+    /// resources: a `component` label for the role, but no `role-group` label.
+    #[test]
+    fn group_listener_carries_role_level_labels() {
+        let cluster = validated_cluster();
+        let resources = build(&cluster).expect("build succeeds");
+
+        let listener = resources
+            .listeners
+            .iter()
+            .find(|listener| listener.meta().name.as_deref() == Some("simple-superset-node"))
+            .expect("node group listener");
+        let labels = listener
+            .meta()
+            .labels
+            .as_ref()
+            .expect("the listener has labels");
+
+        assert_eq!(
+            labels
+                .get("app.kubernetes.io/component")
+                .map(String::as_str),
+            Some("node")
+        );
+        assert!(
+            !labels.contains_key("app.kubernetes.io/role-group"),
+            "a role-level listener must not carry a role-group label"
+        );
+    }
 
     fn sorted_names(resources: &[impl Resource]) -> Vec<&str> {
         let mut names: Vec<&str> = resources

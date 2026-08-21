@@ -52,7 +52,7 @@ mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
-pub const OPERATOR_NAME: &str = "superset.stackable.tech";
+pub const SUPERSET_OPERATOR_NAME: &str = "superset.stackable.tech";
 
 #[derive(Parser)]
 #[clap(about, author)]
@@ -104,7 +104,7 @@ async fn main() -> anyhow::Result<()> {
                     .map(anyhow::Ok);
 
             let client = stackable_operator::client::initialize_operator(
-                Some(OPERATOR_NAME.to_string()),
+                Some(SUPERSET_OPERATOR_NAME.to_string()),
                 &common.cluster_info,
             )
             .await?;

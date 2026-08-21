@@ -11,7 +11,7 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
-    OPERATOR_NAME,
+    SUPERSET_OPERATOR_NAME,
     controller::{Applied, KubernetesResources},
     crd::v1alpha1::{SupersetCluster, SupersetClusterStatus},
 };
@@ -64,7 +64,7 @@ pub async fn update_status(
     };
 
     client
-        .apply_patch_status(OPERATOR_NAME, superset, &status)
+        .apply_patch_status(SUPERSET_OPERATOR_NAME, superset, &status)
         .await
         .context(ApplyStatusSnafu)?;
 

@@ -18,13 +18,19 @@ use stackable_operator::{
         create_vector_shutdown_file_command, remove_vector_shutdown_file_command,
     },
     utils::COMMON_BASH_TRAP_FUNCTIONS,
-    v2::{product_logging::framework::STACKABLE_LOG_DIR, types::operator::RoleGroupName},
+    v2::{
+        builder::pod::container::EnvVarSet, product_logging::framework::STACKABLE_LOG_DIR,
+        types::operator::RoleGroupName,
+    },
 };
 
 use crate::{
     controller::{
         SupersetRoleGroupConfig, ValidatedCluster,
-        build::{object_meta, properties::ConfigFileName},
+        build::{
+            object_meta, properties::ConfigFileName, recommended_labels_for_role_group_resources,
+            role_group_selector,
+        },
     },
     crd::{PYTHONPATH, STACKABLE_CONFIG_DIR, STACKABLE_LOG_CONFIG_DIR, SupersetRole},
 };
@@ -71,7 +77,8 @@ pub fn build_rolegroup_deployment(
     let merged_config = &rolegroup_config.config;
 
     let resource_names = validated.role_group_resource_names(superset_role, role_group_name);
-    let recommended_object_labels = validated.recommended_labels(superset_role, role_group_name);
+    let recommended_object_labels =
+        recommended_labels_for_role_group_resources(validated, superset_role, role_group_name);
 
     // The Celery process command, liveness probe and replica policy are the only differences
     // between the `worker` and `beat` rolegroups.
@@ -111,8 +118,10 @@ pub fn build_rolegroup_deployment(
                 .to_string(),
         );
 
-    let mut superset_cb = super::build_superset_container_builder(validated, rolegroup_config)
-        .context(BuildContainerSnafu)?;
+    // The Celery roles set no role-specific env vars, so an empty set is passed.
+    let mut superset_cb =
+        super::build_superset_container_builder(validated, rolegroup_config, EnvVarSet::new())
+            .context(BuildContainerSnafu)?;
 
     superset_cb
         .command(super::bash_wrapper_command())
@@ -176,9 +185,7 @@ pub fn build_rolegroup_deployment(
             replicas: replicas.map(i32::from),
             selector: LabelSelector {
                 match_labels: Some(
-                    validated
-                        .role_group_selector(superset_role, role_group_name)
-                        .into(),
+                    role_group_selector(validated, superset_role, role_group_name).into(),
                 ),
                 ..LabelSelector::default()
             },

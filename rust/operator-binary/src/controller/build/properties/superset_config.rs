@@ -148,7 +148,10 @@ fn core_config_properties(
     );
     config.insert(
         SupersetConfigOptions::MapboxApiKey.to_string(),
-        format!("os.environ.get('{MAPBOX_API_KEY_ENV}', '')"),
+        format!(
+            "os.environ.get('{mapbox_api_key_env}', '')",
+            mapbox_api_key_env = MAPBOX_API_KEY_ENV.as_ref()
+        ),
     );
     config.insert(
         SupersetConfigOptions::LoggingConfigurator.to_string(),

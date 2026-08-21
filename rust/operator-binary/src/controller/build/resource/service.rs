@@ -7,7 +7,10 @@ use stackable_operator::{
 };
 
 use crate::{
-    controller::{ValidatedCluster, build::object_meta},
+    controller::{
+        ValidatedCluster,
+        build::{object_meta, role_group_selector},
+    },
     crd::{APP_PORT, APP_PORT_NAME, METRICS_PORT, METRICS_PORT_NAME, SupersetRole},
 };
 
@@ -40,7 +43,7 @@ pub fn build_rolegroup_headless_service(
             type_: Some(SERVICE_TYPE_CLUSTER_IP.to_owned()),
             cluster_ip: Some(SERVICE_CLUSTER_IP_NONE.to_owned()),
             ports: Some(service_ports()),
-            selector: Some(validated.role_group_selector(role, role_group_name).into()),
+            selector: Some(role_group_selector(validated, role, role_group_name).into()),
             publish_not_ready_addresses: Some(true),
             ..ServiceSpec::default()
         }),
@@ -75,7 +78,7 @@ pub fn build_rolegroup_metrics_service(
             type_: Some(SERVICE_TYPE_CLUSTER_IP.to_owned()),
             cluster_ip: Some(SERVICE_CLUSTER_IP_NONE.to_owned()),
             ports: Some(metrics_ports()),
-            selector: Some(validated.role_group_selector(role, role_group_name).into()),
+            selector: Some(role_group_selector(validated, role, role_group_name).into()),
             publish_not_ready_addresses: Some(true),
             ..ServiceSpec::default()
         }),

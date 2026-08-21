@@ -14,8 +14,8 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     controller::{
-        Applied, KubernetesResources, Prepared, ValidatedCluster, controller_name, operator_name,
-        product_name,
+        Applied, CONTROLLER_NAME, KubernetesResources, OPERATOR_NAME, PRODUCT_NAME, Prepared,
+        ValidatedCluster,
     },
     crd::INTERNAL_SECRET_SECRET_KEY,
 };
@@ -58,9 +58,9 @@ impl<'a> Applier<'a> {
         object_overrides: &'a ObjectOverrides,
     ) -> Applier<'a> {
         let cluster_resources = cluster_resources_new(
-            &product_name(),
-            &operator_name(),
-            &controller_name(),
+            &PRODUCT_NAME,
+            &OPERATOR_NAME,
+            &CONTROLLER_NAME,
             &cluster.name,
             &cluster.namespace,
             &cluster.uid,
@@ -153,8 +153,8 @@ impl<'a> Applier<'a> {
 /// invalidate every session).
 pub async fn ensure_secrets(client: &Client, cluster: &ValidatedCluster) -> Result<()> {
     random_secret_creation::create_random_secret_if_not_exists(
-        &cluster.cluster_config.secret_key_secret_name,
-        INTERNAL_SECRET_SECRET_KEY,
+        cluster.cluster_config.secret_key_secret_name.as_ref(),
+        INTERNAL_SECRET_SECRET_KEY.as_ref(),
         256,
         cluster,
         client,
