@@ -570,7 +570,7 @@ impl HasStatusCondition for v1alpha1::SupersetCluster {
 
 impl v1alpha1::SupersetCluster {
     pub fn shared_secret_key_secret_name(&self) -> String {
-        format!("{}-secret-key", &self.name_any())
+        format!("{}-secret-key", self.name_any())
     }
 
     /// The connection to the metadata database.
