@@ -37,6 +37,8 @@
 - Fix a longstanding problem of including empty `categories`, `shortNames` and `additionalPrinterColumns` in the CRDs,
   which could cause problems with GitOps tools (e.g. ArgoCD) reporting a diff in the custom resources.
   See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#773]).
+- The operator now watches all resources that it creates and early-exits the reconcile action when the
+  cluster is marked for deletion ([#781]).
 
 [#756]: https://github.com/stackabletech/superset-operator/pull/756
 [#761]: https://github.com/stackabletech/superset-operator/pull/761
@@ -44,6 +46,7 @@
 [#772]: https://github.com/stackabletech/superset-operator/pull/772
 [#773]: https://github.com/stackabletech/superset-operator/pull/773
 [#779]: https://github.com/stackabletech/superset-operator/pull/779
+[#781]: https://github.com/stackabletech/superset-operator/pull/781
 
 ## [26.7.0] - 2026-07-21
 
