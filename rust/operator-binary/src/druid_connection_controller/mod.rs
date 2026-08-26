@@ -17,7 +17,7 @@ use stackable_operator::{
         core::v1::{ConfigMap, EnvVar, EnvVarSource, PodSpec, PodTemplateSpec, SecretKeySelector},
     },
     kube::{
-        ResourceExt,
+        Resource, ResourceExt,
         core::{DeserializeGuard, DynamicObject, error_boundary},
         runtime::{controller::Action, reflector::ObjectRef},
     },
@@ -153,6 +153,10 @@ pub async fn reconcile_druid_connection(
     ctx: Arc<Ctx>,
 ) -> Result<Action> {
     tracing::info!("Starting reconciling DruidConnections");
+
+    if druid_connection.meta().deletion_timestamp.is_some() {
+        return Ok(Action::await_change());
+    }
 
     let druid_connection = druid_connection
         .0
@@ -457,9 +461,63 @@ pub fn error_policy(
 
 #[cfg(test)]
 mod tests {
-    use stackable_operator::utils::yaml_from_str_singleton_map;
+    use stackable_operator::{
+        commons::networking::DomainName,
+        kube::{Client as KubeClient, Config},
+        utils::{cluster_info::KubernetesClusterInfo, yaml_from_str_singleton_map},
+    };
 
     use super::*;
+
+    /// The client points at a closed port, so any API call would fail the reconciliation: an `Ok`
+    /// proves that a connection being deleted returns before the reconciler touches the Kubernetes
+    /// API, and because the spec is invalid, before the [`DeserializeGuard`] is unwrapped.
+    #[test]
+    fn reconcile_exits_early_for_deleted_connection() {
+        let druid_connection = serde_yaml::from_str(
+            r#"
+apiVersion: superset.stackable.tech/v1alpha1
+kind: DruidConnection
+metadata:
+  name: simple-connection
+  namespace: default
+  deletionTimestamp: "2026-08-14T12:00:00Z"
+spec: {}
+"#,
+        )
+        .expect("YAML parses; the invalid spec is captured inside the DeserializeGuard");
+
+        let action = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("current-thread tokio runtime")
+            .block_on(async {
+                let ctx = Arc::new(Ctx {
+                    client: Client::new(
+                        KubeClient::try_from(Config::new(
+                            "http://127.0.0.1:1".parse().expect("valid static URI"),
+                        ))
+                        .expect("client from static config"),
+                        None,
+                        "default".to_owned(),
+                        KubernetesClusterInfo {
+                            cluster_domain: DomainName::from_str("cluster.local")
+                                .expect("valid cluster domain"),
+                        },
+                    ),
+                    operator_environment: OperatorEnvironmentOptions {
+                        operator_namespace: "stackable-operators".to_owned(),
+                        operator_service_name: "superset-operator".to_owned(),
+                        image_repository: "oci.stackable.tech/sdp".to_owned(),
+                    },
+                });
+
+                reconcile_druid_connection(Arc::new(druid_connection), ctx).await
+            })
+            .expect("a deleted connection reconciles without any API call");
+
+        assert_eq!(action, Action::await_change());
+    }
 
     #[test]
     fn test_constants() {

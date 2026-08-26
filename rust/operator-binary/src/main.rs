@@ -9,12 +9,14 @@ use futures::{FutureExt, StreamExt, TryFutureExt};
 use stackable_operator::{
     YamlSchema,
     cli::{Command, RunArguments},
-    crd::authentication::core,
+    crd::{authentication::core, listener},
     eos::EndOfSupportChecker,
     k8s_openapi::api::{
         apps::v1::{Deployment, StatefulSet},
         batch::v1::Job,
-        core::v1::{ConfigMap, Service},
+        core::v1::{ConfigMap, Service, ServiceAccount},
+        policy::v1::PodDisruptionBudget,
+        rbac::v1::RoleBinding,
     },
     kube::{
         CustomResourceExt as _, ResourceExt,
@@ -135,16 +137,37 @@ async fn main() -> anyhow::Result<()> {
             let config_map_store = superset_controller.store();
             let superset_controller = superset_controller
                 .owns(
-                    watch_namespace.get_api::<DeserializeGuard<Service>>(&client),
-                    watcher::Config::default(),
-                )
-                .owns(
-                    watch_namespace.get_api::<DeserializeGuard<StatefulSet>>(&client),
+                    watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
                     watcher::Config::default(),
                 )
                 // Required for workers and beat.
                 .owns(
                     watch_namespace.get_api::<DeserializeGuard<Deployment>>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
+                    watch_namespace
+                        .get_api::<DeserializeGuard<listener::v1alpha1::Listener>>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
+                    watch_namespace.get_api::<DeserializeGuard<PodDisruptionBudget>>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
+                    watch_namespace.get_api::<DeserializeGuard<RoleBinding>>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
+                    watch_namespace.get_api::<DeserializeGuard<Service>>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
+                    watch_namespace.get_api::<DeserializeGuard<ServiceAccount>>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
+                    watch_namespace.get_api::<DeserializeGuard<StatefulSet>>(&client),
                     watcher::Config::default(),
                 )
                 .watches(
