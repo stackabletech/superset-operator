@@ -1,0 +1,8 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: check-openlineage-events
+timeout: 480
+commands:
+  - script: kubectl exec -n $NAMESPACE python-0 -- python /tmp/check_lineage.py --receiver-url http://openlineage-receiver:5000
