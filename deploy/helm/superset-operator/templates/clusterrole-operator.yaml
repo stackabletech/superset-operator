@@ -2,9 +2,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "operator.fullname" . }}-clusterrole
+  name: {{ include "superset-operator.fullname" . }}-clusterrole
   labels:
-  {{- include "operator.labels" . | nindent 4 }}
+  {{- include "superset-operator.labels" . | nindent 4 }}
 rules:
   # For automatic cluster domain detection
   - apiGroups:
@@ -54,7 +54,7 @@ rules:
     verbs:
       - bind
     resourceNames:
-      - {{ include "operator.name" . }}-clusterrole
+      - {{ include "superset-operator.name" . }}-clusterrole
   # StatefulSet created per role group. Applied via SSA and tracked for orphan cleanup.
   - apiGroups:
       - apps
@@ -129,9 +129,9 @@ rules:
       - patch
   # Primary CRDs: SupersetCluster and DruidConnection.
   - apiGroups:
-      - {{ include "operator.name" . }}.stackable.tech
+      - {{ include "superset-operator.name" . }}.stackable.tech
     resources:
-      - {{ include "operator.name" . }}clusters
+      - {{ include "superset-operator.name" . }}clusters
       - druidconnections
     verbs:
       - get
@@ -139,14 +139,14 @@ rules:
       - watch
   # Patch status for SupersetCluster (reports conditions such as Available/Degraded).
   - apiGroups:
-      - {{ include "operator.name" . }}.stackable.tech
+      - {{ include "superset-operator.name" . }}.stackable.tech
     resources:
-      - {{ include "operator.name" . }}clusters/status
+      - {{ include "superset-operator.name" . }}clusters/status
     verbs:
       - patch
   # Patch status for DruidConnection (tracks import job progress: Pending/Importing/Ready/Failed).
   - apiGroups:
-      - {{ include "operator.name" . }}.stackable.tech
+      - {{ include "superset-operator.name" . }}.stackable.tech
     resources:
       - druidconnections/status
     verbs:
