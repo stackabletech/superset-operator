@@ -24,6 +24,7 @@
   Since `volumeClaimTemplates` cannot be updated in place, StatefulSets created by older
   operator versions cannot be updated after the upgrade: delete the `node` StatefulSet(s)
   so that the operator immediately recreates them with the new labels ([#779]).
+- Make operations infallible where appropriate ([#785]).
 
 ### Removed
 
@@ -47,6 +48,7 @@
 [#773]: https://github.com/stackabletech/superset-operator/pull/773
 [#779]: https://github.com/stackabletech/superset-operator/pull/779
 [#781]: https://github.com/stackabletech/superset-operator/pull/781
+[#785]: https://github.com/stackabletech/superset-operator/pull/785
 
 ## [26.7.0] - 2026-07-21
 
