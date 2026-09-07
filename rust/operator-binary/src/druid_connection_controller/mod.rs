@@ -3,10 +3,7 @@ use std::{str::FromStr, sync::Arc};
 use const_format::concatcp;
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    builder::{
-        meta::ObjectMetaBuilder,
-        pod::{container::ContainerBuilder, security::PodSecurityContextBuilder},
-    },
+    builder::{meta::ObjectMetaBuilder, pod::security::PodSecurityContextBuilder},
     cli::OperatorEnvironmentOptions,
     client::Client,
     commons::product_image_selection::{self, ResolvedProductImage},
@@ -24,7 +21,10 @@ use stackable_operator::{
     logging::controller::ReconcilerError,
     shared::time::Duration,
     status::condition::{ClusterConditionStatus, ClusterConditionType},
-    v2::builder::pod::container::{EnvVarName, EnvVarSet},
+    v2::{
+        builder::pod::container::{EnvVarName, EnvVarSet, new_container_builder},
+        types::kubernetes::ContainerName,
+    },
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -337,6 +337,9 @@ constant!(SQLALCHEMY_DATABASE_URI_ENV: EnvVarName = "SQLALCHEMY_DATABASE_URI");
 // Name of the env var holding the Flask `SECRET_KEY` for the import job.
 constant!(SUPERSET_SECRET_KEY_ENV: EnvVarName = "SUPERSET_SECRET_KEY");
 
+// Name of the import job's only container.
+constant!(IMPORT_JOB_CONTAINER_NAME: ContainerName = "superset-import-druid-connection");
+
 /// Builds the import job.  When run it will import the druid connection into the database.
 async fn build_import_job(
     superset_cluster: &v1alpha1::SupersetCluster,
@@ -405,8 +408,7 @@ async fn build_import_job(
         );
     }
 
-    let mut container_builder = ContainerBuilder::new("superset-import-druid-connection")
-        .expect("ContainerBuilder not created");
+    let mut container_builder = new_container_builder(&IMPORT_JOB_CONTAINER_NAME);
     container_builder
         .image_from_product_image(resolved_product_image)
         .command(bash_wrapper_command())
@@ -522,6 +524,7 @@ spec: {}
     #[test]
     fn test_constants() {
         // Test that dereferencing the constants does not panic.
+        let _ = *IMPORT_JOB_CONTAINER_NAME;
         let _ = *SQLALCHEMY_DATABASE_URI_ENV;
         let _ = *SUPERSET_SECRET_KEY_ENV;
     }

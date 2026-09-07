@@ -62,9 +62,6 @@ const POD_MANAGEMENT_POLICY_ORDERED_READY: &str = "OrderedReady";
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("failed to build container"))]
-    BuildContainer { source: super::Error },
-
     #[snafu(display("failed to set termination grace period for graceful shutdown"))]
     GracefulShutdown {
         source: stackable_operator::builder::pod::Error,
@@ -78,16 +75,6 @@ pub enum Error {
     #[snafu(display("failed to add TLS Volumes and VolumeMounts"))]
     AddTlsVolumesAndVolumeMounts {
         source: stackable_operator::commons::tls_verification::TlsClientDetailsError,
-    },
-
-    #[snafu(display("failed to add needed volume"))]
-    AddVolume {
-        source: stackable_operator::builder::pod::Error,
-    },
-
-    #[snafu(display("failed to add needed volumeMount"))]
-    AddVolumeMount {
-        source: stackable_operator::builder::pod::container::Error,
     },
 }
 
@@ -135,14 +122,28 @@ pub fn build_node_rolegroup_statefulset(
 
     // The `Node` role serves the Superset web UI, so it additionally passes the authentication
     // env vars into the shared container builder (which merges the user `envOverrides` in last,
-    // so they keep the highest precedence) and mounts the authentication volumes. These mounts
-    // are added after the common config volume mounts (volume mount order is not significant).
+    // so they keep the highest precedence) and mounts the authentication volumes.
     let mut superset_cb = super::build_superset_container_builder(
         validated,
         rolegroup_config,
         authentication_env_vars(&validated.cluster_config.authentication_config),
-    )
-    .context(BuildContainerSnafu)?;
+    );
+
+    // Operator-managed volumes and volume mounts with static names and paths first: their adds
+    // are infallible. The authentication volumes and mounts below are named after the user's
+    // SecretClasses, so they are added afterwards and stay fallible, as they can collide with
+    // the operator-managed ones.
+    superset_cb
+        .add_volume_mount(
+            super::LISTENER_VOLUME_NAME_PVC.as_ref(),
+            LISTENER_VOLUME_DIR,
+        )
+        .expect("The mount paths are statically defined and there should be no duplicates.");
+    pb.add_volumes(super::create_volumes(
+        resource_names.role_group_config_map().as_ref(),
+        &rolegroup_config.config.logging.superset_container,
+    ))
+    .expect("The volume names are statically defined and there should be no duplicates.");
 
     add_authentication_volumes_and_volume_mounts(
         &validated.cluster_config.authentication_config,
@@ -221,24 +222,12 @@ pub fn build_node_rolegroup_statefulset(
         None
     };
 
-    superset_cb
-        .add_volume_mount(
-            super::LISTENER_VOLUME_NAME_PVC.as_ref(),
-            LISTENER_VOLUME_DIR,
-        )
-        .context(AddVolumeMountSnafu)?;
-
     pb.add_container(superset_cb.build());
     if let Some(termination_grace_period) = merged_config.graceful_shutdown_timeout {
         pb.termination_grace_period(&termination_grace_period)
             .context(GracefulShutdownSnafu)?;
     }
 
-    pb.add_volumes(super::create_volumes(
-        resource_names.role_group_config_map().as_ref(),
-        &rolegroup_config.config.logging.superset_container,
-    ))
-    .context(AddVolumeSnafu)?;
     pb.add_container(super::build_metrics_container(&validated.image));
 
     if let Some(vector_container) =
