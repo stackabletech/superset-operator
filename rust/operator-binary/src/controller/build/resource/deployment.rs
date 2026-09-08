@@ -48,6 +48,11 @@ pub enum Error {
     GracefulShutdown {
         source: stackable_operator::builder::pod::Error,
     },
+
+    #[snafu(display("failed to add needed volume"))]
+    AddVolume {
+        source: stackable_operator::builder::pod::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -146,7 +151,7 @@ pub fn build_rolegroup_deployment(
         resource_names.role_group_config_map().as_ref(),
         &rolegroup_config.config.logging.superset_container,
     ))
-    .expect("The volume names are statically defined and there should be no duplicates.");
+    .context(AddVolumeSnafu)?;
     pb.add_container(super::build_metrics_container(&validated.image));
 
     if let Some(vector_container) =

@@ -24,7 +24,7 @@
   Since `volumeClaimTemplates` cannot be updated in place, StatefulSets created by older
   operator versions cannot be updated after the upgrade: delete the `node` StatefulSet(s)
   so that the operator immediately recreates them with the new labels ([#779]).
-- Make operations infallible where appropriate ([#785]).
+- Make operations infallible where dependent on static inputs ([#785]).
 
 ### Removed
 

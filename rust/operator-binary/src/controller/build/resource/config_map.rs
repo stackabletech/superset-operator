@@ -22,6 +22,12 @@ pub enum Error {
         source: superset_config::Error,
         role_group_name: RoleGroupName,
     },
+
+    #[snafu(display("failed to build ConfigMap for role group {role_group_name}"))]
+    RoleGroupConfig {
+        source: stackable_operator::builder::configmap::Error,
+        role_group_name: RoleGroupName,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -66,9 +72,9 @@ pub fn build_rolegroup_config_map(
         cm_builder.add_data(VECTOR_CONFIG_FILE, vector_config);
     }
 
-    Ok(cm_builder
-        .build()
-        .expect("The ConfigMap metadata is set in this function."))
+    cm_builder.build().with_context(|_| RoleGroupConfigSnafu {
+        role_group_name: role_group_name.clone(),
+    })
 }
 
 #[cfg(test)]

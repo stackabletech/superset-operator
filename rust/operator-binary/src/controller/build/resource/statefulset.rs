@@ -76,6 +76,11 @@ pub enum Error {
     AddTlsVolumesAndVolumeMounts {
         source: stackable_operator::commons::tls_verification::TlsClientDetailsError,
     },
+
+    #[snafu(display("failed to add needed volume"))]
+    AddVolume {
+        source: stackable_operator::builder::pod::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -129,10 +134,11 @@ pub fn build_node_rolegroup_statefulset(
         authentication_env_vars(&validated.cluster_config.authentication_config),
     );
 
-    // Operator-managed volumes and volume mounts with static names and paths first: their adds
-    // are infallible. The authentication volumes and mounts below are named after the user's
-    // SecretClasses, so they are added afterwards and stay fallible, as they can collide with
-    // the operator-managed ones.
+    // Operator-managed volumes and volume mounts with static names and paths first. The mount
+    // add is infallible because both its arguments are constants; the volume add is fallible
+    // because the volumes are built by a helper. The authentication volumes and mounts below
+    // are named after the user's SecretClasses, so they are added afterwards and stay fallible,
+    // as they can collide with the operator-managed ones.
     superset_cb
         .add_volume_mount(
             super::LISTENER_VOLUME_NAME_PVC.as_ref(),
@@ -143,7 +149,7 @@ pub fn build_node_rolegroup_statefulset(
         resource_names.role_group_config_map().as_ref(),
         &rolegroup_config.config.logging.superset_container,
     ))
-    .expect("The volume names are statically defined and there should be no duplicates.");
+    .context(AddVolumeSnafu)?;
 
     add_authentication_volumes_and_volume_mounts(
         &validated.cluster_config.authentication_config,
