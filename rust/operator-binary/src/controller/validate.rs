@@ -70,12 +70,6 @@ pub enum Error {
         role_group: RoleGroupName,
     },
 
-    #[snafu(display("invalid environment variable override name in role group {role_group}"))]
-    ParseEnvVarName {
-        source: stackable_operator::v2::macros::attributed_string_type::Error,
-        role_group: RoleGroupName,
-    },
-
     #[snafu(display("invalid role group name {role_group}"))]
     ParseRoleGroupName {
         source: stackable_operator::v2::macros::attributed_string_type::Error,
@@ -155,6 +149,8 @@ pub fn validate_cluster(
         .vector_aggregator_config_map_name
         .clone();
 
+    let cluster_name = get_cluster_name(superset).context(ResolveClusterNameSnafu)?;
+
     let mut role_groups = BTreeMap::new();
     let mut role_configs = BTreeMap::new();
 
@@ -172,10 +168,7 @@ pub fn validate_cluster(
                      }| pod_disruption_budget,
                 ),
                 listener_class: role.listener_class_name(superset),
-                group_listener_name: superset.group_listener_name(&role).map(|name| {
-                    name.parse()
-                        .expect("the group listener name is a valid ListenerName")
-                }),
+                group_listener_name: role.group_listener_name(&cluster_name),
             },
         );
 
@@ -203,7 +196,6 @@ pub fn validate_cluster(
 
     let cluster_config = &superset.spec.cluster_config;
 
-    let cluster_name = get_cluster_name(superset).context(ResolveClusterNameSnafu)?;
     let namespace = get_namespace(superset).context(ResolveNamespaceSnafu)?;
     let uid = get_uid(superset).context(ResolveUidSnafu)?;
 

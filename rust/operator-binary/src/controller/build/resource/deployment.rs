@@ -44,9 +44,6 @@ const CELERY_APP_INVOCATION: &str = "celery --app=superset.tasks.celery_app:app"
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("failed to build container"))]
-    BuildContainer { source: super::Error },
-
     #[snafu(display("failed to set termination grace period for graceful shutdown"))]
     GracefulShutdown {
         source: stackable_operator::builder::pod::Error,
@@ -55,11 +52,6 @@ pub enum Error {
     #[snafu(display("failed to add needed volume"))]
     AddVolume {
         source: stackable_operator::builder::pod::Error,
-    },
-
-    #[snafu(display("failed to add needed volumeMount"))]
-    AddVolumeMount {
-        source: stackable_operator::builder::pod::container::Error,
     },
 }
 
@@ -120,8 +112,7 @@ pub fn build_rolegroup_deployment(
 
     // The Celery roles set no role-specific env vars, so an empty set is passed.
     let mut superset_cb =
-        super::build_superset_container_builder(validated, rolegroup_config, EnvVarSet::new())
-            .context(BuildContainerSnafu)?;
+        super::build_superset_container_builder(validated, rolegroup_config, EnvVarSet::new());
 
     superset_cb
         .command(super::bash_wrapper_command())

@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
 use indoc::formatdoc;
-use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::pod::{
         container::ContainerBuilder, resources::ResourceRequirementsBuilder, volume::VolumeBuilder,
@@ -92,15 +91,6 @@ pub(crate) const PROTOCOL_TCP: &str = "TCP";
 
 /// The `fsGroup` the Pods run as, required by secret-operator-provided volumes.
 pub(crate) const SECRET_OPERATOR_FS_GROUP: i64 = 1000;
-
-/// Errors shared by the container builders below.
-#[derive(Snafu, Debug)]
-pub enum Error {
-    #[snafu(display("failed to add needed volumeMount"))]
-    AddVolumeMount {
-        source: stackable_operator::builder::pod::container::Error,
-    },
-}
 
 /// The shell wrapper used to launch the long-running product containers
 /// (`/bin/bash -x -euo pipefail -c <args>`).
@@ -264,24 +254,24 @@ pub(crate) fn build_superset_container_builder(
     validated: &ValidatedCluster,
     rolegroup_config: &SupersetRoleGroupConfig,
     role_specific_env_vars: EnvVarSet,
-) -> Result<ContainerBuilder, Error> {
+) -> ContainerBuilder {
     let mut superset_cb = new_container_builder(&Container::Superset.to_container_name());
 
     superset_cb
         .image_from_product_image(&validated.image)
         .add_volume_mount(CONFIG_VOLUME_NAME.as_ref(), STACKABLE_CONFIG_DIR)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(LOG_CONFIG_VOLUME_NAME.as_ref(), STACKABLE_LOG_CONFIG_DIR)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_volume_mount(LOG_VOLUME_NAME.as_ref(), STACKABLE_LOG_DIR)
-        .context(AddVolumeMountSnafu)?
+        .expect("The mount paths are statically defined and there should be no duplicates.")
         .add_env_vars(build_env_vars(
             validated,
             rolegroup_config,
             role_specific_env_vars,
         ));
 
-    Ok(superset_cb)
+    superset_cb
 }
 
 /// Builds the `metrics` (statsd exporter) sidecar container, shared by the StatefulSet and

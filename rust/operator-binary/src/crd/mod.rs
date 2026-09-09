@@ -31,8 +31,10 @@ use stackable_operator::{
         role_utils::{GenericCommonConfig, Role, RoleGroup},
         types::{
             common::Port,
-            kubernetes::{ConfigMapName, ContainerName, ListenerClassName, SecretKey},
-            operator::RoleName,
+            kubernetes::{
+                ConfigMapName, ContainerName, ListenerClassName, ListenerName, SecretKey,
+            },
+            operator::{ClusterName, RoleName},
         },
     },
     versioned::versioned,
@@ -46,13 +48,13 @@ use crate::crd::{
     v1alpha1::SupersetRoleConfig,
 };
 
-/// Default [`ListenerClassName`] value used by the rolegroup listener.
-pub const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
+// Default listener class used by the rolegroup listener.
+constant!(pub DEFAULT_LISTENER_CLASS: ListenerClassName = "cluster-internal");
 
-/// Default listener class used by the rolegroup listener.
+/// Default listener class used by the rolegroup listener (the serde default of
+/// `SupersetRoleConfig::listener_class`).
 fn default_listener_class() -> ListenerClassName {
-    ListenerClassName::from_str(DEFAULT_LISTENER_CLASS)
-        .expect("the default listener class is a valid listener class name")
+    DEFAULT_LISTENER_CLASS.clone()
 }
 
 pub mod affinity;
@@ -420,23 +422,41 @@ impl SupersetRole {
             Self::Worker | Self::Beat => None,
         }
     }
+
+    /// The name of the group listener provided for the role, if the role serves the web UI.
+    /// Nodes will use this group listener so that only one load balancer is needed for that role.
+    ///
+    /// The returned ListenerName is a lowercase RFC 1035 label name (checked by a unit test).
+    pub fn group_listener_name(&self, cluster_name: &ClusterName) -> Option<ListenerName> {
+        const _: () = assert!(
+            ClusterName::MAX_LENGTH + 1 /* dash */ + RoleName::MAX_LENGTH
+                <= ListenerName::MAX_LENGTH,
+            "The string `<cluster_name>-<role_name>` must not exceed the limit of Listener names."
+        );
+        // Both halves are RFC 1123 labels joined by a dash, which is a valid RFC 1123 subdomain.
+        let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
+        let _ = RoleName::IS_RFC_1123_LABEL_NAME;
+
+        let role_name: &RoleName = self;
+        match self {
+            Self::Node => Some(
+                ListenerName::from_str(&format!("{cluster_name}-{role_name}"))
+                    .expect("The role listener name is a valid Listener name."),
+            ),
+            Self::Worker | Self::Beat => None,
+        }
+    }
 }
 
 impl From<SupersetRole> for RoleName {
     fn from(value: SupersetRole) -> Self {
-        value
-            .to_string()
-            .parse()
-            .expect("a SupersetRole serialises to a valid RoleName")
+        RoleName::clone(&value)
     }
 }
 
 impl From<&SupersetRole> for RoleName {
     fn from(value: &SupersetRole) -> Self {
-        value
-            .to_string()
-            .parse()
-            .expect("a SupersetRole serialises to a valid RoleName")
+        RoleName::clone(value)
     }
 }
 
@@ -578,20 +598,6 @@ impl v1alpha1::SupersetCluster {
         &self.spec.cluster_config.metadata_database
     }
 
-    /// The name of the group-listener provided for a specific role.
-    /// Nodes will use this group listener so that only one load balancer
-    /// is needed for that role.
-    pub fn group_listener_name(&self, role: &SupersetRole) -> Option<String> {
-        match role {
-            SupersetRole::Node => Some(format!(
-                "{cluster_name}-{role}",
-                role = role.as_ref(),
-                cluster_name = self.name_any()
-            )),
-            SupersetRole::Worker | SupersetRole::Beat => None,
-        }
-    }
-
     pub fn generic_role_config(&self, role: &SupersetRole) -> Option<GenericRoleConfig> {
         self.get_role_config(role).map(|r| r.common.to_owned())
     }
@@ -621,29 +627,21 @@ impl v1alpha1::SupersetCluster {
 
 #[cfg(test)]
 mod tests {
-    use stackable_operator::{
-        v2::types::operator::RoleName, versioned::test_utils::RoundtripTestData,
-    };
+    use std::str::FromStr;
+
+    use stackable_operator::versioned::test_utils::RoundtripTestData;
     use strum::IntoEnumIterator;
 
     use super::{
-        BEAT_ROLE_NAME, INTERNAL_SECRET_SECRET_KEY, MAPBOX_API_KEY_ENV, MAPBOX_API_KEY_SECRET_KEY,
-        NODE_ROLE_NAME, SECRET_KEY_ENV, SupersetRole, WORKER_ROLE_NAME, v1alpha1,
+        BEAT_ROLE_NAME, ClusterName, DEFAULT_LISTENER_CLASS, INTERNAL_SECRET_SECRET_KEY,
+        MAPBOX_API_KEY_ENV, MAPBOX_API_KEY_SECRET_KEY, NODE_ROLE_NAME, SECRET_KEY_ENV,
+        SupersetRole, WORKER_ROLE_NAME, v1alpha1,
     };
-
-    /// Locks the invariant behind the `expect` in the `From<SupersetRole> for RoleName` impls:
-    /// every `SupersetRole` variant (present and future) must serialise to a valid `RoleName`.
-    #[test]
-    fn every_superset_role_serialises_to_a_valid_role_name() {
-        for role in SupersetRole::iter() {
-            let _: RoleName = (&role).into();
-            let _: RoleName = role.into();
-        }
-    }
 
     #[test]
     fn test_constants() {
         // Test that dereferencing the constants does not panic.
+        let _ = *DEFAULT_LISTENER_CLASS;
         let _ = *NODE_ROLE_NAME;
         let _ = *WORKER_ROLE_NAME;
         let _ = *BEAT_ROLE_NAME;
@@ -656,6 +654,26 @@ mod tests {
         let secret_key_env: &str = SECRET_KEY_ENV.as_ref();
         let internal_secret_secret_key: &str = INTERNAL_SECRET_SECRET_KEY.as_ref();
         assert_eq!(secret_key_env, internal_secret_secret_key);
+    }
+
+    #[test]
+    fn group_listener_name_is_rfc_1035_label_name() {
+        // Every ClusterName is a valid RFC 1035 label name, so we use just some string with maximum
+        // length.
+        let _ = ClusterName::IS_RFC_1035_LABEL_NAME;
+        let cluster_name = ClusterName::from_str(&"a".repeat(ClusterName::MAX_LENGTH))
+            .expect("is a valid ClusterName");
+
+        for role in SupersetRole::iter() {
+            if let Some(group_listener_name) = role.group_listener_name(&cluster_name) {
+                assert!(
+                    stackable_operator::validation::is_lowercase_rfc_1035_label(
+                        group_listener_name.as_ref()
+                    )
+                    .is_ok()
+                );
+            }
+        }
     }
 
     impl RoundtripTestData for v1alpha1::SupersetClusterSpec {
