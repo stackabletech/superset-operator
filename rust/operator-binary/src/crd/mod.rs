@@ -425,6 +425,8 @@ impl SupersetRole {
 
     /// The name of the group listener provided for the role, if the role serves the web UI.
     /// Nodes will use this group listener so that only one load balancer is needed for that role.
+    ///
+    /// The returned ListenerName is a lowercase RFC 1035 label name (checked by a unit test).
     pub fn group_listener_name(&self, cluster_name: &ClusterName) -> Option<ListenerName> {
         const _: () = assert!(
             ClusterName::MAX_LENGTH + 1 /* dash */ + RoleName::MAX_LENGTH
@@ -625,11 +627,15 @@ impl v1alpha1::SupersetCluster {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use stackable_operator::versioned::test_utils::RoundtripTestData;
+    use strum::IntoEnumIterator;
 
     use super::{
-        BEAT_ROLE_NAME, DEFAULT_LISTENER_CLASS, INTERNAL_SECRET_SECRET_KEY, MAPBOX_API_KEY_ENV,
-        MAPBOX_API_KEY_SECRET_KEY, NODE_ROLE_NAME, SECRET_KEY_ENV, WORKER_ROLE_NAME, v1alpha1,
+        BEAT_ROLE_NAME, ClusterName, DEFAULT_LISTENER_CLASS, INTERNAL_SECRET_SECRET_KEY,
+        MAPBOX_API_KEY_ENV, MAPBOX_API_KEY_SECRET_KEY, NODE_ROLE_NAME, SECRET_KEY_ENV,
+        SupersetRole, WORKER_ROLE_NAME, v1alpha1,
     };
 
     #[test]
@@ -648,6 +654,26 @@ mod tests {
         let secret_key_env: &str = SECRET_KEY_ENV.as_ref();
         let internal_secret_secret_key: &str = INTERNAL_SECRET_SECRET_KEY.as_ref();
         assert_eq!(secret_key_env, internal_secret_secret_key);
+    }
+
+    #[test]
+    fn group_listener_name_is_rfc_1035_label_name() {
+        // Every ClusterName is a valid RFC 1035 label name, so we use just some string with maximum
+        // length.
+        let _ = ClusterName::IS_RFC_1035_LABEL_NAME;
+        let cluster_name = ClusterName::from_str(&"a".repeat(ClusterName::MAX_LENGTH))
+            .expect("is a valid ClusterName");
+
+        for role in SupersetRole::iter() {
+            if let Some(group_listener_name) = role.group_listener_name(&cluster_name) {
+                assert!(
+                    stackable_operator::validation::is_lowercase_rfc_1035_label(
+                        group_listener_name.as_ref()
+                    )
+                    .is_ok()
+                );
+            }
+        }
     }
 
     impl RoundtripTestData for v1alpha1::SupersetClusterSpec {
