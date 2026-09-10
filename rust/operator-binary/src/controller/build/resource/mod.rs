@@ -80,6 +80,8 @@ const STACKABLE_CERTS_DIR: &str = "/stackable/certs/";
 /// Path of the statsd-exporter binary launched by the `metrics` sidecar.
 const STATSD_EXPORTER_BINARY: &str = "/stackable/statsd_exporter";
 
+// The metrics container has no logging configuration, so it is not a `Container` variant and
+// carries its name directly.
 constant!(METRICS_CONTAINER_NAME: ContainerName = "metrics");
 
 // Name of the listener volume. It is a PVC, so the same name is used as the volume/mount name and
@@ -255,7 +257,7 @@ pub(crate) fn build_superset_container_builder(
     rolegroup_config: &SupersetRoleGroupConfig,
     role_specific_env_vars: EnvVarSet,
 ) -> ContainerBuilder {
-    let mut superset_cb = new_container_builder(&Container::Superset.to_container_name());
+    let mut superset_cb = new_container_builder(Container::Superset.name());
 
     superset_cb
         .image_from_product_image(&validated.image)
@@ -315,7 +317,7 @@ pub(crate) fn build_vector_container(
         .as_ref()
         .map(|vector_log_config| {
             vector_container(
-                &Container::Vector.to_container_name(),
+                Container::Vector.name(),
                 &validated.image,
                 vector_log_config,
                 &validated.role_group_resource_names(superset_role, role_group_name),
