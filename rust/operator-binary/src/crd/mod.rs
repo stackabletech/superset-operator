@@ -460,11 +460,18 @@ impl From<&SupersetRole> for RoleName {
     }
 }
 
+// Typed container names. They must match the strum `Display` (kebab-case) of the
+// `v1alpha1::Container` variants, which is pinned by a unit test.
+constant!(SUPERSET_CONTAINER_NAME: ContainerName = "superset");
+constant!(VECTOR_CONTAINER_NAME: ContainerName = "vector");
+
 impl v1alpha1::Container {
-    /// The type-safe container name for this variant (matching its kebab-case serialization).
-    pub fn to_container_name(&self) -> ContainerName {
-        ContainerName::from_str(&self.to_string())
-            .expect("a Container variant name is a valid container name")
+    /// The typed container name of this variant.
+    pub fn name(&self) -> &'static ContainerName {
+        match self {
+            v1alpha1::Container::Superset => &SUPERSET_CONTAINER_NAME,
+            v1alpha1::Container::Vector => &VECTOR_CONTAINER_NAME,
+        }
     }
 }
 
@@ -635,8 +642,17 @@ mod tests {
     use super::{
         BEAT_ROLE_NAME, ClusterName, DEFAULT_LISTENER_CLASS, INTERNAL_SECRET_SECRET_KEY,
         MAPBOX_API_KEY_ENV, MAPBOX_API_KEY_SECRET_KEY, NODE_ROLE_NAME, SECRET_KEY_ENV,
-        SupersetRole, WORKER_ROLE_NAME, v1alpha1,
+        SUPERSET_CONTAINER_NAME, SupersetRole, VECTOR_CONTAINER_NAME, WORKER_ROLE_NAME, v1alpha1,
     };
+
+    /// The typed container names returned by `name` must agree with the strum `Display` of
+    /// `v1alpha1::Container`, which the logging configuration still uses as the per-container key.
+    #[test]
+    fn container_names_match_display() {
+        for container in v1alpha1::Container::iter() {
+            assert_eq!(container.name().to_string(), container.to_string());
+        }
+    }
 
     #[test]
     fn test_constants() {
@@ -645,6 +661,8 @@ mod tests {
         let _ = *NODE_ROLE_NAME;
         let _ = *WORKER_ROLE_NAME;
         let _ = *BEAT_ROLE_NAME;
+        let _ = *SUPERSET_CONTAINER_NAME;
+        let _ = *VECTOR_CONTAINER_NAME;
         let _ = *SECRET_KEY_ENV;
         let _ = *INTERNAL_SECRET_SECRET_KEY;
         let _ = *MAPBOX_API_KEY_ENV;
