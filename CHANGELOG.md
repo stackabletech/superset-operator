@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support floating tag in product image selection ([#790]).
+
 ### Changed
 
 - Internal operator refactoring: introduce a build() step in the reconciler that
@@ -50,6 +54,7 @@
 [#781]: https://github.com/stackabletech/superset-operator/pull/781
 [#785]: https://github.com/stackabletech/superset-operator/pull/785
 [#788]: https://github.com/stackabletech/superset-operator/pull/788
+[#790]: https://github.com/stackabletech/superset-operator/pull/790
 
 ## [26.7.0] - 2026-07-21
 
