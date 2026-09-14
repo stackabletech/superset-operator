@@ -30,7 +30,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     APP_NAME, SUPERSET_OPERATOR_NAME,
-    built_info::PKG_VERSION,
+    built_info::PKG_VERSION_SEMVER,
     controller::{
         CONTAINER_IMAGE_BASE_NAME,
         build::{properties::ConfigFileName, resource::bash_wrapper_command},
@@ -237,7 +237,7 @@ pub async fn reconcile_druid_connection(
                         .resolve(
                             CONTAINER_IMAGE_BASE_NAME,
                             &ctx.operator_environment.image_repository,
-                            PKG_VERSION,
+                            &PKG_VERSION_SEMVER,
                         )
                         .context(ResolveProductImageSnafu)?;
                     let job = build_import_job(
