@@ -27,7 +27,7 @@ use stackable_operator::{
 use strum::IntoEnumIterator;
 
 use crate::{
-    built_info::PKG_VERSION,
+    built_info::PKG_VERSION_SEMVER,
     controller::{
         CONTAINER_IMAGE_BASE_NAME, SupersetRoleGroupConfig, ValidatedCluster,
         ValidatedClusterConfig, ValidatedLogging, ValidatedRoleConfig, ValidatedSupersetConfig,
@@ -138,7 +138,11 @@ pub fn validate_cluster(
     let resolved_product_image = superset
         .spec
         .image
-        .resolve(CONTAINER_IMAGE_BASE_NAME, image_repository, PKG_VERSION)
+        .resolve(
+            CONTAINER_IMAGE_BASE_NAME,
+            image_repository,
+            &PKG_VERSION_SEMVER,
+        )
         .context(ResolveProductImageSnafu)?;
 
     // The Vector aggregator discovery ConfigMap name. It is only required when the Vector agent is

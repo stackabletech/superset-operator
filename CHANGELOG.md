@@ -2,18 +2,26 @@
 
 ## [Unreleased]
 
+### Added
+
+- Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
+  ([#790]).
+
 ### Changed
 
+- BREAKING: `spec.image.stackableVersion` must now be a full, valid semver version, e.g. `26.7.1`.
+  Abbreviated values such as `26.7` are no longer accepted ([#790]).
+- BREAKING: `spec.image.pullPolicy` now defaults to `IfNotPresent` for non-floating tags instead of
+  always defaulting to `Always` ([#790]).
 - Internal operator refactoring: introduce a build() step in the reconciler that
   assembles all relevant Kubernetes resources before anything is applied ([#756]).
-- Bump stackable-operator to 0.114.0 ([#765]).
+- Bump stackable-operator to 0.118.0 ([#765], [#779], [#790]).
 - The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
   functions and carry the full set of recommended labels ([#761]).
 - BREAKING: The `nodes` role is now required by the CRD; a SupersetCluster without it was
   previously accepted by the API server but reconciled to no `nodes` resources ([#761]).
 - The reconciler now applies resources and derives the cluster status in discrete
   apply and update_status steps for the `controller` reconcile ([#772]).
-- Bump stackable-operator to 0.116.0 ([#779]).
 - Environment variable overrides (`envOverrides`) are now applied after all environment
   variables set by the operator, whereas previously the operator's values always took
   precedence ([#779]).
@@ -50,6 +58,7 @@
 [#781]: https://github.com/stackabletech/superset-operator/pull/781
 [#785]: https://github.com/stackabletech/superset-operator/pull/785
 [#788]: https://github.com/stackabletech/superset-operator/pull/788
+[#790]: https://github.com/stackabletech/superset-operator/pull/790
 
 ## [26.7.0] - 2026-07-21
 
