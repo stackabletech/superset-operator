@@ -413,16 +413,6 @@ impl Deref for SupersetRole {
 }
 
 impl SupersetRole {
-    pub fn listener_class_name(
-        &self,
-        superset: &v1alpha1::SupersetCluster,
-    ) -> Option<ListenerClassName> {
-        match self {
-            Self::Node => Some(superset.spec.nodes.role_config.listener_class.clone()),
-            Self::Worker | Self::Beat => None,
-        }
-    }
-
     /// The name of the group listener provided for the role, if the role serves the web UI.
     /// Nodes will use this group listener so that only one load balancer is needed for that role.
     ///
@@ -603,14 +593,6 @@ impl v1alpha1::SupersetCluster {
     /// The connection to the metadata database.
     pub fn metadata_database(&self) -> &MetadataDatabaseConnection {
         &self.spec.cluster_config.metadata_database
-    }
-
-    pub fn generic_role_config(&self, role: &SupersetRole) -> Option<GenericRoleConfig> {
-        self.get_role_config(role).map(|r| r.common.to_owned())
-    }
-
-    pub fn get_role_config(&self, role: &SupersetRole) -> Option<&SupersetRoleConfig> {
-        self.get_role(role).as_ref().map(|c| &c.role_config)
     }
 
     pub fn get_role(&self, role: &SupersetRole) -> Option<&SupersetRoleType> {

@@ -88,10 +88,13 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 /// The rolegroup [`StatefulSet`] runs the rolegroup, as configured by the administrator.
 pub fn build_node_rolegroup_statefulset(
     validated: &ValidatedCluster,
-    superset_role: &SupersetRole,
     role_group_name: &RoleGroupName,
     rolegroup_config: &SupersetRoleGroupConfig,
 ) -> Result<StatefulSet> {
+    // This function builds the Node role's StatefulSet only; the Worker and Beat roles get
+    // Deployments instead.
+    let superset_role = &SupersetRole::Node;
+
     let merged_config = &rolegroup_config.config;
 
     let resource_names = validated.role_group_resource_names(superset_role, role_group_name);
@@ -210,23 +213,13 @@ pub fn build_node_rolegroup_statefulset(
         .readiness_probe(readiness_probe)
         .liveness_probe(liveness_probe);
 
-    // listener endpoints will use persistent volumes
-    // so that load balancers can hard-code the target addresses and
-    // that it is possible to connect to a consistent address
-    let pvcs = if let Some(group_listener_name) = validated
-        .role_configs
-        .get(superset_role)
-        .and_then(|role_config| role_config.group_listener_name.clone())
-    {
-        let pvc = listener_operator_volume_source_builder_build_pvc(
-            &ListenerReference::Listener(group_listener_name),
-            &unversioned_recommended_labels,
-            &super::LISTENER_VOLUME_NAME_PVC,
-        );
-        Some(vec![pvc])
-    } else {
-        None
-    };
+    let group_listener_name = validated.node_config.group_listener_name.clone();
+    let pvc = listener_operator_volume_source_builder_build_pvc(
+        &ListenerReference::Listener(group_listener_name),
+        &unversioned_recommended_labels,
+        &super::LISTENER_VOLUME_NAME_PVC,
+    );
+    let pvcs = Some(vec![pvc]);
 
     pb.add_container(superset_cb.build());
     if let Some(termination_grace_period) = merged_config.graceful_shutdown_timeout {
@@ -415,7 +408,7 @@ mod tests {
     };
 
     use super::build_node_rolegroup_statefulset;
-    use crate::{controller::build::test_support::validated_cluster, crd::SupersetRole};
+    use crate::controller::build::test_support::validated_cluster;
 
     /// The user-supplied `envOverrides` must be merged in after all operator-set environment
     /// variables, so that they can override any of them. `CONTAINERDEBUG_LOG_DIRECTORY` is used
@@ -425,9 +418,8 @@ mod tests {
         let cluster = validated_cluster();
         let role_group_name = RoleGroupName::from_str("default").expect("valid role group name");
         let mut rg = cluster
-            .role_groups
-            .get(&SupersetRole::Node)
-            .and_then(|groups| groups.get(&role_group_name))
+            .node_role_group_configs
+            .get(&role_group_name)
             .expect("node default role group")
             .clone();
         rg.env_overrides = EnvVarSet::new().with_value(
@@ -435,9 +427,8 @@ mod tests {
             "/stackable/log/user-override",
         );
 
-        let stateful_set =
-            build_node_rolegroup_statefulset(&cluster, &SupersetRole::Node, &role_group_name, &rg)
-                .expect("statefulset built");
+        let stateful_set = build_node_rolegroup_statefulset(&cluster, &role_group_name, &rg)
+            .expect("statefulset built");
 
         let containers = stateful_set
             .spec

@@ -5,6 +5,7 @@ use std::marker::PhantomData;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
+    k8s_openapi::api::core::v1::{ConfigMap, Service},
     kvp::Labels,
     v2::{
         builder::meta::ownerreference_from_resource,
@@ -16,7 +17,7 @@ use stackable_operator::{
 use crate::{
     controller::{
         CONTROLLER_NAME, KubernetesResources, OPERATOR_NAME, PRODUCT_NAME, Prepared,
-        ValidatedCluster,
+        SupersetRoleGroupConfig, ValidatedCluster,
         build::resource::{
             config_map::build_rolegroup_config_map,
             deployment::build_rolegroup_deployment,
@@ -64,89 +65,74 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources<Prepared>
     let mut config_maps = vec![];
     let mut pod_disruption_budgets = vec![];
 
-    for (superset_role, role_group_configs) in &cluster.role_groups {
-        for (role_group_name, rolegroup_config) in role_group_configs {
-            let config = &rolegroup_config.config;
+    for (role_group_name, rolegroup_config) in &cluster.node_role_group_configs {
+        let (config_map, metrics_service) = build_common_role_group_resources(
+            cluster,
+            &SupersetRole::Node,
+            role_group_name,
+            rolegroup_config,
+        )?;
+        config_maps.push(config_map);
+        services.push(metrics_service);
 
-            config_maps.push(
-                build_rolegroup_config_map(
-                    cluster,
-                    superset_role,
-                    role_group_name,
-                    config,
-                    &rolegroup_config.config_overrides,
-                )
-                .context(ConfigMapSnafu {
+        // Only the Node role's StatefulSet references a headless Service (as its `serviceName`);
+        // the Worker/Beat Deployments have no `serviceName` and do not serve the HTTP port.
+        services.push(build_rolegroup_headless_service(
+            cluster,
+            &SupersetRole::Node,
+            role_group_name,
+        ));
+
+        stateful_sets.push(
+            build_node_rolegroup_statefulset(cluster, role_group_name, rolegroup_config).context(
+                StatefulSetSnafu {
                     role_group: role_group_name.clone(),
-                })?,
-            );
+                },
+            )?,
+        );
+    }
 
-            // Every role exposes metrics via the statsd-exporter sidecar, so each rolegroup gets a
-            // metrics Service.
-            services.push(build_rolegroup_metrics_service(
+    // The Celery roles differ from each other only in name: both produce a ConfigMap, a metrics
+    // Service and a Deployment.
+    for (role, role_group_configs) in [
+        (&SupersetRole::Worker, &cluster.worker_role_group_configs),
+        (&SupersetRole::Beat, &cluster.beat_role_group_configs),
+    ] {
+        for (role_group_name, rolegroup_config) in role_group_configs {
+            let (config_map, metrics_service) = build_common_role_group_resources(
                 cluster,
-                superset_role,
+                role,
                 role_group_name,
-            ));
+                rolegroup_config,
+            )?;
+            config_maps.push(config_map);
+            services.push(metrics_service);
 
-            match superset_role {
-                SupersetRole::Node => {
-                    // Only the `Node` role's StatefulSet references a headless Service (as its
-                    // `serviceName`); the `Worker`/`Beat` Deployments have no `serviceName` and do
-                    // not serve the HTTP port, so they get no headless Service.
-                    services.push(build_rolegroup_headless_service(
-                        cluster,
-                        superset_role,
-                        role_group_name,
-                    ));
-
-                    stateful_sets.push(
-                        build_node_rolegroup_statefulset(
-                            cluster,
-                            superset_role,
-                            role_group_name,
-                            rolegroup_config,
-                        )
-                        .context(StatefulSetSnafu {
-                            role_group: role_group_name.clone(),
-                        })?,
-                    );
-                }
-                SupersetRole::Worker | SupersetRole::Beat => {
-                    deployments.push(
-                        build_rolegroup_deployment(
-                            cluster,
-                            superset_role,
-                            role_group_name,
-                            rolegroup_config,
-                        )
-                        .context(DeploymentSnafu {
-                            role_group: role_group_name.clone(),
-                        })?,
-                    );
-                }
-            }
+            deployments.push(
+                build_rolegroup_deployment(cluster, role, role_group_name, rolegroup_config)
+                    .context(DeploymentSnafu {
+                        role_group: role_group_name.clone(),
+                    })?,
+            );
         }
+    }
 
-        // Role-level resources (group listener, PDB) are built once per role, after its role
-        // groups — not once per role group.
-        if let Some(role_config) = cluster.role_configs.get(superset_role) {
-            if let (Some(listener_class), Some(listener_group_name)) = (
-                &role_config.listener_class,
-                &role_config.group_listener_name,
-            ) {
-                listeners.push(build_group_listener(
-                    cluster,
-                    superset_role,
-                    listener_class,
-                    listener_group_name.to_string(),
-                ));
-            }
-
-            if let Some(pdb_config) = &role_config.pdb {
-                pod_disruption_budgets.extend(build_pdb(pdb_config, cluster, superset_role));
-            }
-        }
+    listeners.push(build_group_listener(
+        cluster,
+        &SupersetRole::Node,
+        &cluster.node_config.listener_class,
+        cluster.node_config.group_listener_name.to_string(),
+    ));
+    pod_disruption_budgets.extend(build_pdb(
+        &cluster.node_config.pdb,
+        cluster,
+        &SupersetRole::Node,
+    ));
+    if let Some(worker) = &cluster.worker_config {
+        pod_disruption_budgets.extend(build_pdb(&worker.pdb, cluster, &SupersetRole::Worker));
+    }
+    if let Some(beat) = &cluster.beat_config {
+        pod_disruption_budgets.extend(build_pdb(&beat.pdb, cluster, &SupersetRole::Beat));
     }
 
     Ok(KubernetesResources {
@@ -160,6 +146,31 @@ pub fn build(cluster: &ValidatedCluster) -> Result<KubernetesResources<Prepared>
         role_bindings: vec![build_role_binding(cluster)],
         status: PhantomData,
     })
+}
+
+/// The resources every role group gets regardless of its role: a ConfigMap and a metrics Service
+/// (every role exposes metrics via the statsd-exporter sidecar).
+fn build_common_role_group_resources(
+    cluster: &ValidatedCluster,
+    role: &SupersetRole,
+    role_group_name: &RoleGroupName,
+    rolegroup_config: &SupersetRoleGroupConfig,
+) -> Result<(ConfigMap, Service), Error> {
+    let config_map = build_rolegroup_config_map(
+        cluster,
+        role,
+        role_group_name,
+        &rolegroup_config.config,
+        &rolegroup_config.config_overrides,
+    )
+    .context(ConfigMapSnafu {
+        role_group: role_group_name.clone(),
+    })?;
+
+    Ok((
+        config_map,
+        build_rolegroup_metrics_service(cluster, role, role_group_name),
+    ))
 }
 
 /// Returns an [`ObjectMetaBuilder`] pre-filled with the namespace, an owner reference back to
