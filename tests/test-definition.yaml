@@ -83,6 +83,10 @@ tests:
     dimensions:
       - superset
       - openshift
+  - name: openlineage
+    dimensions:
+      - superset-latest
+      - openshift
   - name: upgrade
     dimensions:
       - superset-old
