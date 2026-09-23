@@ -7,7 +7,6 @@ dimensions:
   - name: superset
     values:
       - 4.1.4
-      - 6.0.0
       - 6.1.0
       # Or use a custom image:
       # - 6.1.0,oci.stackable.tech/sandbox/superset:6.1.0
@@ -18,7 +17,6 @@ dimensions:
   - name: superset-old
     values:
       - 4.1.4
-      - 6.0.0
   - name: superset-new
     values:
       - 6.1.0
