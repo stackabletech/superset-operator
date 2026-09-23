@@ -33,6 +33,10 @@
   operator versions cannot be updated after the upgrade: delete the `node` StatefulSet(s)
   so that the operator immediately recreates them with the new labels ([#779]).
 - Make operations infallible where dependent on static inputs ([#785], [#788]).
+- Internal operator refactoring: the validated cluster carries each role's configuration in its own
+  typed fields instead of maps keyed by role, and only the node role carries a listener class and a
+  group listener, so those are no longer optional fields that the worker and beat roles leave unset
+  ([#791]).
 
 ### Removed
 
@@ -59,6 +63,7 @@
 [#785]: https://github.com/stackabletech/superset-operator/pull/785
 [#788]: https://github.com/stackabletech/superset-operator/pull/788
 [#790]: https://github.com/stackabletech/superset-operator/pull/790
+[#791]: https://github.com/stackabletech/superset-operator/pull/791
 
 ## [26.7.0] - 2026-07-21
 
