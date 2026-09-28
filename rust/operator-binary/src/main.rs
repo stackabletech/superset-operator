@@ -339,7 +339,7 @@ async fn main() -> anyhow::Result<()> {
 
             let delayed_superset_controller = async {
                 signal::crd_established(&client, v1alpha1::SupersetCluster::crd_name()).await?;
-                superset_cluster_crd_check.mark_passed();
+                druid_connection_crd_check.mark_passed();
                 superset_controller.await
             };
 
