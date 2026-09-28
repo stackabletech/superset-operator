@@ -13,6 +13,7 @@ use stackable_operator::{
     cluster_resources::ClusterResourceApplyStrategy,
     commons::{
         affinity::StackableAffinity,
+        pdb::PdbConfig,
         product_image_selection::ResolvedProductImage,
         resources::{NoRuntimeLimits, Resources},
     },
@@ -107,12 +108,27 @@ pub struct KubernetesResources<T> {
     pub status: PhantomData<T>,
 }
 
-/// Per-role configuration extracted during validation.
+/// The Node role's validated role-level configuration.
+///
+/// Separate from the other roles' because only the Node role serves the web UI, so only it has a
+/// listener class and a group listener. One shared type would have to make both fields `Option` —
+/// mandatory for the Node role, meaningless for Worker and Beat — leaving every reader to work out
+/// which role it is holding.
+#[derive(Clone, Debug)]
+pub struct ValidatedNodeRoleConfig {
+    pub pdb: PdbConfig,
+    pub listener_class: ListenerClassName,
+    pub group_listener_name: ListenerName,
+}
+
+/// The Worker and Beat roles' validated role-level configuration.
+///
+/// Neither serves the web UI, so there is no listener class to carry and the Pod disruption budget
+/// is all that is left. Structurally identical to `GenericRoleConfig`; kept as its own type so the
+/// validated cluster holds controller-owned types throughout.
 #[derive(Clone, Debug)]
 pub struct ValidatedRoleConfig {
-    pub pdb: Option<stackable_operator::commons::pdb::PdbConfig>,
-    pub listener_class: Option<ListenerClassName>,
-    pub group_listener_name: Option<ListenerName>,
+    pub pdb: PdbConfig,
 }
 
 /// A validated, merged Superset role-group config.
@@ -201,22 +217,52 @@ pub struct ValidatedCluster {
     pub product_version: ProductVersion,
     pub image: ResolvedProductImage,
     pub cluster_config: ValidatedClusterConfig,
-    pub role_groups: BTreeMap<SupersetRole, BTreeMap<RoleGroupName, SupersetRoleGroupConfig>>,
-    pub role_configs: BTreeMap<SupersetRole, ValidatedRoleConfig>,
+    pub node_config: ValidatedNodeRoleConfig,
+    pub node_role_group_configs: BTreeMap<RoleGroupName, SupersetRoleGroupConfig>,
+    pub worker_config: Option<ValidatedRoleConfig>,
+    pub worker_role_group_configs: BTreeMap<RoleGroupName, SupersetRoleGroupConfig>,
+    pub beat_config: Option<ValidatedRoleConfig>,
+    pub beat_role_group_configs: BTreeMap<RoleGroupName, SupersetRoleGroupConfig>,
+}
+
+/// The non-derived inputs to [`ValidatedCluster::new`].
+///
+/// Named fields, so the three same-typed role-group maps — and the two
+/// `Option<ValidatedRoleConfig>` — cannot be swapped silently.
+#[derive(Debug)]
+pub struct ValidatedClusterParams {
+    pub name: ClusterName,
+    pub namespace: NamespaceName,
+    pub uid: Uid,
+    pub image: ResolvedProductImage,
+    pub cluster_config: ValidatedClusterConfig,
+    pub node_config: ValidatedNodeRoleConfig,
+    pub node_role_group_configs: BTreeMap<RoleGroupName, SupersetRoleGroupConfig>,
+    pub worker_config: Option<ValidatedRoleConfig>,
+    pub worker_role_group_configs: BTreeMap<RoleGroupName, SupersetRoleGroupConfig>,
+    pub beat_config: Option<ValidatedRoleConfig>,
+    pub beat_role_group_configs: BTreeMap<RoleGroupName, SupersetRoleGroupConfig>,
 }
 
 impl ValidatedCluster {
-    pub fn new(
-        name: ClusterName,
-        namespace: NamespaceName,
-        uid: Uid,
-        image: ResolvedProductImage,
-        cluster_config: ValidatedClusterConfig,
-        role_groups: BTreeMap<SupersetRole, BTreeMap<RoleGroupName, SupersetRoleGroupConfig>>,
-        role_configs: BTreeMap<SupersetRole, ValidatedRoleConfig>,
-    ) -> Self {
+    pub fn new(params: ValidatedClusterParams) -> Self {
+        let ValidatedClusterParams {
+            name,
+            namespace,
+            uid,
+            image,
+            cluster_config,
+            node_config,
+            node_role_group_configs,
+            worker_config,
+            worker_role_group_configs,
+            beat_config,
+            beat_role_group_configs,
+        } = params;
+
         let product_version = ProductVersion::from_str(&image.app_version_label_value)
             .expect("the app version label value is a valid product version");
+
         Self {
             // Capture only the identity fields needed to own child objects, derived from the
             // typed cluster identity rather than the raw CRD.
@@ -228,8 +274,12 @@ impl ValidatedCluster {
             },
             image,
             cluster_config,
-            role_groups,
-            role_configs,
+            node_config,
+            node_role_group_configs,
+            worker_config,
+            worker_role_group_configs,
+            beat_config,
+            beat_role_group_configs,
             name,
             namespace,
             uid,
