@@ -6,6 +6,7 @@
 
 - Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
   ([#790]).
+- Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#795]).
 
 ### Changed
 
@@ -33,6 +34,7 @@
   operator versions cannot be updated after the upgrade: delete the `node` StatefulSet(s)
   so that the operator immediately recreates them with the new labels ([#779]).
 - Make operations infallible where dependent on static inputs ([#785], [#788]).
+- Bump stackable-operator to 0.119.0 ([#795]).
 
 ### Removed
 
@@ -59,6 +61,7 @@
 [#785]: https://github.com/stackabletech/superset-operator/pull/785
 [#788]: https://github.com/stackabletech/superset-operator/pull/788
 [#790]: https://github.com/stackabletech/superset-operator/pull/790
+[#795]: https://github.com/stackabletech/superset-operator/pull/795
 
 ## [26.7.0] - 2026-07-21
 
