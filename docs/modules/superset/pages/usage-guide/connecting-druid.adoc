@@ -39,4 +39,4 @@ image::superset-databases.png[Superset databases showing the connected Druid clu
 
 == Further reading
 
-Read the CRD reference for the {crd-docs}/superset.stackable.tech/druidconnection/v1alpha1/[DruidConnection {external-link-icon}^] CustomResource.
+Read the CRD reference for the {crd-ref}/superset.stackable.tech/v1alpha1/druidconnection{crd-ref-release}[DruidConnection {external-link-icon}^] CustomResource.

@@ -4,8 +4,8 @@
 :superset: https://superset.apache.org/
 :crs: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
 :github: https://github.com/stackabletech/superset-operator/
-:crd: {crd-docs-base-url}/superset-operator/{crd-docs-version}/
-:crd-supersetcluster: {crd-docs}/superset.stackable.tech/supersetcluster/v1alpha1/
+:crd: {crd-ref}{crd-ref-release}&operator=superset-operator
+:crd-supersetcluster: {crd-ref}/superset.stackable.tech/v1alpha1/supersetcluster{crd-ref-release}
 :feature-tracker: https://features.stackable.tech/unified
 
 [.link-bar]
