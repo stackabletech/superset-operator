@@ -32,7 +32,7 @@ use crate::{
         ValidatedRoleConfig, ValidatedSupersetConfig, dereference::DereferencedObjects,
     },
     crd::{
-        SupersetRole, SupersetRoleGroupType, SupersetRoleType,
+        SupersetRole, SupersetRoleGroupType, SupersetRoleType, node_role_group_listener_name,
         v1alpha1::{
             Container, SupersetCluster, SupersetConfig, SupersetConfigFragment,
             SupersetConfigOverrides, SupersetRoleConfig,
@@ -162,9 +162,7 @@ pub fn validate_cluster(
             .pod_disruption_budget
             .clone(),
         listener_class: superset.spec.nodes.role_config.listener_class.clone(),
-        group_listener_name: SupersetRole::Node
-            .group_listener_name(&cluster_name)
-            .expect("The Node role always has a group listener"),
+        group_listener_name: node_role_group_listener_name(&cluster_name),
     };
     let node_role_group_configs = validate_role_groups(
         superset,
