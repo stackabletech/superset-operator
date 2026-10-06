@@ -240,7 +240,11 @@ fn validate_role_groups(
     let Some(resolved_role) = superset.get_role(role) else {
         return Ok(BTreeMap::new());
     };
-    let default_config = SupersetConfig::default_config(&superset.name_any(), role);
+    let default_config = SupersetConfig::default_config(
+        &superset.name_any(),
+        role,
+        superset.get_opa_config().map(|opa_config| &opa_config.opa),
+    );
 
     resolved_role
         .role_groups
