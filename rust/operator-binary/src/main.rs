@@ -32,6 +32,7 @@ use stackable_operator::{
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
     utils::signal::{self, SignalWatcher},
+    webhook::health::HealthCheckRegistry,
 };
 
 use crate::{
@@ -118,9 +119,20 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
 
+            let mut readiness_checks = HealthCheckRegistry::new();
+            let superset_cluster_crd_check = readiness_checks.register(format!(
+                "CRD {crd} established",
+                crd = v1alpha1::SupersetCluster::crd_name()
+            ));
+            let druid_connection_crd_check = readiness_checks.register(format!(
+                "CRD {crd} established",
+                crd = druidconnection::v1alpha1::DruidConnection::crd_name()
+            ));
+
             let webhook_server = create_webhook_server(
                 &operator_environment,
                 maintenance.disable_crd_maintenance,
+                readiness_checks,
                 client.as_kube_client(),
             )
             .await?;
@@ -316,18 +328,18 @@ async fn main() -> anyhow::Result<()> {
                 signal::crd_established(
                     &client,
                     druidconnection::v1alpha1::DruidConnection::crd_name(),
-                    None,
                 )
                 .await?;
+                druid_connection_crd_check.mark_passed();
                 // The druid_controller also watches SupersetCluster
-                signal::crd_established(&client, v1alpha1::SupersetCluster::crd_name(), None)
-                    .await?;
+                signal::crd_established(&client, v1alpha1::SupersetCluster::crd_name()).await?;
+                superset_cluster_crd_check.mark_passed();
                 druid_connection_controller.await
             };
 
             let delayed_superset_controller = async {
-                signal::crd_established(&client, v1alpha1::SupersetCluster::crd_name(), None)
-                    .await?;
+                signal::crd_established(&client, v1alpha1::SupersetCluster::crd_name()).await?;
+                superset_cluster_crd_check.mark_passed();
                 superset_controller.await
             };
 

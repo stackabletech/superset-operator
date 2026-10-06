@@ -6,6 +6,7 @@
 
 - Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
   ([#790]).
+- Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#795]).
 
 ### Changed
 
@@ -37,6 +38,7 @@
   typed fields instead of maps keyed by role, and only the node role carries a listener class and a
   group listener, so those are no longer optional fields that the worker and beat roles leave unset
   ([#791]).
+- Bump stackable-operator to 0.119.0 ([#795]).
 
 ### Removed
 
@@ -64,6 +66,7 @@
 [#788]: https://github.com/stackabletech/superset-operator/pull/788
 [#790]: https://github.com/stackabletech/superset-operator/pull/790
 [#791]: https://github.com/stackabletech/superset-operator/pull/791
+[#795]: https://github.com/stackabletech/superset-operator/pull/795
 
 ## [26.7.0] - 2026-07-21
 
