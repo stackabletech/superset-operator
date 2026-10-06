@@ -526,6 +526,7 @@ impl v1alpha1::SupersetConfig {
     pub(crate) fn default_config(
         cluster_name: &str,
         role: &SupersetRole,
+        opa_config: Option<&OpaConfig>,
     ) -> v1alpha1::SupersetConfigFragment {
         match role {
             SupersetRole::Node => v1alpha1::SupersetConfigFragment {
@@ -541,7 +542,7 @@ impl v1alpha1::SupersetConfig {
                     storage: v1alpha1::SupersetStorageConfigFragment {},
                 },
                 logging: product_logging::spec::default_logging(),
-                affinity: affinity::get_affinity(cluster_name, role),
+                affinity: affinity::get_affinity(cluster_name, role, opa_config),
                 graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
                 row_limit: None,
                 webserver_timeout: None,
@@ -559,7 +560,9 @@ impl v1alpha1::SupersetConfig {
                     storage: v1alpha1::SupersetStorageConfigFragment {},
                 },
                 logging: product_logging::spec::default_logging(),
-                affinity: affinity::get_affinity(cluster_name, role),
+                // Only the web server (node) is known to request the role mapping from OPA, so
+                // workers and beat get no affinity to the OPA Pods.
+                affinity: affinity::get_affinity(cluster_name, role, None),
                 graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
                 row_limit: None,
                 webserver_timeout: None,
@@ -577,7 +580,9 @@ impl v1alpha1::SupersetConfig {
                     storage: v1alpha1::SupersetStorageConfigFragment {},
                 },
                 logging: product_logging::spec::default_logging(),
-                affinity: affinity::get_affinity(cluster_name, role),
+                // Only the web server (node) is known to request the role mapping from OPA, so
+                // workers and beat get no affinity to the OPA Pods.
+                affinity: affinity::get_affinity(cluster_name, role, None),
                 graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
                 row_limit: None,
                 webserver_timeout: None,

@@ -176,7 +176,11 @@ pub fn validate_cluster(
             },
         );
 
-        let default_config = SupersetConfig::default_config(&superset.name_any(), &role);
+        let default_config = SupersetConfig::default_config(
+            &superset.name_any(),
+            &role,
+            superset.get_opa_config().map(|opa_config| &opa_config.opa),
+        );
 
         let mut group_configs = BTreeMap::new();
         for (rolegroup_name, rolegroup) in &resolved_role.role_groups {

@@ -5,3 +5,5 @@ You can configure the Pod placement of the Superset pods as described in xref:co
 The default affinities created by the operator are:
 
 1. Distribute all the Superset Pods (weight 70)
+2. If the role mapping from OPA is configured: co-locate the Superset nodes with the OPA Pods (weight 50).
+   Workers and beat do not get this affinity.
