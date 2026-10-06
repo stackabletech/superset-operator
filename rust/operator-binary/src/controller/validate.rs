@@ -11,7 +11,6 @@ use stackable_operator::{
     config::fragment,
     kube::ResourceExt,
     product_logging::spec::Logging,
-    role_utils::GenericRoleConfig,
     v2::{
         controller_utils::{get_cluster_name, get_namespace, get_uid},
         product_logging::framework::{
@@ -24,17 +23,16 @@ use stackable_operator::{
         },
     },
 };
-use strum::IntoEnumIterator;
 
 use crate::{
     built_info::PKG_VERSION_SEMVER,
     controller::{
         CONTAINER_IMAGE_BASE_NAME, SupersetRoleGroupConfig, ValidatedCluster,
-        ValidatedClusterConfig, ValidatedLogging, ValidatedRoleConfig, ValidatedSupersetConfig,
-        dereference::DereferencedObjects,
+        ValidatedClusterConfig, ValidatedClusterParams, ValidatedLogging, ValidatedNodeRoleConfig,
+        ValidatedRoleConfig, ValidatedSupersetConfig, dereference::DereferencedObjects,
     },
     crd::{
-        SupersetRole, SupersetRoleGroupType, SupersetRoleType,
+        SupersetRole, SupersetRoleGroupType, SupersetRoleType, node_role_group_listener_name,
         v1alpha1::{
             Container, SupersetCluster, SupersetConfig, SupersetConfigFragment,
             SupersetConfigOverrides, SupersetRoleConfig,
@@ -155,48 +153,44 @@ pub fn validate_cluster(
 
     let cluster_name = get_cluster_name(superset).context(ResolveClusterNameSnafu)?;
 
-    let mut role_groups = BTreeMap::new();
-    let mut role_configs = BTreeMap::new();
+    let node_config = ValidatedNodeRoleConfig {
+        pdb: superset
+            .spec
+            .nodes
+            .role_config
+            .common
+            .pod_disruption_budget
+            .clone(),
+        listener_class: superset.spec.nodes.role_config.listener_class.clone(),
+        group_listener_name: node_role_group_listener_name(&cluster_name),
+    };
+    let node_role_group_configs = validate_role_groups(
+        superset,
+        &SupersetRole::Node,
+        &vector_aggregator_config_map_name,
+    )?;
 
-    for role in SupersetRole::iter() {
-        let Some(resolved_role) = superset.get_role(&role) else {
-            continue;
-        };
+    let worker_config = superset
+        .spec
+        .workers
+        .as_ref()
+        .map(|workers| ValidatedRoleConfig {
+            pdb: workers.role_config.common.pod_disruption_budget.clone(),
+        });
+    let worker_role_group_configs = validate_role_groups(
+        superset,
+        &SupersetRole::Worker,
+        &vector_aggregator_config_map_name,
+    )?;
 
-        role_configs.insert(
-            role.clone(),
-            ValidatedRoleConfig {
-                pdb: superset.generic_role_config(&role).map(
-                    |GenericRoleConfig {
-                         pod_disruption_budget,
-                     }| pod_disruption_budget,
-                ),
-                listener_class: role.listener_class_name(superset),
-                group_listener_name: role.group_listener_name(&cluster_name),
-            },
-        );
-
-        let default_config = SupersetConfig::default_config(&superset.name_any(), &role);
-
-        let mut group_configs = BTreeMap::new();
-        for (rolegroup_name, rolegroup) in &resolved_role.role_groups {
-            let role_group_name = RoleGroupName::from_str(rolegroup_name).with_context(|_| {
-                ParseRoleGroupNameSnafu {
-                    role_group: rolegroup_name.clone(),
-                }
-            })?;
-            let validated_rg = validate_role_group_config(
-                &role_group_name,
-                rolegroup,
-                resolved_role,
-                &default_config,
-                &vector_aggregator_config_map_name,
-            )?;
-            group_configs.insert(role_group_name, validated_rg);
-        }
-
-        role_groups.insert(role, group_configs);
-    }
+    let beat_config = superset.spec.beat.as_ref().map(|beat| ValidatedRoleConfig {
+        pdb: beat.role_config.common.pod_disruption_budget.clone(),
+    });
+    let beat_role_group_configs = validate_role_groups(
+        superset,
+        &SupersetRole::Beat,
+        &vector_aggregator_config_map_name,
+    )?;
 
     let cluster_config = &superset.spec.cluster_config;
 
@@ -209,12 +203,12 @@ pub fn validate_cluster(
         })
     };
 
-    Ok(ValidatedCluster::new(
-        cluster_name,
+    Ok(ValidatedCluster::new(ValidatedClusterParams {
+        name: cluster_name,
         namespace,
         uid,
-        resolved_product_image,
-        ValidatedClusterConfig {
+        image: resolved_product_image,
+        cluster_config: ValidatedClusterConfig {
             authentication_config,
             opa_config,
             credentials_secret_name: parse_secret_name(&cluster_config.credentials_secret_name)?,
@@ -228,9 +222,45 @@ pub fn validate_cluster(
             celery_results_backend: cluster_config.celery_results_backend.clone(),
             celery_broker: cluster_config.celery_broker.clone(),
         },
-        role_groups,
-        role_configs,
-    ))
+        node_config,
+        node_role_group_configs,
+        worker_config,
+        worker_role_group_configs,
+        beat_config,
+        beat_role_group_configs,
+    }))
+}
+
+/// The validated config of every role group of `role`, or an empty map if the role is absent.
+fn validate_role_groups(
+    superset: &SupersetCluster,
+    role: &SupersetRole,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
+) -> Result<BTreeMap<RoleGroupName, SupersetRoleGroupConfig>, Error> {
+    let Some(resolved_role) = superset.get_role(role) else {
+        return Ok(BTreeMap::new());
+    };
+    let default_config = SupersetConfig::default_config(&superset.name_any(), role);
+
+    resolved_role
+        .role_groups
+        .iter()
+        .map(|(rolegroup_name, rolegroup)| {
+            let role_group_name = RoleGroupName::from_str(rolegroup_name).with_context(|_| {
+                ParseRoleGroupNameSnafu {
+                    role_group: rolegroup_name.clone(),
+                }
+            })?;
+            let validated = validate_role_group_config(
+                &role_group_name,
+                rolegroup,
+                resolved_role,
+                &default_config,
+                vector_aggregator_config_map_name,
+            )?;
+            Ok((role_group_name, validated))
+        })
+        .collect()
 }
 
 /// Merges and validates one role group into a [`SupersetRoleGroupConfig`].
@@ -282,10 +312,7 @@ mod tests {
     };
 
     use super::{Error, validate_cluster, validate_logging};
-    use crate::{
-        controller::test_support::default_dereferenced,
-        crd::{SupersetRole, v1alpha1},
-    };
+    use crate::{controller::test_support::default_dereferenced, crd::v1alpha1};
 
     /// Builds a [`Logging`] with automatic log configuration for the Superset and Vector containers.
     fn automatic_logging(enable_vector_agent: bool) -> Logging<v1alpha1::Container> {
@@ -372,9 +399,8 @@ mod tests {
 
         let validated = validate_cluster(&superset, dereferenced, "test-repo").expect("validated");
         let node = validated
-            .role_groups
-            .get(&SupersetRole::Node)
-            .and_then(|groups| groups.get(&"default".parse().expect("valid role group name")))
+            .node_role_group_configs
+            .get(&"default".parse().expect("valid role group name"))
             .expect("node default rolegroup");
         let overrides = &node.config_overrides.superset_config_py.overrides;
 

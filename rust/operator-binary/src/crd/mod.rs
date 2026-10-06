@@ -412,42 +412,6 @@ impl Deref for SupersetRole {
     }
 }
 
-impl SupersetRole {
-    pub fn listener_class_name(
-        &self,
-        superset: &v1alpha1::SupersetCluster,
-    ) -> Option<ListenerClassName> {
-        match self {
-            Self::Node => Some(superset.spec.nodes.role_config.listener_class.clone()),
-            Self::Worker | Self::Beat => None,
-        }
-    }
-
-    /// The name of the group listener provided for the role, if the role serves the web UI.
-    /// Nodes will use this group listener so that only one load balancer is needed for that role.
-    ///
-    /// The returned ListenerName is a lowercase RFC 1035 label name (checked by a unit test).
-    pub fn group_listener_name(&self, cluster_name: &ClusterName) -> Option<ListenerName> {
-        const _: () = assert!(
-            ClusterName::MAX_LENGTH + 1 /* dash */ + RoleName::MAX_LENGTH
-                <= ListenerName::MAX_LENGTH,
-            "The string `<cluster_name>-<role_name>` must not exceed the limit of Listener names."
-        );
-        // Both halves are RFC 1123 labels joined by a dash, which is a valid RFC 1123 subdomain.
-        let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
-        let _ = RoleName::IS_RFC_1123_LABEL_NAME;
-
-        let role_name: &RoleName = self;
-        match self {
-            Self::Node => Some(
-                ListenerName::from_str(&format!("{cluster_name}-{role_name}"))
-                    .expect("The role listener name is a valid Listener name."),
-            ),
-            Self::Worker | Self::Beat => None,
-        }
-    }
-}
-
 impl From<SupersetRole> for RoleName {
     fn from(value: SupersetRole) -> Self {
         RoleName::clone(&value)
@@ -458,6 +422,26 @@ impl From<&SupersetRole> for RoleName {
     fn from(value: &SupersetRole) -> Self {
         RoleName::clone(value)
     }
+}
+
+/// The name of the group listener for the Node role, which serves the web UI.
+/// All Node role groups use this listener so that only one load balancer is needed.
+///
+/// The returned ListenerName is a lowercase RFC 1035 label name (checked by a unit test).
+pub fn node_role_group_listener_name(cluster_name: &ClusterName) -> ListenerName {
+    const _: () = assert!(
+        ClusterName::MAX_LENGTH + 1 /* dash */ + RoleName::MAX_LENGTH <= ListenerName::MAX_LENGTH,
+        "The string `<cluster_name>-<role_name>` must not exceed the limit of Listener names."
+    );
+    // Both halves are RFC 1123 labels joined by a dash, which is a valid RFC 1123 subdomain.
+    let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
+    let _ = RoleName::IS_RFC_1123_LABEL_NAME;
+
+    ListenerName::from_str(&format!(
+        "{cluster_name}-{node_role_name}",
+        node_role_name = NODE_ROLE_NAME.as_ref()
+    ))
+    .expect("The role listener name is a valid Listener name.")
 }
 
 // Typed container names. They must match the strum `Display` (kebab-case) of the
@@ -605,14 +589,6 @@ impl v1alpha1::SupersetCluster {
         &self.spec.cluster_config.metadata_database
     }
 
-    pub fn generic_role_config(&self, role: &SupersetRole) -> Option<GenericRoleConfig> {
-        self.get_role_config(role).map(|r| r.common.to_owned())
-    }
-
-    pub fn get_role_config(&self, role: &SupersetRole) -> Option<&SupersetRoleConfig> {
-        self.get_role(role).as_ref().map(|c| &c.role_config)
-    }
-
     pub fn get_role(&self, role: &SupersetRole) -> Option<&SupersetRoleType> {
         match role {
             // The `nodes` role is required by the CRD; `Option` is kept for the signature shared
@@ -642,8 +618,9 @@ mod tests {
     use super::{
         BEAT_ROLE_NAME, ClusterName, DEFAULT_LISTENER_CLASS, INTERNAL_SECRET_SECRET_KEY,
         MAPBOX_API_KEY_ENV, MAPBOX_API_KEY_SECRET_KEY, NODE_ROLE_NAME, SECRET_KEY_ENV,
-        SUPERSET_CONTAINER_NAME, SupersetRole, VECTOR_CONTAINER_NAME, WORKER_ROLE_NAME, v1alpha1,
+        SUPERSET_CONTAINER_NAME, VECTOR_CONTAINER_NAME, WORKER_ROLE_NAME, v1alpha1,
     };
+    use crate::crd::node_role_group_listener_name;
 
     /// The typed container names returned by `name` must agree with the strum `Display` of
     /// `v1alpha1::Container`, which the logging configuration still uses as the per-container key.
@@ -682,16 +659,13 @@ mod tests {
         let cluster_name = ClusterName::from_str(&"a".repeat(ClusterName::MAX_LENGTH))
             .expect("is a valid ClusterName");
 
-        for role in SupersetRole::iter() {
-            if let Some(group_listener_name) = role.group_listener_name(&cluster_name) {
-                assert!(
-                    stackable_operator::validation::is_lowercase_rfc_1035_label(
-                        group_listener_name.as_ref()
-                    )
-                    .is_ok()
-                );
-            }
-        }
+        let group_listener_name = node_role_group_listener_name(&cluster_name);
+        assert!(
+            stackable_operator::validation::is_lowercase_rfc_1035_label(
+                group_listener_name.as_ref()
+            )
+            .is_ok()
+        );
     }
 
     impl RoundtripTestData for v1alpha1::SupersetClusterSpec {

@@ -120,9 +120,8 @@ mod tests {
 
         let role_group_name: RoleGroupName = "default".parse().expect("valid role group name");
         let rolegroup_config = validated
-            .role_groups
-            .get(&SupersetRole::Node)
-            .and_then(|groups| groups.get(&role_group_name))
+            .node_role_group_configs
+            .get(&role_group_name)
             .expect("node default rolegroup");
 
         let config_map = build_rolegroup_config_map(
