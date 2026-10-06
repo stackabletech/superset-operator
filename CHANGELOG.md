@@ -7,7 +7,7 @@
 - Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
   ([#790]).
 - Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#795]).
-- Nodes now have a default affinity to the OPA Pods when the role mapping from OPA is configured ([#XXX]).
+- Nodes now have a default affinity to the OPA Pods when the role mapping from OPA is configured ([#796]).
 
 ### Changed
 
@@ -63,6 +63,7 @@
 [#788]: https://github.com/stackabletech/superset-operator/pull/788
 [#790]: https://github.com/stackabletech/superset-operator/pull/790
 [#795]: https://github.com/stackabletech/superset-operator/pull/795
+[#796]: https://github.com/stackabletech/superset-operator/pull/796
 
 ## [26.7.0] - 2026-07-21
 
