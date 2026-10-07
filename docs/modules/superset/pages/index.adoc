@@ -46,7 +46,7 @@ Based on the custom resources you define, the operator creates ConfigMaps, State
 image::superset_overview.drawio.svg[A diagram depicting the Kubernetes resources created by the operator]
 
 The diagram above depicts all the Kubernetes resources created by the operator, and how they relate to each other.
-The Job created for the DruidConnnection resource is not shown.
+The Job created for the DruidConnection resource is not shown.
 
 For every xref:concepts:roles-and-role-groups.adoc#_role_groups[role group] you define, the operator creates a StatefulSet with the amount of replicas defined in the RoleGroup.
 Every Pod in the StatefulSet has two containers: the main container running Superset and a sidecar container gathering metrics for xref:operators:monitoring.adoc[].
