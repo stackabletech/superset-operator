@@ -8,7 +8,7 @@ use stackable_operator::{
 };
 
 /// Obsolete: only used in the DB controller for historical reasons. Scheduled for deletion
-/// once the entire DB controller is deleted as discused here: <https://github.com/stackabletech/superset-operator/issues/351>
+/// once the entire DB controller is deleted as discussed here: <https://github.com/stackabletech/superset-operator/issues/351>
 ///
 /// Build RBAC objects for the product workloads.
 /// The `rbac_prefix` is meant to be the product name, for example: zookeeper, airflow, etc.
