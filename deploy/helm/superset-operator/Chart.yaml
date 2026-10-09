@@ -12,19 +12,30 @@ icon: https://raw.githubusercontent.com/stackabletech/superset-operator/main/.re
 sources:
   - https://github.com/stackabletech/superset-operator
 keywords: ["apache-superset", "superset", "business-intelligence", "dashboards", "kubernetes", "operator"]
+# Artifact Hub drops any maintainer entry that has no email.
 maintainers:
-  - name: Stackable
+  - name: Stackable GmbH
+    email: info@stackable.tech
     url: https://www.stackable.tech
 # Consumed by Artifact Hub, see https://artifacthub.io/docs/topics/annotations/helm/
 annotations:
   # The chart package ships no LICENSE file, so Artifact Hub cannot detect this itself.
   artifacthub.io/license: OSL-3.0
+  # Artifact Hub currently infers this from "operator" in the chart name but I don't want to rely on the heuristics.
+  artifacthub.io/operator: "true"
+  # Unset means Artifact Hub predicts a category from the keywords, which it gets wrong a lot for our stuff
+  artifacthub.io/category: skip-prediction
+  artifacthub.io/alternativeName: superset
   # A link named "support" is rendered highlighted by Artifact Hub. Keep it lowercase.
   artifacthub.io/links: |
     - name: Documentation
       url: https://docs.stackable.tech/home/stable/superset/
+    - name: Stackable Hub
+      url: https://hub.stackable.tech/components/superset
     - name: support
       url: https://github.com/stackabletech/superset-operator/issues
+    - name: Operator image on quay.io
+      url: https://quay.io/repository/stackable/sdp/superset-operator
   artifacthub.io/crds: |-
     - kind: SupersetCluster
       version: v1alpha1
