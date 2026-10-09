@@ -40,6 +40,7 @@
   group listener, so those are no longer optional fields that the worker and beat roles leave unset
   ([#791]).
 - Bump stackable-operator to 0.119.0 ([#795]).
+- test: Bump vector-aggregator to 0.58.0 ([#800]).
 
 ### Removed
 
@@ -69,6 +70,7 @@
 [#791]: https://github.com/stackabletech/superset-operator/pull/791
 [#795]: https://github.com/stackabletech/superset-operator/pull/795
 [#796]: https://github.com/stackabletech/superset-operator/pull/796
+[#800]: https://github.com/stackabletech/superset-operator/pull/800
 
 ## [26.7.0] - 2026-07-21
 
