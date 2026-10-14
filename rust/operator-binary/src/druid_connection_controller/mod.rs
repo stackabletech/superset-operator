@@ -476,7 +476,7 @@ mod tests {
     /// API, and because the spec is invalid, before the [`DeserializeGuard`] is unwrapped.
     #[test]
     fn reconcile_exits_early_for_deleted_connection() {
-        let druid_connection = serde_yaml::from_str(
+        let druid_connection = yaml_serde::from_str(
             r#"
 apiVersion: superset.stackable.tech/v1alpha1
 kind: DruidConnection

@@ -17,7 +17,7 @@
   always defaulting to `Always` ([#790]).
 - Internal operator refactoring: introduce a build() step in the reconciler that
   assembles all relevant Kubernetes resources before anything is applied ([#756]).
-- Bump stackable-operator to 0.118.0 ([#765], [#779], [#790]).
+- Bump stackable-operator to 0.121.0 ([#765], [#779], [#790], [#795], [#802]).
 - The RBAC ServiceAccount and RoleBinding are now built with the operator-rs `v2::rbac`
   functions and carry the full set of recommended labels ([#761]).
 - BREAKING: The `nodes` role is now required by the CRD; a SupersetCluster without it was
@@ -39,9 +39,10 @@
   typed fields instead of maps keyed by role, and only the node role carries a listener class and a
   group listener, so those are no longer optional fields that the worker and beat roles leave unset
   ([#791]).
-- Bump stackable-operator to 0.119.0 ([#795]).
 - test: Bump vector-aggregator to 0.58.0 ([#800]).
 - test: Update OPA to 1.20.2 in integration tests ([#803]).
+- All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#802]).
+- Replace the unmaintained `serde_yaml` with `yaml_serde` ([#802]).
 
 ### Removed
 
@@ -72,6 +73,7 @@
 [#795]: https://github.com/stackabletech/superset-operator/pull/795
 [#796]: https://github.com/stackabletech/superset-operator/pull/796
 [#800]: https://github.com/stackabletech/superset-operator/pull/800
+[#802]: https://github.com/stackabletech/superset-operator/pull/802
 [#803]: https://github.com/stackabletech/superset-operator/pull/803
 
 ## [26.7.0] - 2026-07-21

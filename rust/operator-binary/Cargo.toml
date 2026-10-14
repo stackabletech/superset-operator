@@ -28,8 +28,8 @@ tracing.workspace = true
 [dev-dependencies]
 indoc.workspace = true
 rstest.workspace = true
-serde_yaml.workspace = true
 tokio.workspace = true
+yaml_serde.workspace = true
 
 [build-dependencies]
 built.workspace = true
