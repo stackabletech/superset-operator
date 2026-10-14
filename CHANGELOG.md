@@ -39,7 +39,7 @@
   typed fields instead of maps keyed by role, and only the node role carries a listener class and a
   group listener, so those are no longer optional fields that the worker and beat roles leave unset
   ([#791]).
-- test: Bump vector-aggregator to 0.58.0 ([#800]).
+- Support Vector 0.58.0 ([#800], [#804]).
 - All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#802]).
 - Replace the unmaintained `serde_yaml` with `yaml_serde` ([#802]).
 
@@ -73,6 +73,7 @@
 [#796]: https://github.com/stackabletech/superset-operator/pull/796
 [#800]: https://github.com/stackabletech/superset-operator/pull/800
 [#802]: https://github.com/stackabletech/superset-operator/pull/802
+[#804]: https://github.com/stackabletech/superset-operator/pull/804
 
 ## [26.7.0] - 2026-07-21
 

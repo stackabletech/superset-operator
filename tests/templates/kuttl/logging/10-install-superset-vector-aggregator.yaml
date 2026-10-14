@@ -14,4 +14,4 @@ kind: ConfigMap
 metadata:
   name: superset-vector-aggregator-discovery
 data:
-  ADDRESS: superset-vector-aggregator:6123
+  ADDRESS: http://superset-vector-aggregator:6123

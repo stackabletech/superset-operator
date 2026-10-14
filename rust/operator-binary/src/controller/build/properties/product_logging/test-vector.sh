@@ -1,13 +1,19 @@
 #!/usr/bin/env sh
 
-# `TZ=UTC` so the Python-JSON `asctime` (which has no timezone) parses deterministically.
-TZ=UTC \
-DATA_DIR=/stackable/log/_vector-state \
-LOG_DIR=/stackable/log \
-NAMESPACE=default \
-CLUSTER_NAME=superset \
-ROLE_NAME=node \
-ROLE_GROUP_NAME=default \
-VECTOR_AGGREGATOR_ADDRESS=vector-aggregator \
-VECTOR_FILE_LOG_LEVEL=info \
-vector test vector.yaml vector-test.yaml
+set -eu
+
+export DATA_DIR=/stackable/log/_vector-state
+export LOG_DIR=/stackable/log
+export NAMESPACE=default
+export CLUSTER_NAME=superset
+export ROLE_NAME=node
+export ROLE_GROUP_NAME=default
+export VECTOR_AGGREGATOR_ADDRESS=http://vector-aggregator:6000
+export VECTOR_FILE_LOG_LEVEL=info
+
+# Required because vector.yaml contains ${...} placeholders
+export VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION=true
+
+vector validate --no-environment vector.yaml
+
+vector test test-config.yaml vector.yaml vector-test.yaml
