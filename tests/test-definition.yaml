@@ -34,7 +34,7 @@ dimensions:
       - oidc
   - name: opa-latest
     values:
-      - 1.16.2
+      - 1.20.2
   - name: openshift
     values:
       - "false"
