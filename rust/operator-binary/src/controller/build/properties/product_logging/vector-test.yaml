@@ -17,6 +17,7 @@ tests:
           timestamp: 2025-10-02T09:27:28.582Z
     outputs:
       - extract_from: extended_logs
+        expected_event_count: 1
         conditions:
           - type: vrl
             source: |
@@ -47,6 +48,7 @@ tests:
           timestamp: 2025-10-02T09:27:28.582Z
     outputs:
       - extract_from: extended_logs
+        expected_event_count: 1
         conditions:
           - type: vrl
             source: |
@@ -77,6 +79,7 @@ tests:
           timestamp: 2025-10-02T09:27:29.473487331Z
     outputs:
       - extract_from: extended_logs
+        expected_event_count: 1
         conditions:
           - type: vrl
             source: |
@@ -114,6 +117,7 @@ tests:
           version: 0.56.0
     outputs:
       - extract_from: extended_logs
+        expected_event_count: 1
         conditions:
           - type: vrl
             source: |
@@ -142,6 +146,7 @@ tests:
             level: INFO
     outputs:
       - extract_from: filtered_logs_vector
+        expected_event_count: 1
         conditions:
           - type: vrl
             source: |
