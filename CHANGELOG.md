@@ -40,6 +40,7 @@
   group listener, so those are no longer optional fields that the worker and beat roles leave unset
   ([#791]).
 - Support Vector 0.58.0 ([#800], [#804]).
+- test: Update OPA to 1.20.2 in integration tests ([#803]).
 - All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#802]).
 - Replace the unmaintained `serde_yaml` with `yaml_serde` ([#802]).
 
@@ -73,6 +74,7 @@
 [#796]: https://github.com/stackabletech/superset-operator/pull/796
 [#800]: https://github.com/stackabletech/superset-operator/pull/800
 [#802]: https://github.com/stackabletech/superset-operator/pull/802
+[#803]: https://github.com/stackabletech/superset-operator/pull/803
 [#804]: https://github.com/stackabletech/superset-operator/pull/804
 
 ## [26.7.0] - 2026-07-21
