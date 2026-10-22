@@ -43,6 +43,7 @@
 - test: Update OPA to 1.20.2 in integration tests ([#803]).
 - All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#802]).
 - Replace the unmaintained `serde_yaml` with `yaml_serde` ([#802]).
+- The operator Deployment runs with a restricted security context and a read-only root filesystem, so it can be deployed into namespaces that enforce the `restricted` Pod Security Standard ([#807]).
 
 ### Removed
 
@@ -77,6 +78,7 @@
 [#803]: https://github.com/stackabletech/superset-operator/pull/803
 [#804]: https://github.com/stackabletech/superset-operator/pull/804
 [#805]: https://github.com/stackabletech/superset-operator/pull/805
+[#807]: https://github.com/stackabletech/superset-operator/pull/807
 
 ## [26.7.0] - 2026-07-21
 
