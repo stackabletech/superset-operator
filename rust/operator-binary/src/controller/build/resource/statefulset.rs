@@ -100,8 +100,7 @@ pub fn build_node_rolegroup_statefulset(
     let resource_names = validated.role_group_resource_names(superset_role, role_group_name);
     let recommended_object_labels =
         recommended_labels_for_role_group_resources(validated, superset_role, role_group_name);
-    // Used for PVC templates that cannot be modified once they are deployed (omitting the
-    // version label keeps the labels stable across version upgrades).
+    // The PVC template is immutable once deployed, so its labels must stay stable.
     let unversioned_recommended_labels = recommended_labels_for_unversioned_role_group_resources(
         validated,
         superset_role,

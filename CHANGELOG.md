@@ -28,12 +28,7 @@
   variables set by the operator, whereas previously the operator's values always took
   precedence ([#779]).
 - The role-level group `Listener` now carries the recommended labels for role resources;
-  the `app.kubernetes.io/role-group: none` placeholder label is no longer set ([#779]).
-- BREAKING: The listener PVC template of the `node` StatefulSet no longer carries an
-  `app.kubernetes.io/version` label (previously set to the placeholder value `none`).
-  Since `volumeClaimTemplates` cannot be updated in place, StatefulSets created by older
-  operator versions cannot be updated after the upgrade: delete the `node` StatefulSet(s)
-  so that the operator immediately recreates them with the new labels ([#779]).
+  the `app.kubernetes.io/role-group: none` placeholder label is no longer set ([#779], [#809]).
 - Make operations infallible where dependent on static inputs ([#785], [#788]).
 - Internal operator refactoring: the validated cluster carries each role's configuration in its own
   typed fields instead of maps keyed by role, and only the node role carries a listener class and a
@@ -79,6 +74,7 @@
 [#804]: https://github.com/stackabletech/superset-operator/pull/804
 [#805]: https://github.com/stackabletech/superset-operator/pull/805
 [#807]: https://github.com/stackabletech/superset-operator/pull/807
+[#809]: https://github.com/stackabletech/superset-operator/pull/809
 
 ## [26.7.0] - 2026-07-21
 
