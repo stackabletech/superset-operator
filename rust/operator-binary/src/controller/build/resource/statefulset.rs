@@ -30,6 +30,7 @@ use stackable_operator::{
             volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
         },
         product_logging::framework::STACKABLE_LOG_DIR,
+        rbac::RbacResourceNames,
         types::operator::RoleGroupName,
     },
 };

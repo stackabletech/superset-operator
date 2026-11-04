@@ -383,7 +383,8 @@ pub enum Error {
 
     #[snafu(display("SupersetCluster object is invalid"))]
     InvalidSupersetCluster {
-        source: error_boundary::InvalidObject,
+        #[snafu(source(from(error_boundary::InvalidObject, Box::new)))]
+        source: Box<error_boundary::InvalidObject>,
     },
 }
 
