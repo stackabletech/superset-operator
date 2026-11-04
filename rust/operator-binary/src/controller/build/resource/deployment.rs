@@ -20,7 +20,7 @@ use stackable_operator::{
     utils::COMMON_BASH_TRAP_FUNCTIONS,
     v2::{
         builder::pod::container::EnvVarSet, product_logging::framework::STACKABLE_LOG_DIR,
-        types::operator::RoleGroupName,
+        rbac::RbacResourceNames, types::operator::RoleGroupName,
     },
 };
 
