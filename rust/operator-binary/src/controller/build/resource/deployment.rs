@@ -125,6 +125,7 @@ pub fn build_rolegroup_deployment(
 
             {remove_vector_shutdown_file_command}
             prepare_signal_handlers
+            mkdir --parents \"$FILE_LOG_DIRECTORY\"
             containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &
 
             {celery_command} &
