@@ -424,7 +424,7 @@ mod tests {
             .expect("node default role group")
             .clone();
         rg.env_overrides = EnvVarSet::new().with_value(
-            &EnvVarName::from_str("FILE_LOG_DIRECTORY").expect("valid env var name"),
+            &EnvVarName::from_str_unsafe("FILE_LOG_DIRECTORY"),
             "/stackable/log/user-override",
         );
 
