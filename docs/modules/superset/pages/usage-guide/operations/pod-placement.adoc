@@ -1,4 +1,5 @@
 = Pod Placement
+:description: Pod placement for Apache Superset, covering the default affinities and placement next to OPA when role mapping from OPA is configured.
 
 You can configure the Pod placement of the Superset pods as described in xref:concepts:operations/pod_placement.adoc[].
 
