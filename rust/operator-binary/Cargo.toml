@@ -28,6 +28,7 @@ tracing.workspace = true
 [dev-dependencies]
 indoc.workspace = true
 rstest.workspace = true
+stackable-operator = { workspace = true, features = ["test-support"] }
 tokio.workspace = true
 yaml_serde.workspace = true
 

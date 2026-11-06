@@ -7,6 +7,8 @@
 - Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
   ([#790]).
 - Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#795]).
+- The logs of the `containerdebug` process are now collected by the Vector agent and forwarded to
+  the Vector aggregator ([#812]).
 - Nodes now have a default affinity to the OPA Pods when the role mapping from OPA is configured ([#796]).
 
 ### Changed
@@ -54,6 +56,10 @@
   See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#773]).
 - The operator now watches all resources that it creates and early-exits the reconcile action when the
   cluster is marked for deletion ([#781]).
+- The `containerdebug` process writes its log file again. The operator set
+  `CONTAINERDEBUG_LOG_DIRECTORY`, which containerdebug stopped reading in its version 0.2.0 when it
+  moved to `stackable-telemetry`; the directory is now set via `FILE_LOG_DIRECTORY`. The file is
+  rotated hourly and at most two files are kept, because rotation is opt-in ([#812]).
 
 [#756]: https://github.com/stackabletech/superset-operator/pull/756
 [#761]: https://github.com/stackabletech/superset-operator/pull/761
@@ -75,6 +81,7 @@
 [#805]: https://github.com/stackabletech/superset-operator/pull/805
 [#807]: https://github.com/stackabletech/superset-operator/pull/807
 [#809]: https://github.com/stackabletech/superset-operator/pull/809
+[#812]: https://github.com/stackabletech/superset-operator/pull/812
 
 ## [26.7.0] - 2026-07-21
 

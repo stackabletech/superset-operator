@@ -190,6 +190,7 @@ pub fn build_node_rolegroup_statefulset(
 
             {remove_vector_shutdown_file_command}
             prepare_signal_handlers
+            mkdir --parents \"$FILE_LOG_DIRECTORY\"
             containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &
             gunicorn --bind 0.0.0.0:${{SUPERSET_PORT}} --worker-class gthread --threads 20 --timeout {webserver_timeout} --limit-request-line 0 --limit-request-field_size 0 'superset.app:create_app()' &
             wait_for_termination $!
@@ -411,7 +412,7 @@ mod tests {
     use crate::controller::build::test_support::validated_cluster;
 
     /// The user-supplied `envOverrides` must be merged in after all operator-set environment
-    /// variables, so that they can override any of them. `CONTAINERDEBUG_LOG_DIRECTORY` is used
+    /// variables, so that they can override any of them. `FILE_LOG_DIRECTORY` is used
     /// as the example here because it is set unconditionally by the operator.
     #[test]
     fn env_overrides_override_operator_set_env_vars() {
@@ -423,7 +424,7 @@ mod tests {
             .expect("node default role group")
             .clone();
         rg.env_overrides = EnvVarSet::new().with_value(
-            &EnvVarName::from_str("CONTAINERDEBUG_LOG_DIRECTORY").expect("valid env var name"),
+            &EnvVarName::from_str_unsafe("FILE_LOG_DIRECTORY"),
             "/stackable/log/user-override",
         );
 
@@ -445,7 +446,7 @@ mod tests {
             .env
             .iter()
             .flatten()
-            .filter(|env_var| env_var.name == "CONTAINERDEBUG_LOG_DIRECTORY")
+            .filter(|env_var| env_var.name == "FILE_LOG_DIRECTORY")
             .collect();
         assert_eq!(
             matching_env_vars.len(),

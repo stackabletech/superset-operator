@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use const_format::concatcp;
 use indoc::formatdoc;
 use stackable_operator::{
     builder::pod::{
@@ -70,8 +71,13 @@ constant!(ADMIN_LASTNAME_SECRET_KEY: SecretKey = "adminUser.lastname");
 constant!(ADMIN_EMAIL_SECRET_KEY: SecretKey = "adminUser.email");
 constant!(ADMIN_PASSWORD_SECRET_KEY: SecretKey = "adminUser.password");
 
-// Env var the `containerdebug` process logs its tracing information to.
-constant!(CONTAINERDEBUG_LOG_DIRECTORY: EnvVarName = "CONTAINERDEBUG_LOG_DIRECTORY");
+// Let the `containerdebug` process write its tracing information to a file. These are the generic
+// `stackable-telemetry` variables and apply to the whole Superset container, so any other
+// telemetry-based process in it would log into the same directory and the Vector agent would label
+// its events with `container: containerdebug`.
+constant!(FILE_LOG_DIRECTORY: EnvVarName = "FILE_LOG_DIRECTORY");
+constant!(FILE_LOG_MAX_FILES: EnvVarName = "FILE_LOG_MAX_FILES");
+constant!(FILE_LOG_ROTATION_PERIOD: EnvVarName = "FILE_LOG_ROTATION_PERIOD");
 // Env var pointing the Superset container at the directory holding trusted CA certs.
 constant!(SSL_CERT_DIR: EnvVarName = "SSL_CERT_DIR");
 
@@ -121,6 +127,9 @@ pub(crate) fn create_volumes(
         name: LOG_VOLUME_NAME.to_string(),
         empty_dir: Some(EmptyDirVolumeSource {
             medium: None,
+            // Only the Superset log files are budgeted. The `containerdebug` files in this
+            // volume are rotated by time, not by size, so they have no budget; raising
+            // `FILE_LOG_LEVEL` via `envOverrides` can therefore evict the Pod.
             size_limit: Some(product_logging::framework::calculate_log_volume_size_limit(
                 &[MAX_LOG_FILES_SIZE],
             )),
@@ -226,10 +235,15 @@ fn build_env_vars(
             credentials_secret,
             &ADMIN_PASSWORD_SECRET_KEY,
         )
+        // The directory must be exactly one level below the log directory, because the Vector
+        // agent derives the container name from that path segment.
         .with_value(
-            &CONTAINERDEBUG_LOG_DIRECTORY,
-            format!("{STACKABLE_LOG_DIR}/containerdebug"),
+            &FILE_LOG_DIRECTORY,
+            concatcp!(STACKABLE_LOG_DIR, "/containerdebug"),
         )
+        // Rotation is opt-in, so without these the file would grow unbounded.
+        .with_value(&FILE_LOG_ROTATION_PERIOD, "hourly")
+        .with_value(&FILE_LOG_MAX_FILES, "2")
         .with_value(&SSL_CERT_DIR, STACKABLE_CERTS_DIR);
 
     // Environment variable overrides (highest precedence), merged from role and role group.
@@ -370,9 +384,9 @@ mod tests {
     use super::{
         ADMIN_EMAIL, ADMIN_EMAIL_SECRET_KEY, ADMIN_FIRSTNAME, ADMIN_FIRSTNAME_SECRET_KEY,
         ADMIN_LASTNAME, ADMIN_LASTNAME_SECRET_KEY, ADMIN_PASSWORD, ADMIN_PASSWORD_SECRET_KEY,
-        ADMIN_USERNAME, ADMIN_USERNAME_SECRET_KEY, CONFIG_VOLUME_NAME,
-        CONTAINERDEBUG_LOG_DIRECTORY, LISTENER_VOLUME_NAME_PVC, LOG_CONFIG_VOLUME_NAME,
-        LOG_VOLUME_NAME, METRICS_CONTAINER_NAME, SSL_CERT_DIR,
+        ADMIN_USERNAME, ADMIN_USERNAME_SECRET_KEY, CONFIG_VOLUME_NAME, FILE_LOG_DIRECTORY,
+        FILE_LOG_MAX_FILES, FILE_LOG_ROTATION_PERIOD, LISTENER_VOLUME_NAME_PVC,
+        LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME, METRICS_CONTAINER_NAME, SSL_CERT_DIR,
     };
 
     #[test]
@@ -391,7 +405,9 @@ mod tests {
         let _ = *ADMIN_LASTNAME_SECRET_KEY;
         let _ = *ADMIN_EMAIL_SECRET_KEY;
         let _ = *ADMIN_PASSWORD_SECRET_KEY;
-        let _ = *CONTAINERDEBUG_LOG_DIRECTORY;
+        let _ = *FILE_LOG_DIRECTORY;
+        let _ = *FILE_LOG_MAX_FILES;
+        let _ = *FILE_LOG_ROTATION_PERIOD;
         let _ = *SSL_CERT_DIR;
         let _ = *METRICS_CONTAINER_NAME;
         let _ = *LISTENER_VOLUME_NAME_PVC;
