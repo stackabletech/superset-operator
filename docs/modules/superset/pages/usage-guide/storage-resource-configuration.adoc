@@ -3,7 +3,7 @@
 
 == Resource Requests
 
-include::concepts:stackable_resource_requests.adoc[]
+include::concepts:partial$stackable_resource_requests.adoc[]
 
 A minimal HA setup consisting of 2 Superset instances has the following
 https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/[resource requirements]:
