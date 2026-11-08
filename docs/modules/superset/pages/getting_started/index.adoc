@@ -1,4 +1,5 @@
 = Getting started
+:description: Getting started with Apache Superset on Kubernetes, covering the Stackable operator and its dependencies, a first instance and sample data.
 
 This guide helps you get started with Superset using the Stackable Operator.
 It covers the installation of the Operator and its dependencies, setting up your first Superset instance, connecting to it, and exploring sample data.

@@ -1,4 +1,5 @@
 = First steps
+:description: First steps with Apache Superset, covering a first instance with a metadata database and credentials, its web interface and the example dashboards.
 
 Once you have followed the steps in  xref:getting_started/installation.adoc[] for the Operator and its dependencies, you will now go through the steps to set up and connect to a Superset instance.
 
