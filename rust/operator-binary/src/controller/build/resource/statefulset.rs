@@ -190,7 +190,7 @@ pub fn build_node_rolegroup_statefulset(
 
             {remove_vector_shutdown_file_command}
             prepare_signal_handlers
-            mkdir --parents \"$FILE_LOG_DIRECTORY\"
+            mkdir --parents \"${file_log_directory}\" || true
             containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &
             gunicorn --bind 0.0.0.0:${{SUPERSET_PORT}} --worker-class gthread --threads 20 --timeout {webserver_timeout} --limit-request-line 0 --limit-request-field_size 0 'superset.app:create_app()' &
             wait_for_termination $!
@@ -198,6 +198,7 @@ pub fn build_node_rolegroup_statefulset(
             {create_vector_shutdown_file_command}
         ",
             log_config_file = ConfigFileName::LogConfig,
+            file_log_directory = super::FILE_LOG_DIRECTORY.as_ref(),
             auth_commands = authentication_start_commands(&validated.cluster_config.authentication_config),
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),

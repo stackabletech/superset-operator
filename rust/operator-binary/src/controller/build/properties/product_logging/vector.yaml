@@ -114,7 +114,6 @@ transforms:
         }
       }
 
-  # Extends the processed files with the fields "container" and "file"
   # Transforms the tracing-rs JSON logs written by the containerdebug process
   processed_files_tracing_rs:
     inputs:
@@ -195,6 +194,7 @@ transforms:
         }
       }
 
+  # Extends the processed files with the fields "container" and "file"
   extended_logs_files:
     inputs:
       - processed_files_stdout
