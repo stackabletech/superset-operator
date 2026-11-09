@@ -1,4 +1,5 @@
 = Configuration & Environment Overrides
+:description: Overrides for Apache Superset, covering configuration properties, environment variables and Pod specs per role or role group.
 
 The cluster definition also supports overriding configuration properties and environment variables,
 either per role or per role group, where the more specific override (role group) has precedence over
