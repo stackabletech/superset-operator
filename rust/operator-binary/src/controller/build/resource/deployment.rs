@@ -125,6 +125,7 @@ pub fn build_rolegroup_deployment(
 
             {remove_vector_shutdown_file_command}
             prepare_signal_handlers
+            mkdir --parents \"${file_log_directory}\" || true
             containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &
 
             {celery_command} &
@@ -133,6 +134,7 @@ pub fn build_rolegroup_deployment(
             {create_vector_shutdown_file_command}
         ",
             log_config_file = ConfigFileName::LogConfig,
+            file_log_directory = super::FILE_LOG_DIRECTORY.as_ref(),
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             create_vector_shutdown_file_command =
