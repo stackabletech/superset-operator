@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add the `config.containerdebug` field to roles and role groups ([#818]).
+
+[#818]: https://github.com/stackabletech/superset-operator/pull/818
+
 ## [26.11.0] - 2026-11-20
 
 ## [26.11.0-rc1] - 2026-11-19

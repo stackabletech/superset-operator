@@ -18,7 +18,7 @@ use stackable_operator::{
         resources::{NoRuntimeLimits, Resources},
     },
     constant,
-    crd::listener,
+    crd::{containerdebug::ValidatedContainerdebugConfig, listener},
     k8s_openapi::api::{
         apps::v1::{Deployment, StatefulSet},
         core::v1::{ConfigMap, Service, ServiceAccount},
@@ -148,6 +148,7 @@ pub type SupersetRoleGroupConfig =
 #[derive(Clone, Debug)]
 pub struct ValidatedSupersetConfig {
     pub affinity: StackableAffinity,
+    pub containerdebug: ValidatedContainerdebugConfig,
     pub graceful_shutdown_timeout: Option<Duration>,
     pub logging: ValidatedLogging,
     pub resources: Resources<SupersetStorageConfig, NoRuntimeLimits>,
@@ -157,10 +158,15 @@ pub struct ValidatedSupersetConfig {
 
 impl ValidatedSupersetConfig {
     /// Builds the validated config from the merged [`SupersetConfig`], swapping in the
-    /// already-validated logging.
-    fn from_merged(merged: SupersetConfig, logging: ValidatedLogging) -> Self {
+    /// already-validated `containerdebug` and logging configuration.
+    fn from_merged(
+        merged: SupersetConfig,
+        containerdebug: ValidatedContainerdebugConfig,
+        logging: ValidatedLogging,
+    ) -> Self {
         Self {
             affinity: merged.affinity,
+            containerdebug,
             graceful_shutdown_timeout: merged.graceful_shutdown_timeout,
             logging,
             resources: merged.resources,

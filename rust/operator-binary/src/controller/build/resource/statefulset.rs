@@ -191,7 +191,7 @@ pub fn build_node_rolegroup_statefulset(
             {remove_vector_shutdown_file_command}
             prepare_signal_handlers
             mkdir --parents \"${file_log_directory}\" || true
-            containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &
+            {containerdebug_command}
             gunicorn --bind 0.0.0.0:${{SUPERSET_PORT}} --worker-class gthread --threads 20 --timeout {webserver_timeout} --limit-request-line 0 --limit-request-field_size 0 'superset.app:create_app()' &
             wait_for_termination $!
 
@@ -199,6 +199,10 @@ pub fn build_node_rolegroup_statefulset(
         ",
             log_config_file = ConfigFileName::LogConfig,
             file_log_directory = super::FILE_LOG_DIRECTORY.as_ref(),
+            containerdebug_command = merged_config
+                .containerdebug
+                .background_command(STACKABLE_LOG_DIR)
+                .unwrap_or_default(),
             auth_commands = authentication_start_commands(&validated.cluster_config.authentication_config),
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
@@ -459,6 +463,54 @@ mod tests {
             matching_env_vars[0].value.as_deref(),
             Some("/stackable/log/user-override"),
             "the user-supplied env override must win over the operator-set value"
+        );
+    }
+
+    /// The superset container of a webserver node starts `containerdebug` from the role group's
+    /// validated config. The command itself is owned (and tested) by operator-rs, so only the
+    /// wiring is checked here.
+    #[rstest::rstest]
+    #[case::enabled(stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig::Enabled {
+        interval: stackable_operator::shared::time::Duration::from_minutes_unchecked(10)
+    })]
+    #[case::disabled(
+        stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig::Disabled
+    )]
+    fn superset_container_starts_containerdebug_from_config(
+        #[case] containerdebug: stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig,
+    ) {
+        let expected = containerdebug.background_command(
+            stackable_operator::v2::product_logging::framework::STACKABLE_LOG_DIR,
+        );
+        let cluster = validated_cluster();
+        let role_group_name = RoleGroupName::from_str("default").expect("valid role group name");
+        let mut rg = cluster
+            .node_role_group_configs
+            .get(&role_group_name)
+            .expect("node default role group")
+            .clone();
+        rg.config.containerdebug = containerdebug;
+
+        let stateful_set = build_node_rolegroup_statefulset(&cluster, &role_group_name, &rg)
+            .expect("statefulset built");
+
+        let args = stateful_set
+            .spec
+            .and_then(|spec| spec.template.spec)
+            .expect("pod spec")
+            .containers
+            .into_iter()
+            .find(|container| container.name == "superset")
+            .and_then(|container| container.args)
+            .expect("the superset container has args")
+            .join("\n");
+
+        assert_eq!(
+            args.lines()
+                .map(str::trim)
+                .find(|line| line.starts_with("containerdebug ")),
+            expected.as_deref(),
+            "args: {args}"
         );
     }
 }

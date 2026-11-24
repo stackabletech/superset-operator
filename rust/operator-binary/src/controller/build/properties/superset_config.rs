@@ -312,6 +312,10 @@ mod tests {
     ) -> ValidatedSupersetConfig {
         ValidatedSupersetConfig {
             affinity: StackableAffinity::default(),
+            containerdebug:
+                stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig::Enabled {
+                    interval: stackable_operator::crd::containerdebug::DEFAULT_INTERVAL,
+                },
             graceful_shutdown_timeout: None,
             logging: ValidatedLogging {
                 superset_container: ValidatedContainerLogConfigChoice::Automatic(
