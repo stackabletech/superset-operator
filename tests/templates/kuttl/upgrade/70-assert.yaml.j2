@@ -1,13 +1,13 @@
 {# Compute the app.kubernetes.io/version label value which operator-rs derives #}
 {# from the product image: "<productVersion>-<imageTag>" for custom images and #}
 {# "<productVersion>-stackable<operatorVersion>" otherwise; tests always run   #}
-{# against a 0.0.0-dev operator.                                               #}
+{# against a 26.11.0 operator.                                               #}
 {% if test_scenario['values']['superset-new'].find(",") > 0 %}
 {%   set product_version = test_scenario['values']['superset-new'].split(',')[0] %}
 {%   set image_tag = test_scenario['values']['superset-new'].split(',')[1].split(':')[-1] %}
 {%   set app_version = product_version ~ '-' ~ image_tag %}
 {% else %}
-{%   set app_version = test_scenario['values']['superset-new'] ~ '-stackable0.0.0-dev' %}
+{%   set app_version = test_scenario['values']['superset-new'] ~ '-stackable26.11.0' %}
 {% endif %}
 ---
 # A ready pod implies that `superset db upgrade`, `superset init` and the
