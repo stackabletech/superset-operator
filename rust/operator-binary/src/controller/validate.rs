@@ -19,7 +19,7 @@ use stackable_operator::{
         role_utils::{GenericCommonConfig, with_validated_config},
         types::{
             kubernetes::{ConfigMapName, SecretName},
-            operator::RoleGroupName,
+            operator::{RoleGroupName, RoleName},
         },
     },
 };
@@ -65,6 +65,15 @@ pub enum Error {
     #[snafu(display("failed to validate the config for role group {role_group}"))]
     ValidateConfig {
         source: fragment::ValidationError,
+        role_group: RoleGroupName,
+    },
+
+    #[snafu(display(
+        "invalid containerdebug configuration for role {role} role group {role_group}"
+    ))]
+    InvalidContainerdebugConfig {
+        source: stackable_operator::crd::containerdebug::Error,
+        role: RoleName,
         role_group: RoleGroupName,
     },
 
@@ -256,6 +265,7 @@ fn validate_role_groups(
                 }
             })?;
             let validated = validate_role_group_config(
+                role,
                 &role_group_name,
                 rolegroup,
                 resolved_role,
@@ -269,6 +279,7 @@ fn validate_role_groups(
 
 /// Merges and validates one role group into a [`SupersetRoleGroupConfig`].
 fn validate_role_group_config(
+    superset_role: &SupersetRole,
     role_group_name: &RoleGroupName,
     role_group: &SupersetRoleGroupType,
     role: &SupersetRoleType,
@@ -286,6 +297,16 @@ fn validate_role_group_config(
         role_group: role_group_name.clone(),
     })?;
 
+    let containerdebug = merged
+        .config
+        .config
+        .containerdebug
+        .validate()
+        .with_context(|_| InvalidContainerdebugConfigSnafu {
+            role: (**superset_role).clone(),
+            role_group: role_group_name.clone(),
+        })?;
+
     let logging = validate_logging(
         &merged.config.config.logging,
         vector_aggregator_config_map_name,
@@ -293,7 +314,7 @@ fn validate_role_group_config(
 
     Ok(SupersetRoleGroupConfig {
         replicas: merged.replicas,
-        config: ValidatedSupersetConfig::from_merged(merged.config.config, logging),
+        config: ValidatedSupersetConfig::from_merged(merged.config.config, containerdebug, logging),
         config_overrides: merged.config.config_overrides,
         env_overrides: merged.config.env_overrides.into(),
         cli_overrides: merged.config.cli_overrides,
@@ -451,6 +472,106 @@ mod tests {
         assert!(
             result.is_err(),
             "a `null` configOverrides value must be rejected: values are typed as String"
+        );
+    }
+
+    /// A role `config` that does not mention `containerdebug` still gets the default, so the
+    /// `containerdebug` field of the CRD must be optional.
+    #[test]
+    fn containerdebug_defaults_when_not_configured() {
+        use stackable_operator::crd::containerdebug::{
+            DEFAULT_INTERVAL, ValidatedContainerdebugConfig,
+        };
+
+        let input = r#"
+        apiVersion: superset.stackable.tech/v1alpha1
+        kind: SupersetCluster
+        metadata:
+          name: simple-superset
+          namespace: default
+          uid: 01234567-89ab-cdef-0123-456789abcdef
+        spec:
+          image:
+            productVersion: 4.1.4
+          clusterConfig:
+            credentialsSecret: superset-admin-credentials
+            metadataDatabase:
+              postgresql:
+                host: superset-postgresql
+                database: superset
+                credentialsSecretName: superset-postgresql-credentials
+          nodes:
+            config:
+              gracefulShutdownTimeout: 1h
+            roleGroups:
+              default:
+                replicas: 1
+        "#;
+        let superset: v1alpha1::SupersetCluster =
+            yaml_from_str_singleton_map(input).expect("illegal test input");
+
+        let validated =
+            validate_cluster(&superset, default_dereferenced(), "test-repo").expect("validated");
+        let node = validated
+            .node_role_group_configs
+            .get(&"default".parse().expect("valid role group name"))
+            .expect("node default rolegroup");
+
+        assert_eq!(
+            node.config.containerdebug,
+            ValidatedContainerdebugConfig::Enabled {
+                interval: DEFAULT_INTERVAL
+            }
+        );
+    }
+
+    /// An invalid `containerdebug` config fails the validation, naming the role and role group.
+    #[test]
+    fn zero_containerdebug_interval_fails_validation() {
+        let input = r#"
+        apiVersion: superset.stackable.tech/v1alpha1
+        kind: SupersetCluster
+        metadata:
+          name: simple-superset
+          namespace: default
+          uid: 01234567-89ab-cdef-0123-456789abcdef
+        spec:
+          image:
+            productVersion: 4.1.4
+          clusterConfig:
+            credentialsSecret: superset-admin-credentials
+            metadataDatabase:
+              postgresql:
+                host: superset-postgresql
+                database: superset
+                credentialsSecretName: superset-postgresql-credentials
+          nodes:
+            config:
+              containerdebug:
+                interval: 0s
+            roleGroups:
+              default:
+                replicas: 1
+        "#;
+        let superset: v1alpha1::SupersetCluster =
+            yaml_from_str_singleton_map(input).expect("illegal test input");
+
+        let Err(error) = validate_cluster(&superset, default_dereferenced(), "test-repo") else {
+            panic!("the validation should fail");
+        };
+        let chain: Vec<String> =
+            std::iter::successors(Some(&error as &dyn std::error::Error), |error| {
+                error.source()
+            })
+            .map(ToString::to_string)
+            .collect();
+
+        assert_eq!(
+            chain,
+            [
+                "invalid containerdebug configuration for role node role group default",
+                "the containerdebug interval must not be zero",
+            ]
         );
     }
 }

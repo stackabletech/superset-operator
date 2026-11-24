@@ -126,7 +126,7 @@ pub fn build_rolegroup_deployment(
             {remove_vector_shutdown_file_command}
             prepare_signal_handlers
             mkdir --parents \"${file_log_directory}\" || true
-            containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &
+            {containerdebug_command}
 
             {celery_command} &
 
@@ -135,6 +135,10 @@ pub fn build_rolegroup_deployment(
         ",
             log_config_file = ConfigFileName::LogConfig,
             file_log_directory = super::FILE_LOG_DIRECTORY.as_ref(),
+            containerdebug_command = merged_config
+                .containerdebug
+                .background_command(STACKABLE_LOG_DIR)
+                .unwrap_or_default(),
             remove_vector_shutdown_file_command =
                 remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             create_vector_shutdown_file_command =
@@ -241,7 +245,12 @@ fn beat_replicas(requested: Option<u16>) -> Option<u16> {
 
 #[cfg(test)]
 mod tests {
-    use super::beat_replicas;
+    use std::str::FromStr;
+
+    use stackable_operator::v2::types::operator::RoleGroupName;
+
+    use super::{beat_replicas, build_rolegroup_deployment};
+    use crate::{controller::build::test_support::validated_cluster, crd::SupersetRole};
 
     #[test]
     fn beat_replicas_clamps_to_a_single_instance() {
@@ -254,5 +263,58 @@ mod tests {
         // Anything greater than one is clamped down to a single instance.
         assert_eq!(beat_replicas(Some(2)), Some(1));
         assert_eq!(beat_replicas(Some(100)), Some(1));
+    }
+
+    /// The superset container of a Celery worker or beat starts `containerdebug` from the role
+    /// group's validated config. The command itself is owned (and tested) by operator-rs, so only
+    /// the wiring is checked here.
+    #[rstest::rstest]
+    fn superset_container_starts_containerdebug_from_config(
+        #[values(SupersetRole::Worker, SupersetRole::Beat)] role: SupersetRole,
+        #[values(
+            stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig::Enabled {
+                interval: stackable_operator::shared::time::Duration::from_minutes_unchecked(10)
+            },
+            stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig::Disabled
+        )]
+        containerdebug: stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig,
+    ) {
+        let expected = containerdebug.background_command(
+            stackable_operator::v2::product_logging::framework::STACKABLE_LOG_DIR,
+        );
+        let cluster = validated_cluster();
+        let role_group_name = RoleGroupName::from_str("default").expect("valid role group name");
+        let role_group_configs = match role {
+            SupersetRole::Worker => &cluster.worker_role_group_configs,
+            SupersetRole::Beat => &cluster.beat_role_group_configs,
+            SupersetRole::Node => unreachable!("nodes are built as a StatefulSet"),
+        };
+        let mut rg = role_group_configs
+            .get(&role_group_name)
+            .expect("default role group")
+            .clone();
+        rg.config.containerdebug = containerdebug;
+
+        let deployment = build_rolegroup_deployment(&cluster, &role, &role_group_name, &rg)
+            .expect("deployment built");
+
+        let args = deployment
+            .spec
+            .and_then(|spec| spec.template.spec)
+            .expect("pod spec")
+            .containers
+            .into_iter()
+            .find(|container| container.name == "superset")
+            .and_then(|container| container.args)
+            .expect("the superset container has args")
+            .join("\n");
+
+        assert_eq!(
+            args.lines()
+                .map(str::trim)
+                .find(|line| line.starts_with("containerdebug ")),
+            expected.as_deref(),
+            "args: {args}"
+        );
     }
 }

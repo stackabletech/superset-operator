@@ -15,6 +15,7 @@ use stackable_operator::{
     },
     config::{fragment::Fragment, merge::Merge},
     constant,
+    crd::containerdebug::{default_containerdebug_config, v1alpha1::ContainerdebugConfig},
     deep_merger::ObjectOverrides,
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::{CustomResource, ResourceExt},
@@ -277,7 +278,7 @@ pub mod versioned {
         pub vector_aggregator_config_map_name: Option<ConfigMapName>,
     }
 
-    #[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+    #[derive(Clone, Debug, Fragment, JsonSchema, PartialEq)]
     #[fragment_attrs(
         derive(
             Clone,
@@ -311,6 +312,9 @@ pub mod versioned {
 
         #[fragment_attrs(serde(default))]
         pub affinity: StackableAffinity,
+
+        #[fragment_attrs(serde(default))]
+        pub containerdebug: ContainerdebugConfig,
 
         /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the operator documentation for details.
         #[fragment_attrs(serde(default))]
@@ -527,6 +531,7 @@ impl v1alpha1::SupersetConfig {
                 },
                 logging: product_logging::spec::default_logging(),
                 affinity: affinity::get_affinity(cluster_name, role, opa_config),
+                containerdebug: default_containerdebug_config(),
                 graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
                 row_limit: None,
                 webserver_timeout: None,
@@ -547,6 +552,7 @@ impl v1alpha1::SupersetConfig {
                 // Only the web server (node) is known to request the role mapping from OPA, so
                 // workers and beat get no affinity to the OPA Pods.
                 affinity: affinity::get_affinity(cluster_name, role, None),
+                containerdebug: default_containerdebug_config(),
                 graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
                 row_limit: None,
                 webserver_timeout: None,
@@ -567,6 +573,7 @@ impl v1alpha1::SupersetConfig {
                 // Only the web server (node) is known to request the role mapping from OPA, so
                 // workers and beat get no affinity to the OPA Pods.
                 affinity: affinity::get_affinity(cluster_name, role, None),
+                containerdebug: default_containerdebug_config(),
                 graceful_shutdown_timeout: Some(DEFAULT_NODE_GRACEFUL_SHUTDOWN_TIMEOUT),
                 row_limit: None,
                 webserver_timeout: None,
